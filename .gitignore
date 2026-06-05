@@ -1,0 +1,31 @@
+# Build
+cmake-build-*/
+build/
+out/
+.cache/
+compile_commands.json
+
+# Planning is a separate shadow repo, never committed to the code repo
+.planning/
+
+# Artifacts
+*.o
+*.a
+*.so*
+*.dylib*
+*.dll
+*.exe
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+
+# Editor / OS
+.DS_Store
+*~
+**/*.log
+
+# IDE
+.idea/
+.vscode/
