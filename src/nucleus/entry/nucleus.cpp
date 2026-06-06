@@ -88,7 +88,7 @@ public:
             return fail(std::string(
                 "load/resolve is not allowed: the facade is already resolved"));
 
-        resolution_context ctx(schema, tokenizer, sources);
+        resolution_context ctx(schema, tokenizer);
         if(auto folded = ctx.fold(stack); !folded)
             return fail(std::move(folded).error());
 

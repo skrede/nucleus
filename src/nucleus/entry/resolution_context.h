@@ -5,7 +5,6 @@
 #include "nucleus/entry/configuration.h"
 #include "nucleus/schema/schema_enforcer.h"
 #include "nucleus/schema/schema_registry.h"
-#include "nucleus/source/source_registry.h"
 #include "nucleus/keyspace/keyspace.h"
 #include "nucleus/keyspace/provenance.h"
 #include "nucleus/diagnostics/key_suggester.h"
@@ -30,12 +29,19 @@ namespace nucleus {
 using resolve_fold_error = std::string;
 
 // The transient hand-off vehicle and the convergence keystone. It BORROWS (holds
-// references to) the three flat sibling registries the facade owns; it does not
-// own them and lives only for the duration of one load()/resolve(). This is the
-// ONLY path by which one registry reaches another: a registry operation takes the
-// context (or a specific sibling) as a parameter and never stores it. Living in
-// entry/ -- the one place that knows all three registries by type -- physically
-// reinforces that no registry owns another.
+// references to) the flat sibling registries it actually consults during a
+// resolve; it does not own them and lives only for the duration of one
+// load()/resolve(). This is the ONLY path by which one registry reaches another:
+// a registry operation takes the context (or a specific sibling) as a parameter
+// and never stores it. Living in entry/ -- the one place that may name the
+// registries by type -- physically reinforces that no registry owns another.
+//
+// It borrows the schema (read by validate() to gate the resolved keyspace) and
+// the tokenizer registry (read by the fold to expand ${...} per source). It does
+// NOT borrow the source registry: in v0.1 the sources to fold arrive directly in
+// the precedence stack the facade passes to fold(), and the source registry holds
+// only name stubs with no pullable source to consult. The keystone borrows only
+// what it genuinely reads rather than claiming a sibling it never touches.
 //
 // Beyond the borrowed registries it holds the transient working state of one
 // resolve: the building keyspace, the provenance map, and the retained source
@@ -46,15 +52,13 @@ class resolution_context
 {
 public:
     resolution_context(schema_registry &schema,
-                        tokenizer_registry &tokenizer,
-                        source_registry &sources) noexcept
-        : m_schema(schema), m_tokenizer(tokenizer), m_sources(sources)
+                        tokenizer_registry &tokenizer) noexcept
+        : m_schema(schema), m_tokenizer(tokenizer)
     {
     }
 
     [[nodiscard]] schema_registry &schema() noexcept { return m_schema; }
     [[nodiscard]] tokenizer_registry &tokenizer() noexcept { return m_tokenizer; }
-    [[nodiscard]] source_registry &sources() noexcept { return m_sources; }
 
     [[nodiscard]] keyspace &building() noexcept { return m_building; }
     [[nodiscard]] provenance &origins() noexcept { return m_provenance; }
@@ -172,7 +176,6 @@ public:
 private:
     schema_registry &m_schema;
     tokenizer_registry &m_tokenizer;
-    source_registry &m_sources;
 
     keyspace m_building;
     provenance m_provenance;

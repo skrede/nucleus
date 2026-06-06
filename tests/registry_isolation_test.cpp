@@ -49,17 +49,21 @@ TEST_CASE("each registry is constructed and exercised with no sibling in scope",
 
 TEST_CASE("siblings collaborate only through a hand-built resolution context", "[isolation]")
 {
-    // The three registries are built independently and only meet through the
-    // transient context, which borrows them. No registry references another.
+    // The registries are built independently and only meet through the transient
+    // context, which borrows the ones it consults. No registry references another.
+    // The context borrows the schema and tokenizer registries it reads during a
+    // resolve; the source registry remains a flat sibling, built and exercised on
+    // its own (sources to fold arrive through the precedence stack, not the
+    // registry), which is precisely the point of the flat topology.
     nucleus::schema_registry schema;
     nucleus::tokenizer_registry tokenizer;
     nucleus::source_registry sources;
 
-    nucleus::resolution_context ctx(schema, tokenizer, sources);
+    nucleus::resolution_context ctx(schema, tokenizer);
 
     ctx.schema().add(nucleus::schema_spec{"k"}, nucleus::owner_token{});
     ctx.tokenizer().add(nucleus::tokenizer_builder("uuid").build(), nucleus::owner_token{});
-    ctx.sources().add(nucleus::source_spec{"env"}, nucleus::owner_token{});
+    sources.add(nucleus::source_spec{"env"}, nucleus::owner_token{});
 
     REQUIRE(schema.size() == 1);
     REQUIRE(tokenizer.size() == 1);

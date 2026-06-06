@@ -252,11 +252,10 @@ TEST_CASE("install_tokenizer injects an additional tokenizer reachable at resolv
 TEST_CASE("tokens are expanded per-source before layering (expand-then-layer)", "[resolution][tokens]")
 {
     // Driven at the keystone directly so a real tokenizer registry is in scope:
-    // the three registries are built independently and meet only through the
+    // the borrowed registries are built independently and meet only through the
     // transient borrowing context.
     nucleus::schema_registry schema;
     nucleus::tokenizer_registry tokenizer;
-    nucleus::source_registry sources;
     tokenizer.add(nucleus::make_string_tokenizer(), nucleus::owner_token{});
 
     nucleus::env_source env;
@@ -265,7 +264,7 @@ TEST_CASE("tokens are expanded per-source before layering (expand-then-layer)", 
     nucleus::source_stack stack;
     stack.add(env, nucleus::layer_rank::base, "base");
 
-    nucleus::resolution_context ctx(schema, tokenizer, sources);
+    nucleus::resolution_context ctx(schema, tokenizer);
     auto folded = ctx.fold(stack);
     REQUIRE(folded);
 
