@@ -14,9 +14,9 @@ include(cmake/buildflags.cmake)
 # ---------------------------------------------------------------------------
 # nucleus core library
 #
-# The public API is intentionally NOT defined here yet -- it is produced by the
-# project roadmap, not the scaffold. Only a minimal version walking-skeleton
-# exists so the build, install/export, and test wiring are real and verifiable.
+# The public headers below are the stable, installed surface of the engine; the
+# subdirectory header sets that follow carry the source-seam, keyspace, schema,
+# and diagnostics contracts.
 # ---------------------------------------------------------------------------
 set(NUCLEUS_PUBLIC_HEADERS
     include/nucleus/version.h

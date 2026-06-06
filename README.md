@@ -4,12 +4,6 @@ A document-format-agnostic configuration engine for C++ — schema, tokenization
 validation, a unified keyspace, and argument parsing, all driven by registered
 schemas.
 
-> **Status: scaffold.** The public API is not defined yet. This repository
-> currently contains only the build/convention skeleton and a version
-> walking-skeleton. The design has been captured in
-> [`.planning/HANDOFF.md`](.planning/HANDOFF.md); the project shape is intended
-> to be established through `gsd-new-project` using that brief as seed context.
-
 ## What it is
 
 `nucleus` treats a configuration as a flat **keyspace** (`/`-separated,
@@ -23,9 +17,36 @@ modules, not built-in assumptions. It is also **policy-free** at the core —
 ownership, reservation, and filename conventions live in the host/adapter that
 embeds it.
 
-It is built standalone and is intended, over time, to replace the configuration
-system currently embedded in vagus (via a future thin `vagus-nucleus` adapter),
-but it carries no vagus-specific coupling.
+It is built standalone and carries no application-specific coupling, so it is
+useful to any C++ program.
+
+## Status
+
+The core engine is substantially implemented:
+
+- A two-phase **facade** (`nucleus`) that is configurable
+  (`register_schema` / `register_element` / `register_tokenizer` /
+  `register_source` / `install_tokenizer`) until `load()` / `resolve()`, which
+  yields an immutable, freely thread-readable `configuration`.
+- A typed **schema** model (`anchor::root` / `anchor::keyspace`, required and
+  identity elements) that is authoritative over both the CLI surface and the
+  document structure, with referential-integrity enforcement at attach time.
+- The **source** seam (`source` / `provider`) with argv, env, and a separately
+  linked XML module (wrapping pugixml, privately linked and unreachable from the
+  core), plus extension-based parser discovery.
+- The **tokenizer** pipeline (`${...}` syntax) with the generic core tokenizers
+  (env, uuid, file/dir/self, string, scope), recursive-to-fixpoint nested
+  expansion with depth and cycle guards, and an opt-in `HOST` tokenizer module.
+- **Diagnostics**: nearest-key suggestions, conflict/provenance reporting, and a
+  no-op `log_sink` seam (`std::format`, with an `fmt` fallback for toolchains
+  that lack `std::format`).
+
+Schema-projected shell tab completion is **not yet built**. The public API may
+still change while the engine stabilizes.
+
+## License
+
+Apache-2.0. See [`LICENSE`](LICENSE).
 
 ## Build
 
