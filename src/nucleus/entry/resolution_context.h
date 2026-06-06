@@ -95,7 +95,7 @@ public:
 
             source_result pulled = layer->src->pull();
             if(!pulled)
-                return fail(::nucleus::format("source '{}': {}",
+                return fail(nucleus::format("source '{}': {}",
                                               layer->label, pulled.error()));
 
             source_batch &batch = pulled.value();
@@ -104,7 +104,7 @@ public:
             {
                 token_result expanded = resolve_tokens(entry.value.text(), m_tokenizer);
                 if(!expanded)
-                    return fail(::nucleus::format(
+                    return fail(nucleus::format(
                         "source '{}': token resolution failed for key '{}': {}",
                         layer->label, entry.path, expanded.error().message));
 
@@ -151,12 +151,12 @@ public:
         std::string report = "schema validation failed:";
         for(const schema_violation &v : checked.error())
         {
-            report += ::nucleus::format("\n  - {}", v.reason);
+            report += nucleus::format("\n  - {}", v.reason);
             if(!m_schema.recognizes_text(v.path))
             {
                 auto near = suggest_keys(v.path, known, 1);
                 if(!near.empty())
-                    report += ::nucleus::format(" (did you mean '{}'?)", near.front());
+                    report += nucleus::format(" (did you mean '{}'?)", near.front());
             }
         }
         return fail(std::move(report));

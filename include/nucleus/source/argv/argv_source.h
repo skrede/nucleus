@@ -113,13 +113,13 @@ public:
             {
                 if(m_policy == unknown_key_policy::strict)
                 {
-                    return fail(::nucleus::format(
+                    return fail(nucleus::format(
                         "unknown CLI flag '{}' maps to undeclared key '{}'",
                         token, path.str()));
                 }
                 if(m_log)
                 {
-                    m_log->log(log_level::warn, ::nucleus::format(
+                    m_log->log(log_level::warn, nucleus::format(
                         "unknown CLI flag '{}'; lenient mode -- stored as string at '{}'",
                         token, path.str()));
                 }

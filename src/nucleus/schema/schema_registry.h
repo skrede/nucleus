@@ -85,7 +85,7 @@ public:
             const key_path &under = el.at.under();
             if(!is_defined_node(under))
             {
-                return fail(::nucleus::format(
+                return fail(nucleus::format(
                     "schema element '{}' cannot attach under undefined keyspace '{}'",
                     el.name, under.str()));
             }

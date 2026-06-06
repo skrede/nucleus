@@ -65,7 +65,7 @@ public:
     {
         std::vector<claimant> &claims = m_claims[key_path];
         claims.push_back(claimant{
-            ::nucleus::format("{} registration of '{}'", to_string(kind), key_path), owner});
+            nucleus::format("{} registration of '{}'", to_string(kind), key_path), owner});
         if(claims.size() < 2)
             return;
 
@@ -160,7 +160,7 @@ namespace {
 [[nodiscard]] registration_result reject_if_resolved(facade_phase phase, registration_kind kind)
 {
     if(phase != facade_phase::configurable)
-        return fail(::nucleus::format(
+        return fail(nucleus::format(
             "cannot register a {} after the facade has resolved", to_string(kind)));
     return registration_ok();
 }
@@ -275,7 +275,7 @@ load_result configuration_space::load(std::vector<std::string> paths, const docu
     {
         std::unique_ptr<source> doc = make ? make(path) : nullptr;
         if(!doc)
-            return fail(::nucleus::format("no source could be built for path '{}'", path));
+            return fail(nucleus::format("no source could be built for path '{}'", path));
         docs.push_back(std::move(doc));
     }
 
@@ -284,7 +284,7 @@ load_result configuration_space::load(std::vector<std::string> paths, const docu
     // later-wins inside the band) so no config file count can outrank the CLI.
     source_stack stack;
     for(std::size_t i = 0; i < docs.size(); ++i)
-        stack.add(*docs[i], document_rank(i), ::nucleus::format("path:{}", paths[i]));
+        stack.add(*docs[i], document_rank(i), nucleus::format("path:{}", paths[i]));
     return m_impl->run_resolve(stack);
 }
 
@@ -298,7 +298,7 @@ load_result configuration_space::load(std::vector<std::string> args,
     {
         std::unique_ptr<source> doc = make ? make(path) : nullptr;
         if(!doc)
-            return fail(::nucleus::format("no source could be built for path '{}'", path));
+            return fail(nucleus::format("no source could be built for path '{}'", path));
         docs.push_back(std::move(doc));
     }
 
@@ -311,7 +311,7 @@ load_result configuration_space::load(std::vector<std::string> args,
     // the command line; later files still beat earlier ones inside that band.
     source_stack stack;
     for(std::size_t i = 0; i < docs.size(); ++i)
-        stack.add(*docs[i], document_rank(i), ::nucleus::format("path:{}", paths[i]));
+        stack.add(*docs[i], document_rank(i), nucleus::format("path:{}", paths[i]));
     stack.add(argv, layer_rank::argv, "argv");
     return m_impl->run_resolve(stack);
 }

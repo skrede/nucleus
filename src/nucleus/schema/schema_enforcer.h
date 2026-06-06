@@ -59,7 +59,7 @@ public:
             {
                 violations.push_back(schema_violation{
                     path.str(),
-                    ::nucleus::format("path '{}' is not declared by the schema",
+                    nucleus::format("path '{}' is not declared by the schema",
                                       path.str())});
             }
         }
@@ -75,7 +75,7 @@ public:
             {
                 violations.push_back(schema_violation{
                     declared.str(),
-                    ::nucleus::format("required field '{}' is missing",
+                    nucleus::format("required field '{}' is missing",
                                       declared.str())});
             }
 
@@ -83,7 +83,7 @@ public:
             {
                 violations.push_back(schema_violation{
                     declared.str(),
-                    ::nucleus::format("identity field '{}' has no value to select on",
+                    nucleus::format("identity field '{}' has no value to select on",
                                       declared.str())});
             }
         }

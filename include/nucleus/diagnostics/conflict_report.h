@@ -51,10 +51,10 @@ public:
     // host decides what to do; the engine only reports.
     [[nodiscard]] std::string describe() const
     {
-        std::string out = ::nucleus::format(
+        std::string out = nucleus::format(
             "key '{}' is claimed by {} registrations:", m_key, m_claimants.size());
         for(const claimant &who : m_claimants)
-            out += ::nucleus::format("\n  - {}", who.location);
+            out += nucleus::format("\n  - {}", who.location);
         out += "\nno winner is chosen; the host adjudicates ownership.";
         return out;
     }

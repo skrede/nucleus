@@ -89,11 +89,11 @@ public:
                 chain += *it + " -> ";
             chain += label;
             return fail(resolve_error(resolve_errc::cyclic_reference,
-                                      ::nucleus::format("cyclic reference: {}", chain)));
+                                      nucleus::format("cyclic reference: {}", chain)));
         }
         if(m_chain.size() >= m_cap)
             return fail(resolve_error(resolve_errc::depth_exceeded,
-                                      ::nucleus::format("token expansion depth {} exceeded", m_cap)));
+                                      nucleus::format("token expansion depth {} exceeded", m_cap)));
         m_chain.push_back(std::move(label));
         return scope(this);
     }
