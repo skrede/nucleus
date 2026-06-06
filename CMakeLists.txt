@@ -74,6 +74,14 @@ set(NUCLEUS_SOURCE_ARGV_HEADERS
     include/nucleus/source/argv/argv_source.h
 )
 
+set(NUCLEUS_COMPLETION_HEADERS
+    include/nucleus/completion/completion.h
+    include/nucleus/completion/completion_model.h
+    include/nucleus/completion/shell_emitter.h
+    include/nucleus/completion/bash_emitter.h
+    include/nucleus/completion/zsh_emitter.h
+)
+
 set(NUCLEUS_SOURCES
     src/nucleus/version.cpp
     src/nucleus/entry/configuration_space.cpp
@@ -83,6 +91,7 @@ set(NUCLEUS_SOURCES
     src/nucleus/tokenizer/resolver_scope.cpp
     src/nucleus/tokenizer/uuid.cpp
     src/nucleus/tokenizer/builtin_tokenizers.cpp
+    src/nucleus/completion/completion.cpp
 )
 
 add_library(nucleus ${NUCLEUS_SOURCES})
@@ -177,6 +186,8 @@ install(FILES ${NUCLEUS_SCHEMA_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/schema)
 install(FILES ${NUCLEUS_SOURCE_ARGV_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/source/argv)
+install(FILES ${NUCLEUS_COMPLETION_HEADERS}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/completion)
 
 # ---------------------------------------------------------------------------
 # XML source module
