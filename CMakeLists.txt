@@ -22,12 +22,15 @@ set(NUCLEUS_PUBLIC_HEADERS
     include/nucleus/version.h
     include/nucleus/result.h
     include/nucleus/format.h
+    include/nucleus/nucleus.h
     include/nucleus/identity.h
     include/nucleus/log_sink.h
+    include/nucleus/registration_policy.h
 )
 
 set(NUCLEUS_SOURCES
     src/nucleus/version.cpp
+    src/nucleus/entry/nucleus.cpp
 )
 
 add_library(nucleus ${NUCLEUS_SOURCES})
