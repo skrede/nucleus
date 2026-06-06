@@ -12,6 +12,7 @@
 #include <vector>
 #include <utility>
 #include <variant>
+#include <algorithm>
 #include <functional>
 #include <string_view>
 #include <initializer_list>
@@ -61,6 +62,13 @@ public:
                     "extension '{}' is already claimed by {} parser",
                     key, same_owner ? "the same" : "another"));
             }
+            // A double-claim WITHIN one call is just as much a registration-time
+            // error as colliding with an already-registered parser: the map
+            // would silently no-op the second emplace, so reject it here before
+            // anything is committed (the registration stays atomic).
+            if(std::find(normalized.begin(), normalized.end(), key) != normalized.end())
+                return fail(nucleus::format(
+                    "extension '{}' is claimed twice in the same registration", key));
             normalized.push_back(std::move(key));
         }
 

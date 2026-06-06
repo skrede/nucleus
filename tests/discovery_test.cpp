@@ -115,6 +115,25 @@ TEST_CASE("one parser may claim several extensions", "[extension]")
             == "xml:app.config");
 }
 
+TEST_CASE("an extension claimed twice in one call is rejected atomically", "[extension]")
+{
+    nucleus::extension_registry registry;
+
+    // The same extension appears twice in one claim(). The map would silently
+    // no-op the second emplace, so the registry must reject it as a
+    // registration-time error and commit nothing.
+    auto dup = registry.claim({".cfg", ".cfg"}, tagging_factory("cfg"));
+    REQUIRE_FALSE(dup);
+    REQUIRE(dup.error().find(".cfg") != std::string::npos);
+    REQUIRE(registry.size() == 0);
+    REQUIRE_FALSE(registry.claims(".cfg"));
+
+    // The leading-dot/bare normalization also collapses to a duplicate.
+    auto dup_norm = registry.claim({"cfg", ".cfg"}, tagging_factory("cfg"));
+    REQUIRE_FALSE(dup_norm);
+    REQUIRE(registry.size() == 0);
+}
+
 TEST_CASE("discovery finds host-supplied base name across host-supplied paths", "[discovery]")
 {
     namespace fs = std::filesystem;
