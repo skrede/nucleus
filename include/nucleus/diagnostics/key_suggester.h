@@ -19,9 +19,11 @@ namespace nucleus {
 //
 // The metric is a weighted Levenshtein distance: a substitution between two
 // characters of the same class (both lowercase letters, both digits, or both the
-// path separator) costs half of a cross-class substitution, so `level` <-> `leve1`
-// ranks ahead of `level` <-> `leve/`. This is generic string machinery with no
-// host vocabulary -- it operates purely on the `/`-separated key text.
+// path separator) costs half of a cross-class substitution. So a one-letter typo
+// like `cache` <-> `cacho` (letter-for-letter, cost 0.5) ranks ahead of
+// `cache` <-> `cach3` (a letter swapped for a digit is cross-class, cost 1.0).
+// This is generic string machinery with no host vocabulary -- it operates purely
+// on the `/`-separated key text.
 
 // Three character classes for the substitution-weight rule. Anything outside
 // them (notably `_`) falls to the cross-class weight.
