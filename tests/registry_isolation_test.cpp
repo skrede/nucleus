@@ -13,15 +13,28 @@
 // Compile-time enforcement: each registry must be constructible with only its
 // own dependencies, independently of every sibling. A registry that held a
 // sibling reference member would not be default-constructible and would fail
-// these assertions, stopping the build. (The negative fixture proves the
+// these assertions, stopping the build. (The negative fixtures prove the
 // converse explicitly.)
 static_assert(nucleus::flat_registry<nucleus::schema_registry>);
 static_assert(nucleus::flat_registry<nucleus::tokenizer_registry>);
 static_assert(nucleus::flat_registry<nucleus::source_registry>);
 
-static_assert(nucleus::independently_constructible<nucleus::schema_registry>::value);
-static_assert(nucleus::independently_constructible<nucleus::tokenizer_registry>::value);
-static_assert(nucleus::independently_constructible<nucleus::source_registry>::value);
+// Strengthened pin: each registry is independently constructible AND exposes no
+// constructor that takes either of its siblings by reference or pointer. Naming
+// the two siblings of each registry makes the entangling-constructor check span
+// the whole flat set.
+static_assert(nucleus::independently_constructible<
+              nucleus::schema_registry,
+              nucleus::tokenizer_registry,
+              nucleus::source_registry>::value);
+static_assert(nucleus::independently_constructible<
+              nucleus::tokenizer_registry,
+              nucleus::schema_registry,
+              nucleus::source_registry>::value);
+static_assert(nucleus::independently_constructible<
+              nucleus::source_registry,
+              nucleus::schema_registry,
+              nucleus::tokenizer_registry>::value);
 
 TEST_CASE("each registry is constructed and exercised with no sibling in scope", "[isolation]")
 {

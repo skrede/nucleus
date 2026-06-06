@@ -97,10 +97,13 @@ if(NUCLEUS_BUILD_TOKENIZER_HOST)
 endif()
 
 # ---------------------------------------------------------------------------
-# Negative compile test: a registry that stores a sibling reference member
-# violates the flat-ownership invariant and must NOT compile. WILL_FAIL asserts
-# the build of the fixture fails, making the invariant executable rather than
-# review-only.
+# Negative compile tests: registries that violate the flat-ownership invariant
+# must NOT compile. WILL_FAIL asserts the build of each fixture fails, making the
+# invariant executable rather than review-only. Two distinct vectors are covered:
+#   - a sibling REFERENCE member (breaks default-construction);
+#   - a default-constructible registry that still exposes a constructor taking a
+#     sibling by pointer (a construction-time hand-off the strengthened pin
+#     rejects even though the plain concept would pass it).
 # ---------------------------------------------------------------------------
 add_test(
     NAME flat_ownership_negative_compile
@@ -113,6 +116,21 @@ add_executable(sibling_member_fixture EXCLUDE_FROM_ALL
     isolation/sibling_member_fixture.cpp)
 target_link_libraries(sibling_member_fixture PRIVATE nucleus::nucleus)
 target_include_directories(sibling_member_fixture PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src
+)
+
+add_test(
+    NAME flat_ownership_entangling_ctor_negative_compile
+    COMMAND ${CMAKE_COMMAND} --build . --target entangling_ctor_fixture --config $<CONFIG>
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+set_tests_properties(flat_ownership_entangling_ctor_negative_compile PROPERTIES WILL_FAIL TRUE)
+
+add_executable(entangling_ctor_fixture EXCLUDE_FROM_ALL
+    isolation/entangling_ctor_fixture.cpp)
+target_link_libraries(entangling_ctor_fixture PRIVATE nucleus::nucleus)
+target_include_directories(entangling_ctor_fixture PRIVATE
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/src
 )
