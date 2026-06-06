@@ -46,6 +46,18 @@ set(NUCLEUS_SOURCE_ENV_HEADERS
 set(NUCLEUS_KEYSPACE_HEADERS
     include/nucleus/keyspace/value.h
     include/nucleus/keyspace/entry.h
+    include/nucleus/keyspace/key_path.h
+    include/nucleus/keyspace/keyspace.h
+)
+
+set(NUCLEUS_SCHEMA_HEADERS
+    include/nucleus/schema/anchor.h
+    include/nucleus/schema/schema.h
+)
+
+set(NUCLEUS_SOURCE_ARGV_HEADERS
+    include/nucleus/source/argv/cli_surface.h
+    include/nucleus/source/argv/argv_source.h
 )
 
 set(NUCLEUS_SOURCES
@@ -125,6 +137,10 @@ install(FILES ${NUCLEUS_SOURCE_ENV_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/source/env)
 install(FILES ${NUCLEUS_KEYSPACE_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/keyspace)
+install(FILES ${NUCLEUS_SCHEMA_HEADERS}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/schema)
+install(FILES ${NUCLEUS_SOURCE_ARGV_HEADERS}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/source/argv)
 
 # ---------------------------------------------------------------------------
 # XML source module
