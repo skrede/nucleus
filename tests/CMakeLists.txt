@@ -6,14 +6,22 @@ if(NUCLEUS_FETCH_TEST_DEPS)
     FetchContent_Declare(
         Catch2
         GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-        GIT_TAG v3.7.1
+        GIT_TAG v3.15.0
     )
     FetchContent_MakeAvailable(Catch2)
 else()
     find_package(Catch2 3 REQUIRED)
 endif()
 
-add_executable(version_test version_test.cpp)
-target_link_libraries(version_test PRIVATE nucleus::nucleus Catch2::Catch2WithMain)
+# Registers a Catch2 test executable built from a single source file, linked
+# against the core library and Catch2's bundled main, and wired into CTest.
+function(nucleus_add_test name)
+    add_executable(${name} ${name}.cpp)
+    target_link_libraries(${name} PRIVATE nucleus::nucleus Catch2::Catch2WithMain)
+    add_test(NAME ${name} COMMAND ${name})
+endfunction()
 
-add_test(NAME version_test COMMAND version_test)
+nucleus_add_test(version_test)
+nucleus_add_test(result_test)
+nucleus_add_test(format_test)
+nucleus_add_test(identity_test)

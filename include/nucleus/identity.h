@@ -1,0 +1,86 @@
+#ifndef HPP_GUARD_NUCLEUS_IDENTITY_H
+#define HPP_GUARD_NUCLEUS_IDENTITY_H
+
+#include <memory>
+#include <utility>
+#include <typeinfo>
+#include <type_traits>
+
+namespace nucleus {
+
+// An opaque owner token attached to every registration. The core stores it and
+// surfaces it (e.g. in conflict reports) but NEVER interprets its value: there
+// is no accessor that exposes the wrapped payload for branching, only identity
+// comparison. A host may wrap any equality-comparable type; two tokens are equal
+// iff they wrap the same type and that type compares equal. This is the
+// substrate the host uses to mean "who registered this" without the core ever
+// learning the meaning.
+class owner_token
+{
+public:
+    // A token with no host payload. Anonymous tokens are never equal to each
+    // other (each default-constructed token is a distinct identity) so that an
+    // un-tagged registration is not silently conflated with another. The
+    // distinct identity is carried by a per-instance allocation, not a host
+    // value, so has_value() stays false.
+    owner_token() : m_identity(std::make_shared<int>()) {}
+
+    template <typename T, typename = std::enable_if_t<
+                              !std::is_same_v<std::decay_t<T>, owner_token>>>
+    explicit owner_token(T value)
+        : m_payload(std::make_shared<model<std::decay_t<T>>>(std::move(value)))
+    {
+    }
+
+    [[nodiscard]] bool has_value() const noexcept { return m_payload != nullptr; }
+
+    friend bool operator==(const owner_token &a, const owner_token &b) noexcept
+    {
+        // Host-tagged tokens compare by wrapped type + value. Anonymous tokens
+        // (no payload) compare by per-instance identity, so two un-tagged
+        // registrations are never conflated. A tagged and an anonymous token
+        // are never equal.
+        if(a.m_payload && b.m_payload)
+            return a.m_payload->equals(*b.m_payload);
+        if(!a.m_payload && !b.m_payload)
+            return a.m_identity == b.m_identity;
+        return false;
+    }
+
+    friend bool operator!=(const owner_token &a, const owner_token &b) noexcept
+    {
+        return !(a == b);
+    }
+
+private:
+    struct concept_base
+    {
+        virtual ~concept_base() = default;
+        [[nodiscard]] virtual const std::type_info &type() const noexcept = 0;
+        [[nodiscard]] virtual bool equals(const concept_base &other) const noexcept = 0;
+    };
+
+    template <typename T>
+    struct model final : concept_base
+    {
+        explicit model(T value) : held(std::move(value)) {}
+
+        [[nodiscard]] const std::type_info &type() const noexcept override { return typeid(T); }
+
+        [[nodiscard]] bool equals(const concept_base &other) const noexcept override
+        {
+            if(other.type() != typeid(T))
+                return false;
+            return held == static_cast<const model &>(other).held;
+        }
+
+        T held;
+    };
+
+    std::shared_ptr<const concept_base> m_payload;
+    std::shared_ptr<const void> m_identity;
+};
+
+}
+
+#endif

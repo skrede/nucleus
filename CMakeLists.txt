@@ -20,6 +20,9 @@ include(cmake/buildflags.cmake)
 # ---------------------------------------------------------------------------
 set(NUCLEUS_PUBLIC_HEADERS
     include/nucleus/version.h
+    include/nucleus/result.h
+    include/nucleus/format.h
+    include/nucleus/identity.h
 )
 
 set(NUCLEUS_SOURCES
@@ -36,6 +39,38 @@ target_include_directories(nucleus PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_include_directories(nucleus PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+# ---------------------------------------------------------------------------
+# Diagnostic formatting backend
+#
+# std::format is the interface vocabulary, but libc++/Apple Clang historically
+# lagged on it. Detect __cpp_lib_format; if the standard library lacks it, pull
+# {fmt} (the reference implementation) so the format() seam stays buildable. The
+# dependency is PUBLIC because the fallback appears in a public header.
+# ---------------------------------------------------------------------------
+include(CheckCXXSourceCompiles)
+set(CMAKE_REQUIRED_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20")
+check_cxx_source_compiles(
+    "#include <version>
+     #ifndef __cpp_lib_format
+     #error no std::format
+     #endif
+     int main() {}"
+    NUCLEUS_HAVE_STD_FORMAT
+)
+unset(CMAKE_REQUIRED_FLAGS)
+
+if(NOT NUCLEUS_HAVE_STD_FORMAT)
+    include(FetchContent)
+    FetchContent_Declare(
+        fmt
+        GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+        GIT_TAG 11.0.2
+        FIND_PACKAGE_ARGS NAMES fmt
+    )
+    FetchContent_MakeAvailable(fmt)
+    target_link_libraries(nucleus PUBLIC fmt::fmt)
+endif()
 
 set_target_properties(nucleus PROPERTIES
     PUBLIC_HEADER "${NUCLEUS_PUBLIC_HEADERS}"
