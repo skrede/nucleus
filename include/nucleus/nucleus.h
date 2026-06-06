@@ -3,6 +3,7 @@
 
 #include "nucleus/result.h"
 #include "nucleus/identity.h"
+#include "nucleus/schema/schema.h"
 #include "nucleus/source/source.h"
 #include "nucleus/entry/precedence.h"
 #include "nucleus/entry/configuration.h"
@@ -74,6 +75,17 @@ public:
     void set_registration_policy(std::shared_ptr<registration_policy> policy);
 
     registration_result register_schema(std::string key_path, owner_token owner = {});
+
+    // Registers a typed schema element (the real schema-as-authority model:
+    // anchor::root / anchor::keyspace, required, identity). This is how a host
+    // makes the schema authoritative over CONTENT -- the resolve path validates
+    // the resolved keyspace against these elements, rejecting undeclared keys
+    // (with a nearest-key suggestion) and missing required/identity fields.
+    // Enforces referential integrity at attach time: a keyspace-anchored element
+    // may only attach under an already-defined node. Subject to the same
+    // state-machine and registration-policy seam as the other surfaces.
+    registration_result register_element(schema_element element, owner_token owner = {});
+
     registration_result register_tokenizer(std::string name, owner_token owner = {});
     registration_result register_source(std::string name, owner_token owner = {});
 

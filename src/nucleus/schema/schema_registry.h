@@ -104,6 +104,14 @@ public:
         return m_defined.find(path.str()) != m_defined.end();
     }
 
+    // Text-keyed variant of recognizes() for callers (diagnostics) that already
+    // hold a path as a string and want to tell an unknown-path violation apart
+    // from a required/identity one without re-parsing.
+    [[nodiscard]] bool recognizes_text(const std::string &path) const
+    {
+        return m_defined.find(path) != m_defined.end();
+    }
+
     // The schema-projected surface: every declared element path, in canonical
     // order. The CLI surface and the document structure are both this set, which
     // is why a schema change moves both at once.

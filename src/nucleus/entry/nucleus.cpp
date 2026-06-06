@@ -1,10 +1,12 @@
 #include "nucleus/nucleus.h"
 
 #include "nucleus/format.h"
+#include "nucleus/schema/schema_enforcer.h"
 #include "nucleus/schema/schema_registry.h"
 #include "nucleus/source/source_registry.h"
 #include "nucleus/registration_policy.h"
 #include "nucleus/source/argv/argv_source.h"
+#include "nucleus/diagnostics/key_suggester.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
 #include "nucleus/tokenizer/builtin_tokenizers.h"
 #include "nucleus/entry/resolution_context.h"
@@ -57,6 +59,12 @@ public:
         resolution_context ctx(schema, tokenizer, sources);
         if(auto folded = ctx.fold(stack); !folded)
             return fail(std::move(folded).error());
+
+        // The schema is the authority over CONTENT: a non-empty schema gates the
+        // folded keyspace before it is frozen, so undeclared keys and missing
+        // required/identity fields fail the resolve rather than silently shipping.
+        if(auto checked = ctx.validate(); !checked)
+            return fail(std::move(checked).error());
 
         configuration result = ctx.freeze();
         // The context (and every retained source buffer) is dropped here; the
@@ -124,6 +132,18 @@ registration_result nucleus::register_schema(std::string key_path, owner_token o
     if(auto verdict = m_impl->review(registration_kind::schema, owner); !verdict)
         return verdict;
     m_impl->schema.add(schema_spec{std::move(key_path)}, std::move(owner));
+    return registration_ok();
+}
+
+registration_result nucleus::register_element(schema_element element, owner_token owner)
+{
+    if(auto guard = reject_if_resolved(m_impl->phase, registration_kind::schema); !guard)
+        return guard;
+    if(auto verdict = m_impl->review(registration_kind::schema, owner); !verdict)
+        return verdict;
+    // attach() enforces referential integrity; surface its rejection verbatim.
+    if(auto attached = m_impl->schema.attach(std::move(element)); !attached)
+        return fail(std::move(attached).error());
     return registration_ok();
 }
 

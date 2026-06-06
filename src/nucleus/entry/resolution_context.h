@@ -3,10 +3,12 @@
 
 #include "nucleus/entry/precedence.h"
 #include "nucleus/entry/configuration.h"
+#include "nucleus/schema/schema_enforcer.h"
 #include "nucleus/schema/schema_registry.h"
 #include "nucleus/source/source_registry.h"
 #include "nucleus/keyspace/keyspace.h"
 #include "nucleus/keyspace/provenance.h"
+#include "nucleus/diagnostics/key_suggester.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
 #include "nucleus/tokenizer/token_resolution.h"
 
@@ -19,6 +21,7 @@
 #include <cstddef>
 #include <utility>
 #include <algorithm>
+#include <string_view>
 
 namespace nucleus {
 
@@ -113,6 +116,42 @@ public:
         }
 
         return std::monostate{};
+    }
+
+    // Validates the folded keyspace against the borrowed schema -- the step that
+    // makes the schema authoritative over CONTENT at resolve time, reached only
+    // through ctx.schema() so the registry stays a borrowed sibling. Runs ONLY
+    // when the schema declares a surface: a host that registers no schema gets no
+    // content gate (an empty schema is not a claim that nothing is allowed). An
+    // undeclared key is reported with its nearest declared neighbor so a typo is
+    // actionable; missing required/identity fields are reported by the enforcer.
+    [[nodiscard]] result<std::monostate, resolve_fold_error> validate()
+    {
+        if(m_schema.surface().empty())
+            return std::monostate{};
+
+        schema_validation checked = schema_enforcer::validate(m_schema, m_building);
+        if(checked)
+            return std::monostate{};
+
+        const std::vector<key_path> surface = m_schema.surface();
+        std::vector<std::string> known;
+        known.reserve(surface.size());
+        for(const key_path &path : surface)
+            known.push_back(path.str());
+
+        std::string report = "schema validation failed:";
+        for(const schema_violation &v : checked.error())
+        {
+            report += ::nucleus::format("\n  - {}", v.reason);
+            if(!m_schema.recognizes_text(v.path))
+            {
+                auto near = suggest_keys(v.path, known, 1);
+                if(!near.empty())
+                    report += ::nucleus::format(" (did you mean '{}'?)", near.front());
+            }
+        }
+        return fail(std::move(report));
     }
 
     // Copies every building value OUT into an owned snapshot and pairs it with the
