@@ -13,8 +13,8 @@ namespace nucleus {
 
 // A minimal source registration payload. The runtime-virtual source/provider
 // seam, capability descriptors, and the extension->parser map land in a later
-// phase; here the spec is a stub naming the source. Note the deliberately
-// format-neutral vocabulary -- no document/xml coupling reaches this far.
+// phase; here the spec is a stub naming the source. The vocabulary is kept
+// deliberately format-neutral -- no parser/document coupling reaches this far.
 struct source_spec
 {
     std::string name;

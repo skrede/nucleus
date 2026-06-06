@@ -1,0 +1,37 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -DNUCLEUS_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Core-purity check
+        run: bash scripts/core_purity_check.sh
+
+  sanitizer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (AddressSanitizer)
+        run: cmake -B build-asan -DNUCLEUS_BUILD_TESTS=ON -DNUCLEUS_BUILD_SANITIZER=ON
+
+      - name: Build (AddressSanitizer)
+        run: cmake --build build-asan
+
+      - name: Test under AddressSanitizer
+        run: ctest --test-dir build-asan --output-on-failure
