@@ -227,6 +227,15 @@ std::size_t nucleus::source_count() const noexcept { return m_impl->sources.size
 
 std::vector<conflict_report> nucleus::conflicts() const { return m_impl->conflicts(); }
 
+gate_result nucleus::gate_capabilities(std::string_view consumer,
+                                       std::string_view source_name,
+                                       const capability_descriptor &caps,
+                                       const std::vector<feature_requirement> &required,
+                                       log_sink &log) const
+{
+    return gate_features(consumer, source_name, caps, required, log);
+}
+
 facade_phase nucleus::phase() const noexcept { return m_impl->phase; }
 
 load_result nucleus::resolve(const source_stack &stack)

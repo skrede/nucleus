@@ -1,8 +1,12 @@
 #include "nucleus/nucleus.h"
 #include "nucleus/identity.h"
+#include "nucleus/log_sink.h"
+#include "nucleus/capability.h"
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 #include "nucleus/keyspace/key_path.h"
+#include "nucleus/source/feature_gate.h"
+#include "nucleus/source/env/env_source.h"
 #include "nucleus/registration_policy.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -11,6 +15,7 @@
 #include <memory>
 #include <vector>
 #include <utility>
+#include <string_view>
 
 namespace {
 
@@ -136,6 +141,36 @@ TEST_CASE("a typed element double-claiming a path conflicts with a path registra
     REQUIRE(reports.size() == 1);
     REQUIRE(reports.front().key_path() == "logging/level");
     REQUIRE(reports.front().size() == 2);
+}
+
+TEST_CASE("capability gating is reachable through the facade", "[facade][capability]")
+{
+    // The gating mechanism is host-callable through the facade: the v0.1 schema
+    // model does not carry per-element capability requirements, so the host
+    // supplies them. A required capability env lacks fails loudly; an optional one
+    // degrades observably.
+    struct counting_sink final : nucleus::log_sink
+    {
+        void log(nucleus::log_level, std::string_view) override { ++count; }
+        int count = 0;
+    } sink;
+
+    nucleus::nucleus engine;
+    nucleus::env_source env;
+
+    std::vector<nucleus::feature_requirement> required{
+        {nucleus::capability::nesting, nucleus::requirement_strength::required}};
+    auto refused = engine.gate_capabilities("schema", "env", env.capabilities(), required, sink);
+    REQUIRE_FALSE(refused);
+    REQUIRE(refused.error().find("nesting") != std::string::npos);
+    REQUIRE(refused.error().find("env") != std::string::npos);
+
+    std::vector<nucleus::feature_requirement> optional{
+        {nucleus::capability::ordering, nucleus::requirement_strength::optional}};
+    auto degraded = engine.gate_capabilities("schema", "env", env.capabilities(), optional, sink);
+    REQUIRE(degraded);
+    REQUIRE(degraded.value().degraded.size() == 1);
+    REQUIRE(sink.count == 1); // the degradation was surfaced through the sink.
 }
 
 TEST_CASE("clearing the policy restores accept-all behavior", "[facade]")

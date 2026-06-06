@@ -3,9 +3,11 @@
 
 #include "nucleus/result.h"
 #include "nucleus/identity.h"
+#include "nucleus/log_sink.h"
 #include "nucleus/schema/schema.h"
 #include "nucleus/source/source.h"
 #include "nucleus/entry/precedence.h"
+#include "nucleus/source/feature_gate.h"
 #include "nucleus/entry/configuration.h"
 #include "nucleus/registration_policy.h"
 #include "nucleus/diagnostics/conflict_report.h"
@@ -16,6 +18,7 @@
 #include <cstddef>
 #include <variant>
 #include <functional>
+#include <string_view>
 
 namespace nucleus {
 
@@ -74,6 +77,23 @@ public:
     // Installs a host registration policy. The default policy accepts every
     // registration; the core imposes no reservation or namespacing rules itself.
     void set_registration_policy(std::shared_ptr<registration_policy> policy);
+
+    // Gates a source's capabilities against a consumer's requirements: a required
+    // capability the source lacks is a loud named error; an optional one degrades
+    // observably (warned through `log` and recorded). This is a HOST-CALLABLE step,
+    // not auto-driven by the resolve fold, on purpose: the v0.1 schema model
+    // expresses presence (required) and selector role (identity) per element but
+    // does NOT yet carry per-element capability requirements, so there is nothing
+    // in the schema for the fold to gate a source against. Rather than fake a
+    // half-wired integration, the mechanism is exposed for a host to call with the
+    // requirements it knows; richer per-element capability requirements that the
+    // fold could drive itself are deferred. Reachable through the facade so a host
+    // need not reach into the source headers directly.
+    [[nodiscard]] gate_result gate_capabilities(std::string_view consumer,
+                                                std::string_view source_name,
+                                                const capability_descriptor &caps,
+                                                const std::vector<feature_requirement> &required,
+                                                log_sink &log) const;
 
     registration_result register_schema(std::string key_path, owner_token owner = {});
 
