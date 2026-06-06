@@ -28,9 +28,10 @@ The core engine is substantially implemented:
   (`register_schema` / `register_element` / `register_tokenizer` /
   `register_source` / `install_tokenizer`) until `load()` / `resolve()`, which
   yields an immutable, freely thread-readable `configuration`.
-- A typed **schema** model (`anchor::root` / `anchor::keyspace`, required and
-  identity elements) that is authoritative over both the CLI surface and the
-  document structure, with referential-integrity enforcement at attach time.
+- A typed **schema** model (`anchor::root` / `anchor::keyspace`, required,
+  identity, and closed-value-set elements) that is authoritative over both the
+  CLI surface and the document structure, with referential-integrity enforcement
+  at attach time and value-set validation at resolve.
 - The **source** seam (`source` / `provider`) with argv, env, and a separately
   linked XML module (wrapping pugixml, privately linked and unreachable from the
   core), plus extension-based parser discovery.
@@ -40,9 +41,13 @@ The core engine is substantially implemented:
 - **Diagnostics**: nearest-key suggestions, conflict/provenance reporting, and a
   no-op `log_sink` seam (`std::format`, with an `fmt` fallback for toolchains
   that lack `std::format`).
+- **Shell completion** generation (`generate_completion`) that projects the
+  schema into a static bash or zsh completion script -- flag names plus each
+  element's declared value set -- behind a per-shell emission seam, so each shell
+  owns its own quoting and word-break handling. The same flag mapping the CLI
+  surface uses drives the projection, so completion cannot drift from the CLI.
 
-Schema-projected shell tab completion is **not yet built**. The public API may
-still change while the engine stabilizes.
+The public API may still change while the engine stabilizes.
 
 ## License
 
