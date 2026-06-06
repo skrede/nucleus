@@ -1,6 +1,7 @@
 #include "nucleus/tokenizer/scope_keys.h"
 
 #include "nucleus/format.h"
+#include "nucleus/source/path_text.h"
 
 #include <ranges>
 
@@ -31,10 +32,10 @@ token_result resolve_scope_key(std::string_view key, std::span<const scope_frame
         return fail(resolve_error(resolve_errc::out_of_scope_context,
                                   nucleus::format("'scope.{}' resolved outside any file frame", key)));
 
-    if(key == "file_name") return file->file_path.filename().string();
-    if(key == "file_directory") return file->file_path.parent_path().string();
-    if(key == "file_path") return file->file_path.string();
-    return file->file_path.stem().string();
+    if(key == "file_name") return path_to_text(file->file_path.filename());
+    if(key == "file_directory") return path_to_text(file->file_path.parent_path());
+    if(key == "file_path") return path_to_text(file->file_path);
+    return path_to_text(file->file_path.stem());
 }
 
 bool is_location_category(std::string_view category) noexcept
@@ -54,21 +55,21 @@ token_result resolve_location_key(std::string_view category, std::string_view ke
 
     if(category == "self")
     {
-        if(key == "path") return path.string();
+        if(key == "path") return path_to_text(path);
         return fail(resolve_error(resolve_errc::missing_field,
                                   nucleus::format("unknown key 'self.{}'", key)));
     }
     if(category == "dir")
     {
-        if(key == "path") return path.parent_path().string();
-        if(key == "name") return path.parent_path().filename().string();
+        if(key == "path") return path_to_text(path.parent_path());
+        if(key == "name") return path_to_text(path.parent_path().filename());
         return fail(resolve_error(resolve_errc::missing_field,
                                   nucleus::format("unknown key 'dir.{}'", key)));
     }
     // category == "file"
-    if(key == "name") return path.filename().string();
-    if(key == "path") return path.string();
-    if(key == "stem") return path.stem().string();
+    if(key == "name") return path_to_text(path.filename());
+    if(key == "path") return path_to_text(path);
+    if(key == "stem") return path_to_text(path.stem());
     return fail(resolve_error(resolve_errc::missing_field,
                               nucleus::format("unknown key 'file.{}'", key)));
 }

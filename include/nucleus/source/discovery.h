@@ -2,6 +2,7 @@
 #define HPP_GUARD_NUCLEUS_SOURCE_DISCOVERY_H
 
 #include "nucleus/source/source.h"
+#include "nucleus/source/path_text.h"
 #include "nucleus/source/extension_registry.h"
 
 #include <memory>
@@ -53,7 +54,7 @@ public:
                 std::filesystem::path candidate = dir / (std::string(base_name) + ext);
                 std::error_code ec;
                 if(std::filesystem::is_regular_file(candidate, ec))
-                    found.push_back({candidate.string(), ext});
+                    found.push_back({path_to_text(candidate), ext});
             }
         }
         return found;
