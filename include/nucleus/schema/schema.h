@@ -6,6 +6,7 @@
 #include "nucleus/keyspace/key_path.h"
 
 #include <string>
+#include <vector>
 #include <utility>
 
 namespace nucleus {
@@ -41,6 +42,14 @@ struct schema_element
     // Role constraint: this element is its parent node's identity/selector.
     bool identity = false;
 
+    // The closed set of values this element accepts, if it is constrained. An
+    // empty vector (the default) means unconstrained -- any value is admissible.
+    // A non-empty vector is a value constraint: a resolved value outside the set
+    // is a validation error, and the set is the candidate list the projected
+    // shell completion offers for `--flag=<value>`. Kept a plain string vector so
+    // the core stays domain-neutral and free of any enum-reflection dependency.
+    std::vector<std::string> allowed_values;
+
     // The full keyspace path this element declares: the anchor's path extended by
     // the element's name. A root element declares a single-segment top-level
     // path; a nested element declares the anchor path + name.
@@ -54,7 +63,7 @@ struct schema_element
 // boolean axes positionally.
 [[nodiscard]] inline schema_element element(std::string name, anchor at)
 {
-    return schema_element{std::move(name), std::move(at), false, false};
+    return schema_element{std::move(name), std::move(at), false, false, {}};
 }
 
 [[nodiscard]] inline schema_element required_element(std::string name, anchor at)
@@ -68,6 +77,17 @@ struct schema_element
 {
     schema_element e = element(std::move(name), std::move(at));
     e.identity = true;
+    return e;
+}
+
+// An element whose value is constrained to a closed set. The values are both the
+// validation allow-list (a resolved value outside the set is rejected) and the
+// candidate list the projected shell completion offers for this flag.
+[[nodiscard]] inline schema_element enum_element(std::string name, anchor at,
+                                                 std::vector<std::string> values)
+{
+    schema_element e = element(std::move(name), std::move(at));
+    e.allowed_values = std::move(values);
     return e;
 }
 

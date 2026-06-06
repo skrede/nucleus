@@ -7,11 +7,17 @@
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/schema_registry.h"
 
+#include "nucleus/diagnostics/key_suggester.h"
+
+#include "nucleus/keyspace/value.h"
 #include "nucleus/keyspace/key_path.h"
 #include "nucleus/keyspace/keyspace.h"
 
+#include <span>
 #include <string>
 #include <vector>
+#include <algorithm>
+#include <string_view>
 #include <utility>
 #include <variant>
 
@@ -41,6 +47,9 @@ using schema_validation = result<std::monostate, std::vector<schema_violation>>;
 //                        addressable. Checked SEPARATELY from required: an
 //                        identity is validated for its selector role even when
 //                        the host did not also mark it required.
+//   * allowed values  -- when an element declares a closed value set, a present
+//                        value outside that set is rejected; the nearest allowed
+//                        value (by edit distance) is offered as a suggestion.
 //
 // The enforcer borrows the schema and the keyspace as parameters -- it stores
 // neither and holds no registry reference, in keeping with the flat topology.
@@ -85,6 +94,31 @@ public:
                     declared.str(),
                     nucleus::format("identity field '{}' has no value to select on",
                                       declared.str())});
+            }
+
+            // Closed-value check: a present value must be one of the declared
+            // allowed values. An unconstrained element (empty set) skips this.
+            if(present && !el.allowed_values.empty())
+            {
+                const value *v = resolved.find(declared);
+                const std::string actual(v ? v->text() : std::string_view{});
+                const bool admissible = std::any_of(
+                    el.allowed_values.begin(), el.allowed_values.end(),
+                    [&](const std::string &a) { return a == actual; });
+                if(!admissible)
+                {
+                    std::string reason = nucleus::format(
+                        "field '{}' value '{}' is not one of the allowed values",
+                        declared.str(), actual);
+                    const std::span<const std::string> candidates(
+                        el.allowed_values.data(), el.allowed_values.size());
+                    auto nearest = suggest_keys(actual, candidates, 1);
+                    if(!nearest.empty())
+                        reason += nucleus::format(" (did you mean '{}'?)",
+                                                  nearest.front());
+                    violations.push_back(schema_violation{declared.str(),
+                                                          std::move(reason)});
+                }
             }
         }
 
