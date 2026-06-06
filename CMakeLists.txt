@@ -23,6 +23,7 @@ set(NUCLEUS_PUBLIC_HEADERS
     include/nucleus/result.h
     include/nucleus/format.h
     include/nucleus/identity.h
+    include/nucleus/log_sink.h
 )
 
 set(NUCLEUS_SOURCES
