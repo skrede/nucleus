@@ -66,6 +66,22 @@ if(NUCLEUS_BUILD_SOURCE_XML)
 endif()
 
 # ---------------------------------------------------------------------------
+# HOST tokenizer module test: proves the opt-in module is off by default (an
+# unregistered ${HOST.*} token is unknown) and resolves once explicitly
+# registered. Built only when the opt-in module is, and links it directly.
+# ---------------------------------------------------------------------------
+if(NUCLEUS_BUILD_TOKENIZER_HOST)
+    add_executable(host_tokenizer_test host_tokenizer_test.cpp)
+    target_link_libraries(host_tokenizer_test
+        PRIVATE nucleus::nucleus nucleus::tokenizer_host Catch2::Catch2WithMain)
+    target_include_directories(host_tokenizer_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+    )
+    add_test(NAME host_tokenizer_test COMMAND host_tokenizer_test)
+endif()
+
+# ---------------------------------------------------------------------------
 # Negative compile test: a registry that stores a sibling reference member
 # violates the flat-ownership invariant and must NOT compile. WILL_FAIL asserts
 # the build of the fixture fails, making the invariant executable rather than

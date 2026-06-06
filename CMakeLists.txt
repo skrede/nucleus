@@ -196,6 +196,47 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     )
 endif()
 
+# ---------------------------------------------------------------------------
+# HOST tokenizer module (opt-in)
+#
+# An optional, separately-linked module that adds the ${HOST.*} tokenizer
+# (hostname / fqdn / machine-id / username). It pulls platform-specific code,
+# which is exactly why it is isolated here and OFF by default: core carries no
+# platform host vocabulary, and a host that wants these tokens links this module
+# and registers make_host_tokenizer() explicitly. It links core PUBLICly because
+# its public surface is a core tokenizer; it has no third-party dependency.
+# ---------------------------------------------------------------------------
+option(NUCLEUS_BUILD_TOKENIZER_HOST "Build the opt-in HOST tokenizer module" OFF)
+
+if(NUCLEUS_BUILD_TOKENIZER_HOST)
+    add_library(nucleus_tokenizer_host
+        src/nucleus/host/host_platform.cpp
+        src/nucleus/host/host_tokenizer.cpp
+    )
+    add_library(nucleus::tokenizer_host ALIAS nucleus_tokenizer_host)
+
+    target_compile_features(nucleus_tokenizer_host PUBLIC cxx_std_20)
+    target_include_directories(nucleus_tokenizer_host
+        PUBLIC
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(nucleus_tokenizer_host PUBLIC nucleus::nucleus)
+
+    if(WIN32)
+        target_link_libraries(nucleus_tokenizer_host PRIVATE ws2_32)
+    endif()
+
+    install(TARGETS nucleus_tokenizer_host
+        EXPORT nucleus-targets
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+endif()
+
 if(NUCLEUS_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
