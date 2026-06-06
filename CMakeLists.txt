@@ -63,6 +63,12 @@ set(NUCLEUS_SOURCE_ARGV_HEADERS
 set(NUCLEUS_SOURCES
     src/nucleus/version.cpp
     src/nucleus/entry/nucleus.cpp
+    src/nucleus/tokenizer/tokenizer.cpp
+    src/nucleus/tokenizer/token_lexer.cpp
+    src/nucleus/tokenizer/scope_keys.cpp
+    src/nucleus/tokenizer/resolver_scope.cpp
+    src/nucleus/tokenizer/uuid.cpp
+    src/nucleus/tokenizer/builtin_tokenizers.cpp
 )
 
 add_library(nucleus ${NUCLEUS_SOURCES})

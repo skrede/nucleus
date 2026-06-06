@@ -4,6 +4,7 @@
 #include "nucleus/entry/resolution_context.h"
 #include "nucleus/source/source_registry.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
+#include "nucleus/tokenizer/tokenizer_builder.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -34,7 +35,7 @@ TEST_CASE("each registry is constructed and exercised with no sibling in scope",
     SECTION("tokenizer registry alone")
     {
         nucleus::tokenizer_registry tokenizer;
-        tokenizer.add(nucleus::tokenizer_spec{"env"}, nucleus::owner_token{});
+        tokenizer.add(nucleus::tokenizer_builder("env").build(), nucleus::owner_token{});
         REQUIRE(tokenizer.size() == 1);
     }
 
@@ -57,7 +58,7 @@ TEST_CASE("siblings collaborate only through a hand-built resolution context", "
     nucleus::resolution_context ctx(schema, tokenizer, sources);
 
     ctx.schema().add(nucleus::schema_spec{"k"}, nucleus::owner_token{});
-    ctx.tokenizer().add(nucleus::tokenizer_spec{"uuid"}, nucleus::owner_token{});
+    ctx.tokenizer().add(nucleus::tokenizer_builder("uuid").build(), nucleus::owner_token{});
     ctx.sources().add(nucleus::source_spec{"env"}, nucleus::owner_token{});
 
     REQUIRE(schema.size() == 1);

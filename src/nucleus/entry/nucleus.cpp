@@ -57,7 +57,7 @@ registration_result nucleus::register_tokenizer(std::string name, owner_token ow
 {
     if(auto verdict = m_impl->review(registration_kind::tokenizer, owner); !verdict)
         return verdict;
-    m_impl->tokenizer.add(tokenizer_spec{std::move(name)}, std::move(owner));
+    m_impl->tokenizer.add(tokenizer(std::move(name), {}, {}, nullptr), std::move(owner));
     return registration_ok();
 }
 

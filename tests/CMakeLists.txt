@@ -43,6 +43,9 @@ nucleus_add_test(schema_registry_test)
 nucleus_add_test(schema_enforcer_test)
 nucleus_add_test(argv_source_test)
 nucleus_add_test(schema_cli_bijection_test)
+nucleus_add_test(token_lexer_test)
+nucleus_add_test(token_resolution_test)
+nucleus_add_test(token_cycle_test)
 
 # ---------------------------------------------------------------------------
 # Buffer-lifetime test: exercises the XML document source through the seam and
