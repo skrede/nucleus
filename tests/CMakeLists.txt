@@ -49,6 +49,8 @@ nucleus_add_test(token_resolution_test)
 nucleus_add_test(token_cycle_test)
 nucleus_add_test(resolution_test)
 nucleus_add_test(diagnostics_test)
+nucleus_add_test(completion_test)
+nucleus_add_test(completion_smoke_test)
 
 # ---------------------------------------------------------------------------
 # Buffer-lifetime test: exercises the XML document source through the seam and

@@ -74,6 +74,36 @@ TEST_CASE("identity is enforced separately from required", "[enforcer]")
     REQUIRE_FALSE(violation_mentions(v.error(), "required field"));
 }
 
+TEST_CASE("a value within a declared allowed set passes", "[enforcer]")
+{
+    schema_registry reg;
+    reg.attach(nucleus::element("logging", anchor::root()));
+    reg.attach(nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
+                                     {"debug", "info", "warn", "error"}));
+
+    keyspace ks;
+    ks.set(path_of("logging/level"), nucleus::value::owned("warn"));
+
+    REQUIRE(schema_enforcer::validate(reg, ks));
+}
+
+TEST_CASE("a value outside the declared allowed set is rejected", "[enforcer]")
+{
+    schema_registry reg;
+    reg.attach(nucleus::element("logging", anchor::root()));
+    reg.attach(nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
+                                     {"debug", "info", "warn", "error"}));
+
+    keyspace ks;
+    ks.set(path_of("logging/level"), nucleus::value::owned("warm"));
+
+    auto v = schema_enforcer::validate(reg, ks);
+    REQUIRE_FALSE(v);
+    REQUIRE(violation_mentions(v.error(), "not one of the allowed values"));
+    // The nearest allowed value is suggested.
+    REQUIRE(violation_mentions(v.error(), "did you mean 'warn'?"));
+}
+
 TEST_CASE("a value at an undeclared path is rejected", "[enforcer]")
 {
     schema_registry reg;
