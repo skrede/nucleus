@@ -2,6 +2,8 @@
 #include "nucleus/configuration_space.h"
 #include "nucleus/registration_policy.h"
 
+#include "nucleus/completion/completion.h"
+
 #include "nucleus/schema/schema_enforcer.h"
 #include "nucleus/schema/schema_registry.h"
 
@@ -239,6 +241,16 @@ gate_result configuration_space::gate_capabilities(std::string_view consumer,
                                        log_sink &log) const
 {
     return gate_features(consumer, source_name, caps, required, log);
+}
+
+std::string configuration_space::generate_completion(shell which, std::string_view prog) const
+{
+    // Project the facade's internally held schema through the free generator. The
+    // schema registry stays encapsulated -- it is never exposed; only the script
+    // string crosses the facade boundary. The schema is retained across resolve
+    // (run_resolve drops only the transient context's source buffers), so this
+    // reads the same registered schema in either phase.
+    return nucleus::generate_completion(which, m_impl->schema, prog);
 }
 
 facade_phase configuration_space::phase() const noexcept { return m_impl->phase; }

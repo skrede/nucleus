@@ -51,6 +51,7 @@ nucleus_add_test(resolution_test)
 nucleus_add_test(diagnostics_test)
 nucleus_add_test(completion_test)
 nucleus_add_test(completion_smoke_test)
+nucleus_add_test(facade_completion_test)
 
 # ---------------------------------------------------------------------------
 # Buffer-lifetime test: exercises the XML document source through the seam and

@@ -32,6 +32,12 @@ namespace nucleus {
 // machinery -- a host that injects one includes that header itself.
 class tokenizer;
 
+// The shell a completion script targets (defined in the completion header).
+// Forward declared so generate_completion is reachable on the facade without the
+// public header pulling the completion machinery; a host that calls it includes
+// completion.h for the enumerators.
+enum class shell;
+
 // The outcome of a registration: success, or a host-supplied rejection reason
 // surfaced verbatim from the registration-policy seam.
 using registration_result = result<std::monostate, std::string>;
@@ -132,6 +138,15 @@ public:
     // report; a third extends it. Surfacing is non-adjudicating mechanism -- the
     // host queries this and decides what a collision means. Empty when none occurred.
     [[nodiscard]] std::vector<conflict_report> conflicts() const;
+
+    // Generates a completion script for `which`, projected from the registered
+    // schema and bound to the program name `prog`. This is the host-reachable
+    // entry point: it delegates to the free nucleus::generate_completion over the
+    // facade's internally held schema, so a host that built its schema through
+    // register_element can reach completion without touching the internal schema
+    // registry. A pure read of the registered schema -- it needs no resolve and is
+    // callable in either phase.
+    [[nodiscard]] std::string generate_completion(shell which, std::string_view prog) const;
 
     [[nodiscard]] facade_phase phase() const noexcept;
 
