@@ -5,7 +5,9 @@
 // concept and the static_assert that pins it stops the build.
 
 #include "nucleus/registry/flat_registry.h"
+
 #include "nucleus/source/source_registry.h"
+
 #include "nucleus/tokenizer/tokenizer_registry.h"
 
 namespace {

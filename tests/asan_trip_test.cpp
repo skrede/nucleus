@@ -4,8 +4,8 @@
 // process reports a heap-use-after-free, confirming ASan catches the very class
 // of bug (view-into-freed-buffer) that is the project's #1 memory risk.
 
-#include <cstdlib>
 #include <cstdio>
+#include <cstdlib>
 
 int main()
 {

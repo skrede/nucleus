@@ -1,16 +1,21 @@
-#include "nucleus/nucleus.h"
-
 #include "nucleus/format.h"
+#include "nucleus/nucleus.h"
+#include "nucleus/registration_policy.h"
+
 #include "nucleus/schema/schema_enforcer.h"
 #include "nucleus/schema/schema_registry.h"
+
 #include "nucleus/source/source_registry.h"
-#include "nucleus/registration_policy.h"
+
 #include "nucleus/source/argv/argv_source.h"
-#include "nucleus/diagnostics/key_suggester.h"
-#include "nucleus/tokenizer/tokenizer_registry.h"
-#include "nucleus/tokenizer/builtin_tokenizers.h"
+
 #include "nucleus/entry/resolution_context.h"
+
+#include "nucleus/diagnostics/key_suggester.h"
 #include "nucleus/diagnostics/conflict_report.h"
+
+#include "nucleus/tokenizer/builtin_tokenizers.h"
+#include "nucleus/tokenizer/tokenizer_registry.h"
 
 #include <map>
 #include <memory>

@@ -1,9 +1,9 @@
 #ifndef HPP_GUARD_NUCLEUS_TOKENIZER_TOKENIZER_H
 #define HPP_GUARD_NUCLEUS_TOKENIZER_TOKENIZER_H
 
-#include "nucleus/tokenizer/resolve_error.h"
-
 #include "nucleus/result.h"
+
+#include "nucleus/tokenizer/resolve_error.h"
 
 #include <span>
 #include <string>

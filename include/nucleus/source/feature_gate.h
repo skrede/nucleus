@@ -1,8 +1,8 @@
 #ifndef HPP_GUARD_NUCLEUS_SOURCE_FEATURE_GATE_H
 #define HPP_GUARD_NUCLEUS_SOURCE_FEATURE_GATE_H
 
-#include "nucleus/result.h"
 #include "nucleus/format.h"
+#include "nucleus/result.h"
 #include "nucleus/log_sink.h"
 #include "nucleus/capability.h"
 

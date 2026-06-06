@@ -1,9 +1,9 @@
-#include "nucleus/tokenizer/token_resolution.h"
-#include "nucleus/tokenizer/builtin_tokenizers.h"
-#include "nucleus/tokenizer/tokenizer_builder.h"
-#include "nucleus/tokenizer/tokenizer_registry.h"
-
 #include "nucleus/identity.h"
+
+#include "nucleus/tokenizer/token_resolution.h"
+#include "nucleus/tokenizer/tokenizer_builder.h"
+#include "nucleus/tokenizer/builtin_tokenizers.h"
+#include "nucleus/tokenizer/tokenizer_registry.h"
 
 #include <catch2/catch_test_macros.hpp>
 

@@ -4,16 +4,20 @@
 #include "nucleus/result.h"
 #include "nucleus/identity.h"
 #include "nucleus/log_sink.h"
-#include "nucleus/schema/schema.h"
-#include "nucleus/source/source.h"
-#include "nucleus/entry/precedence.h"
-#include "nucleus/source/feature_gate.h"
-#include "nucleus/entry/configuration.h"
 #include "nucleus/registration_policy.h"
+
+#include "nucleus/schema/schema.h"
+
+#include "nucleus/source/source.h"
+#include "nucleus/source/feature_gate.h"
+
+#include "nucleus/entry/precedence.h"
+#include "nucleus/entry/configuration.h"
+
 #include "nucleus/diagnostics/conflict_report.h"
 
-#include <string>
 #include <memory>
+#include <string>
 #include <vector>
 #include <cstddef>
 #include <variant>

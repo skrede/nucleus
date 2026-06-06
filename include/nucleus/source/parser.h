@@ -1,8 +1,9 @@
 #ifndef HPP_GUARD_NUCLEUS_SOURCE_PARSER_H
 #define HPP_GUARD_NUCLEUS_SOURCE_PARSER_H
 
-#include "nucleus/source/source.h"
 #include "nucleus/capability.h"
+
+#include "nucleus/source/source.h"
 
 #include <concepts>
 

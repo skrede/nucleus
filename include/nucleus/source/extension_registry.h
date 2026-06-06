@@ -1,9 +1,10 @@
 #ifndef HPP_GUARD_NUCLEUS_SOURCE_EXTENSION_REGISTRY_H
 #define HPP_GUARD_NUCLEUS_SOURCE_EXTENSION_REGISTRY_H
 
-#include "nucleus/result.h"
 #include "nucleus/format.h"
+#include "nucleus/result.h"
 #include "nucleus/identity.h"
+
 #include "nucleus/source/source.h"
 
 #include <map>

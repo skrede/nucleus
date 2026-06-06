@@ -1,17 +1,19 @@
 #ifndef HPP_GUARD_NUCLEUS_SCHEMA_SCHEMA_ENFORCER_H
 #define HPP_GUARD_NUCLEUS_SCHEMA_SCHEMA_ENFORCER_H
 
-#include "nucleus/result.h"
 #include "nucleus/format.h"
+#include "nucleus/result.h"
+
 #include "nucleus/schema/schema.h"
-#include "nucleus/keyspace/keyspace.h"
-#include "nucleus/keyspace/key_path.h"
 #include "nucleus/schema/schema_registry.h"
+
+#include "nucleus/keyspace/key_path.h"
+#include "nucleus/keyspace/keyspace.h"
 
 #include <string>
 #include <vector>
-#include <variant>
 #include <utility>
+#include <variant>
 
 namespace nucleus {
 

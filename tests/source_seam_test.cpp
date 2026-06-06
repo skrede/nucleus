@@ -1,14 +1,16 @@
 #include "nucleus/capability.h"
-#include "nucleus/source/source.h"
+
 #include "nucleus/source/parser.h"
-#include "nucleus/keyspace/value.h"
-#include "nucleus/keyspace/entry.h"
+#include "nucleus/source/source.h"
 #include "nucleus/source/parser_adapter.h"
+
+#include "nucleus/keyspace/entry.h"
+#include "nucleus/keyspace/value.h"
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <string>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace {

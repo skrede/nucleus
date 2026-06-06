@@ -7,7 +7,9 @@
 // plain default-constructibility concept.
 
 #include "nucleus/registry/flat_registry.h"
+
 #include "nucleus/source/source_registry.h"
+
 #include "nucleus/tokenizer/tokenizer_registry.h"
 
 namespace {

@@ -1,15 +1,15 @@
+#include "xml_reader.h"
 #include "xml_source.h"
 
-#include "xml_reader.h"
-
 #include "nucleus/capability.h"
-#include "nucleus/keyspace/value.h"
+
 #include "nucleus/keyspace/entry.h"
+#include "nucleus/keyspace/value.h"
 
 #include <pugixml.hpp>
 
-#include <string>
 #include <memory>
+#include <string>
 #include <utility>
 #include <string_view>
 

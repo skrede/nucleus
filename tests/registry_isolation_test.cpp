@@ -1,10 +1,15 @@
 #include "nucleus/identity.h"
+
 #include "nucleus/registry/flat_registry.h"
+
 #include "nucleus/schema/schema_registry.h"
-#include "nucleus/entry/resolution_context.h"
+
 #include "nucleus/source/source_registry.h"
-#include "nucleus/tokenizer/tokenizer_registry.h"
+
+#include "nucleus/entry/resolution_context.h"
+
 #include "nucleus/tokenizer/tokenizer_builder.h"
+#include "nucleus/tokenizer/tokenizer_registry.h"
 
 #include <catch2/catch_test_macros.hpp>
 

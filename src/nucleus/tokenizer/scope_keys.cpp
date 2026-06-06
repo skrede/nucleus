@@ -1,7 +1,8 @@
-#include "nucleus/tokenizer/scope_keys.h"
-
 #include "nucleus/format.h"
+
 #include "nucleus/source/path_text.h"
+
+#include "nucleus/tokenizer/scope_keys.h"
 
 #include <ranges>
 

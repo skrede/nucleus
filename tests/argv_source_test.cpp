@@ -1,8 +1,11 @@
 #include "nucleus/log_sink.h"
+
 #include "nucleus/source/source.h"
+
 #include "nucleus/keyspace/key_path.h"
-#include "nucleus/source/argv/cli_surface.h"
+
 #include "nucleus/source/argv/argv_source.h"
+#include "nucleus/source/argv/cli_surface.h"
 
 #include <catch2/catch_test_macros.hpp>
 

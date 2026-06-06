@@ -1,20 +1,23 @@
 #ifndef HPP_GUARD_NUCLEUS_SCHEMA_SCHEMA_REGISTRY_H
 #define HPP_GUARD_NUCLEUS_SCHEMA_SCHEMA_REGISTRY_H
 
-#include "nucleus/result.h"
 #include "nucleus/format.h"
+#include "nucleus/result.h"
 #include "nucleus/identity.h"
-#include "nucleus/schema/schema.h"
+
 #include "nucleus/schema/anchor.h"
+#include "nucleus/schema/schema.h"
+
 #include "nucleus/keyspace/key_path.h"
+
 #include "nucleus/registry/registration.h"
 
 #include <set>
 #include <string>
 #include <vector>
-#include <variant>
 #include <cstddef>
 #include <utility>
+#include <variant>
 
 namespace nucleus {
 

@@ -1,6 +1,6 @@
 #include "nucleus/keyspace/value.h"
-#include "nucleus/keyspace/keyspace.h"
 #include "nucleus/keyspace/key_path.h"
+#include "nucleus/keyspace/keyspace.h"
 
 #include <catch2/catch_test_macros.hpp>
 

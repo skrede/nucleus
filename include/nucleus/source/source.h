@@ -3,6 +3,7 @@
 
 #include "nucleus/result.h"
 #include "nucleus/capability.h"
+
 #include "nucleus/keyspace/entry.h"
 
 #include <memory>

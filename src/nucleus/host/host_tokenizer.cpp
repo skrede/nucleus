@@ -1,11 +1,10 @@
-#include "nucleus/host/host_tokenizer.h"
+#include "nucleus/format.h"
 
 #include "nucleus/host/host_platform.h"
+#include "nucleus/host/host_tokenizer.h"
 
-#include "nucleus/tokenizer/tokenizer_builder.h"
 #include "nucleus/tokenizer/resolve_error.h"
-
-#include "nucleus/format.h"
+#include "nucleus/tokenizer/tokenizer_builder.h"
 
 #include <string>
 #include <utility>

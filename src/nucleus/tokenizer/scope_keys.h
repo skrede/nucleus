@@ -1,8 +1,8 @@
 #ifndef HPP_GUARD_NUCLEUS_TOKENIZER_SCOPE_KEYS_H
 #define HPP_GUARD_NUCLEUS_TOKENIZER_SCOPE_KEYS_H
 
-#include "nucleus/tokenizer/scope_frame.h"
 #include "nucleus/tokenizer/tokenizer.h"
+#include "nucleus/tokenizer/scope_frame.h"
 
 #include <span>
 #include <string_view>

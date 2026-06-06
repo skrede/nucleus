@@ -1,10 +1,9 @@
-#include "nucleus/tokenizer/resolver_scope.h"
+#include "nucleus/format.h"
 
 #include "nucleus/tokenizer/scope_keys.h"
 #include "nucleus/tokenizer/token_lexer.h"
+#include "nucleus/tokenizer/resolver_scope.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
-
-#include "nucleus/format.h"
 
 #include <ranges>
 #include <optional>

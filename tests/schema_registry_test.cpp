@@ -1,7 +1,8 @@
-#include "nucleus/schema/schema.h"
 #include "nucleus/schema/anchor.h"
-#include "nucleus/keyspace/key_path.h"
+#include "nucleus/schema/schema.h"
 #include "nucleus/schema/schema_registry.h"
+
+#include "nucleus/keyspace/key_path.h"
 
 #include <catch2/catch_test_macros.hpp>
 

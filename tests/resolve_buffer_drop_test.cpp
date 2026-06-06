@@ -1,13 +1,16 @@
 #include "nucleus/nucleus.h"
+
+#include "nucleus/xml/xml_source.h"
+
 #include "nucleus/entry/precedence.h"
 #include "nucleus/entry/configuration.h"
+
 #include "nucleus/source/env/env_source.h"
-#include "nucleus/xml/xml_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <string>
 #include <memory>
+#include <string>
 #include <vector>
 #include <optional>
 

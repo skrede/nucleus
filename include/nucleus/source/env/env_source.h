@@ -2,9 +2,11 @@
 #define HPP_GUARD_NUCLEUS_SOURCE_ENV_ENV_SOURCE_H
 
 #include "nucleus/capability.h"
+
 #include "nucleus/source/source.h"
-#include "nucleus/keyspace/value.h"
+
 #include "nucleus/keyspace/entry.h"
+#include "nucleus/keyspace/value.h"
 
 #include <string>
 #include <vector>

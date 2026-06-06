@@ -2,17 +2,21 @@
 #include "nucleus/identity.h"
 #include "nucleus/log_sink.h"
 #include "nucleus/capability.h"
+#include "nucleus/registration_policy.h"
+
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
+
 #include "nucleus/keyspace/key_path.h"
+
 #include "nucleus/source/feature_gate.h"
+
 #include "nucleus/source/env/env_source.h"
-#include "nucleus/registration_policy.h"
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <string>
 #include <memory>
+#include <string>
 #include <vector>
 #include <utility>
 #include <string_view>

@@ -1,18 +1,22 @@
 #ifndef HPP_GUARD_NUCLEUS_ENTRY_RESOLUTION_CONTEXT_H
 #define HPP_GUARD_NUCLEUS_ENTRY_RESOLUTION_CONTEXT_H
 
+#include "nucleus/format.h"
+#include "nucleus/result.h"
+
 #include "nucleus/entry/precedence.h"
 #include "nucleus/entry/configuration.h"
-#include "nucleus/schema/schema_enforcer.h"
-#include "nucleus/schema/schema_registry.h"
+
 #include "nucleus/keyspace/keyspace.h"
 #include "nucleus/keyspace/provenance.h"
-#include "nucleus/diagnostics/key_suggester.h"
-#include "nucleus/tokenizer/tokenizer_registry.h"
-#include "nucleus/tokenizer/token_resolution.h"
 
-#include "nucleus/result.h"
-#include "nucleus/format.h"
+#include "nucleus/schema/schema_enforcer.h"
+#include "nucleus/schema/schema_registry.h"
+
+#include "nucleus/diagnostics/key_suggester.h"
+
+#include "nucleus/tokenizer/token_resolution.h"
+#include "nucleus/tokenizer/tokenizer_registry.h"
 
 #include <map>
 #include <string>

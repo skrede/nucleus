@@ -1,6 +1,6 @@
-#include "nucleus/tokenizer/tokenizer.h"
-
 #include "nucleus/format.h"
+
+#include "nucleus/tokenizer/tokenizer.h"
 
 namespace nucleus {
 

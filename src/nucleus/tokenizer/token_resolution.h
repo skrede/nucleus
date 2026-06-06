@@ -1,12 +1,12 @@
 #ifndef HPP_GUARD_NUCLEUS_TOKENIZER_TOKEN_RESOLUTION_H
 #define HPP_GUARD_NUCLEUS_TOKENIZER_TOKEN_RESOLUTION_H
 
-#include "nucleus/tokenizer/resolver_scope.h"
-#include "nucleus/tokenizer/tokenizer.h"
-#include "nucleus/tokenizer/tokenizer_registry.h"
-#include "nucleus/tokenizer/resolve_error.h"
-
 #include "nucleus/result.h"
+
+#include "nucleus/tokenizer/tokenizer.h"
+#include "nucleus/tokenizer/resolve_error.h"
+#include "nucleus/tokenizer/resolver_scope.h"
+#include "nucleus/tokenizer/tokenizer_registry.h"
 
 #include <utility>
 #include <filesystem>

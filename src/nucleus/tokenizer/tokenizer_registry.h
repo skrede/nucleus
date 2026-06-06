@@ -1,9 +1,10 @@
 #ifndef HPP_GUARD_NUCLEUS_TOKENIZER_TOKENIZER_REGISTRY_H
 #define HPP_GUARD_NUCLEUS_TOKENIZER_TOKENIZER_REGISTRY_H
 
+#include "nucleus/identity.h"
+
 #include "nucleus/tokenizer/tokenizer.h"
 
-#include "nucleus/identity.h"
 #include "nucleus/registry/registration.h"
 
 #include <string>

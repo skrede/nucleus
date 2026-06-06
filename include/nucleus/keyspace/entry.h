@@ -2,6 +2,7 @@
 #define HPP_GUARD_NUCLEUS_KEYSPACE_ENTRY_H
 
 #include "nucleus/capability.h"
+
 #include "nucleus/keyspace/value.h"
 
 #include <string>

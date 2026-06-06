@@ -1,14 +1,15 @@
-#include "nucleus/xml/xml_source.h"
-
 #include "nucleus/source/source.h"
-#include "nucleus/keyspace/value.h"
+
 #include "nucleus/keyspace/entry.h"
+#include "nucleus/keyspace/value.h"
+
+#include "nucleus/xml/xml_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <map>
-#include <string>
 #include <memory>
+#include <string>
 #include <optional>
 
 namespace {

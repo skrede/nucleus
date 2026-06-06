@@ -1,8 +1,12 @@
 #include "nucleus/nucleus.h"
+
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
-#include "nucleus/keyspace/key_path.h"
+
 #include "nucleus/entry/precedence.h"
+
+#include "nucleus/keyspace/key_path.h"
+
 #include "nucleus/source/env/env_source.h"
 
 #include <catch2/catch_test_macros.hpp>

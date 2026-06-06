@@ -2,6 +2,7 @@
 #define HPP_GUARD_NUCLEUS_ENTRY_PRECEDENCE_H
 
 #include "nucleus/identity.h"
+
 #include "nucleus/source/source.h"
 
 #include <string>

@@ -1,12 +1,14 @@
-#include "nucleus/schema/schema.h"
 #include "nucleus/schema/anchor.h"
-#include "nucleus/keyspace/value.h"
-#include "nucleus/keyspace/keyspace.h"
-#include "nucleus/keyspace/key_path.h"
-#include "nucleus/source/argv/cli_surface.h"
-#include "nucleus/source/argv/argv_source.h"
-#include "nucleus/schema/schema_registry.h"
+#include "nucleus/schema/schema.h"
 #include "nucleus/schema/schema_enforcer.h"
+#include "nucleus/schema/schema_registry.h"
+
+#include "nucleus/keyspace/value.h"
+#include "nucleus/keyspace/key_path.h"
+#include "nucleus/keyspace/keyspace.h"
+
+#include "nucleus/source/argv/argv_source.h"
+#include "nucleus/source/argv/cli_surface.h"
 
 #include <catch2/catch_test_macros.hpp>
 

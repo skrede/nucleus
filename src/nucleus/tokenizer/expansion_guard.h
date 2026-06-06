@@ -1,10 +1,10 @@
 #ifndef HPP_GUARD_NUCLEUS_TOKENIZER_EXPANSION_GUARD_H
 #define HPP_GUARD_NUCLEUS_TOKENIZER_EXPANSION_GUARD_H
 
-#include "nucleus/tokenizer/resolve_error.h"
-
 #include "nucleus/format.h"
 #include "nucleus/result.h"
+
+#include "nucleus/tokenizer/resolve_error.h"
 
 #include <string>
 #include <vector>

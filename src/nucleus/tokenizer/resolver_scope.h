@@ -1,20 +1,20 @@
 #ifndef HPP_GUARD_NUCLEUS_TOKENIZER_RESOLVER_SCOPE_H
 #define HPP_GUARD_NUCLEUS_TOKENIZER_RESOLVER_SCOPE_H
 
-#include "nucleus/tokenizer/scope_frame.h"
+#include "nucleus/result.h"
+
 #include "nucleus/tokenizer/tokenizer.h"
+#include "nucleus/tokenizer/scope_frame.h"
 #include "nucleus/tokenizer/resolve_error.h"
 #include "nucleus/tokenizer/expansion_guard.h"
-
-#include "nucleus/result.h"
 
 #include <span>
 #include <string>
 #include <vector>
 #include <cstddef>
 #include <utility>
-#include <functional>
 #include <filesystem>
+#include <functional>
 #include <string_view>
 #include <unordered_map>
 

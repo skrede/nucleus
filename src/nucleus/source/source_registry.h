@@ -2,6 +2,7 @@
 #define HPP_GUARD_NUCLEUS_SOURCE_SOURCE_REGISTRY_H
 
 #include "nucleus/identity.h"
+
 #include "nucleus/registry/registration.h"
 
 #include <string>

@@ -1,15 +1,17 @@
 #include "nucleus/capability.h"
+
 #include "nucleus/source/source.h"
-#include "nucleus/keyspace/value.h"
-#include "nucleus/keyspace/entry.h"
 #include "nucleus/source/discovery.h"
 #include "nucleus/source/extension_registry.h"
 
+#include "nucleus/keyspace/entry.h"
+#include "nucleus/keyspace/value.h"
+
 #include <catch2/catch_test_macros.hpp>
 
+#include <memory>
 #include <random>
 #include <string>
-#include <memory>
 #include <vector>
 #include <fstream>
 #include <algorithm>

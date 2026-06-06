@@ -2,6 +2,7 @@
 #define HPP_GUARD_NUCLEUS_SCHEMA_SCHEMA_H
 
 #include "nucleus/schema/anchor.h"
+
 #include "nucleus/keyspace/key_path.h"
 
 #include <string>

@@ -2,8 +2,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <vector>
 #include <string>
+#include <vector>
 
 using nucleus::key_path;
 
