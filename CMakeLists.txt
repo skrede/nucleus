@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.28)
+cmake_minimum_required(VERSION 3.24)
 project(nucleus VERSION 0.0.0 LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -34,9 +34,12 @@ set(NUCLEUS_PUBLIC_HEADERS
 set(NUCLEUS_SOURCE_HEADERS
     include/nucleus/source/source.h
     include/nucleus/source/parser.h
+    include/nucleus/source/discovery.h
+    include/nucleus/source/path_text.h
     include/nucleus/source/feature_gate.h
     include/nucleus/source/parser_adapter.h
     include/nucleus/source/document_source.h
+    include/nucleus/source/extension_registry.h
 )
 
 set(NUCLEUS_SOURCE_ENV_HEADERS
@@ -102,7 +105,14 @@ target_include_directories(nucleus PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 # dependency is PUBLIC because the fallback appears in a public header.
 # ---------------------------------------------------------------------------
 include(CheckCXXSourceCompiles)
-set(CMAKE_REQUIRED_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20")
+# Drive the probe with the compiler's own standard selection rather than a
+# hardcoded GNU flag: -std=c++20 is wrong on MSVC (which wants /std:c++20) and
+# would make the probe falsely fail there, dragging in {fmt} despite MSVC having
+# std::format. CMAKE_CXX_STANDARD makes try_compile pick the right per-compiler
+# flag on every toolchain.
+set(CMAKE_REQUIRED_FLAGS "${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 check_cxx_source_compiles(
     "#include <version>
      #ifndef __cpp_lib_format
@@ -133,6 +143,11 @@ set_target_properties(nucleus PROPERTIES
 # ---------------------------------------------------------------------------
 # Install / export
 # ---------------------------------------------------------------------------
+# Whether the XML module (and thus its pugixml dependency) is part of this
+# install. Defaults off; set TRUE when the module is built+installed below. The
+# package config consumes it to decide whether to find_dependency(pugixml).
+set(NUCLEUS_XML_INSTALLED FALSE)
+
 install(TARGETS nucleus
     EXPORT nucleus-targets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -203,12 +218,21 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         PRIVATE pugixml::pugixml
     )
 
+    # Match the imported target name to the in-tree alias (nucleus::source_xml).
+    # Without this the NAMESPACE-prefixed export yields nucleus::nucleus_source_xml.
+    set_target_properties(nucleus_source_xml PROPERTIES EXPORT_NAME source_xml)
+
     install(TARGETS nucleus_source_xml
         EXPORT nucleus-targets
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
+
+    # The installed export carries $<LINK_ONLY:pugixml::pugixml> from this
+    # static module, so the package config must require pugixml. Recorded here
+    # and consumed by the config template below.
+    set(NUCLEUS_XML_INSTALLED TRUE)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -240,6 +264,9 @@ if(NUCLEUS_BUILD_TOKENIZER_HOST)
     )
     target_link_libraries(nucleus_tokenizer_host PUBLIC nucleus::nucleus)
 
+    # Match the imported target name to the in-tree alias (nucleus::tokenizer_host).
+    set_target_properties(nucleus_tokenizer_host PROPERTIES EXPORT_NAME tokenizer_host)
+
     if(WIN32)
         target_link_libraries(nucleus_tokenizer_host PRIVATE ws2_32)
     endif()
@@ -251,6 +278,32 @@ if(NUCLEUS_BUILD_TOKENIZER_HOST)
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
 endif()
+
+# ---------------------------------------------------------------------------
+# Package config
+#
+# Generate and install the find_package(nucleus) entry point. Without these a
+# consumer's find_package(nucleus) fails even though the targets export exists.
+# The config includes the targets export and, when the XML module is part of
+# this install, requires pugixml so the exported $<LINK_ONLY:pugixml::pugixml>
+# reference resolves for adopters. Emitted last so NUCLEUS_XML_INSTALLED is
+# final.
+# ---------------------------------------------------------------------------
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/nucleus-config.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/nucleus-config.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/nucleus
+)
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/nucleus-config-version.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/nucleus-config.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/nucleus-config-version.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/nucleus
+)
 
 if(NUCLEUS_BUILD_TESTS)
     enable_testing()
