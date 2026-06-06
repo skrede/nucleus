@@ -82,3 +82,13 @@ TEST_CASE("malformed tokens report parse_error", "[lexer]")
     auto stray = lex_token("${string.upper(a)x}");
     REQUIRE_FALSE(stray.has_value());
 }
+
+TEST_CASE("a dynamically-named function is a clean parse error", "[lexer]")
+{
+    // A nested ${...} forming the function name ahead of a top-level '(' is an
+    // unsupported nesting shape. It must be a named parse error, not a dispatch
+    // of an unresolved literal name.
+    auto dynamic_name = lex_token("${cat.${x}(a)}");
+    REQUIRE_FALSE(dynamic_name.has_value());
+    CHECK(dynamic_name.error().code == resolve_errc::parse_error);
+}

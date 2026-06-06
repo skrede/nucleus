@@ -28,9 +28,26 @@ struct head_parse
     std::size_t paren_pos;
 };
 
+// Supported nesting shapes (recursive-to-fixpoint, resolved before this lexer
+// runs on a flat head):
+//
+//   - Head-of-field nesting: `${cat.${x}}` -- the inner `${x}` resolves first,
+//     producing a flat `${cat.value}` field token that this lexer then parses.
+//     The resolver flattens this before calling lex_token (resolver_scope).
+//   - Function-argument nesting: `${f.g(${b})}` -- the inner `${b}` lives inside
+//     an argument list and is preserved here verbatim, then resolved per argument
+//     by the resolver. parse_args keeps it as one literal argument.
+//
+// NOT supported: a dynamically-named function, where a nested `${...}` forms the
+// function NAME ahead of a top-level '(' (e.g. `${cat.${x}(args)}`). The head is
+// never pre-flattened in that case, so the nested token would reach this lexer as
+// a literal function name. That is rejected here as a clean, named parse error
+// rather than dispatched with an unresolved `${...}` name.
+
 // Splits the body head into (category, name) and locates the first '(' (or npos
-// for field form). Rejects an empty category, an empty name, and a name that
-// still carries a dot (a multi-dot head is malformed).
+// for field form). Rejects an empty category, an empty name, a name that still
+// carries a dot (a multi-dot head is malformed), and a dynamically-named function
+// (a nested ${...} in the function name -- an unsupported nesting shape).
 result<head_parse, resolve_error> parse_head(std::string_view body)
 {
     auto dot = body.find('.');
@@ -49,6 +66,13 @@ result<head_parse, resolve_error> parse_head(std::string_view body)
     if(out.name.empty() || out.name.find('.') != std::string_view::npos)
         return fail(resolve_error(resolve_errc::parse_error,
                                   "token name is empty or contains a dot"));
+    // A nested ${...} surviving into the name means a dynamically-named function
+    // (`${cat.${x}(args)}`): nesting in the head before a top-level '(' is not a
+    // supported shape. Reject it loudly rather than dispatch an unresolved name.
+    if(out.name.find("${") != std::string_view::npos)
+        return fail(resolve_error(resolve_errc::parse_error,
+                                  "dynamically-named functions are not supported: "
+                                  "a nested ${...} may not form a function name"));
     return out;
 }
 
