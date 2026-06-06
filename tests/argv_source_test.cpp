@@ -17,8 +17,6 @@ using nucleus::normalize_arg;
 
 namespace {
 
-key_path path_of(const char *text) { return key_path::parse(text).value(); }
-
 // Collects the warn-level messages a source emits, to observe lenient behavior.
 class capturing_sink final : public nucleus::log_sink
 {
