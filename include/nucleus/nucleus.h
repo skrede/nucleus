@@ -8,6 +8,7 @@
 #include "nucleus/entry/precedence.h"
 #include "nucleus/entry/configuration.h"
 #include "nucleus/registration_policy.h"
+#include "nucleus/diagnostics/conflict_report.h"
 
 #include <string>
 #include <memory>
@@ -100,6 +101,13 @@ public:
     [[nodiscard]] std::size_t schema_count() const noexcept;
     [[nodiscard]] std::size_t tokenizer_count() const noexcept;
     [[nodiscard]] std::size_t source_count() const noexcept;
+
+    // The key-path collisions detected during registration: each report names the
+    // colliding key and every claimant (location + opaque owner token) WITHOUT
+    // choosing a winner. Two registrations claiming the same key path produce one
+    // report; a third extends it. Surfacing is non-adjudicating mechanism -- the
+    // host queries this and decides what a collision means. Empty when none occurred.
+    [[nodiscard]] std::vector<conflict_report> conflicts() const;
 
     [[nodiscard]] facade_phase phase() const noexcept;
 

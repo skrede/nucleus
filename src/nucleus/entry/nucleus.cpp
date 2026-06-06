@@ -10,7 +10,9 @@
 #include "nucleus/tokenizer/tokenizer_registry.h"
 #include "nucleus/tokenizer/builtin_tokenizers.h"
 #include "nucleus/entry/resolution_context.h"
+#include "nucleus/diagnostics/conflict_report.h"
 
+#include <map>
 #include <memory>
 #include <vector>
 #include <utility>
@@ -47,6 +49,36 @@ public:
         return registration_ok();
     }
 
+    // Records that `owner` claimed `key_path` and, on a second-or-later claim of
+    // the same path, builds/extends a non-adjudicating conflict_report naming
+    // every claimant. The core surfaces who claimed what WITHOUT picking a winner
+    // (mechanism, not policy): a host queries conflicts() and decides. A claim is
+    // any path-bearing registration -- a schema path string or a typed element's
+    // declared path. The location label is the claimed path plus the registration
+    // surface; the opaque owner token travels for host adjudication.
+    void note_claim(const std::string &key_path, registration_kind kind, const owner_token &owner)
+    {
+        std::vector<claimant> &claims = m_claims[key_path];
+        claims.push_back(claimant{
+            ::nucleus::format("{} registration of '{}'", to_string(kind), key_path), owner});
+        if(claims.size() < 2)
+            return;
+
+        conflict_report report(key_path);
+        for(const claimant &c : claims)
+            report.add(c);
+        m_conflicts.insert_or_assign(key_path, std::move(report));
+    }
+
+    [[nodiscard]] std::vector<conflict_report> conflicts() const
+    {
+        std::vector<conflict_report> out;
+        out.reserve(m_conflicts.size());
+        for(const auto &[_, report] : m_conflicts)
+            out.push_back(report);
+        return out;
+    }
+
     // The shared resolve path: build the transient borrowing context, fold the
     // stack (expand-then-layer with provenance), freeze the immutable result, and
     // transition the state machine. Enforces the no-resolve-after-resolve rule.
@@ -78,6 +110,11 @@ public:
     source_registry sources;
     facade_phase phase = facade_phase::configurable;
     std::shared_ptr<registration_policy> m_policy = std::make_shared<registration_policy>();
+
+    // Per-path claim ledger and the conflict reports it produces. Keyed by claimed
+    // key path so a third claim extends the same report. Surfaced, never adjudicated.
+    std::map<std::string, std::vector<claimant>> m_claims;
+    std::map<std::string, conflict_report> m_conflicts;
 };
 
 nucleus::nucleus() : m_impl(std::make_unique<impl>()) {}
@@ -131,6 +168,7 @@ registration_result nucleus::register_schema(std::string key_path, owner_token o
         return guard;
     if(auto verdict = m_impl->review(registration_kind::schema, owner); !verdict)
         return verdict;
+    m_impl->note_claim(key_path, registration_kind::schema, owner);
     m_impl->schema.add(schema_spec{std::move(key_path)}, std::move(owner));
     return registration_ok();
 }
@@ -141,9 +179,13 @@ registration_result nucleus::register_element(schema_element element, owner_toke
         return guard;
     if(auto verdict = m_impl->review(registration_kind::schema, owner); !verdict)
         return verdict;
+    // The element's declared path is the key it claims; record it for conflict
+    // surfacing before attach consumes the element.
+    const std::string claimed = element.declared_path().str();
     // attach() enforces referential integrity; surface its rejection verbatim.
     if(auto attached = m_impl->schema.attach(std::move(element)); !attached)
         return fail(std::move(attached).error());
+    m_impl->note_claim(claimed, registration_kind::schema, owner);
     return registration_ok();
 }
 
@@ -182,6 +224,8 @@ std::size_t nucleus::schema_count() const noexcept { return m_impl->schema.size(
 std::size_t nucleus::tokenizer_count() const noexcept { return m_impl->tokenizer.size(); }
 
 std::size_t nucleus::source_count() const noexcept { return m_impl->sources.size(); }
+
+std::vector<conflict_report> nucleus::conflicts() const { return m_impl->conflicts(); }
 
 facade_phase nucleus::phase() const noexcept { return m_impl->phase; }
 

@@ -1,5 +1,8 @@
 #include "nucleus/nucleus.h"
 #include "nucleus/identity.h"
+#include "nucleus/schema/anchor.h"
+#include "nucleus/schema/schema.h"
+#include "nucleus/keyspace/key_path.h"
 #include "nucleus/registration_policy.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -81,6 +84,58 @@ TEST_CASE("the registration-policy seam can intercept a registration", "[facade]
     REQUIRE(policy->seen.size() == 2);
     REQUIRE(policy->seen[0] == nucleus::registration_kind::schema);
     REQUIRE(policy->seen[1] == nucleus::registration_kind::source);
+}
+
+TEST_CASE("two registrations claiming the same key path surface a non-adjudicating conflict",
+          "[facade][conflict]")
+{
+    nucleus::nucleus engine;
+    nucleus::owner_token plugin_a(std::string("plugin.a"));
+    nucleus::owner_token plugin_b(std::string("plugin.b"));
+
+    // No conflict until a second claim of the same path.
+    REQUIRE(engine.register_schema("server/port", plugin_a));
+    REQUIRE(engine.conflicts().empty());
+
+    // A second registration claims the same key path -- a duplicate claim.
+    REQUIRE(engine.register_schema("server/port", plugin_b));
+
+    auto reports = engine.conflicts();
+    REQUIRE(reports.size() == 1);
+    const nucleus::conflict_report &report = reports.front();
+    REQUIRE(report.key_path() == "server/port");
+    REQUIRE(report.size() == 2);
+
+    // The report names the colliding key and refuses to pick a winner; both
+    // claimants' owner tokens travel for host adjudication.
+    const std::string text = report.describe();
+    REQUIRE(text.find("server/port") != std::string::npos);
+    REQUIRE(text.find("no winner") != std::string::npos);
+    REQUIRE(report.claimants().front().owner == plugin_a);
+    REQUIRE(report.claimants().back().owner == plugin_b);
+
+    // The duplicate registration still committed -- the core surfaces, it does not
+    // reject (that would be adjudication).
+    REQUIRE(engine.schema_count() == 2);
+}
+
+TEST_CASE("a typed element double-claiming a path conflicts with a path registration",
+          "[facade][conflict]")
+{
+    nucleus::nucleus engine;
+    auto logging = nucleus::key_path::parse("logging");
+    REQUIRE(logging);
+
+    REQUIRE(engine.register_schema("logging/level"));
+    REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
+    REQUIRE(engine.register_element(
+        nucleus::element("level", nucleus::anchor::keyspace(logging.value()))));
+
+    // logging/level was claimed both by the path registration and the element.
+    auto reports = engine.conflicts();
+    REQUIRE(reports.size() == 1);
+    REQUIRE(reports.front().key_path() == "logging/level");
+    REQUIRE(reports.front().size() == 2);
 }
 
 TEST_CASE("clearing the policy restores accept-all behavior", "[facade]")
