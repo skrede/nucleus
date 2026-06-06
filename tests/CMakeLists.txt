@@ -38,6 +38,24 @@ nucleus_add_test(source_seam_test)
 nucleus_add_test(capability_gating_test)
 
 # ---------------------------------------------------------------------------
+# Buffer-lifetime test: exercises the XML document source through the seam and
+# proves the copy-out severs every view from the document arena before it is
+# dropped. Links the XML module (and thus pugixml, transitively) only here, never
+# in core. Built only when the XML module is. Run under the sanitizer to make the
+# use-after-free guard real.
+# ---------------------------------------------------------------------------
+if(NUCLEUS_BUILD_SOURCE_XML)
+    add_executable(buffer_lifetime_test buffer_lifetime_test.cpp)
+    target_link_libraries(buffer_lifetime_test
+        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+    target_include_directories(buffer_lifetime_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+    )
+    add_test(NAME buffer_lifetime_test COMMAND buffer_lifetime_test)
+endif()
+
+# ---------------------------------------------------------------------------
 # Negative compile test: a registry that stores a sibling reference member
 # violates the flat-ownership invariant and must NOT compile. WILL_FAIL asserts
 # the build of the fixture fails, making the invariant executable rather than

@@ -36,6 +36,7 @@ set(NUCLEUS_SOURCE_HEADERS
     include/nucleus/source/parser.h
     include/nucleus/source/feature_gate.h
     include/nucleus/source/parser_adapter.h
+    include/nucleus/source/document_source.h
 )
 
 set(NUCLEUS_SOURCE_ENV_HEADERS
@@ -124,6 +125,54 @@ install(FILES ${NUCLEUS_SOURCE_ENV_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/source/env)
 install(FILES ${NUCLEUS_KEYSPACE_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/keyspace)
+
+# ---------------------------------------------------------------------------
+# XML source module
+#
+# A separate target that wraps pugixml. pugixml is PRIVATE-linked here and is
+# reachable from nowhere else: the core library has zero parser dependencies, so
+# adopters who never use XML never pull pugixml. The module is built only when
+# requested (default ON for the test build; adopters opt in). It links the core
+# PUBLICly because its public header is a core document_source, and pugixml
+# PRIVATELY so the dependency never leaks through the link interface.
+# ---------------------------------------------------------------------------
+option(NUCLEUS_BUILD_SOURCE_XML "Build the XML source module (fetches pugixml)" ON)
+
+if(NUCLEUS_BUILD_SOURCE_XML)
+    include(FetchContent)
+    FetchContent_Declare(
+        pugixml
+        GIT_REPOSITORY https://github.com/zeux/pugixml.git
+        GIT_TAG v1.15
+        FIND_PACKAGE_ARGS NAMES pugixml
+    )
+    FetchContent_MakeAvailable(pugixml)
+
+    add_library(nucleus_source_xml
+        src/nucleus/xml/xml_source.cpp
+    )
+    add_library(nucleus::source_xml ALIAS nucleus_source_xml)
+
+    target_compile_features(nucleus_source_xml PUBLIC cxx_std_20)
+    target_include_directories(nucleus_source_xml
+        PUBLIC
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(nucleus_source_xml
+        PUBLIC nucleus::nucleus
+        PRIVATE pugixml::pugixml
+    )
+
+    install(TARGETS nucleus_source_xml
+        EXPORT nucleus-targets
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+endif()
 
 if(NUCLEUS_BUILD_TESTS)
     enable_testing()
