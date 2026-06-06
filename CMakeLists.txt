@@ -34,7 +34,12 @@ set(NUCLEUS_PUBLIC_HEADERS
 set(NUCLEUS_SOURCE_HEADERS
     include/nucleus/source/source.h
     include/nucleus/source/parser.h
+    include/nucleus/source/feature_gate.h
     include/nucleus/source/parser_adapter.h
+)
+
+set(NUCLEUS_SOURCE_ENV_HEADERS
+    include/nucleus/source/env/env_source.h
 )
 
 set(NUCLEUS_KEYSPACE_HEADERS
@@ -115,6 +120,8 @@ install(EXPORT nucleus-targets
 # (PUBLIC_HEADER flattens, which would collide source/ and keyspace/ names).
 install(FILES ${NUCLEUS_SOURCE_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/source)
+install(FILES ${NUCLEUS_SOURCE_ENV_HEADERS}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/source/env)
 install(FILES ${NUCLEUS_KEYSPACE_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/keyspace)
 
