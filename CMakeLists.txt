@@ -25,7 +25,21 @@ set(NUCLEUS_PUBLIC_HEADERS
     include/nucleus/nucleus.h
     include/nucleus/identity.h
     include/nucleus/log_sink.h
+    include/nucleus/capability.h
     include/nucleus/registration_policy.h
+)
+
+# Public source-seam and keyspace headers. These are header-only contracts; they
+# install under their subdirectory so the include paths stay stable for adopters.
+set(NUCLEUS_SOURCE_HEADERS
+    include/nucleus/source/source.h
+    include/nucleus/source/parser.h
+    include/nucleus/source/parser_adapter.h
+)
+
+set(NUCLEUS_KEYSPACE_HEADERS
+    include/nucleus/keyspace/value.h
+    include/nucleus/keyspace/entry.h
 )
 
 set(NUCLEUS_SOURCES
@@ -96,6 +110,13 @@ install(EXPORT nucleus-targets
     NAMESPACE nucleus::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/nucleus
 )
+
+# Subdirectory headers preserve their relative path under the include root
+# (PUBLIC_HEADER flattens, which would collide source/ and keyspace/ names).
+install(FILES ${NUCLEUS_SOURCE_HEADERS}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/source)
+install(FILES ${NUCLEUS_KEYSPACE_HEADERS}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/keyspace)
 
 if(NUCLEUS_BUILD_TESTS)
     enable_testing()

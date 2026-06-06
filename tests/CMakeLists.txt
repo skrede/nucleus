@@ -34,6 +34,7 @@ nucleus_add_test(identity_test)
 nucleus_add_test(log_sink_test)
 nucleus_add_test(facade_test)
 nucleus_add_test(registry_isolation_test)
+nucleus_add_test(source_seam_test)
 
 # ---------------------------------------------------------------------------
 # Negative compile test: a registry that stores a sibling reference member
