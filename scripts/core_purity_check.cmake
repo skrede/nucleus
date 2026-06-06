@@ -14,12 +14,20 @@ endif()
 
 # Forbidden vocabulary. Case-insensitive substrings that must not appear in core:
 # format-specific (xml/pugi) and host-specific (vagus/node-vocabulary) symbols.
-set(forbidden "pugixml" "pugi::" "vagus" "<vagus>" "<node>")
+# Kept in lockstep with the shell gate (scripts/core_purity_check.sh): both
+# forbid the bare substring "xml" so a stray mention anywhere in core trips the
+# gate, not only the "pugixml" spelling.
+set(forbidden "xml" "pugi" "vagus" "<vagus>" "<node>")
 
 # Directories that are allowed to mention parser/host vocabulary because they ARE
-# the quarantined module (none exist yet; listed so the gate stays correct once
-# the xml source module lands).
-set(quarantined_dirs "${NUCLEUS_ROOT}/src/nucleus/xml")
+# the quarantined module: the xml source module (src/nucleus/xml/) now exists and
+# wraps pugixml privately. It is excluded so the gate stays correct while the rest
+# of core remains format/host-neutral. Paths are normalized to absolute real
+# paths so the exclusion holds however NUCLEUS_ROOT was passed (absolute, ".",
+# or with embedded "/./" segments).
+get_filename_component(quarantined_xml_dir
+    "${NUCLEUS_ROOT}/src/nucleus/xml" REALPATH)
+set(quarantined_dirs "${quarantined_xml_dir}")
 
 file(GLOB_RECURSE core_files
     "${NUCLEUS_ROOT}/include/nucleus/*.h"
@@ -30,9 +38,13 @@ file(GLOB_RECURSE core_files
 set(violations "")
 
 foreach(file ${core_files})
+    get_filename_component(file "${file}" REALPATH)
     set(is_quarantined FALSE)
     foreach(dir ${quarantined_dirs})
-        if(file MATCHES "^${dir}/")
+        # Plain substring test (not regex) so "." and other metacharacters in the
+        # path cannot weaken or break the quarantine match.
+        string(FIND "${file}" "${dir}/" quarantine_position)
+        if(quarantine_position EQUAL 0)
             set(is_quarantined TRUE)
         endif()
     endforeach()
