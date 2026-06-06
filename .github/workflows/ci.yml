@@ -3,35 +3,97 @@ name: ci
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022, macos-14]
+
+    runs-on: ${{ matrix.os }}
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Configure
-        run: cmake -B build -DNUCLEUS_BUILD_TESTS=ON
+        shell: bash
+        run: |
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            GENERATOR_OPTIONS="-A x64"
+          fi
+
+          cmake . -B build -DCMAKE_BUILD_TYPE=Release $GENERATOR_OPTIONS \
+            -DNUCLEUS_BUILD_TESTS=ON \
+            -DNUCLEUS_BUILD_EXAMPLES=ON \
+            -DNUCLEUS_BUILD_SOURCE_XML=ON \
+            -DNUCLEUS_BUILD_TOKENIZER_HOST=ON
 
       - name: Build
-        run: cmake --build build
+        run: cmake --build build --config Release
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure
-
-      - name: Core-purity check
-        run: bash scripts/core_purity_check.sh
+        run: ctest --test-dir build -C Release --output-on-failure
 
   sanitizer:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
       - name: Configure (AddressSanitizer)
-        run: cmake -B build-asan -DNUCLEUS_BUILD_TESTS=ON -DNUCLEUS_BUILD_SANITIZER=ON
+        run: >-
+          cmake -B build-asan
+          -DNUCLEUS_BUILD_TESTS=ON
+          -DNUCLEUS_BUILD_SANITIZER=ON
 
       - name: Build (AddressSanitizer)
         run: cmake --build build-asan
 
       - name: Test under AddressSanitizer
         run: ctest --test-dir build-asan --output-on-failure
+
+  core-purity:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Core-purity check
+        run: bash scripts/core_purity_check.sh
+
+  coverage:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install gcovr
+        run: pipx install gcovr
+
+      - name: Configure (coverage)
+        run: >-
+          cmake -B build-coverage
+          -DCMAKE_BUILD_TYPE=Debug
+          -DNUCLEUS_BUILD_TESTS=ON
+          -DNUCLEUS_COVERAGE=ON
+
+      - name: Build (coverage)
+        run: cmake --build build-coverage
+
+      - name: Test (coverage)
+        run: ctest --test-dir build-coverage --output-on-failure
+
+      - name: Generate report
+        run: >-
+          gcovr --root .
+          --filter 'include/nucleus/' --filter 'src/nucleus/'
+          --xml-pretty --output coverage.xml
+          build-coverage
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.xml
+          slug: skrede/nucleus
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

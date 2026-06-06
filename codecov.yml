@@ -1,0 +1,19 @@
+# Codecov configuration. The defaults are intentionally non-blocking: coverage is
+# informational here, so a delta never fails CI. Reports are filtered to the
+# library's own sources; third-party fetched dependencies and tests are excluded.
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+comment:
+  require_changes: true
+
+ignore:
+  - "tests/**"
+  - "examples/**"
+  - "**/_deps/**"

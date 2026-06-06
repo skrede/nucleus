@@ -7,6 +7,7 @@ include(CMakePackageConfigHelpers)
 option(NUCLEUS_BUILD_TESTS "Build tests" OFF)
 option(NUCLEUS_BUILD_EXAMPLES "Build examples" OFF)
 option(NUCLEUS_BUILD_SANITIZER "Build with AddressSanitizer" OFF)
+option(NUCLEUS_COVERAGE "Instrument the library and tests for coverage (gcc/clang)" OFF)
 option(NUCLEUS_FETCH_TEST_DEPS "Fetch test dependencies (Catch2) via FetchContent" ON)
 
 include(cmake/buildflags.cmake)
