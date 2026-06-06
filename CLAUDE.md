@@ -87,7 +87,7 @@ Load-bearing architecture (do not violate without discussion):
   (XML/...) are the common subcategory sharing a view-node model; argv and env are
   also sources. Feature availability = schema requirements intersected with source
   capabilities (graceful degradation, never silent data loss).
-- **Two-phase lifecycle.** A `nucleus` facade is `configurable`
+- **Two-phase lifecycle.** A `configuration_space` facade is `configurable`
   (register_schema/register_tokenizer/register_source) until `load()`/`resolve()`,
   which yields an immutable, self-owning, freely-thread-readable `configuration`.
   Registration after resolve is an error.
@@ -100,7 +100,7 @@ Load-bearing architecture (do not violate without discussion):
 
 Conventions and naming:
 
-- The configurable facade type is `nucleus`; the resolved immutable type is
+- The configurable facade type is `configuration_space`; the resolved immutable type is
   `configuration`.
 - Schema registrations anchor via a typed API (`anchor::root` /
   `anchor::keyspace("name")`); anchors are code/schema-side only and never appear

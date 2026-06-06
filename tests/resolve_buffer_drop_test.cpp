@@ -1,4 +1,4 @@
-#include "nucleus/nucleus.h"
+#include "nucleus/configuration_space.h"
 
 #include "nucleus/xml/xml_source.h"
 
@@ -35,7 +35,7 @@ TEST_CASE("resolved values survive dropping every source buffer", "[resolution][
     std::optional<nucleus::configuration> config;
 
     {
-        nucleus::nucleus engine;
+        nucleus::configuration_space engine;
 
         // A document source (views into the parser arena) layered beneath an env
         // overlay that overrides one key -- so both a view-backed and an

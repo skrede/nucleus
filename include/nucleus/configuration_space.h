@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_NUCLEUS_NUCLEUS_H
-#define HPP_GUARD_NUCLEUS_NUCLEUS_H
+#ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SPACE_H
+#define HPP_GUARD_NUCLEUS_CONFIGURATION_SPACE_H
 
 #include "nucleus/result.h"
 #include "nucleus/identity.h"
@@ -66,17 +66,17 @@ using load_result = result<configuration, std::string>;
 // The facade is the only owner of the registries. When cross-registry work
 // begins (a later phase) it builds a transient resolution_context that BORROWS
 // the registries; they never reference one another directly.
-class nucleus
+class configuration_space
 {
 public:
-    nucleus();
-    ~nucleus();
+    configuration_space();
+    ~configuration_space();
 
-    nucleus(nucleus &&) noexcept;
-    nucleus &operator=(nucleus &&) noexcept;
+    configuration_space(configuration_space &&) noexcept;
+    configuration_space &operator=(configuration_space &&) noexcept;
 
-    nucleus(const nucleus &) = delete;
-    nucleus &operator=(const nucleus &) = delete;
+    configuration_space(const configuration_space &) = delete;
+    configuration_space &operator=(const configuration_space &) = delete;
 
     // Installs a host registration policy. The default policy accepts every
     // registration; the core imposes no reservation or namespacing rules itself.

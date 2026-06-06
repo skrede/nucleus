@@ -24,7 +24,7 @@ useful to any C++ program.
 
 The core engine is substantially implemented:
 
-- A two-phase **facade** (`nucleus`) that is configurable
+- A two-phase **facade** (`configuration_space`) that is configurable
   (`register_schema` / `register_element` / `register_tokenizer` /
   `register_source` / `install_tokenizer`) until `load()` / `resolve()`, which
   yields an immutable, freely thread-readable `configuration`.

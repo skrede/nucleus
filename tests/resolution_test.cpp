@@ -1,4 +1,4 @@
-#include "nucleus/nucleus.h"
+#include "nucleus/configuration_space.h"
 #include "nucleus/identity.h"
 
 #include "nucleus/entry/precedence.h"
@@ -30,7 +30,7 @@
 
 TEST_CASE("resolve folds a precedence stack and freezes an immutable result", "[resolution]")
 {
-    nucleus::nucleus engine;
+    nucleus::configuration_space engine;
 
     nucleus::env_source defaults;
     defaults.set("server/host", "localhost").set("server/port", "80");
@@ -58,7 +58,7 @@ TEST_CASE("resolve folds a precedence stack and freezes an immutable result", "[
 
 TEST_CASE("value and provenance are recorded in the same fold and cannot diverge", "[resolution]")
 {
-    nucleus::nucleus engine;
+    nucleus::configuration_space engine;
 
     nucleus::env_source base;
     base.set("a", "from-base").set("b", "base-only");
@@ -89,7 +89,7 @@ TEST_CASE("value and provenance are recorded in the same fold and cannot diverge
 
 TEST_CASE("explicit precedence is argv over overlay over base over env over defaults", "[resolution]")
 {
-    nucleus::nucleus engine;
+    nucleus::configuration_space engine;
 
     nucleus::env_source defaults;  defaults.set("k", "defaults");
     nucleus::env_source env;       env.set("k", "env");
@@ -113,7 +113,7 @@ TEST_CASE("explicit precedence is argv over overlay over base over env over defa
 
 TEST_CASE("registration after resolve is a state-machine error", "[resolution][lifecycle]")
 {
-    nucleus::nucleus engine;
+    nucleus::configuration_space engine;
     nucleus::env_source one; one.set("k", "v");
     nucleus::source_stack stack;
     stack.add(one, nucleus::layer_rank::base, "base");
@@ -134,7 +134,7 @@ TEST_CASE("the args-only overload wires the argv recognizer to the schema", "[re
 {
     SECTION("a declared flag resolves")
     {
-        nucleus::nucleus engine;
+        nucleus::configuration_space engine;
         REQUIRE(engine.register_schema("logging/level"));
 
         auto loaded = engine.load(std::vector<std::string>{"--logging-level=debug"});
@@ -144,7 +144,7 @@ TEST_CASE("the args-only overload wires the argv recognizer to the schema", "[re
 
     SECTION("an undeclared flag is rejected by the schema authority")
     {
-        nucleus::nucleus engine;
+        nucleus::configuration_space engine;
         REQUIRE(engine.register_schema("logging/level"));
 
         auto loaded = engine.load(std::vector<std::string>{"--logging-levle=debug"});
@@ -165,7 +165,7 @@ TEST_CASE("argv outranks any number of config documents", "[resolution][preceden
         return src;
     };
 
-    nucleus::nucleus engine;
+    nucleus::configuration_space engine;
     REQUIRE(engine.register_schema("k"));
 
     std::vector<std::string> paths{"p0", "p1", "p2", "p3", "p4"};
@@ -185,7 +185,7 @@ TEST_CASE("the last config document wins among layered paths", "[resolution][pre
         return src;
     };
 
-    nucleus::nucleus engine;
+    nucleus::configuration_space engine;
     REQUIRE(engine.register_schema("k"));
 
     std::vector<std::string> paths{"first", "second", "third", "fourth"};
@@ -196,7 +196,7 @@ TEST_CASE("the last config document wins among layered paths", "[resolution][pre
 
 TEST_CASE("an unresolvable token fails the fold loudly rather than passing through", "[resolution][tokens]")
 {
-    nucleus::nucleus engine;
+    nucleus::configuration_space engine;
 
     nucleus::env_source env;
     // No tokenizer answers the `nope` category (the core builtins are
@@ -217,7 +217,7 @@ TEST_CASE("the facade resolves core builtin tokens with no extra registration", 
 {
     // A host that registers nothing special must still get token expansion: the
     // generic core tokenizers are installed by default on the facade.
-    nucleus::nucleus engine;
+    nucleus::configuration_space engine;
 
     nucleus::env_source env;
     env.set("greeting", "${string.upper(hi)}");
@@ -234,7 +234,7 @@ TEST_CASE("the facade resolves core builtin tokens with no extra registration", 
 
 TEST_CASE("install_tokenizer injects an additional tokenizer reachable at resolve", "[resolution][tokens]")
 {
-    nucleus::nucleus engine;
+    nucleus::configuration_space engine;
 
     // A host-built tokenizer for a custom category, installed through the facade.
     nucleus::tokenizer_builder builder("greet");

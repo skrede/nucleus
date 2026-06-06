@@ -1,4 +1,4 @@
-#include "nucleus/nucleus.h"
+#include "nucleus/configuration_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -39,7 +39,7 @@ nucleus::env_source one(std::string path, std::string text)
 
 TEST_CASE("a typed schema element registers through the facade", "[facade][schema]")
 {
-    nucleus::nucleus engine;
+    nucleus::configuration_space engine;
     REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
     REQUIRE(engine.register_element(
         nucleus::element("level", nucleus::anchor::keyspace(path_of("logging")))));
@@ -54,7 +54,7 @@ TEST_CASE("a typed schema element registers through the facade", "[facade][schem
 TEST_CASE("resolve rejects an undeclared key and suggests the nearest declared one",
           "[facade][schema]")
 {
-    nucleus::nucleus engine;
+    nucleus::configuration_space engine;
     REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
     REQUIRE(engine.register_element(
         nucleus::element("level", nucleus::anchor::keyspace(path_of("logging")))));
@@ -72,7 +72,7 @@ TEST_CASE("resolve rejects an undeclared key and suggests the nearest declared o
 
 TEST_CASE("resolve rejects a missing required field", "[facade][schema]")
 {
-    nucleus::nucleus engine;
+    nucleus::configuration_space engine;
     REQUIRE(engine.register_element(nucleus::element("server", nucleus::anchor::root())));
     REQUIRE(engine.register_element(
         nucleus::required_element("host", nucleus::anchor::keyspace(path_of("server")))));
@@ -92,7 +92,7 @@ TEST_CASE("resolve rejects a missing required field", "[facade][schema]")
 TEST_CASE("resolve rejects a missing identity field separately from required",
           "[facade][schema]")
 {
-    nucleus::nucleus engine;
+    nucleus::configuration_space engine;
     REQUIRE(engine.register_element(nucleus::element("node", nucleus::anchor::root())));
     REQUIRE(engine.register_element(
         nucleus::identity_element("name", nucleus::anchor::keyspace(path_of("node")))));
@@ -110,7 +110,7 @@ TEST_CASE("resolve rejects a missing identity field separately from required",
 
 TEST_CASE("resolve admits a document that satisfies the schema", "[facade][schema]")
 {
-    nucleus::nucleus engine;
+    nucleus::configuration_space engine;
     REQUIRE(engine.register_element(nucleus::element("server", nucleus::anchor::root())));
     REQUIRE(engine.register_element(
         nucleus::required_element("host", nucleus::anchor::keyspace(path_of("server")))));

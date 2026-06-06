@@ -1,5 +1,5 @@
 #include "nucleus/format.h"
-#include "nucleus/nucleus.h"
+#include "nucleus/configuration_space.h"
 #include "nucleus/registration_policy.h"
 
 #include "nucleus/schema/schema_enforcer.h"
@@ -27,7 +27,7 @@ namespace nucleus {
 // The facade composition-owns the three flat sibling registries plus the host
 // registration policy. This is the single place the registries are owned; they
 // hold no references to one another.
-class nucleus::impl
+class configuration_space::impl
 {
 public:
     // The generic core tokenizers are MECHANISM, not policy: ${env.*}, ${uuid.*},
@@ -122,15 +122,15 @@ public:
     std::map<std::string, conflict_report> m_conflicts;
 };
 
-nucleus::nucleus() : m_impl(std::make_unique<impl>()) {}
+configuration_space::configuration_space() : m_impl(std::make_unique<impl>()) {}
 
-nucleus::~nucleus() = default;
+configuration_space::~configuration_space() = default;
 
-nucleus::nucleus(nucleus &&) noexcept = default;
+configuration_space::configuration_space(configuration_space &&) noexcept = default;
 
-nucleus &nucleus::operator=(nucleus &&) noexcept = default;
+configuration_space &configuration_space::operator=(configuration_space &&) noexcept = default;
 
-void nucleus::set_registration_policy(std::shared_ptr<registration_policy> policy)
+void configuration_space::set_registration_policy(std::shared_ptr<registration_policy> policy)
 {
     m_impl->m_policy = policy ? std::move(policy)
                               : std::make_shared<registration_policy>();
@@ -167,7 +167,7 @@ namespace {
 
 }
 
-registration_result nucleus::register_schema(std::string key_path, owner_token owner)
+registration_result configuration_space::register_schema(std::string key_path, owner_token owner)
 {
     if(auto guard = reject_if_resolved(m_impl->phase, registration_kind::schema); !guard)
         return guard;
@@ -178,7 +178,7 @@ registration_result nucleus::register_schema(std::string key_path, owner_token o
     return registration_ok();
 }
 
-registration_result nucleus::register_element(schema_element element, owner_token owner)
+registration_result configuration_space::register_element(schema_element element, owner_token owner)
 {
     if(auto guard = reject_if_resolved(m_impl->phase, registration_kind::schema); !guard)
         return guard;
@@ -194,7 +194,7 @@ registration_result nucleus::register_element(schema_element element, owner_toke
     return registration_ok();
 }
 
-registration_result nucleus::register_tokenizer(std::string name, owner_token owner)
+registration_result configuration_space::register_tokenizer(std::string name, owner_token owner)
 {
     if(auto guard = reject_if_resolved(m_impl->phase, registration_kind::tokenizer); !guard)
         return guard;
@@ -204,7 +204,7 @@ registration_result nucleus::register_tokenizer(std::string name, owner_token ow
     return registration_ok();
 }
 
-registration_result nucleus::install_tokenizer(tokenizer tok, owner_token owner)
+registration_result configuration_space::install_tokenizer(tokenizer tok, owner_token owner)
 {
     if(auto guard = reject_if_resolved(m_impl->phase, registration_kind::tokenizer); !guard)
         return guard;
@@ -214,7 +214,7 @@ registration_result nucleus::install_tokenizer(tokenizer tok, owner_token owner)
     return registration_ok();
 }
 
-registration_result nucleus::register_source(std::string name, owner_token owner)
+registration_result configuration_space::register_source(std::string name, owner_token owner)
 {
     if(auto guard = reject_if_resolved(m_impl->phase, registration_kind::source); !guard)
         return guard;
@@ -224,15 +224,15 @@ registration_result nucleus::register_source(std::string name, owner_token owner
     return registration_ok();
 }
 
-std::size_t nucleus::schema_count() const noexcept { return m_impl->schema.size(); }
+std::size_t configuration_space::schema_count() const noexcept { return m_impl->schema.size(); }
 
-std::size_t nucleus::tokenizer_count() const noexcept { return m_impl->tokenizer.size(); }
+std::size_t configuration_space::tokenizer_count() const noexcept { return m_impl->tokenizer.size(); }
 
-std::size_t nucleus::source_count() const noexcept { return m_impl->sources.size(); }
+std::size_t configuration_space::source_count() const noexcept { return m_impl->sources.size(); }
 
-std::vector<conflict_report> nucleus::conflicts() const { return m_impl->conflicts(); }
+std::vector<conflict_report> configuration_space::conflicts() const { return m_impl->conflicts(); }
 
-gate_result nucleus::gate_capabilities(std::string_view consumer,
+gate_result configuration_space::gate_capabilities(std::string_view consumer,
                                        std::string_view source_name,
                                        const capability_descriptor &caps,
                                        const std::vector<feature_requirement> &required,
@@ -241,19 +241,19 @@ gate_result nucleus::gate_capabilities(std::string_view consumer,
     return gate_features(consumer, source_name, caps, required, log);
 }
 
-facade_phase nucleus::phase() const noexcept { return m_impl->phase; }
+facade_phase configuration_space::phase() const noexcept { return m_impl->phase; }
 
-load_result nucleus::resolve(const source_stack &stack)
+load_result configuration_space::resolve(const source_stack &stack)
 {
     return m_impl->run_resolve(stack);
 }
 
-load_result nucleus::load(const source_stack &stack)
+load_result configuration_space::load(const source_stack &stack)
 {
     return m_impl->run_resolve(stack);
 }
 
-load_result nucleus::load(std::vector<std::string> args)
+load_result configuration_space::load(std::vector<std::string> args)
 {
     // The argv source's unknown-key recognizer bridges to the schema surface --
     // the schema is the authority over which flags exist. The recognizer captures
@@ -267,7 +267,7 @@ load_result nucleus::load(std::vector<std::string> args)
     return m_impl->run_resolve(stack);
 }
 
-load_result nucleus::load(std::vector<std::string> paths, const document_factory &make)
+load_result configuration_space::load(std::vector<std::string> paths, const document_factory &make)
 {
     std::vector<std::unique_ptr<source>> docs;
     docs.reserve(paths.size());
@@ -288,9 +288,9 @@ load_result nucleus::load(std::vector<std::string> paths, const document_factory
     return m_impl->run_resolve(stack);
 }
 
-load_result nucleus::load(std::vector<std::string> args,
-                          std::vector<std::string> paths,
-                          const document_factory &make)
+load_result configuration_space::load(std::vector<std::string> args,
+                                      std::vector<std::string> paths,
+                                      const document_factory &make)
 {
     std::vector<std::unique_ptr<source>> docs;
     docs.reserve(paths.size());

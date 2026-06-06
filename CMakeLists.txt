@@ -22,7 +22,7 @@ set(NUCLEUS_PUBLIC_HEADERS
     include/nucleus/version.h
     include/nucleus/result.h
     include/nucleus/format.h
-    include/nucleus/nucleus.h
+    include/nucleus/configuration_space.h
     include/nucleus/identity.h
     include/nucleus/log_sink.h
     include/nucleus/capability.h
@@ -76,7 +76,7 @@ set(NUCLEUS_SOURCE_ARGV_HEADERS
 
 set(NUCLEUS_SOURCES
     src/nucleus/version.cpp
-    src/nucleus/entry/nucleus.cpp
+    src/nucleus/entry/configuration_space.cpp
     src/nucleus/tokenizer/tokenizer.cpp
     src/nucleus/tokenizer/token_lexer.cpp
     src/nucleus/tokenizer/scope_keys.cpp
