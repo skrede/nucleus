@@ -17,6 +17,12 @@
 
 namespace nucleus {
 
+// A constructed tokenizer (defined in the internal tokenizer header). Forward
+// declared so the public facade can accept an already-built tokenizer for
+// install_tokenizer without the public header pulling the internal tokenizer
+// machinery -- a host that injects one includes that header itself.
+class tokenizer;
+
 // The outcome of a registration: success, or a host-supplied rejection reason
 // surfaced verbatim from the registration-policy seam.
 using registration_result = result<std::monostate, std::string>;
@@ -70,6 +76,14 @@ public:
     registration_result register_schema(std::string key_path, owner_token owner = {});
     registration_result register_tokenizer(std::string name, owner_token owner = {});
     registration_result register_source(std::string name, owner_token owner = {});
+
+    // Installs an already-constructed tokenizer (the generic core builtins are
+    // installed automatically on construction; this is how a host injects an
+    // additional one -- e.g. the opt-in HOST module via install_tokenizer(
+    // make_host_tokenizer()), or a custom category). The tokenizer is moved in; a
+    // later registration of the same category shadows an earlier one. Subject to
+    // the same state-machine and registration-policy seam as register_tokenizer.
+    registration_result install_tokenizer(tokenizer tok, owner_token owner = {});
 
     [[nodiscard]] std::size_t schema_count() const noexcept;
     [[nodiscard]] std::size_t tokenizer_count() const noexcept;

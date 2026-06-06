@@ -7,6 +7,7 @@
 #include "nucleus/schema/schema_registry.h"
 #include "nucleus/source/source_registry.h"
 #include "nucleus/entry/resolution_context.h"
+#include "nucleus/tokenizer/tokenizer_builder.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
 #include "nucleus/tokenizer/builtin_tokenizers.h"
 
@@ -15,6 +16,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <utility>
+#include <string_view>
 
 // The facade-level convergence: a transient resolution_context borrows the
 // registries, folds a precedence stack with provenance, and freezes an immutable
@@ -191,17 +194,59 @@ TEST_CASE("an unresolvable token fails the fold loudly rather than passing throu
     nucleus::nucleus engine;
 
     nucleus::env_source env;
-    env.set("greeting", "${string.upper(hi)}");
+    // No tokenizer answers the `nope` category (the core builtins are
+    // env/uuid/string), so the ${...} cannot resolve.
+    env.set("greeting", "${nope.whatever}");
 
     nucleus::source_stack stack;
     stack.add(env, nucleus::layer_rank::base, "base");
 
-    // The facade's default tokenizer registry has no `string` category, so the
-    // ${...} cannot resolve: the fold reports the offending key instead of
-    // silently layering the unexpanded text.
+    // The fold reports the offending key instead of silently layering the
+    // unexpanded text.
     auto loaded = engine.resolve(stack);
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().find("greeting") != std::string::npos);
+}
+
+TEST_CASE("the facade resolves core builtin tokens with no extra registration", "[resolution][tokens]")
+{
+    // A host that registers nothing special must still get token expansion: the
+    // generic core tokenizers are installed by default on the facade.
+    nucleus::nucleus engine;
+
+    nucleus::env_source env;
+    env.set("greeting", "${string.upper(hi)}");
+    env.set("token", "${string.concat(a,b,c)}");
+
+    nucleus::source_stack stack;
+    stack.add(env, nucleus::layer_rank::base, "base");
+
+    auto loaded = engine.resolve(stack);
+    REQUIRE(loaded);
+    REQUIRE(loaded.value().get("greeting") == "HI");
+    REQUIRE(loaded.value().get("token") == "abc");
+}
+
+TEST_CASE("install_tokenizer injects an additional tokenizer reachable at resolve", "[resolution][tokens]")
+{
+    nucleus::nucleus engine;
+
+    // A host-built tokenizer for a custom category, installed through the facade.
+    nucleus::tokenizer_builder builder("greet");
+    builder.set_wildcard([](std::string_view who) -> nucleus::token_result {
+        return std::string("hello ") + std::string(who);
+    });
+    REQUIRE(engine.install_tokenizer(std::move(builder).build()));
+
+    nucleus::env_source env;
+    env.set("msg", "${greet.world}");
+
+    nucleus::source_stack stack;
+    stack.add(env, nucleus::layer_rank::base, "base");
+
+    auto loaded = engine.resolve(stack);
+    REQUIRE(loaded);
+    REQUIRE(loaded.value().get("msg") == "hello world");
 }
 
 TEST_CASE("tokens are expanded per-source before layering (expand-then-layer)", "[resolution][tokens]")

@@ -6,6 +6,7 @@
 #include "nucleus/registration_policy.h"
 #include "nucleus/source/argv/argv_source.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
+#include "nucleus/tokenizer/builtin_tokenizers.h"
 #include "nucleus/entry/resolution_context.h"
 
 #include <memory>
@@ -20,6 +21,21 @@ namespace nucleus {
 class nucleus::impl
 {
 public:
+    // The generic core tokenizers are MECHANISM, not policy: ${env.*}, ${uuid.*},
+    // ${string.*} (and the scope file frame, handled inside the resolver) carry no
+    // host vocabulary, so they are installed by default on construction. Without
+    // this a host cannot get any token expansion through load()/resolve() at all,
+    // because the fold fails loudly on every unresolved ${...}. The HOST tokenizer
+    // module stays OPT-IN -- it pulls platform vocabulary and is registered only by
+    // a host that links it and calls install_tokenizer(make_host_tokenizer()).
+    impl()
+    {
+        owner_token core;
+        tokenizer.add(make_env_tokenizer(), core);
+        tokenizer.add(make_uuid_tokenizer(), core);
+        tokenizer.add(make_string_tokenizer(), core);
+    }
+
     registration_result review(registration_kind kind, const owner_token &owner)
     {
         registration_request request{kind, owner};
@@ -118,6 +134,16 @@ registration_result nucleus::register_tokenizer(std::string name, owner_token ow
     if(auto verdict = m_impl->review(registration_kind::tokenizer, owner); !verdict)
         return verdict;
     m_impl->tokenizer.add(tokenizer(std::move(name), {}, {}, nullptr), std::move(owner));
+    return registration_ok();
+}
+
+registration_result nucleus::install_tokenizer(tokenizer tok, owner_token owner)
+{
+    if(auto guard = reject_if_resolved(m_impl->phase, registration_kind::tokenizer); !guard)
+        return guard;
+    if(auto verdict = m_impl->review(registration_kind::tokenizer, owner); !verdict)
+        return verdict;
+    m_impl->tokenizer.add(std::move(tok), std::move(owner));
     return registration_ok();
 }
 
