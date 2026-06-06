@@ -1,11 +1,15 @@
 #include "nucleus/nucleus.h"
 
+#include "nucleus/format.h"
 #include "nucleus/schema/schema_registry.h"
 #include "nucleus/source/source_registry.h"
 #include "nucleus/registration_policy.h"
+#include "nucleus/source/argv/argv_source.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
+#include "nucleus/entry/resolution_context.h"
 
 #include <memory>
+#include <vector>
 #include <utility>
 
 namespace nucleus {
@@ -25,9 +29,30 @@ public:
         return registration_ok();
     }
 
+    // The shared resolve path: build the transient borrowing context, fold the
+    // stack (expand-then-layer with provenance), freeze the immutable result, and
+    // transition the state machine. Enforces the no-resolve-after-resolve rule.
+    load_result run_resolve(const source_stack &stack)
+    {
+        if(phase != facade_phase::configurable)
+            return fail(std::string(
+                "load/resolve is not allowed: the facade is already resolved"));
+
+        resolution_context ctx(schema, tokenizer, sources);
+        if(auto folded = ctx.fold(stack); !folded)
+            return fail(std::move(folded).error());
+
+        configuration result = ctx.freeze();
+        // The context (and every retained source buffer) is dropped here; the
+        // frozen configuration holds only owned values.
+        phase = facade_phase::resolved;
+        return result;
+    }
+
     schema_registry schema;
     tokenizer_registry tokenizer;
     source_registry sources;
+    facade_phase phase = facade_phase::configurable;
     std::shared_ptr<registration_policy> m_policy = std::make_shared<registration_policy>();
 };
 
@@ -45,8 +70,25 @@ void nucleus::set_registration_policy(std::shared_ptr<registration_policy> polic
                               : std::make_shared<registration_policy>();
 }
 
+namespace {
+
+// The state-machine guard: registration is only legal while configurable. A
+// registration attempted after resolve is rejected with a verbatim reason -- the
+// two-phase lifecycle enforced, not merely documented.
+[[nodiscard]] registration_result reject_if_resolved(facade_phase phase, registration_kind kind)
+{
+    if(phase != facade_phase::configurable)
+        return fail(::nucleus::format(
+            "cannot register a {} after the facade has resolved", to_string(kind)));
+    return registration_ok();
+}
+
+}
+
 registration_result nucleus::register_schema(std::string key_path, owner_token owner)
 {
+    if(auto guard = reject_if_resolved(m_impl->phase, registration_kind::schema); !guard)
+        return guard;
     if(auto verdict = m_impl->review(registration_kind::schema, owner); !verdict)
         return verdict;
     m_impl->schema.add(schema_spec{std::move(key_path)}, std::move(owner));
@@ -55,6 +97,8 @@ registration_result nucleus::register_schema(std::string key_path, owner_token o
 
 registration_result nucleus::register_tokenizer(std::string name, owner_token owner)
 {
+    if(auto guard = reject_if_resolved(m_impl->phase, registration_kind::tokenizer); !guard)
+        return guard;
     if(auto verdict = m_impl->review(registration_kind::tokenizer, owner); !verdict)
         return verdict;
     m_impl->tokenizer.add(tokenizer(std::move(name), {}, {}, nullptr), std::move(owner));
@@ -63,6 +107,8 @@ registration_result nucleus::register_tokenizer(std::string name, owner_token ow
 
 registration_result nucleus::register_source(std::string name, owner_token owner)
 {
+    if(auto guard = reject_if_resolved(m_impl->phase, registration_kind::source); !guard)
+        return guard;
     if(auto verdict = m_impl->review(registration_kind::source, owner); !verdict)
         return verdict;
     m_impl->sources.add(source_spec{std::move(name)}, std::move(owner));
@@ -74,5 +120,80 @@ std::size_t nucleus::schema_count() const noexcept { return m_impl->schema.size(
 std::size_t nucleus::tokenizer_count() const noexcept { return m_impl->tokenizer.size(); }
 
 std::size_t nucleus::source_count() const noexcept { return m_impl->sources.size(); }
+
+facade_phase nucleus::phase() const noexcept { return m_impl->phase; }
+
+load_result nucleus::resolve(const source_stack &stack)
+{
+    return m_impl->run_resolve(stack);
+}
+
+load_result nucleus::load(const source_stack &stack)
+{
+    return m_impl->run_resolve(stack);
+}
+
+load_result nucleus::load(std::vector<std::string> args)
+{
+    // The argv source's unknown-key recognizer bridges to the schema surface --
+    // the schema is the authority over which flags exist. The recognizer captures
+    // the schema by reference; it lives only for this resolve call.
+    schema_registry &schema = m_impl->schema;
+    argv_source argv(std::move(args));
+    argv.recognize_with([&schema](const key_path &path) { return schema.recognizes(path); });
+
+    source_stack stack;
+    stack.add(argv, layer_rank::argv, "argv");
+    return m_impl->run_resolve(stack);
+}
+
+load_result nucleus::load(std::vector<std::string> paths, const document_factory &make)
+{
+    std::vector<std::unique_ptr<source>> docs;
+    docs.reserve(paths.size());
+    for(const std::string &path : paths)
+    {
+        std::unique_ptr<source> doc = make ? make(path) : nullptr;
+        if(!doc)
+            return fail(::nucleus::format("no source could be built for path '{}'", path));
+        docs.push_back(std::move(doc));
+    }
+
+    // Later paths overlay earlier ones: the first is the base, the rest stack
+    // above it at ascending ranks so a later file wins a key contest.
+    source_stack stack;
+    for(std::size_t i = 0; i < docs.size(); ++i)
+        stack.add(*docs[i], static_cast<std::size_t>(layer_rank::base) + i,
+                  ::nucleus::format("path:{}", paths[i]));
+    return m_impl->run_resolve(stack);
+}
+
+load_result nucleus::load(std::vector<std::string> args,
+                          std::vector<std::string> paths,
+                          const document_factory &make)
+{
+    std::vector<std::unique_ptr<source>> docs;
+    docs.reserve(paths.size());
+    for(const std::string &path : paths)
+    {
+        std::unique_ptr<source> doc = make ? make(path) : nullptr;
+        if(!doc)
+            return fail(::nucleus::format("no source could be built for path '{}'", path));
+        docs.push_back(std::move(doc));
+    }
+
+    schema_registry &schema = m_impl->schema;
+    argv_source argv(std::move(args));
+    argv.recognize_with([&schema](const key_path &path) { return schema.recognizes(path); });
+
+    // Documents layer beneath argv (which wins): files set the base, the command
+    // line overrides them.
+    source_stack stack;
+    for(std::size_t i = 0; i < docs.size(); ++i)
+        stack.add(*docs[i], static_cast<std::size_t>(layer_rank::base) + i,
+                  ::nucleus::format("path:{}", paths[i]));
+    stack.add(argv, layer_rank::argv, "argv");
+    return m_impl->run_resolve(stack);
+}
 
 }

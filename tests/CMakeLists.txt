@@ -46,6 +46,8 @@ nucleus_add_test(schema_cli_bijection_test)
 nucleus_add_test(token_lexer_test)
 nucleus_add_test(token_resolution_test)
 nucleus_add_test(token_cycle_test)
+nucleus_add_test(resolution_test)
+nucleus_add_test(diagnostics_test)
 
 # ---------------------------------------------------------------------------
 # Buffer-lifetime test: exercises the XML document source through the seam and
@@ -63,6 +65,18 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         ${CMAKE_SOURCE_DIR}/src
     )
     add_test(NAME buffer_lifetime_test COMMAND buffer_lifetime_test)
+
+    # Convergence buffer-drop checkpoint: drives the full facade resolve() with an
+    # XML document source in the precedence stack, drops every buffer, then reads
+    # every value back. The single most valuable test in the project under ASan.
+    add_executable(resolve_buffer_drop_test resolve_buffer_drop_test.cpp)
+    target_link_libraries(resolve_buffer_drop_test
+        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+    target_include_directories(resolve_buffer_drop_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+    )
+    add_test(NAME resolve_buffer_drop_test COMMAND resolve_buffer_drop_test)
 endif()
 
 # ---------------------------------------------------------------------------

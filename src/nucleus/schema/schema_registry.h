@@ -53,6 +53,13 @@ public:
 
     void add(schema_spec spec, owner_token owner)
     {
+        // A path-tagged registration also defines that path as a recognized
+        // target, so the schema-as-authority surface (recognizes / CLI gating)
+        // honors paths registered through the facade, not only those attached as
+        // typed elements. A malformed path is still stored as a registration but
+        // contributes no recognized node.
+        if(key_path::parse(spec.key_path))
+            m_defined.insert(spec.key_path);
         m_entries.push_back(make_registration(std::move(spec), std::move(owner)));
     }
 

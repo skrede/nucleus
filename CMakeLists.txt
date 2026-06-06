@@ -48,6 +48,17 @@ set(NUCLEUS_KEYSPACE_HEADERS
     include/nucleus/keyspace/entry.h
     include/nucleus/keyspace/key_path.h
     include/nucleus/keyspace/keyspace.h
+    include/nucleus/keyspace/provenance.h
+)
+
+set(NUCLEUS_ENTRY_HEADERS
+    include/nucleus/entry/precedence.h
+    include/nucleus/entry/configuration.h
+)
+
+set(NUCLEUS_DIAGNOSTICS_HEADERS
+    include/nucleus/diagnostics/key_suggester.h
+    include/nucleus/diagnostics/conflict_report.h
 )
 
 set(NUCLEUS_SCHEMA_HEADERS
@@ -143,6 +154,10 @@ install(FILES ${NUCLEUS_SOURCE_ENV_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/source/env)
 install(FILES ${NUCLEUS_KEYSPACE_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/keyspace)
+install(FILES ${NUCLEUS_ENTRY_HEADERS}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/entry)
+install(FILES ${NUCLEUS_DIAGNOSTICS_HEADERS}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/diagnostics)
 install(FILES ${NUCLEUS_SCHEMA_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/schema)
 install(FILES ${NUCLEUS_SOURCE_ARGV_HEADERS}
