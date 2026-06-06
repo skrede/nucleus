@@ -39,6 +39,7 @@ nucleus_add_test(capability_gating_test)
 nucleus_add_test(discovery_test)
 nucleus_add_test(key_path_test)
 nucleus_add_test(keyspace_test)
+nucleus_add_test(schema_registry_test)
 
 # ---------------------------------------------------------------------------
 # Buffer-lifetime test: exercises the XML document source through the seam and
