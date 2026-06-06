@@ -70,10 +70,18 @@ fallback. Options: `NUCLEUS_BUILD_TESTS`, `NUCLEUS_BUILD_EXAMPLES`,
 `NUCLEUS_BUILD_SOURCE_XML` (on by default), `NUCLEUS_BUILD_TOKENIZER_HOST`,
 `NUCLEUS_BUILD_SANITIZER`, `NUCLEUS_COVERAGE`.
 
+## Documentation
+
+The [`docs/`](docs/) directory holds the API reference, split three ways:
+[types you use](docs/api-using.md), [seams you extend](docs/api-extending.md),
+and the [shipped implementations](docs/api-implementations.md) of those seams.
+
 ## Examples
 
-See `examples/` for full, compilable programs; build them with
-`-DNUCLEUS_BUILD_EXAMPLES=ON`.
+See [`examples/`](examples/) for a small, self-contained program per concept --
+quickstart, schema, argv, env, layering, custom sources, the parser concept,
+tokens, logging, completion, diagnostics, the registration policy, and XML. Build
+them with `-DNUCLEUS_BUILD_EXAMPLES=ON`.
 
 ### Quickstart
 
@@ -86,9 +94,9 @@ records which layer won each key.
 nucleus::configuration_space engine;
 engine.register_element(nucleus::element("server", nucleus::anchor::root()));
 engine.register_element(nucleus::required_element(
-    "host", nucleus::anchor::keyspace(path_of("server"))));
+    "host", nucleus::anchor::keyspace("server")));
 engine.register_element(nucleus::enum_element(
-    "mode", nucleus::anchor::keyspace(path_of("server")), {"http", "https"}));
+    "mode", nucleus::anchor::keyspace("server"), {"http", "https"}));
 
 const char *document = R"(<server host="127.0.0.1" mode="http"/>)";
 auto make = [document](const std::string &) -> std::unique_ptr<nucleus::source> {
@@ -156,7 +164,7 @@ script as a string and the host decides how to surface it.
 ```cpp
 engine.register_element(nucleus::element("logging", nucleus::anchor::root()));
 engine.register_element(nucleus::enum_element(
-    "level", nucleus::anchor::keyspace(path_of("logging")),
+    "level", nucleus::anchor::keyspace("logging"),
     {"debug", "info", "warn", "error"}));
 
 std::cout << engine.generate_completion(nucleus::shell::bash, "mytool");

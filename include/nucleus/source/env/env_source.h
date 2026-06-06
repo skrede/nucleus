@@ -9,8 +9,8 @@
 #include "nucleus/keyspace/value.h"
 
 #include <string>
-#include <vector>
 #include <utility>
+#include <vector>
 
 namespace nucleus {
 
@@ -72,6 +72,6 @@ private:
     std::vector<std::pair<std::string, std::string>> m_entries;
 };
 
-}
+} // namespace nucleus
 
 #endif

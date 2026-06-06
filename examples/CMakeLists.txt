@@ -1,7 +1,8 @@
 # Example programs, built under -DNUCLEUS_BUILD_EXAMPLES=ON. Each is a small,
-# self-contained main() that links the core library (and, where it needs them,
-# the separately-linked source/tokenizer modules). They are demonstrations, not
-# tests, so they are not registered with CTest.
+# self-contained main() focused on one concept and linked against the core
+# library (and, where it needs them, the separately-linked source/tokenizer
+# modules). They are demonstrations, not tests, so they are not registered with
+# CTest.
 
 # Registers an example executable linked against the core library.
 function(nucleus_add_example name)
@@ -10,19 +11,33 @@ function(nucleus_add_example name)
     target_include_directories(${name} PRIVATE ${CMAKE_SOURCE_DIR}/include)
 endfunction()
 
+# Getting started.
+nucleus_add_example(quickstart)
+nucleus_add_example(schema)
+
+# Sources: the built-in flat sources and the seam a host extends.
+nucleus_add_example(argv)
+nucleus_add_example(env)
+nucleus_add_example(layering)
+nucleus_add_example(custom_source)
+nucleus_add_example(parser_concept)
+
+# Tokens, logging, completion, diagnostics, and the registration-policy seam.
 nucleus_add_example(tokens)
 nucleus_add_example(logging)
 nucleus_add_example(completion)
+nucleus_add_example(diagnostics)
+nucleus_add_example(registration_policy)
 
-# The quickstart layers an XML document under the command line, so it links the
-# XML source module. The module's header lives under the internal src/ tree (it
-# is the one place pugixml is reachable), so the example adds src/ to its include
-# path -- the same way the buffer-lifetime test reaches it. Built only when the
-# XML module is.
+# The XML example layers an XML document under the command line, so it links the
+# XML source module. That module's header lives under the internal src/ tree (the
+# one place pugixml is reachable), so the example adds src/ to its include path --
+# the same way the buffer-lifetime test reaches it. Built only when the XML
+# module is.
 if(NUCLEUS_BUILD_SOURCE_XML)
-    add_executable(quickstart quickstart.cpp)
-    target_link_libraries(quickstart PRIVATE nucleus::nucleus nucleus::source_xml)
-    target_include_directories(quickstart PRIVATE
+    add_executable(xml xml.cpp)
+    target_link_libraries(xml PRIVATE nucleus::nucleus nucleus::source_xml)
+    target_include_directories(xml PRIVATE
         ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_SOURCE_DIR}/src
     )
