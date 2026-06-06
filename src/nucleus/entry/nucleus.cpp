@@ -72,6 +72,22 @@ void nucleus::set_registration_policy(std::shared_ptr<registration_policy> polic
 
 namespace {
 
+// Maps a document's position in a path list onto a precedence rank that is always
+// STRICTLY BELOW argv. The first path is the base; each later path overlays the
+// previous one, but the whole band is clamped to the overlay rank so that no
+// document -- however many were supplied -- can ever tie or outrank argv. The
+// locked precedence "argv > overlay > base > env > defaults" demands argv win
+// every config file unconditionally; a naive base+i would let a 3rd path tie argv
+// and a 4th outrank it. Within the document band later still beats earlier because
+// the fold is a stable sort and documents are added in list order.
+[[nodiscard]] std::size_t document_rank(std::size_t index)
+{
+    const auto base    = static_cast<std::size_t>(layer_rank::base);
+    const auto overlay = static_cast<std::size_t>(layer_rank::overlay);
+    const std::size_t raw = base + index;
+    return raw < overlay ? raw : overlay;
+}
+
 // The state-machine guard: registration is only legal while configurable. A
 // registration attempted after resolve is rejected with a verbatim reason -- the
 // two-phase lifecycle enforced, not merely documented.
@@ -160,11 +176,11 @@ load_result nucleus::load(std::vector<std::string> paths, const document_factory
     }
 
     // Later paths overlay earlier ones: the first is the base, the rest stack
-    // above it at ascending ranks so a later file wins a key contest.
+    // above it within a band clamped strictly below argv (the stable sort keeps
+    // later-wins inside the band) so no config file count can outrank the CLI.
     source_stack stack;
     for(std::size_t i = 0; i < docs.size(); ++i)
-        stack.add(*docs[i], static_cast<std::size_t>(layer_rank::base) + i,
-                  ::nucleus::format("path:{}", paths[i]));
+        stack.add(*docs[i], document_rank(i), ::nucleus::format("path:{}", paths[i]));
     return m_impl->run_resolve(stack);
 }
 
@@ -186,12 +202,12 @@ load_result nucleus::load(std::vector<std::string> args,
     argv_source argv(std::move(args));
     argv.recognize_with([&schema](const key_path &path) { return schema.recognizes(path); });
 
-    // Documents layer beneath argv (which wins): files set the base, the command
-    // line overrides them.
+    // Documents layer beneath argv (which always wins): the per-document ranks are
+    // clamped strictly below argv so even a long path list cannot tie or outrank
+    // the command line; later files still beat earlier ones inside that band.
     source_stack stack;
     for(std::size_t i = 0; i < docs.size(); ++i)
-        stack.add(*docs[i], static_cast<std::size_t>(layer_rank::base) + i,
-                  ::nucleus::format("path:{}", paths[i]));
+        stack.add(*docs[i], document_rank(i), ::nucleus::format("path:{}", paths[i]));
     stack.add(argv, layer_rank::argv, "argv");
     return m_impl->run_resolve(stack);
 }

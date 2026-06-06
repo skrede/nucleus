@@ -12,6 +12,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -142,6 +143,47 @@ TEST_CASE("the args-only overload wires the argv recognizer to the schema", "[re
         REQUIRE_FALSE(loaded);
         REQUIRE(loaded.error().find("logging/levle") != std::string::npos);
     }
+}
+
+TEST_CASE("argv outranks any number of config documents", "[resolution][precedence]")
+{
+    // Each path becomes a one-key source whose value is the path label, so the
+    // winning value names which layer won. With four-plus documents a naive
+    // base+index rank would push a document to or past the argv rank; the clamp
+    // keeps every document strictly below argv.
+    auto make = [](const std::string &path) -> std::unique_ptr<nucleus::source> {
+        auto src = std::make_unique<nucleus::env_source>();
+        src->set("k", path);
+        return src;
+    };
+
+    nucleus::nucleus engine;
+    REQUIRE(engine.register_schema("k"));
+
+    std::vector<std::string> paths{"p0", "p1", "p2", "p3", "p4"};
+    auto loaded = engine.load(std::vector<std::string>{"--k=from-argv"}, paths, make);
+    REQUIRE(loaded);
+    REQUIRE(loaded.value().get("k") == "from-argv");
+    REQUIRE(loaded.value().provenance_of("k")->layer == "argv");
+}
+
+TEST_CASE("the last config document wins among layered paths", "[resolution][precedence]")
+{
+    // No argv: the last path in the list must still win over earlier ones even
+    // though all documents past the base are clamped to the same band.
+    auto make = [](const std::string &path) -> std::unique_ptr<nucleus::source> {
+        auto src = std::make_unique<nucleus::env_source>();
+        src->set("k", path);
+        return src;
+    };
+
+    nucleus::nucleus engine;
+    REQUIRE(engine.register_schema("k"));
+
+    std::vector<std::string> paths{"first", "second", "third", "fourth"};
+    auto loaded = engine.load(paths, make);
+    REQUIRE(loaded);
+    REQUIRE(loaded.value().get("k") == "fourth");
 }
 
 TEST_CASE("an unresolvable token fails the fold loudly rather than passing through", "[resolution][tokens]")
