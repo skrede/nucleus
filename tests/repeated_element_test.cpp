@@ -8,9 +8,9 @@
 
 #include "nucleus/entry/configuration.h"
 
-#include "nucleus/source/source.h"
-#include "nucleus/keyspace/entry.h"
 #include "nucleus/capability.h"
+
+#include "nucleus/source/source.h"
 
 #include "nucleus/source/env/env_source.h"
 
@@ -322,6 +322,72 @@ TEST_CASE("ASan: freeze copies values out before buffer drop", "[repeated][lifet
 
     // Any use-after-free would trip under ASan.
     REQUIRE(cfg.get_all("config/tag") == std::vector<std::string>{"x", "y"});
+}
+
+TEST_CASE("relay_strain: higher-rank keyed collection wins over lower-rank flat scalar",
+          "[repeated][keyed][relay][rank]")
+{
+    // Rank-inversion regression: a flat scalar at the unified path (rank 5) must
+    // not silence a higher-ranked keyed collection (rank 10) during relay_strain.
+    // Expected: collection wins; get_all returns {"alpha","beta"} and the scalar
+    // is replaced.
+    nucleus::configuration_space engine;
+    declare_cluster_tags(engine);
+    REQUIRE(engine.select("yin"));
+
+    nucleus::env_source flat;
+    flat.set("cluster/server/tags", "low");
+
+    const char *doc = R"(
+        <cluster>
+            <server name="yin"><tags>alpha</tags><tags>beta</tags></server>
+        </cluster>)";
+
+    auto src = xml_of(doc);
+    nucleus::source_stack stack;
+    stack.add(flat, std::size_t{5},  "flat-low");
+    stack.add(*src, std::size_t{10}, "xml-high");
+
+    auto loaded = engine.resolve(stack);
+    REQUIRE(loaded);
+    const nucleus::configuration &config = loaded.value();
+
+    // Collection at rank 10 wins over flat scalar at rank 5.
+    REQUIRE(config.get_all("cluster/server/tags")
+            == std::vector<std::string>{"alpha", "beta"});
+    REQUIRE_FALSE(config.get("cluster/server/tags") == "low");
+}
+
+TEST_CASE("relay_strain: higher-rank flat override wins over lower-rank keyed collection",
+          "[repeated][keyed][relay][rank]")
+{
+    // Argv-style override: a flat source at rank 20 must displace a lower-ranked
+    // keyed collection (rank 10) during relay_strain. The flat source feeds the
+    // unified repeated path directly, producing a single-element collection that
+    // should survive because its rank is higher than the keyed collection.
+    nucleus::configuration_space engine;
+    declare_cluster_tags(engine);
+    REQUIRE(engine.select("yin"));
+
+    const char *doc = R"(
+        <cluster>
+            <server name="yin"><tags>alpha</tags><tags>beta</tags></server>
+        </cluster>)";
+
+    nucleus::env_source flat;
+    flat.set("cluster/server/tags", "high");
+
+    auto src = xml_of(doc);
+    nucleus::source_stack stack;
+    stack.add(*src,  std::size_t{10}, "xml-low");
+    stack.add(flat,  std::size_t{20}, "flat-high");
+
+    auto loaded = engine.resolve(stack);
+    REQUIRE(loaded);
+    const nucleus::configuration &config = loaded.value();
+
+    // Flat source at rank 20 wins; only "high" remains.
+    REQUIRE(config.get_all("cluster/server/tags") == std::vector<std::string>{"high"});
 }
 
 TEST_CASE("collection scope-policy exclusion and admission",

@@ -128,7 +128,7 @@ public:
             for(keyspace_entry &entry : batch.entries)
             {
                 // Expand tokens FIRST, before the repeated-path branch, so each
-                // collection value is independently expanded (Pitfall 5).
+                // collection value is independently expanded before accumulation.
                 token_result expanded = resolve_tokens(entry.value.text(), m_tokenizer);
                 if(!expanded)
                     return fail(nucleus::format(
@@ -677,15 +677,29 @@ private:
 
             if(!m_building.find(unified.value()))
             {
-                // No scalar at the unified path: collections are never displaced.
                 if(const std::vector<value> *col = m_building.find_collection(keyed))
                 {
-                    // Repeated leaf: relay the whole collection to the unified path.
-                    m_building.replace_collection(unified.value(),
-                                                  std::vector<value>(*col));
-                    if(const std::vector<origin> *co =
-                           m_provenance.collection_origins_of(keyed.str()))
-                        m_provenance.record_collection(unified.value().str(), *co);
+                    // Repeated leaf: relay to the unified path. If a collection is
+                    // already there (from a flat source fold), check rank so a
+                    // higher-rank flat source's collection is not silently discarded.
+                    const std::vector<origin> *existing_co =
+                        m_provenance.collection_origins_of(unified.value().str());
+                    const std::size_t existing_rank =
+                        (existing_co != nullptr && !existing_co->empty())
+                            ? existing_co->front().rank : 0;
+                    if(existing_rank > entry_rank)
+                    {
+                        // Unified path already has a higher-rank collection; keyed
+                        // collection is displaced -- drop it, keep the existing.
+                    }
+                    else
+                    {
+                        m_building.replace_collection(unified.value(),
+                                                      std::vector<value>(*col));
+                        if(const std::vector<origin> *co =
+                               m_provenance.collection_origins_of(keyed.str()))
+                            m_provenance.record_collection(unified.value().str(), *co);
+                    }
                 }
                 else if(const value *v = m_building.find(keyed))
                 {
@@ -699,11 +713,29 @@ private:
             {
                 // A scalar already occupies the unified path; check displacement.
                 const origin *at = m_provenance.of(unified.value().str());
-                const bool displaced = from != nullptr && at != nullptr
-                                       && at->rank > from->rank;
+
+                // For a collection leaf, scalar provenance (from) is absent; use
+                // the collection's winning rank for the displacement comparison so
+                // a lower-rank flat scalar cannot silence a higher-rank collection.
+                const std::size_t effective_rank =
+                    from != nullptr ? from->rank : entry_rank;
+                const bool displaced =
+                    at != nullptr && at->rank > effective_rank;
+
                 if(!displaced)
                 {
-                    if(const value *v = m_building.find(keyed))
+                    if(const std::vector<value> *col =
+                           m_building.find_collection(keyed))
+                    {
+                        // Collection wins: replace the scalar at the unified path.
+                        m_building.replace_collection(unified.value(),
+                                                      std::vector<value>(*col));
+                        if(const std::vector<origin> *co =
+                               m_provenance.collection_origins_of(keyed.str()))
+                            m_provenance.record_collection(
+                                unified.value().str(), *co);
+                    }
+                    else if(const value *v = m_building.find(keyed))
                     {
                         m_building.set(unified.value(), *v);
                         if(from != nullptr)
