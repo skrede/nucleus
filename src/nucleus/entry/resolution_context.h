@@ -20,14 +20,13 @@
 #include "nucleus/tokenizer/tokenizer_registry.h"
 
 #include <map>
+#include <limits>
 #include <string>
 #include <vector>
 #include <cstddef>
-#include <limits>
-#include <optional>
 #include <utility>
+#include <optional>
 #include <algorithm>
-#include <string_view>
 
 namespace nucleus {
 
@@ -145,12 +144,16 @@ public:
     // With a selection: the matching named strain survives, non-matching named
     // strains are pruned from the keyspace, and the selected strain's entries
     // are re-laid onto the declared (stripped) paths. Selecting a value that
-    // matches no strain is a loud error listing every available strain value.
-    // Selecting when the schema declares no primary key is a loud error.
+    // matches no strain is a loud error listing every available strain value --
+    // including when the container holds no keyed instances at all. Selecting
+    // when the schema declares no primary key is a loud error.
     //
     // Without a selection: exactly one named strain auto-resolves (its entries
     // re-laid); several named strains with no selection is a loud error naming
     // the container and every strain; anonymous-only content collapses unchanged.
+    //
+    // The scope policy applies whenever a strain resolves -- explicitly selected
+    // or auto-resolved -- so the two paths cannot diverge for the same strain.
     [[nodiscard]] result<std::monostate, resolve_fold_error>
     slice(const std::optional<std::string> &selection = std::nullopt,
           strain_scope_policy policy = strain_scope_policy::space_open_container_closed)
@@ -181,17 +184,40 @@ public:
             const key_path container = el.container();
 
             // Bucket every keyed leaf by its instance's key value. paths() is a
-            // snapshot, so mutating the keyspace below is safe.
+            // snapshot, so mutating the keyspace below is safe. A key value that
+            // shadows a declared element name can never be bucketed -- report it
+            // loudly here instead of letting validation fail later with an
+            // unrelated unknown-key suggestion.
             std::map<std::string, std::vector<key_path>> strains;
             for(const key_path &path : m_building.paths())
             {
                 if(m_schema.keyed_instance_path(container, path))
                     strains[path.segments()[container.size()]].push_back(path);
+                else if(m_schema.key_value_collision(container, path))
+                    return fail(nucleus::format(
+                        "primary-key value '{}' in container '{}' collides with "
+                        "a declared element of the same name: a strain cannot "
+                        "be keyed by a sibling element's name",
+                        path.segments()[container.size()], container.str()));
             }
 
             if(strains.empty())
+            {
+                // A selection against a container holding no keyed instances is
+                // unsatisfiable and must fail loudly, never silently resolve to
+                // whatever template content exists.
+                if(selection.has_value())
+                    return fail(nucleus::format(
+                        "selection '{}' does not match any strain in container "
+                        "'{}': the container holds no primary-keyed instances",
+                        selection.value(), container.str()));
                 continue;
+            }
 
+            // Resolve WHICH strain survives: the explicit selection, or the
+            // single named strain present. Several named strains with no
+            // selection is the undefined resolve the model rejects.
+            std::string chosen;
             if(selection.has_value())
             {
                 // If the requested value is not among the bucketed strains,
@@ -210,135 +236,7 @@ public:
                         "'{}'; available: {}",
                         selection.value(), container.str(), available));
                 }
-
-                // Compute Ld: minimum winning provenance rank across the selected
-                // strain's keyed paths. Default 0 if no provenance entry exists.
-                // Must be computed BEFORE pruning competing strains, because Ls
-                // computation also needs the full strains map.
-                std::size_t Ld = 0;
-                {
-                    bool found_any = false;
-                    for(const key_path &keyed : strains.at(selection.value()))
-                    {
-                        const origin *orig = m_provenance.of(keyed.str());
-                        if(orig != nullptr)
-                        {
-                            if(!found_any || orig->rank < Ld)
-                            {
-                                Ld = orig->rank;
-                                found_any = true;
-                            }
-                        }
-                    }
-                }
-
-                // Compute Ls: minimum winning provenance rank across all competing
-                // named strains' keyed paths. Unbounded (max size_t) when none exist.
-                std::size_t Ls = std::numeric_limits<std::size_t>::max();
-                for(const auto &[key_value, paths] : strains)
-                {
-                    if(key_value == selection.value())
-                        continue;
-                    for(const key_path &keyed : paths)
-                    {
-                        const origin *orig = m_provenance.of(keyed.str());
-                        if(orig != nullptr && orig->rank < Ls)
-                            Ls = orig->rank;
-                    }
-                }
-
-                // Prune every non-selected named strain: remove its keyed
-                // paths from the building keyspace and forget their provenance.
-                for(auto &[key_value, paths] : strains)
-                {
-                    if(key_value == selection.value())
-                        continue;
-                    for(const key_path &keyed : paths)
-                    {
-                        m_building.remove(keyed);
-                        m_provenance.forget(keyed.str());
-                    }
-                }
-
-                // Narrow strains to the single selected bucket so the shared
-                // re-lay loop below operates on exactly one strain.
-                auto it = strains.find(selection.value());
-                std::map<std::string, std::vector<key_path>> selected_only;
-                selected_only.emplace(it->first, std::move(it->second));
-                strains = std::move(selected_only);
-
-                // Policy (a) general-keyspace pre-pass: prune ALL paths in
-                // m_building whose winning provenance rank exceeds Ld. This sweeps
-                // both container and non-container entries, and runs on a snapshot
-                // to avoid iterator invalidation during removal.
-                if(policy == strain_scope_policy::file_level)
-                {
-                    const std::vector<key_path> snapshot = m_building.paths();
-                    for(const key_path &path : snapshot)
-                    {
-                        const origin *orig = m_provenance.of(path.str());
-                        if(orig != nullptr && orig->rank > Ld)
-                        {
-                            m_building.remove(path);
-                            m_provenance.forget(path.str());
-                        }
-                    }
-                }
-
-                // Re-lay the selected strain onto unified (key-stripped) paths,
-                // applying rank-bounded filters per policy in the re-lay loop.
-                for(const key_path &keyed : strains.begin()->second)
-                {
-                    const origin *from = m_provenance.of(keyed.str());
-                    const std::size_t entry_rank = from != nullptr ? from->rank : 0;
-
-                    // Rank-bounded filter: skip entries whose rank is outside the
-                    // policy-defined composable window for the container subtree.
-                    // (Policy (a) already pruned via the general pre-pass above;
-                    // this handles the re-lay loop filter for (a) and (b)/(c).)
-                    if(policy == strain_scope_policy::file_level ||
-                       policy == strain_scope_policy::space_open_container_closed)
-                    {
-                        if(entry_rank > Ld)
-                        {
-                            m_building.remove(keyed);
-                            m_provenance.forget(keyed.str());
-                            continue;
-                        }
-                    }
-                    else if(policy == strain_scope_policy::container_open_until_next_strain)
-                    {
-                        if(entry_rank >= Ls)
-                        {
-                            m_building.remove(keyed);
-                            m_provenance.forget(keyed.str());
-                            continue;
-                        }
-                    }
-
-                    auto unified = key_path::parse(m_schema.canonical_text(keyed));
-                    if(!unified)
-                        continue;
-
-                    const origin *at = m_provenance.of(unified.value().str());
-                    const bool displaced = from != nullptr && at != nullptr
-                                           && at->rank > from->rank;
-                    if(!displaced)
-                    {
-                        if(const value *v = m_building.find(keyed))
-                        {
-                            m_building.set(unified.value(), *v);
-                            if(from != nullptr)
-                                m_provenance.record(unified.value().str(), *from);
-                        }
-                    }
-                    m_building.remove(keyed);
-                    m_provenance.forget(keyed.str());
-                }
-
-                // The strain's key value named the instance and was consumed; the
-                // enforcer's identity-presence check is satisfied structurally.
-                m_keyed_satisfied.push_back(container.str());
+                chosen = selection.value();
             }
             else if(strains.size() > 1)
             {
@@ -356,34 +254,84 @@ public:
                     container.str(), strains.size(), keys));
             }
             else
-            {
-                // Auto-resolve: exactly one named strain, no selection needed.
-                // No scope policy applies (no competing strains, no Ld/Ls to bound).
-                for(const key_path &keyed : strains.begin()->second)
-                {
-                    auto unified = key_path::parse(m_schema.canonical_text(keyed));
-                    if(!unified)
-                        continue;
+                chosen = strains.begin()->first;
 
-                    const origin *from = m_provenance.of(keyed.str());
-                    const origin *at = m_provenance.of(unified.value().str());
-                    const bool displaced = from != nullptr && at != nullptr
-                                           && at->rank > from->rank;
-                    if(!displaced)
+            // Ld: the chosen strain's defining layer -- the minimum
+            // first-introduction rank among its keyed entries. A later overwrite
+            // of an entry does not move the defining layer. No recorded rank for
+            // any entry is an invariant violation (the fold records provenance
+            // with every set), never a silent default.
+            std::size_t Ld = 0;
+            {
+                bool found_any = false;
+                for(const key_path &keyed : strains.at(chosen))
+                {
+                    const std::size_t *first = m_provenance.first_rank_of(keyed.str());
+                    if(first != nullptr && (!found_any || *first < Ld))
                     {
-                        if(const value *v = m_building.find(keyed))
-                        {
-                            m_building.set(unified.value(), *v);
-                            if(from != nullptr)
-                                m_provenance.record(unified.value().str(), *from);
-                        }
+                        Ld = *first;
+                        found_any = true;
                     }
+                }
+                if(!found_any)
+                    return fail(nucleus::format(
+                        "strain '{}' in container '{}' has no recorded "
+                        "provenance: resolve cannot bound its defining layer",
+                        chosen, container.str()));
+            }
+
+            // Ls: the first layer ABOVE the defining layer that introduces a
+            // competing named strain. A competitor introduced at or below Ld is
+            // not the "next" strain and never bounds the chosen one. Unbounded
+            // (max size_t) when no competitor is introduced above Ld.
+            std::size_t Ls = std::numeric_limits<std::size_t>::max();
+            for(const auto &[key_value, paths] : strains)
+            {
+                if(key_value == chosen)
+                    continue;
+                for(const key_path &keyed : paths)
+                {
+                    const std::size_t *first = m_provenance.first_rank_of(keyed.str());
+                    if(first != nullptr && *first > Ld && *first < Ls)
+                        Ls = *first;
+                }
+            }
+
+            // Prune every non-chosen named strain: remove its keyed paths from
+            // the building keyspace and forget their provenance.
+            for(auto &[key_value, paths] : strains)
+            {
+                if(key_value == chosen)
+                    continue;
+                for(const key_path &keyed : paths)
+                {
                     m_building.remove(keyed);
                     m_provenance.forget(keyed.str());
                 }
-
-                m_keyed_satisfied.push_back(container.str());
             }
+
+            // file_level general pre-pass: prune ALL paths whose winning rank
+            // exceeds Ld. This sweeps keyed and general entries alike, and runs
+            // on a snapshot to avoid iterator invalidation during removal.
+            if(policy == strain_scope_policy::file_level)
+            {
+                const std::vector<key_path> snapshot = m_building.paths();
+                for(const key_path &path : snapshot)
+                {
+                    const origin *orig = m_provenance.of(path.str());
+                    if(orig != nullptr && orig->rank > Ld)
+                    {
+                        m_building.remove(path);
+                        m_provenance.forget(path.str());
+                    }
+                }
+            }
+
+            relay_strain(strains.at(chosen), policy, Ld, Ls);
+
+            // The strain's key value named the instance and was consumed; the
+            // enforcer's identity-presence check is satisfied structurally.
+            m_keyed_satisfied.push_back(container.str());
         }
 
         return std::monostate{};
@@ -442,6 +390,53 @@ public:
     }
 
 private:
+    // Re-lays one strain's keyed entries onto the unified (key-stripped) paths,
+    // applying the policy's rank-bounded filter to each entry's WINNING rank:
+    // file_level and space_open_container_closed freeze the strain's keyed
+    // entries at the defining layer Ld; container_open_until_next_strain admits
+    // them up to but excluding Ls. An entry already at the unified path with a
+    // higher winning rank (a flat override such as argv) displaces the keyed
+    // value -- it composes by plain rank precedence, outside the bounds.
+    void relay_strain(const std::vector<key_path> &keyed_paths,
+                      strain_scope_policy policy, std::size_t Ld, std::size_t Ls)
+    {
+        for(const key_path &keyed : keyed_paths)
+        {
+            const origin *from = m_provenance.of(keyed.str());
+            const std::size_t entry_rank = from != nullptr ? from->rank : 0;
+
+            const bool excluded =
+                policy == strain_scope_policy::container_open_until_next_strain
+                    ? entry_rank >= Ls
+                    : entry_rank > Ld;
+            if(excluded)
+            {
+                m_building.remove(keyed);
+                m_provenance.forget(keyed.str());
+                continue;
+            }
+
+            auto unified = key_path::parse(m_schema.canonical_text(keyed));
+            if(!unified)
+                continue;
+
+            const origin *at = m_provenance.of(unified.value().str());
+            const bool displaced = from != nullptr && at != nullptr
+                                   && at->rank > from->rank;
+            if(!displaced)
+            {
+                if(const value *v = m_building.find(keyed))
+                {
+                    m_building.set(unified.value(), *v);
+                    if(from != nullptr)
+                        m_provenance.record(unified.value().str(), *from);
+                }
+            }
+            m_building.remove(keyed);
+            m_provenance.forget(keyed.str());
+        }
+    }
+
     schema_registry &m_schema;
     tokenizer_registry &m_tokenizer;
 

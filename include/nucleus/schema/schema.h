@@ -107,9 +107,13 @@ struct schema_element
     return e;
 }
 
-// The primary key of its parent container: the one field a slice selects on. At
-// most one per container. `identity_element` is the established spelling;
-// `primary_key_element` is an alias for hosts that think in primary-key terms.
+// The primary key of its parent container: the one field a slice selects on.
+// Exactly one per configuration space -- it is the single slice selector for
+// the whole schema hierarchy. A key VALUE must not shadow a declared sibling
+// element's name (an instance literally named like a leaf can never be
+// bucketed; resolve rejects the collision loudly). `identity_element` is the
+// established spelling; `primary_key_element` is an alias for hosts that think
+// in primary-key terms.
 [[nodiscard]] inline schema_element identity_element(std::string name, anchor at)
 {
     schema_element e = element(std::move(name), std::move(at));

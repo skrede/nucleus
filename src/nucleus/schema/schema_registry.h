@@ -191,6 +191,52 @@ public:
         return !is_defined_text(instance);
     }
 
+    // Detects a primary-key value that collides with a declared element name: the
+    // path extends a keyed container by a segment that IS a declared node (so
+    // keyed_instance_path cannot treat it as a transient key), yet stripping that
+    // segment re-lays the remainder onto a declared path -- the shape of an
+    // instance literally named after a sibling element (e.g. a strain keyed
+    // "port" under a container declaring a "port" leaf). Such an instance can
+    // never be bucketed or selected, so the slice step reports it loudly instead
+    // of letting validation fail later with an unrelated unknown-key suggestion.
+    [[nodiscard]] bool key_value_collision(const key_path &container,
+                                           const key_path &path) const
+    {
+        if(path.size() <= container.size() + 1 || !keyed_container(container.str()))
+            return false;
+
+        const std::vector<std::string> &outer = container.segments();
+        const std::vector<std::string> &inner = path.segments();
+        if(!std::equal(outer.begin(), outer.end(), inner.begin()))
+            return false;
+
+        std::string instance = container.str();
+        if(!instance.empty())
+            instance += key_path::separator;
+        instance += inner[outer.size()];
+        // A non-declared segment is a true transient key value; keyed_instance_path
+        // buckets it and no collision exists.
+        if(!is_defined_text(instance))
+            return false;
+
+        // A path that is itself declared (or a prefix of a declared path) is
+        // ordinary declared content, not an instance.
+        if(is_defined_text(path.str()))
+            return false;
+
+        // Treat the segment as a transient key: if the remainder lands on a
+        // declared path, the shape is an instance whose key value shadows the
+        // declared element.
+        std::string stripped = container.str();
+        for(std::size_t i = outer.size() + 1; i < inner.size(); ++i)
+        {
+            if(!stripped.empty())
+                stripped += key_path::separator;
+            stripped += inner[i];
+        }
+        return is_defined_text(stripped);
+    }
+
     // Text-keyed variant of recognizes() for callers (diagnostics) that already
     // hold a path as a string and want to tell an unknown-path violation apart
     // from a required/identity one without re-parsing.

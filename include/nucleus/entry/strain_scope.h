@@ -4,37 +4,51 @@
 namespace nucleus {
 
 // Composition-scope policy governing which entries survive after the slice step
-// selects one named strain. The policy applies rank-bounded filtering against
-// provenance ranks recorded during the fold:
+// resolves one named strain -- whether through an explicit selection or by
+// auto-resolving the single named strain present. The policy applies
+// rank-bounded filtering against ranks recorded during the fold:
 //
-//   Ld — the minimum winning provenance rank among the selected strain's
-//        container-subtree entries (the defining layer of that strain).
-//   Ls — the minimum winning provenance rank among any competing named strain's
-//        container-subtree entries (the first layer that introduces another strain).
+//   Ld -- the minimum FIRST-INTRODUCTION rank among the resolved strain's keyed
+//         (instance-scoped) entries: the layer that defined that strain. A later
+//         overwrite of an entry does not move Ld.
+//   Ls -- the minimum first-introduction rank ABOVE Ld among any competing named
+//         strain's keyed entries: the first layer after the strain's defining
+//         layer that introduces another strain. A competing strain introduced at
+//         or below Ld does not bound the resolved strain; with no competitor
+//         above Ld, Ls is unbounded.
 //
-// When no strain resolves (no keyed container content, so strains map is empty
-// after bucketing), Ld is undefined and scope policies are no-ops.
+// The rank bounds apply to the resolved strain's keyed (instance-scoped)
+// entries; the exclusion filter tests an entry's WINNING rank, so an entry
+// overwritten by a layer outside the composable window is excluded. A direct
+// unified-path write (an entry already at the declared path with no key
+// segment, e.g. from argv or env) is NOT instance-scoped: it composes by plain
+// rank precedence and can displace the strain's value regardless of the
+// container bound -- a flat command-line override always wins. The one
+// exception is file_level, whose general pre-pass prunes EVERY entry above Ld.
+//
+// When no strain resolves at all (no keyed container content), there is no
+// defining layer and scope policies are no-ops.
 enum class strain_scope_policy : int
 {
     // The entire keyspace is frozen at the strain's defining layer. Every entry
-    // whose winning provenance rank is greater than Ld is discarded — both the
-    // selected container's subtree entries and all general keyspace entries alike.
-    // Derived files (layers above Ld) contribute nothing to the resolved result.
+    // whose winning rank is greater than Ld is discarded -- the strain's keyed
+    // entries and all general keyspace entries alike. Derived files (layers
+    // above Ld) contribute nothing to the resolved result.
     file_level,
 
     // General keyspace entries compose freely from all layers (their rank is
-    // unconstrained). The selected container's subtree entries are frozen at Ld:
-    // entries with a winning provenance rank above Ld are excluded. Entries from
-    // layers introducing other named strains do not widen the selected strain's
-    // subtree. This is the DEFAULT policy when the host sets nothing.
+    // unconstrained). The strain's keyed entries are frozen at Ld: entries with
+    // a winning rank above Ld are excluded, so no instance-scoped change below
+    // the strain's defining file takes effect. This is the DEFAULT policy when
+    // the host sets nothing.
     space_open_container_closed,
 
-    // The container subtree composes from the defining layer up to but excluding
-    // Ls: container entries with a winning provenance rank in [Ld+1, Ls-1] are
-    // admitted in addition to those at or below Ld. Container entries with a
-    // winning rank at or above Ls are excluded. If no competing strain exists, Ls
-    // is treated as unbounded and all container entries compose regardless of rank.
-    // General keyspace entries are unconstrained (same as space_open_container_closed).
+    // The strain's keyed entries compose from the defining layer up to but
+    // excluding Ls: entries with a winning rank in [Ld, Ls) are admitted.
+    // Keyed entries with a winning rank at or above Ls are excluded. If no
+    // competing strain is introduced above Ld, Ls is unbounded and all keyed
+    // entries compose regardless of rank. General keyspace entries are
+    // unconstrained (same as space_open_container_closed).
     container_open_until_next_strain,
 };
 

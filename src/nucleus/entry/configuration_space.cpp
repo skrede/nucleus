@@ -23,8 +23,9 @@
 #include <map>
 #include <memory>
 #include <vector>
-#include <optional>
 #include <utility>
+#include <optional>
+#include <string_view>
 
 namespace nucleus {
 
@@ -167,14 +168,15 @@ namespace {
     return raw < overlay ? raw : overlay;
 }
 
-// The state-machine guard: registration is only legal while configurable. A
-// registration attempted after resolve is rejected with a verbatim reason -- the
-// two-phase lifecycle enforced, not merely documented.
-[[nodiscard]] registration_result reject_if_resolved(facade_phase phase, registration_kind kind)
+// The state-machine guard: mutating the configurable surface is only legal
+// while configurable. An attempt after resolve is rejected with a reason naming
+// the operation that was actually attempted -- the two-phase lifecycle
+// enforced, not merely documented.
+[[nodiscard]] registration_result reject_if_resolved(facade_phase phase, std::string_view what)
 {
     if(phase != facade_phase::configurable)
         return fail(nucleus::format(
-            "cannot register a {} after the facade has resolved", to_string(kind)));
+            "{} is not allowed after the facade has resolved", what));
     return registration_ok();
 }
 
@@ -182,7 +184,7 @@ namespace {
 
 registration_result configuration_space::register_schema(std::string key_path, owner_token owner)
 {
-    if(auto guard = reject_if_resolved(m_impl->phase, registration_kind::schema); !guard)
+    if(auto guard = reject_if_resolved(m_impl->phase, "registering a schema"); !guard)
         return guard;
     if(auto verdict = m_impl->review(registration_kind::schema, owner); !verdict)
         return verdict;
@@ -193,7 +195,7 @@ registration_result configuration_space::register_schema(std::string key_path, o
 
 registration_result configuration_space::register_element(schema_element element, owner_token owner)
 {
-    if(auto guard = reject_if_resolved(m_impl->phase, registration_kind::schema); !guard)
+    if(auto guard = reject_if_resolved(m_impl->phase, "registering a schema element"); !guard)
         return guard;
     if(auto verdict = m_impl->review(registration_kind::schema, owner); !verdict)
         return verdict;
@@ -209,7 +211,7 @@ registration_result configuration_space::register_element(schema_element element
 
 registration_result configuration_space::select(std::string key_value)
 {
-    if(auto guard = reject_if_resolved(m_impl->phase, registration_kind::schema); !guard)
+    if(auto guard = reject_if_resolved(m_impl->phase, "select()"); !guard)
         return guard;
     m_impl->m_selection = std::move(key_value);
     return registration_ok();
@@ -217,7 +219,7 @@ registration_result configuration_space::select(std::string key_value)
 
 registration_result configuration_space::set_strain_scope(strain_scope_policy policy)
 {
-    if(auto guard = reject_if_resolved(m_impl->phase, registration_kind::schema); !guard)
+    if(auto guard = reject_if_resolved(m_impl->phase, "set_strain_scope()"); !guard)
         return guard;
     m_impl->m_strain_scope = policy;
     return registration_ok();
@@ -225,7 +227,7 @@ registration_result configuration_space::set_strain_scope(strain_scope_policy po
 
 registration_result configuration_space::register_tokenizer(std::string name, owner_token owner)
 {
-    if(auto guard = reject_if_resolved(m_impl->phase, registration_kind::tokenizer); !guard)
+    if(auto guard = reject_if_resolved(m_impl->phase, "registering a tokenizer"); !guard)
         return guard;
     if(auto verdict = m_impl->review(registration_kind::tokenizer, owner); !verdict)
         return verdict;
@@ -235,7 +237,7 @@ registration_result configuration_space::register_tokenizer(std::string name, ow
 
 registration_result configuration_space::install_tokenizer(tokenizer tok, owner_token owner)
 {
-    if(auto guard = reject_if_resolved(m_impl->phase, registration_kind::tokenizer); !guard)
+    if(auto guard = reject_if_resolved(m_impl->phase, "installing a tokenizer"); !guard)
         return guard;
     if(auto verdict = m_impl->review(registration_kind::tokenizer, owner); !verdict)
         return verdict;
@@ -245,7 +247,7 @@ registration_result configuration_space::install_tokenizer(tokenizer tok, owner_
 
 registration_result configuration_space::register_source(std::string name, owner_token owner)
 {
-    if(auto guard = reject_if_resolved(m_impl->phase, registration_kind::source); !guard)
+    if(auto guard = reject_if_resolved(m_impl->phase, "registering a source"); !guard)
         return guard;
     if(auto verdict = m_impl->review(registration_kind::source, owner); !verdict)
         return verdict;

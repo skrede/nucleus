@@ -36,9 +36,14 @@ public:
 
     // Records (last-write-wins, mirroring the keyspace fold) the origin of the
     // value at `key`. Called in lockstep with keyspace::set so the two never
-    // disagree about which source provided the winning value.
+    // disagree about which source provided the winning value. The rank of the
+    // FIRST layer to set the key is retained separately across overwrites: the
+    // winning origin answers "who provided this value?", the first rank answers
+    // "which layer introduced this key?" -- the slice step bounds a strain's
+    // defining layer by introduction, not by whoever overwrote it last.
     void record(const std::string &key, origin where)
     {
+        m_first_ranks.try_emplace(key, where.rank);
         m_origins.insert_or_assign(key, std::move(where));
     }
 
@@ -48,12 +53,21 @@ public:
     void forget(const std::string &key)
     {
         m_origins.erase(key);
+        m_first_ranks.erase(key);
     }
 
     [[nodiscard]] const origin *of(const std::string &key) const
     {
         auto it = m_origins.find(key);
         return it == m_origins.end() ? nullptr : &it->second;
+    }
+
+    // The rank of the layer that FIRST set `key`, regardless of later
+    // overwrites; nullptr when the key was never recorded.
+    [[nodiscard]] const std::size_t *first_rank_of(const std::string &key) const
+    {
+        auto it = m_first_ranks.find(key);
+        return it == m_first_ranks.end() ? nullptr : &it->second;
     }
 
     [[nodiscard]] std::size_t size() const noexcept { return m_origins.size(); }
@@ -65,6 +79,9 @@ public:
 
 private:
     std::map<std::string, origin> m_origins;
+    // First-introduction ranks, kept apart from the winning origins so an
+    // overwrite never erases the answer to "which layer introduced this key?".
+    std::map<std::string, std::size_t> m_first_ranks;
 };
 
 }

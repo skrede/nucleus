@@ -122,14 +122,19 @@ public:
     // primary-key value of the single strain to keep during resolve. When set,
     // resolve() prunes every non-matching named strain and strips the transient
     // key segment before freezing the configuration. Must be called before
-    // load()/resolve(); calling after resolve is a state-machine error.
+    // load()/resolve(); calling after resolve is a state-machine error. A
+    // resolve parameter, not a registration: it is not offered to the
+    // registration-policy seam.
     registration_result select(std::string key_value);
 
     // Sets the composition-scope policy that governs which entries survive the
     // slice step. The default is space_open_container_closed (general entries
-    // compose freely; the selected container's subtree freezes at Ld). Must be
+    // compose freely; the resolved strain's keyed entries freeze at its
+    // defining layer). The policy applies whenever a strain resolves -- through
+    // select() or by auto-resolving the single named strain present. Must be
     // called before load()/resolve(); calling after resolve is a state-machine
-    // error.
+    // error. A resolve parameter, not a registration: it is not offered to the
+    // registration-policy seam.
     registration_result set_strain_scope(strain_scope_policy policy);
 
     registration_result register_tokenizer(std::string name, owner_token owner = {});

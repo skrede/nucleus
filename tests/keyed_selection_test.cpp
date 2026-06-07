@@ -158,13 +158,15 @@ TEST_CASE("select() after resolve() is rejected",
                               [doc](const std::string &) { return xml_of(doc); });
     REQUIRE(loaded);
 
-    // After resolve the facade is sealed; select() is a state-machine error.
+    // After resolve the facade is sealed; select() is a state-machine error,
+    // and the diagnostic names the operation that was attempted.
     auto result = engine.select("web");
     REQUIRE_FALSE(result);
+    REQUIRE(result.error().find("select") != std::string::npos);
     REQUIRE(result.error().find("resolved") != std::string::npos);
 }
 
-TEST_CASE("select() with anonymous-only strains: anonymous collapse still works",
+TEST_CASE("anonymous-only content collapses without a selection",
           "[selection][keyed]")
 {
     // No named strain anywhere -- the composed template is the configuration.
@@ -184,4 +186,49 @@ TEST_CASE("select() with anonymous-only strains: anonymous collapse still works"
 
     REQUIRE(config.get("cluster/server/port") == "8080");
     REQUIRE(config.get("cluster/server/protocol") == "tcp");
+}
+
+TEST_CASE("select() against anonymous-only content fails loudly",
+          "[selection][keyed]")
+{
+    // The container holds only an anonymous template instance: a selection is
+    // unsatisfiable and must be rejected, never silently dropped in favor of
+    // whatever template content exists.
+    const char *doc = R"(
+        <cluster>
+            <server><port>8080</port></server>
+        </cluster>)";
+
+    nucleus::configuration_space engine;
+    declare_cluster(engine);
+
+    REQUIRE(engine.select("web"));
+
+    auto loaded = engine.load(std::vector<std::string>{"doc.xml"},
+                              [doc](const std::string &) { return xml_of(doc); });
+    REQUIRE_FALSE(loaded);
+    REQUIRE(loaded.error().find("web") != std::string::npos);
+    REQUIRE(loaded.error().find("no primary-keyed instances") != std::string::npos);
+}
+
+TEST_CASE("a key value shadowing a declared element name is a loud error",
+          "[selection][keyed]")
+{
+    // A strain literally named after a sibling element ("port") can never be
+    // bucketed -- its projected path collides with the declared leaf. The
+    // resolve names the collision instead of failing later with an unrelated
+    // unknown-key suggestion.
+    const char *doc = R"(
+        <cluster>
+            <server name="port"><port>80</port></server>
+        </cluster>)";
+
+    nucleus::configuration_space engine;
+    declare_cluster(engine);
+
+    auto loaded = engine.load(std::vector<std::string>{"doc.xml"},
+                              [doc](const std::string &) { return xml_of(doc); });
+    REQUIRE_FALSE(loaded);
+    REQUIRE(loaded.error().find("primary-key value 'port'") != std::string::npos);
+    REQUIRE(loaded.error().find("collides") != std::string::npos);
 }
