@@ -14,6 +14,7 @@ that satisfy these seams, see [Shipped implementations](api-implementations.md).
 - [`feature_gate` — capability gating](#feature_gate)
 - [`log_sink` — the logging seam](#log_sink)
 - [`registration_policy` — intercepting registration](#registration_policy)
+- [Inheritance: `inherit_declaration`, `inherit_policy`, `extend_disposition`](#inheritance)
 - [Discovery: `extension_registry`, `discovery`](#discovery)
 - [`path_text`, `cli_surface` — shared transforms](#transforms)
 
@@ -34,16 +35,31 @@ public:
     virtual ~source() = default;
     [[nodiscard]] virtual capability_descriptor capabilities() const = 0;
     [[nodiscard]] virtual source_result pull() = 0;
+
+    // Called by the resolve fold just before pull(), passing a schema-derived
+    // projection. A document source uses it to project repeatable keyed
+    // containers faithfully (one instance per primary-key value) instead of
+    // collapsing repeated siblings last-wins. Default: no-op. Flat sources
+    // (env, argv) and sources that do not opt in ignore it.
+    virtual void apply_projection(const schema_projection &) {}
+
+    // Called after pull() to declare this source's inheritance chain parent,
+    // if any. Default: no-op (returns inherit_default). Flat sources ignore it.
+    [[nodiscard]] virtual inherit_declaration inheritance() const { return {}; }
 };
 ```
 
-A subclass implements two methods:
+A subclass implements two required methods and may override the two optional ones:
 
 - **`capabilities()`** — declare which structural affordances this source
   provides (see [`capability_descriptor`](#capability)). Be honest: a source that
   claims an affordance it lacks defeats graceful degradation.
 - **`pull()`** — produce one batch of entries, or a `source_error` (a
   `std::string`) naming why it failed. The core never silently drops a source.
+- **`apply_projection()`** -- override when the source is a document that needs
+  the schema's keyed-container map to emit one sub-tree per named instance.
+- **`inheritance()`** -- override when the source can declare a parent file; the
+  chain walker calls it after `pull()` completes.
 
 ### Supporting types
 
@@ -53,9 +69,13 @@ using source_result = result<source_batch, source_error>;
 
 struct source_batch {
     std::vector<keyspace_entry> entries;
+    std::vector<extend_disposition> dispositions;  // empty for flat sources
     retained_buffer buffer;     // pins any backing memory the entries view into
 };
 ```
+
+A document source that permits re-opening a named instance populates
+`dispositions`; flat sources leave it empty.
 
 `keyspace_entry` (`"nucleus/keyspace/entry.h"`) is `{ std::string path;
 value value; capability_descriptor capabilities; }`; build one with
@@ -264,6 +284,111 @@ public:
 Install it with `configuration_space::set_registration_policy(std::make_shared<...>())`.
 A rejection's `reason()` is surfaced verbatim as the `registration_result` error.
 See [`examples/registration_policy.cpp`](../examples/registration_policy.cpp).
+
+---
+
+<a id="inheritance"></a>
+## Inheritance: inherit_declaration, inherit_policy, extend_disposition
+
+`#include "nucleus/source/inherit_declaration.h"`
+
+These three types together form the seam through which a document source declares
+ancestry and a host controls chain walking. All three are in the same header; the
+core never interprets file paths or naming conventions.
+
+### inherit_declaration
+
+The signal a source returns from `inheritance()` after its `pull()`. The chain
+walker reads it to decide whether to fetch another source.
+
+```cpp
+struct inherit_declaration {
+    enum class kind { parent_path, inherit_default, opt_out };
+    kind which = kind::inherit_default;
+    std::string path;  // non-empty only when which == parent_path
+};
+```
+
+The three kinds:
+
+- `parent_path` -- this source declares a parent file; the chain walker fetches it
+  using the host's document factory.
+- `inherit_default` -- no explicit declaration; compose with a base if one exists,
+  otherwise no-op. This is the default when the source returns `{}`.
+- `opt_out` -- explicitly truncate the chain below this source. No parent is
+  fetched regardless of what a base layer might declare.
+
+### inherit_policy
+
+The host-injectable policy installed via
+`configuration_space::set_inherit_policy(inherit_policy)`. Must be called before
+`load()`/`resolve()`.
+
+```cpp
+struct inherit_policy {
+    std::function<std::string(const source &)> admissibility;
+    std::size_t depth_cap = 16;
+};
+```
+
+- `admissibility` -- invoked for each candidate parent source after it is pulled
+  (not for the top-level requested source). A non-empty return value rejects that
+  parent and fails the load with the returned string as the error. An empty return
+  admits the source. A null admissibility callback (the default) admits all sources.
+- `depth_cap` -- the maximum inheritance chain depth before the walker fails with
+  a loud error. Default is 16.
+
+### extend_disposition
+
+A re-open declaration carried in `source_batch::dispositions`. A derived document
+that re-opens a named instance from a base document declares the instance's
+container path and primary-key value alongside the extend strength.
+
+```cpp
+enum class extend_strength { narrow, wide };
+
+struct extend_disposition {
+    std::string container_path;  // e.g. "cluster/server"
+    std::string key_value;       // the instance's primary-key value, e.g. "yin"
+    extend_strength strength;
+};
+```
+
+The two strengths:
+
+- `narrow` -- the re-open is honored where the active scope policy admits
+  container changes. Subject to `set_strain_scope()` filtering.
+- `wide` -- the re-open composes regardless of scope policy. An explicit
+  site-level override: the derived layer's entries for this instance are always
+  admitted.
+
+A disposition for a primary-key value not present in any base layer is a loud
+error (extend-without-base is rejected at resolve).
+
+### XML grammar -- shipped implementation (xml_source)
+
+The XML source (`nucleus::xml::xml_source`) translates document attributes into
+`inherit_declaration` and `extend_disposition` values automatically.
+
+**Root element:** the `inherit=` attribute populates `inherit_declaration`:
+
+- `inherit="path/to/parent.xml"` -- sets `kind::parent_path`; the chain walker
+  fetches the named file through the host's document factory.
+- `inherit="none"` -- sets `kind::opt_out`; the chain is truncated at this source.
+- Attribute absent -- sets `kind::inherit_default`.
+
+The `inherit=` attribute is valid only on the document root; placing it on any
+other element is a loud parse error naming the offending element.
+
+**Instance elements:** the `extend=` attribute declares a re-open disposition:
+
+- `extend="narrow"` -- emits an `extend_disposition` with `strength::narrow`.
+- `extend="wide"` -- emits an `extend_disposition` with `strength::wide`.
+- Any other value is a loud parse error.
+
+See [`examples/strains.cpp`](../examples/strains.cpp) for a complete example and
+[`tests/inherit_chain_test.cpp`](../tests/inherit_chain_test.cpp) for the full
+inheritance chain test suite.
 
 ---
 

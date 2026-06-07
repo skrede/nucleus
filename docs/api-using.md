@@ -8,6 +8,8 @@ back. None of these requires subclassing. For the seams a host extends, see
 
 - [`configuration_space` — the facade](#configuration_space)
 - [Declaring a schema: `schema_element`, `anchor`, free factories](#schema)
+- [Keying model: primary key, uniqueness, strains](#keying)
+- [Strain selection: `select()`, `set_strain_scope()`](#selection)
 - [`key_path` — addressing the keyspace](#key_path)
 - [`configuration` — the resolved result](#configuration)
 - [Provenance: `origin`, `provenance`](#provenance)
@@ -39,6 +41,11 @@ registration_result register_tokenizer(std::string name, owner_token owner = {})
 registration_result register_source(std::string name, owner_token owner = {});
 registration_result install_tokenizer(tokenizer tok, owner_token owner = {});
 void set_registration_policy(std::shared_ptr<registration_policy> policy);
+
+// Strain selection and scope (configurable phase only; must be called before load/resolve).
+registration_result select(std::string key_value);
+registration_result set_strain_scope(strain_scope_policy policy);
+registration_result set_inherit_policy(inherit_policy policy);
 
 // Resolve (transitions to the resolved phase).
 load_result resolve(const source_stack &stack);
@@ -87,15 +94,24 @@ struct schema_element {
     anchor at = anchor::root();             // where it attaches
     bool required = false;                   // must carry a value at resolve
     bool identity = false;                   // this node's selector / primary key
+    bool unique = false;                     // value must be distinct across sibling instances
     std::vector<std::string> allowed_values; // closed set; empty = unconstrained
     key_path declared_path() const;          // anchor path + name
+    bool enforces_uniqueness() const;        // true if identity || unique
 };
 
 schema_element element(std::string name, anchor at);
 schema_element required_element(std::string name, anchor at);
 schema_element identity_element(std::string name, anchor at);
+schema_element primary_key_element(std::string name, anchor at);  // alias for identity_element
+schema_element unique_element(std::string name, anchor at);
 schema_element enum_element(std::string name, anchor at, std::vector<std::string> values);
 ```
+
+A primary-key field selects one instance from a repeatable container and is
+implicitly unique; a `unique_element` constrains values to be distinct across
+sibling instances without taking on the selector role. Both are checked at resolve;
+violations are loud errors.
 
 ### `anchor` — where an element attaches
 
@@ -121,6 +137,76 @@ engine.register_element(nucleus::enum_element("mode", nucleus::anchor::keyspace(
 ```
 
 See [`examples/schema.cpp`](../examples/schema.cpp).
+
+---
+
+<a id="keying"></a>
+## Keying model: primary key, uniqueness, strains
+
+Marking an element with `identity` (via `primary_key_element`) makes its parent
+container repeatable: multiple instances can coexist in one fileset, each
+distinguished by a distinct primary-key value. Exactly one primary-key element is
+allowed per configuration space; it is the single slice selector for the whole
+schema hierarchy.
+
+`unique_element` constrains sibling values to be distinct without enabling the
+selector role. Many unique fields may coexist per container; a primary key is
+implicitly unique whether or not `unique` is also set.
+
+Anonymous instances (instances with no primary-key value) are templates: they
+compose in document order and are inherited by all named instances. Named
+instances compose on top of the template.
+
+Resolution always strips the transient key segment: the resolved keyspace
+contains `cluster/server/port`, never `cluster/server/yin/port`. The primary-key
+value names which instance was selected, not a permanent path segment.
+
+Duplicate primary-key values within one parse stack are a loud error. Duplicate
+`unique` values across sibling instances are a loud error.
+
+```cpp
+engine.register_element(nucleus::element("server", anchor::keyspace("cluster")));
+engine.register_element(nucleus::primary_key_element("name", anchor::keyspace("cluster/server")));
+engine.register_element(nucleus::unique_element("serial", anchor::keyspace("cluster/server")));
+```
+
+---
+
+<a id="selection"></a>
+## Strain selection: select(), set_strain_scope()
+
+Select a specific strain before resolve:
+
+```cpp
+engine.select("yin");  // keep only the instance whose name == "yin"
+```
+
+Rules:
+
+- No selection and exactly one named strain present: auto-resolves to that strain.
+- No selection and multiple named strains: loud resolve error listing the available
+  strain names.
+- Unknown selection key value: loud error.
+
+Scope policy governs which entries survive after the slice step. Set it before
+load/resolve:
+
+```cpp
+engine.set_strain_scope(nucleus::strain_scope_policy::container_open_until_next_strain);
+```
+
+The three values and their effects:
+
+| Policy | Effect |
+|--------|--------|
+| `file_level` | The entire keyspace is frozen at the strain's defining layer. Every entry whose winning rank exceeds Ld is discarded, keyed and general alike. |
+| `space_open_container_closed` | General keyspace entries compose freely from all layers. The strain's keyed entries are frozen at Ld: entries with a winning rank above Ld are excluded. This is the default. |
+| `container_open_until_next_strain` | The strain's keyed entries compose from Ld up to but excluding Ls (the first layer that introduces a competing strain). If no competing strain exists above Ld, Ls is unbounded. General entries are unconstrained. |
+
+Both `select()` and `set_strain_scope()` must be called before `load()`/`resolve()`;
+calling after resolve is a state-machine error.
+
+See [`examples/strains.cpp`](../examples/strains.cpp).
 
 ---
 

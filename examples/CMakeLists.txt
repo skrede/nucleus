@@ -41,4 +41,11 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_SOURCE_DIR}/src
     )
+
+    add_executable(strains strains.cpp)
+    target_link_libraries(strains PRIVATE nucleus::nucleus nucleus::source_xml)
+    target_include_directories(strains PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+    )
 endif()
