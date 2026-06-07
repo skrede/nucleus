@@ -12,6 +12,7 @@ back. None of these requires subclassing. For the seams a host extends, see
 - [Strain selection: `select()`, `set_strain_scope()`](#selection)
 - [`key_path` — addressing the keyspace](#key_path)
 - [`configuration` — the resolved result](#configuration)
+- [Typed fields: `typed_element<T>`](#typed)
 - [Provenance: `origin`, `provenance`](#provenance)
 - [Precedence: `source_stack`, `layer_rank`](#precedence)
 - [Built-in sources: `env_source`, `argv_source`](#sources)
@@ -109,6 +110,11 @@ schema_element primary_key_element(std::string name, anchor at);  // alias for i
 schema_element unique_element(std::string name, anchor at);
 schema_element repeated_element(std::string name, anchor at);
 schema_element enum_element(std::string name, anchor at, std::vector<std::string> values);
+template<typename T>
+schema_element typed_element(std::string name, anchor at,
+    std::function<result<std::any, std::string>(std::string_view)> conv);
+template<typename T>
+schema_element typed_element(std::string name, anchor at);  // built-in scalar converter
 ```
 
 A primary-key field selects one instance from a repeatable container and is
@@ -274,6 +280,145 @@ For a path declared `repeated`, `get_all()` returns the full ordered collection
 and `get()` returns the LAST value in precedence order; for a single-value path
 `get_all()` returns a one-element vector. `provenance_of()` covers scalar keys
 only; a collection's per-element origins come from `collection_provenance_of()`.
+
+---
+
+<a id="typed"></a>
+## Typed fields: `typed_element<T>`
+
+`#include "nucleus/schema/converters.h"`
+
+### Registration
+
+`typed_element<T>` attaches a converter and a type identity to a `schema_element`; the
+element is otherwise identical to `element()`. Two overloads are available:
+
+- The two-argument overload `typed_element<T>(name, at)` uses the built-in scalar
+  converter for `T`. Only the following types have a built-in converter: `int8_t`,
+  `int16_t`, `int32_t`, `int64_t`, `uint8_t`, `uint16_t`, `uint32_t`, `uint64_t`,
+  `float`, `double`, `bool`, `char`, `std::string`. Passing any other type is a
+  static assertion failure.
+- The three-argument overload `typed_element<T>(name, at, conv)` accepts a
+  host-supplied converter of type
+  `std::function<result<std::any, std::string>(std::string_view)>`. The converter
+  must not throw; return `fail()` for any conversion error.
+
+Note on toolchain floor for floating-point `from_chars`: GCC 11+, LLVM Clang 14+,
+MSVC 19.29+, Apple Clang 15+. The Apple Clang floor is Xcode 15 -- `libc++` gained
+floating-point `from_chars` in Xcode 15, not Xcode 14.
+
+```cpp
+engine.register_element(
+    nucleus::typed_element<vec3>("pos", nucleus::anchor::keyspace("body"), make_vec3_converter()));
+engine.register_element(
+    nucleus::typed_element<int32_t>("count", nucleus::anchor::keyspace("body")));
+```
+
+### Content-contract semantics
+
+Declaring a type is a content contract -- every declared path that survives slicing is
+converted at the resolve boundary. A conversion failure fails the resolve loudly, naming
+the path, the reason the converter returned, and the winning layer's label. Absent paths
+are silently skipped (absence is orthogonal to required-ness, which `register_element`
+controls separately). A bad value in a pruned strain or a layer excluded by scope policy
+is never converted.
+
+The converter's type `T` must match the type passed to `get_as<T>` outright -- `type_index`
+equality, no implicit widening, no inheritance walking. Storing `int32_t` and reading as
+`int64_t` is a type mismatch.
+
+### Accessors
+
+The resolved configuration adds two typed reads alongside the existing text reads:
+
+```cpp
+template<typename T> result<T, std::string>              get_as(const std::string &key) const;
+template<typename T> result<std::vector<T>, std::string> get_all_as(const std::string &key) const;
+```
+
+| Condition | Error substring |
+|-----------|-----------------|
+| path carries no value | `"is absent"` |
+| path has a value but no converter | `"declares no type converter"` |
+| stored type does not equal requested type | `"type mismatch"` |
+| path holds a typed collection -- use `get_all_as` | `"use get_all_as"` |
+| path holds a single typed value -- use `get_as` | `"use get_as"` |
+
+`any_cast<T>` produces a copy of the stored value.
+
+### Host converter recipes
+
+Three patterns cover the most common host-side converter shapes.
+
+#### Closed-set enum
+
+```cpp
+enum class color { red, green, blue };
+auto make_color_converter()
+{
+    const std::map<std::string, color> table{
+        {"red", color::red}, {"green", color::green}, {"blue", color::blue}};
+    return [table](std::string_view sv) -> nucleus::result<std::any, std::string> {
+        auto it = table.find(std::string(sv));
+        if(it == table.end())
+            return nucleus::fail(std::string("unknown color '") + std::string(sv) + "'");
+        return std::any(it->second);
+    };
+}
+```
+
+The converter owns the name-to-value map as a closure. Any unrecognized string fails the
+resolve at load time with the converter's message. The host registers it as
+`typed_element<color>("color", at, make_color_converter())`.
+
+#### Flags (split and bitwise-OR)
+
+```cpp
+// Example: flags field accepting "read|write|exec".
+enum flags : int { read = 1, write = 2, exec = 4 };
+auto make_flags_converter(std::map<std::string, int> table)
+{
+    return [table = std::move(table)](std::string_view sv) -> nucleus::result<std::any, std::string> {
+        int result = 0;
+        std::string_view rest = sv;
+        while(!rest.empty()) {
+            auto pos = rest.find('|');
+            std::string token(rest.substr(0, pos));
+            auto it = table.find(token);
+            if(it == table.end())
+                return nucleus::fail(std::string("unknown flag '") + token + "'");
+            result |= it->second;
+            rest = (pos == std::string_view::npos) ? std::string_view{} : rest.substr(pos + 1);
+        }
+        return std::any(result);
+    };
+}
+```
+
+The converter splits the input on `'|'`, validates each token against the table, and
+accumulates the bits. A token not in the table fails the resolve at load time. Completion
+candidates and lenient/strict integration remain the host's responsibility.
+
+#### Leniency
+
+```cpp
+auto make_lenient_int_converter(int fallback)
+{
+    auto base = nucleus::make_scalar_converter<int32_t>();
+    return [base, fallback](std::string_view sv) -> nucleus::result<std::any, std::string> {
+        auto r = base(sv);
+        if(!r)
+            return std::any(fallback);
+        return r;
+    };
+}
+```
+
+A converter that returns a fallback on failure implements lenient-policy behavior for that
+field -- the engine itself stays strict and never applies its own fallback. This lets
+individual fields opt into leniency without adding a policy knob to the engine.
+
+See [`examples/typed.cpp`](../examples/typed.cpp).
 
 ---
 

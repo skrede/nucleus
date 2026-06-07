@@ -48,4 +48,11 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_SOURCE_DIR}/src
     )
+
+    add_executable(typed typed.cpp)
+    target_link_libraries(typed PRIVATE nucleus::nucleus nucleus::source_xml)
+    target_include_directories(typed PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+    )
 endif()

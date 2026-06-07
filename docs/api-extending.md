@@ -11,6 +11,7 @@ that satisfy these seams, see [Shipped implementations](api-implementations.md).
 - [`capability_descriptor` — declaring affordances](#capability)
 - [`document_source` — the document subcategory](#document_source)
 - [`Parser` — the compile-time parser concept](#parser)
+- [Typed converter: `schema_element::converter`](#typed-converter)
 - [`feature_gate` — capability gating](#feature_gate)
 - [`log_sink` — the logging seam](#log_sink)
 - [`registration_policy` — intercepting registration](#registration_policy)
@@ -189,6 +190,62 @@ static_assert(nucleus::Parser<table_parser>);
 Two authoring paths, one runtime seam: a hand-written `source` subclass and a
 concept-satisfying struct both reach the engine as `source&`. See
 [`examples/parser_concept.cpp`](../examples/parser_concept.cpp).
+
+---
+
+<a id="typed-converter"></a>
+## Typed converter: `schema_element::converter`
+
+`#include "nucleus/schema/converters.h"` (for `typed_element<T>` and `make_scalar_converter<T>`)
+`#include "nucleus/schema/schema.h"` (for `schema_element`)
+
+A `schema_element` carries two optional typed-seam fields:
+
+```cpp
+struct schema_element {
+    // ... other fields ...
+    std::function<result<std::any, std::string>(std::string_view)> converter;
+    std::optional<std::type_index> type_identity;
+};
+```
+
+`converter` is a bare `std::function` -- an empty (default-constructed) function means no
+conversion. Both fields are set together by `typed_element<T>()`; a plain `element()` leaves
+them empty. A path with a converter but no type identity (or vice versa) is never consulted
+by the resolve pipeline -- both must be present for conversion to run.
+
+### Position in the resolve pipeline
+
+Conversion runs after `validate()` and before `freeze()`, on the post-slice keyspace. Every
+path whose schema element carries a converter is visited; absent paths are silently skipped.
+Only paths that survived slicing and scope-policy filtering are converted -- a bad value in a
+pruned strain or an excluded layer is never reached.
+
+A conversion failure produces a resolve error in the form:
+
+```
+conversion failed for 'path': <converter reason> (layer: <winning layer label>)
+```
+
+For repeated paths, the per-element form names the zero-based index:
+
+```
+conversion failed for 'path' element [N]: <converter reason> (layer: <winning layer label>)
+```
+
+### Converter contract
+
+A converter is `std::function<result<std::any, std::string>(std::string_view)>`:
+
+- Receives the already-tokenized, fully-resolved text value.
+- Returns `std::any` wrapping the converted value of type `T` on success.
+- Returns `fail(reason)` on any conversion error -- must not throw.
+- The `std::any` must carry exactly `typeid(T)` (the same type passed to
+  `typed_element<T>`); the access-time `get_as<T>` check is a strict `type_index`
+  equality test -- no widening, no coercion.
+
+The built-in `make_scalar_converter<T>()` is exposed so a host can compose it: wrap it
+with extra validation without reimplementing the low-level parsing.
 
 ---
 
