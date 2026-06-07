@@ -3,22 +3,24 @@
 // access surface). Adds ONLY shapes not covered by typed_element_test.cpp.
 
 #include "nucleus/configuration_space.h"
-#include "nucleus/entry/configuration.h"
+
 #include "nucleus/entry/strain_scope.h"
-#include "nucleus/source/source.h"
+#include "nucleus/entry/configuration.h"
 
 #include "nucleus/schema/anchor.h"
-#include "nucleus/schema/converters.h"
 #include "nucleus/schema/schema.h"
+#include "nucleus/schema/converters.h"
+
+#include "nucleus/source/source.h"
 
 #include "nucleus/xml/xml_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
+#include <cstdint>
 
 using nucleus::anchor;
 using nucleus::strain_scope_policy;

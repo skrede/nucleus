@@ -350,6 +350,9 @@ template<typename T> result<std::vector<T>, std::string> get_all_as(const std::s
 
 Three patterns cover the most common host-side converter shapes.
 
+A complete custom-converter registration and typed read-back is shown in
+[`examples/typed.cpp`](../examples/typed.cpp).
+
 #### Closed-set enum
 
 ```cpp
@@ -402,9 +405,9 @@ candidates and lenient/strict integration remain the host's responsibility.
 #### Leniency
 
 ```cpp
-auto make_lenient_int_converter(int fallback)
+auto make_lenient_int_converter(std::int32_t fallback)
 {
-    auto base = nucleus::make_scalar_converter<int32_t>();
+    auto base = nucleus::make_scalar_converter<std::int32_t>();
     return [base, fallback](std::string_view sv) -> nucleus::result<std::any, std::string> {
         auto r = base(sv);
         if(!r)
@@ -417,8 +420,6 @@ auto make_lenient_int_converter(int fallback)
 A converter that returns a fallback on failure implements lenient-policy behavior for that
 field -- the engine itself stays strict and never applies its own fallback. This lets
 individual fields opt into leniency without adding a policy knob to the engine.
-
-See [`examples/typed.cpp`](../examples/typed.cpp).
 
 ---
 
@@ -520,7 +521,7 @@ T &value();              // and const & / &&
 E &error();              // and const & / &&
 T value_or(U fallback) const &;
 
-failure<E> fail(E error);   // construct the error alternative
+constexpr failure<std::decay_t<E>> fail(E &&error);   // construct the error alternative
 ```
 
 ```cpp

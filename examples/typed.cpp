@@ -10,11 +10,10 @@
 
 #include "nucleus/xml/xml_source.h"
 
-#include <cmath>
-#include <charconv>
 #include <memory>
 #include <string>
 #include <vector>
+#include <charconv>
 #include <iostream>
 #include <functional>
 #include <string_view>
@@ -48,7 +47,7 @@ make_vec3_converter()
     };
 }
 
-} // anonymous namespace
+}
 
 int main()
 {
