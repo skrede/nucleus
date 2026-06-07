@@ -16,7 +16,6 @@
 #include <set>
 #include <memory>
 #include <string>
-#include <utility>
 #include <string_view>
 
 namespace nucleus::xml {
@@ -212,12 +211,19 @@ capability_descriptor xml_source::capabilities() const
 
 source_result xml_source::pull()
 {
-    m_arena = std::make_shared<document_arena>();
-
-    const bool loaded = m_kind == kind::file ? m_arena->load_file(m_input)
-                                             : m_arena->load_string(m_input);
-    if(!loaded)
-        return fail(std::string("xml source: failed to parse input"));
+    // Parse the document at most once: if the arena is already populated from a
+    // prior pull() (e.g., a chain-walk discovery pull followed by a fold pull),
+    // skip the file-read/parse step and re-walk the cached DOM. The projection can
+    // change between pulls (the fold hands the schema projection in via
+    // apply_projection() before each pull); only the parse result is cached.
+    if(!m_arena)
+    {
+        m_arena = std::make_shared<document_arena>();
+        const bool loaded = m_kind == kind::file ? m_arena->load_file(m_input)
+                                                 : m_arena->load_string(m_input);
+        if(!loaded)
+            return fail(std::string("xml source: failed to parse input"));
+    }
 
     pugi::xml_node root = m_arena->root();
     if(!root)

@@ -402,11 +402,11 @@ public:
                     if(kv_list.size() > 1)
                     {
                         std::string which;
-                        for(const std::string &kv : kv_list)
+                        for(const std::string &strain_kv : kv_list)
                         {
                             if(!which.empty())
                                 which += ", ";
-                            which += nucleus::format("'{}'", kv);
+                            which += nucleus::format("'{}'", strain_kv);
                         }
                         return fail(nucleus::format(
                             "unique field '{}' in container '{}' has duplicate "

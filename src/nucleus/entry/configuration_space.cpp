@@ -326,7 +326,7 @@ load_result configuration_space::load(std::vector<std::string> paths, const docu
     if(!expanded)
         return fail(std::move(expanded).error());
 
-    // entries owns the sources and their batches; they must outlive run_resolve.
+    // entries owns the sources; they must outlive run_resolve.
     std::vector<chain_walker::chain_entry> entries = std::move(expanded).value();
 
     // Root-first order: index 0 is the deepest ancestor, last is the requested file.
@@ -346,7 +346,7 @@ load_result configuration_space::load(std::vector<std::string> args,
     if(!expanded)
         return fail(std::move(expanded).error());
 
-    // entries owns the sources and their batches; they must outlive run_resolve.
+    // entries owns the sources; they must outlive run_resolve.
     std::vector<chain_walker::chain_entry> entries = std::move(expanded).value();
 
     schema_registry &schema = m_impl->schema;

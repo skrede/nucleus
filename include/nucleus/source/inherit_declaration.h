@@ -2,7 +2,6 @@
 #define HPP_GUARD_NUCLEUS_SOURCE_INHERIT_DECLARATION_H
 
 #include <string>
-#include <vector>
 #include <cstddef>
 #include <functional>
 

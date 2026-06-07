@@ -79,13 +79,14 @@ public:
         path_guard &operator=(const path_guard &) = delete;
     };
 
-    // One entry in the expanded chain: the path the source was built from, the
-    // source itself, and the batch it produced. Owned by the caller.
+    // One entry in the expanded chain: the path the source was built from and the
+    // source itself. Owned by the caller. The walk pulls once to surface the
+    // inheritance declaration; the batch is discarded -- the fold performs the
+    // consuming pull.
     struct chain_entry
     {
         std::string path;
         std::unique_ptr<source> src;
-        source_batch batch;
     };
 
     // Factory type: given a path string, return a non-null unique_ptr<source>
@@ -147,12 +148,16 @@ private:
 
     // Recursively expands one path: recurses into the parent (if declared) before
     // appending this source. On return, out[] contains root-first entries.
+    // is_parent is false for the top-level requested source and true for every
+    // recursive call that follows an inherit= declaration; the admissibility
+    // callback is invoked only when is_parent is true.
     [[nodiscard]] result<std::monostate, std::string>
     expand_one(const std::string &path,
                const factory_fn &make,
                const schema_projection &projection,
                const inherit_policy &policy,
-               std::vector<chain_entry> &out)
+               std::vector<chain_entry> &out,
+               bool is_parent = false)
     {
         // Normalize the path to get a stable key for the cycle guard.
         std::string norm;
@@ -211,7 +216,7 @@ private:
                     decl.path, path));
             }
 
-            auto rec = expand_one(parent_path_str, make, projection, policy, out);
+            auto rec = expand_one(parent_path_str, make, projection, policy, out, true);
             if(!rec)
                 return fail(std::move(rec).error());
         }
@@ -219,7 +224,9 @@ private:
         // kind::inherit_default means "no parent declared" -- the chain terminates here.
 
         // Admissibility check runs after pull() but before appending to output.
-        if(m_admissibility)
+        // Invoked only for candidate parent sources (is_parent=true); the initially
+        // requested source is never subject to the admissibility policy.
+        if(is_parent && m_admissibility)
         {
             std::string reason = m_admissibility(*src);
             if(!reason.empty())
@@ -228,7 +235,7 @@ private:
         }
 
         // Append this source AFTER its parent (root-first).
-        out.push_back(chain_entry{path, std::move(src), std::move(pulled).value()});
+        out.push_back(chain_entry{path, std::move(src)});
 
         // depth_guard and path_guard released here by RAII.
         return std::monostate{};

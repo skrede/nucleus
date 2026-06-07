@@ -341,6 +341,77 @@ TEST_CASE("admissibility callback rejection fails naming the parent", "[chain]")
 }
 
 // ---------------------------------------------------------------------------
+// 8b. Single-file load with a reject-all admissibility callback succeeds.
+//     The admissibility callback must not fire on the explicitly requested
+//     source -- only on parent candidates reached via inherit= declarations.
+// ---------------------------------------------------------------------------
+TEST_CASE("admissibility reject-all does not block a single-file load", "[chain]")
+{
+    const char *doc = R"(
+        <cluster>
+            <server name="web"><port>80</port></server>
+        </cluster>)";
+
+    nucleus::configuration_space engine;
+    declare_cluster(engine);
+    REQUIRE(engine.select("web"));
+
+    nucleus::inherit_policy policy;
+    policy.admissibility = [](const nucleus::source &) -> std::string {
+        return "reject everything";
+    };
+    REQUIRE(engine.set_inherit_policy(std::move(policy)));
+
+    // Single file: no parent is ever visited, so the reject-all callback must
+    // never fire and the load must succeed.
+    auto loaded = engine.load(std::vector<std::string>{"only.xml"},
+                              [&](const std::string &) { return xml_of(doc); });
+    REQUIRE(loaded);
+    REQUIRE(loaded.value().get("cluster/server/port") == "80");
+}
+
+// ---------------------------------------------------------------------------
+// 8c. Two-file chain with a reject-all admissibility callback fails naming
+//     the parent path, not the requested (leaf) source.
+// ---------------------------------------------------------------------------
+TEST_CASE("admissibility reject-all fails naming the parent in a two-file chain", "[chain]")
+{
+    const char *base_doc = R"(
+        <cluster>
+            <server name="web"><port>80</port></server>
+        </cluster>)";
+
+    const char *derived_doc = R"(
+        <cluster inherit="base.xml">
+            <server name="web" extend="wide"><port>8080</port></server>
+        </cluster>)";
+
+    nucleus::configuration_space engine;
+    declare_cluster(engine);
+    REQUIRE(engine.select("web"));
+
+    nucleus::inherit_policy policy;
+    policy.admissibility = [](const nucleus::source &) -> std::string {
+        return "reject everything";
+    };
+    REQUIRE(engine.set_inherit_policy(std::move(policy)));
+
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+        const std::string name = filename_of(path);
+        if(name == "base.xml")
+            return xml_of(base_doc);
+        if(name == "derived.xml")
+            return xml_of(derived_doc);
+        return nullptr;
+    };
+
+    auto loaded = engine.load(std::vector<std::string>{"derived.xml"}, factory);
+    REQUIRE_FALSE(loaded);
+    // The error must name the rejected parent, not "derived.xml".
+    REQUIRE(loaded.error().find("base.xml") != std::string::npos);
+}
+
+// ---------------------------------------------------------------------------
 // 9. Default admit-all policy allows all parents.
 // ---------------------------------------------------------------------------
 TEST_CASE("default admit-all policy allows all parents", "[chain]")
