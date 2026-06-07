@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 #include <cstddef>
+#include <optional>
 #include <utility>
 #include <algorithm>
 #include <string_view>
@@ -139,15 +140,36 @@ public:
     // as a resolved segment would make the tree untraversable without knowing
     // the key. Run between fold and validate.
     //
-    // With exactly one named instance the strain auto-resolves: its entries are
-    // re-laid onto the declared (stripped) paths, where the named instance
-    // overrides template (anonymous) content of equal or lower rank but never a
-    // higher-ranked layer's value at the unified path (a flat env/argv override
-    // addresses the unified path precisely because the key is stripped). With
-    // several named instances and no selection the resolve fails loudly --
-    // silently composing strains and leaking key segments are both forbidden.
-    [[nodiscard]] result<std::monostate, resolve_fold_error> slice()
+    // With a selection: the matching named strain survives, non-matching named
+    // strains are pruned from the keyspace, and the selected strain's entries
+    // are re-laid onto the declared (stripped) paths. Selecting a value that
+    // matches no strain is a loud error listing every available strain value.
+    // Selecting when the schema declares no primary key is a loud error.
+    //
+    // Without a selection: exactly one named strain auto-resolves (its entries
+    // re-laid); several named strains with no selection is a loud error naming
+    // the container and every strain; anonymous-only content collapses unchanged.
+    [[nodiscard]] result<std::monostate, resolve_fold_error>
+    slice(const std::optional<std::string> &selection = std::nullopt)
     {
+        // When the caller supplies a selection, the schema must declare a
+        // primary key: without one there is no slice selector at all. Check
+        // before the per-element loop because the loop body is only entered
+        // for identity elements -- if there are none it would never fire.
+        if(selection.has_value())
+        {
+            bool has_identity = false;
+            for(const schema_element &any : m_schema.elements())
+            {
+                if(any.identity) { has_identity = true; break; }
+            }
+            if(!has_identity)
+                return fail(nucleus::format(
+                    "selection '{}' cannot be applied: the schema declares "
+                    "no primary key",
+                    selection.value()));
+        }
+
         for(const schema_element &el : m_schema.elements())
         {
             if(!el.identity)
@@ -167,7 +189,46 @@ public:
             if(strains.empty())
                 continue;
 
-            if(strains.size() > 1)
+            if(selection.has_value())
+            {
+                // If the requested value is not among the bucketed strains,
+                // fail loudly listing every available value.
+                if(strains.find(selection.value()) == strains.end())
+                {
+                    std::string available;
+                    for(const auto &[key_value, _] : strains)
+                    {
+                        if(!available.empty())
+                            available += ", ";
+                        available += nucleus::format("'{}'", key_value);
+                    }
+                    return fail(nucleus::format(
+                        "selection '{}' does not match any strain in container "
+                        "'{}'; available: {}",
+                        selection.value(), container.str(), available));
+                }
+
+                // Prune every non-selected named strain: remove its keyed
+                // paths from the building keyspace and forget their provenance.
+                for(auto &[key_value, paths] : strains)
+                {
+                    if(key_value == selection.value())
+                        continue;
+                    for(const key_path &keyed : paths)
+                    {
+                        m_building.remove(keyed);
+                        m_provenance.forget(keyed.str());
+                    }
+                }
+
+                // Narrow strains to the single selected bucket so the shared
+                // re-lay loop below operates on exactly one strain.
+                auto it = strains.find(selection.value());
+                std::map<std::string, std::vector<key_path>> selected_only;
+                selected_only.emplace(it->first, std::move(it->second));
+                strains = std::move(selected_only);
+            }
+            else if(strains.size() > 1)
             {
                 std::string keys;
                 for(const auto &[key_value, _] : strains)

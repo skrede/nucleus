@@ -93,6 +93,15 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         ${CMAKE_SOURCE_DIR}/src
     )
     add_test(NAME keyed_projection_test COMMAND keyed_projection_test)
+
+    add_executable(keyed_selection_test keyed_selection_test.cpp)
+    target_link_libraries(keyed_selection_test
+        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+    target_include_directories(keyed_selection_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+    )
+    add_test(NAME keyed_selection_test COMMAND keyed_selection_test)
 endif()
 
 # ---------------------------------------------------------------------------

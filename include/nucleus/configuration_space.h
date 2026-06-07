@@ -117,6 +117,13 @@ public:
     // state-machine and registration-policy seam as the other surfaces.
     registration_result register_element(schema_element element, owner_token owner = {});
 
+    // Accumulates the strain selection in the configurable phase: the
+    // primary-key value of the single strain to keep during resolve. When set,
+    // resolve() prunes every non-matching named strain and strips the transient
+    // key segment before freezing the configuration. Must be called before
+    // load()/resolve(); calling after resolve is a state-machine error.
+    registration_result select(std::string key_value);
+
     registration_result register_tokenizer(std::string name, owner_token owner = {});
     registration_result register_source(std::string name, owner_token owner = {});
 

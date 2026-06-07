@@ -22,6 +22,7 @@
 #include <map>
 #include <memory>
 #include <vector>
+#include <optional>
 #include <utility>
 
 namespace nucleus {
@@ -103,7 +104,7 @@ public:
         // the schema gates content: a primary-key value is transient resolution
         // state and never reaches validation or the frozen configuration. An
         // ambiguous fold (several strains, no selection) fails loudly here.
-        if(auto sliced = ctx.slice(); !sliced)
+        if(auto sliced = ctx.slice(m_selection); !sliced)
             return fail(std::move(sliced).error());
 
         // The schema is the authority over CONTENT: a non-empty schema gates the
@@ -123,6 +124,7 @@ public:
     tokenizer_registry tokenizer;
     source_registry sources;
     facade_phase phase = facade_phase::configurable;
+    std::optional<std::string> m_selection;
     std::shared_ptr<registration_policy> m_policy = std::make_shared<registration_policy>();
 
     // Per-path claim ledger and the conflict reports it produces. Keyed by claimed
@@ -200,6 +202,14 @@ registration_result configuration_space::register_element(schema_element element
     if(auto attached = m_impl->schema.attach(std::move(element)); !attached)
         return fail(std::move(attached).error());
     m_impl->note_claim(claimed, registration_kind::schema, owner);
+    return registration_ok();
+}
+
+registration_result configuration_space::select(std::string key_value)
+{
+    if(auto guard = reject_if_resolved(m_impl->phase, registration_kind::schema); !guard)
+        return guard;
+    m_impl->m_selection = std::move(key_value);
     return registration_ok();
 }
 
