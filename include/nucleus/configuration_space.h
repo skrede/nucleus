@@ -12,6 +12,7 @@
 #include "nucleus/source/feature_gate.h"
 
 #include "nucleus/entry/precedence.h"
+#include "nucleus/entry/strain_scope.h"
 #include "nucleus/entry/configuration.h"
 
 #include "nucleus/diagnostics/conflict_report.h"
@@ -123,6 +124,13 @@ public:
     // key segment before freezing the configuration. Must be called before
     // load()/resolve(); calling after resolve is a state-machine error.
     registration_result select(std::string key_value);
+
+    // Sets the composition-scope policy that governs which entries survive the
+    // slice step. The default is space_open_container_closed (general entries
+    // compose freely; the selected container's subtree freezes at Ld). Must be
+    // called before load()/resolve(); calling after resolve is a state-machine
+    // error.
+    registration_result set_strain_scope(strain_scope_policy policy);
 
     registration_result register_tokenizer(std::string name, owner_token owner = {});
     registration_result register_source(std::string name, owner_token owner = {});

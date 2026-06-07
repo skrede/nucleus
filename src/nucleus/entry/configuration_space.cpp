@@ -11,6 +11,7 @@
 
 #include "nucleus/source/argv/argv_source.h"
 
+#include "nucleus/entry/strain_scope.h"
 #include "nucleus/entry/resolution_context.h"
 
 #include "nucleus/diagnostics/key_suggester.h"
@@ -104,7 +105,7 @@ public:
         // the schema gates content: a primary-key value is transient resolution
         // state and never reaches validation or the frozen configuration. An
         // ambiguous fold (several strains, no selection) fails loudly here.
-        if(auto sliced = ctx.slice(m_selection); !sliced)
+        if(auto sliced = ctx.slice(m_selection, m_strain_scope); !sliced)
             return fail(std::move(sliced).error());
 
         // The schema is the authority over CONTENT: a non-empty schema gates the
@@ -125,6 +126,7 @@ public:
     source_registry sources;
     facade_phase phase = facade_phase::configurable;
     std::optional<std::string> m_selection;
+    strain_scope_policy m_strain_scope = strain_scope_policy::space_open_container_closed;
     std::shared_ptr<registration_policy> m_policy = std::make_shared<registration_policy>();
 
     // Per-path claim ledger and the conflict reports it produces. Keyed by claimed
@@ -210,6 +212,14 @@ registration_result configuration_space::select(std::string key_value)
     if(auto guard = reject_if_resolved(m_impl->phase, registration_kind::schema); !guard)
         return guard;
     m_impl->m_selection = std::move(key_value);
+    return registration_ok();
+}
+
+registration_result configuration_space::set_strain_scope(strain_scope_policy policy)
+{
+    if(auto guard = reject_if_resolved(m_impl->phase, registration_kind::schema); !guard)
+        return guard;
+    m_impl->m_strain_scope = policy;
     return registration_ok();
 }
 
