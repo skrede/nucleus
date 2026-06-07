@@ -1,0 +1,62 @@
+name: Windows
+
+on:
+  push:
+    branches: [master, develop]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".planning/**"
+  pull_request:
+    branches: [master, develop]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".planning/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: |
+          cmake . -B build -A x64 `
+            -DNUCLEUS_BUILD_TESTS=ON `
+            -DNUCLEUS_BUILD_EXAMPLES=ON `
+            -DNUCLEUS_BUILD_SOURCE_XML=ON
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Test
+        run: cd build && ctest -C Release --output-on-failure --timeout 30
+
+  install-test:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: |
+          cmake . -B build -A x64 `
+            -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/install" `
+            -DNUCLEUS_BUILD_TESTS=OFF `
+            -DNUCLEUS_BUILD_EXAMPLES=OFF `
+            -DNUCLEUS_BUILD_SOURCE_XML=OFF
+
+      - name: Build and install
+        run: |
+          cmake --build build --config Release
+          cmake --install build --config Release
+
+      - name: Build consumer
+        run: |
+          cmake tests/integration -B build-consumer -A x64 `
+            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install"
+          cmake --build build-consumer --config Release
+
+      - name: Run consumer test
+        run: build-consumer/Release/integration_test.exe
