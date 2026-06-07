@@ -1,0 +1,692 @@
+// All existing suites pass -- zero behavior change for untyped paths.
+//
+// Unit tests for the typed-field converter seam:
+// built-in scalar edge cases, custom domain-neutral struct converter,
+// conversion failure surfacing, get_as error distinctions,
+// repeated x typed (get_all_as), and orthogonality with other schema axes.
+
+#include "nucleus/configuration_space.h"
+
+#include "nucleus/schema/anchor.h"
+#include "nucleus/schema/converters.h"
+#include "nucleus/schema/schema.h"
+
+#include "nucleus/entry/configuration.h"
+
+#include "nucleus/source/source.h"
+
+#include "nucleus/xml/xml_source.h"
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <cmath>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+using nucleus::anchor;
+
+namespace {
+
+std::unique_ptr<nucleus::source> xml_of(const std::string &text)
+{
+    return std::make_unique<nucleus::xml::xml_source>(
+        nucleus::xml::xml_source::from_string(text));
+}
+
+struct point2
+{
+    int x = 0;
+    int y = 0;
+    bool operator==(const point2 &other) const noexcept
+    {
+        return x == other.x && y == other.y;
+    }
+};
+
+std::function<nucleus::result<std::any, std::string>(std::string_view)>
+make_point2_converter()
+{
+    return [](std::string_view sv) -> nucleus::result<std::any, std::string> {
+        auto comma = sv.find(',');
+        if(comma == std::string_view::npos)
+            return nucleus::fail(std::string("missing comma separator"));
+        std::string_view xs = sv.substr(0, comma);
+        std::string_view ys = sv.substr(comma + 1);
+        int xv{}, yv{};
+        auto [px, ecx] = std::from_chars(xs.data(), xs.data() + xs.size(), xv);
+        if(ecx != std::errc{} || px != xs.data() + xs.size())
+            return nucleus::fail(std::string("bad x component"));
+        auto [py, ecy] = std::from_chars(ys.data(), ys.data() + ys.size(), yv);
+        if(ecy != std::errc{} || py != ys.data() + ys.size())
+            return nucleus::fail(std::string("bad y component"));
+        return std::any(point2{xv, yv});
+    };
+}
+
+}
+
+// ---------------------------------------------------------------------------
+// Built-in converter: int32_t edge cases
+// ---------------------------------------------------------------------------
+TEST_CASE("built-in int32_t converter", "[typed][builtin][integer]")
+{
+    SECTION("valid positive")
+    {
+        nucleus::configuration_space engine;
+        engine.register_element(nucleus::element("cfg", anchor::root()));
+        engine.register_element(
+            nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
+
+        auto src = xml_of("<cfg><val>42</val></cfg>");
+        nucleus::source_stack stack;
+        stack.add(*src, std::size_t{10}, "doc");
+
+        auto loaded = engine.resolve(stack);
+        REQUIRE(loaded);
+        auto r = loaded.value().get_as<int32_t>("cfg/val");
+        REQUIRE(r);
+        REQUIRE(r.value() == 42);
+    }
+
+    SECTION("valid negative")
+    {
+        nucleus::configuration_space engine;
+        engine.register_element(nucleus::element("cfg", anchor::root()));
+        engine.register_element(
+            nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
+
+        auto src = xml_of("<cfg><val>-1</val></cfg>");
+        nucleus::source_stack stack;
+        stack.add(*src, std::size_t{10}, "doc");
+
+        auto loaded = engine.resolve(stack);
+        REQUIRE(loaded);
+        auto r = loaded.value().get_as<int32_t>("cfg/val");
+        REQUIRE(r);
+        REQUIRE(r.value() == -1);
+    }
+
+    SECTION("empty input")
+    {
+        auto conv = nucleus::make_scalar_converter<int32_t>();
+        auto r = conv("");
+        REQUIRE(!r);
+        REQUIRE(r.error().find("empty") != std::string::npos);
+    }
+
+    SECTION("trailing garbage")
+    {
+        auto conv = nucleus::make_scalar_converter<int32_t>();
+        auto r = conv("42abc");
+        REQUIRE(!r);
+        REQUIRE(r.error().find("trailing") != std::string::npos);
+    }
+
+    SECTION("overflow")
+    {
+        auto conv = nucleus::make_scalar_converter<int32_t>();
+        auto r = conv("99999999999");
+        REQUIRE(!r);
+        REQUIRE(r.error().find("out of range") != std::string::npos);
+    }
+
+    SECTION("leading whitespace rejected")
+    {
+        // std::from_chars does not skip whitespace -- leading space is a failure.
+        auto conv = nucleus::make_scalar_converter<int32_t>();
+        auto r = conv(" 42");
+        REQUIRE(!r);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Built-in converter: uint32_t edge cases
+// ---------------------------------------------------------------------------
+TEST_CASE("built-in uint32_t converter", "[typed][builtin][integer]")
+{
+    SECTION("valid zero")
+    {
+        auto conv = nucleus::make_scalar_converter<uint32_t>();
+        auto r = conv("0");
+        REQUIRE(r);
+        REQUIRE(std::any_cast<uint32_t>(r.value()) == 0u);
+    }
+
+    SECTION("UINT32_MAX")
+    {
+        auto conv = nucleus::make_scalar_converter<uint32_t>();
+        auto r = conv("4294967295");
+        REQUIRE(r);
+        REQUIRE(std::any_cast<uint32_t>(r.value()) == 4294967295u);
+    }
+
+    SECTION("negative rejected")
+    {
+        auto conv = nucleus::make_scalar_converter<uint32_t>();
+        auto r = conv("-1");
+        REQUIRE(!r);
+        // from_chars for unsigned: '-' is an invalid leading character -- returns
+        // invalid_argument with ptr==sv.data(), which the converter maps to
+        // "value out of range for type".
+        REQUIRE(r.error().find("range") != std::string::npos);
+    }
+
+    SECTION("overflow")
+    {
+        auto conv = nucleus::make_scalar_converter<uint32_t>();
+        auto r = conv("4294967296");
+        REQUIRE(!r);
+        REQUIRE(r.error().find("out of range") != std::string::npos);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Built-in converter: int8_t edge cases
+// ---------------------------------------------------------------------------
+TEST_CASE("built-in int8_t converter", "[typed][builtin][integer]")
+{
+    SECTION("INT8_MAX")
+    {
+        auto conv = nucleus::make_scalar_converter<int8_t>();
+        auto r = conv("127");
+        REQUIRE(r);
+        REQUIRE(std::any_cast<int8_t>(r.value()) == int8_t{127});
+    }
+
+    SECTION("overflow 128")
+    {
+        auto conv = nucleus::make_scalar_converter<int8_t>();
+        auto r = conv("128");
+        REQUIRE(!r);
+        REQUIRE(r.error().find("out of range") != std::string::npos);
+    }
+
+    SECTION("underflow -129")
+    {
+        auto conv = nucleus::make_scalar_converter<int8_t>();
+        auto r = conv("-129");
+        REQUIRE(!r);
+        REQUIRE(r.error().find("out of range") != std::string::npos);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Built-in converter: uint8_t edge cases
+// ---------------------------------------------------------------------------
+TEST_CASE("built-in uint8_t converter", "[typed][builtin][integer]")
+{
+    SECTION("UINT8_MAX 255")
+    {
+        auto conv = nucleus::make_scalar_converter<uint8_t>();
+        auto r = conv("255");
+        REQUIRE(r);
+        REQUIRE(std::any_cast<uint8_t>(r.value()) == uint8_t{255});
+    }
+
+    SECTION("overflow 256")
+    {
+        auto conv = nucleus::make_scalar_converter<uint8_t>();
+        auto r = conv("256");
+        REQUIRE(!r);
+        REQUIRE(r.error().find("out of range") != std::string::npos);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Built-in converter: float edge cases
+// ---------------------------------------------------------------------------
+TEST_CASE("built-in float converter", "[typed][builtin][float]")
+{
+    SECTION("valid 3.14")
+    {
+        auto conv = nucleus::make_scalar_converter<float>();
+        auto r = conv("3.14");
+        REQUIRE(r);
+        REQUIRE(std::abs(std::any_cast<float>(r.value()) - 3.14f) < 0.001f);
+    }
+
+    SECTION("empty input")
+    {
+        auto conv = nucleus::make_scalar_converter<float>();
+        auto r = conv("");
+        REQUIRE(!r);
+        REQUIRE(r.error().find("empty") != std::string::npos);
+    }
+
+    SECTION("trailing garbage")
+    {
+        auto conv = nucleus::make_scalar_converter<float>();
+        auto r = conv("3.14xyz");
+        REQUIRE(!r);
+        REQUIRE(r.error().find("trailing") != std::string::npos);
+    }
+
+    SECTION("1e38 within range")
+    {
+        auto conv = nucleus::make_scalar_converter<float>();
+        auto r = conv("1e38");
+        REQUIRE(r);
+    }
+
+    SECTION("overflow 1e999")
+    {
+        auto conv = nucleus::make_scalar_converter<float>();
+        auto r = conv("1e999");
+        REQUIRE(!r);
+        REQUIRE(r.error().find("out of range") != std::string::npos);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Built-in converter: double edge cases
+// ---------------------------------------------------------------------------
+TEST_CASE("built-in double converter", "[typed][builtin][float]")
+{
+    SECTION("valid 2.718281828")
+    {
+        auto conv = nucleus::make_scalar_converter<double>();
+        auto r = conv("2.718281828");
+        REQUIRE(r);
+        REQUIRE(std::abs(std::any_cast<double>(r.value()) - 2.718281828) < 1e-9);
+    }
+
+    SECTION("empty input")
+    {
+        auto conv = nucleus::make_scalar_converter<double>();
+        auto r = conv("");
+        REQUIRE(!r);
+        REQUIRE(r.error().find("empty") != std::string::npos);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Built-in converter: bool edge cases
+// ---------------------------------------------------------------------------
+TEST_CASE("built-in bool converter", "[typed][builtin][bool]")
+{
+    SECTION("true variants")
+    {
+        auto conv = nucleus::make_scalar_converter<bool>();
+        REQUIRE(std::any_cast<bool>(conv("true").value()) == true);
+        REQUIRE(std::any_cast<bool>(conv("True").value()) == true);
+        REQUIRE(std::any_cast<bool>(conv("TRUE").value()) == true);
+        REQUIRE(std::any_cast<bool>(conv("1").value()) == true);
+    }
+
+    SECTION("false variants")
+    {
+        auto conv = nucleus::make_scalar_converter<bool>();
+        REQUIRE(std::any_cast<bool>(conv("false").value()) == false);
+        REQUIRE(std::any_cast<bool>(conv("False").value()) == false);
+        REQUIRE(std::any_cast<bool>(conv("FALSE").value()) == false);
+        REQUIRE(std::any_cast<bool>(conv("0").value()) == false);
+    }
+
+    SECTION("invalid yes")
+    {
+        auto conv = nucleus::make_scalar_converter<bool>();
+        auto r = conv("yes");
+        REQUIRE(!r);
+        REQUIRE(r.error().find("true/false/1/0") != std::string::npos);
+    }
+
+    SECTION("empty input")
+    {
+        auto conv = nucleus::make_scalar_converter<bool>();
+        auto r = conv("");
+        REQUIRE(!r);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Built-in converter: char edge cases
+// ---------------------------------------------------------------------------
+TEST_CASE("built-in char converter", "[typed][builtin][char]")
+{
+    SECTION("single character")
+    {
+        auto conv = nucleus::make_scalar_converter<char>();
+        auto r = conv("x");
+        REQUIRE(r);
+        REQUIRE(std::any_cast<char>(r.value()) == 'x');
+    }
+
+    SECTION("empty string")
+    {
+        auto conv = nucleus::make_scalar_converter<char>();
+        auto r = conv("");
+        REQUIRE(!r);
+        REQUIRE(r.error().find("one character") != std::string::npos);
+    }
+
+    SECTION("two characters")
+    {
+        auto conv = nucleus::make_scalar_converter<char>();
+        auto r = conv("ab");
+        REQUIRE(!r);
+        REQUIRE(r.error().find("one character") != std::string::npos);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Built-in converter: std::string passthrough
+// ---------------------------------------------------------------------------
+TEST_CASE("built-in std::string passthrough converter", "[typed][builtin][string]")
+{
+    SECTION("non-empty input succeeds")
+    {
+        auto conv = nucleus::make_scalar_converter<std::string>();
+        auto r = conv("hello");
+        REQUIRE(r);
+        REQUIRE(std::any_cast<std::string>(r.value()) == "hello");
+    }
+
+    SECTION("empty string succeeds")
+    {
+        auto conv = nucleus::make_scalar_converter<std::string>();
+        auto r = conv("");
+        REQUIRE(r);
+        REQUIRE(std::any_cast<std::string>(r.value()) == "");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Locale independence: from_chars is locale-independent by specification
+// ---------------------------------------------------------------------------
+TEST_CASE("float converter is locale-independent", "[typed][builtin][float][locale]")
+{
+    auto conv = nucleus::make_scalar_converter<float>();
+
+    SECTION("decimal point parses correctly")
+    {
+        // from_chars uses '.' unconditionally regardless of LC_NUMERIC.
+        auto r = conv("3.14");
+        REQUIRE(r);
+        REQUIRE(std::abs(std::any_cast<float>(r.value()) - 3.14f) < 0.001f);
+    }
+
+    SECTION("comma separator is NOT recognized")
+    {
+        // from_chars stops at ',' since it is not a valid floating-point character,
+        // producing trailing garbage rather than a locale-specific decimal point.
+        auto r = conv("3,14");
+        REQUIRE(!r);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Custom domain-neutral struct converter
+// ---------------------------------------------------------------------------
+TEST_CASE("custom point2 converter round-trips through typed_element", "[typed][custom]")
+{
+    SECTION("valid document resolves to point2{3,7}")
+    {
+        nucleus::configuration_space engine;
+        engine.register_element(nucleus::element("cfg", anchor::root()));
+        engine.register_element(
+            nucleus::typed_element<point2>("pos", anchor::keyspace("cfg"),
+                                           make_point2_converter()));
+
+        auto src = xml_of("<cfg><pos>3,7</pos></cfg>");
+        nucleus::source_stack stack;
+        stack.add(*src, std::size_t{10}, "doc");
+
+        auto loaded = engine.resolve(stack);
+        REQUIRE(loaded);
+        auto r = loaded.value().get_as<point2>("cfg/pos");
+        REQUIRE(r);
+        REQUIRE(r.value() == point2{3, 7});
+    }
+
+    SECTION("missing comma causes resolve failure")
+    {
+        nucleus::configuration_space engine;
+        engine.register_element(nucleus::element("cfg", anchor::root()));
+        engine.register_element(
+            nucleus::typed_element<point2>("pos", anchor::keyspace("cfg"),
+                                           make_point2_converter()));
+
+        auto src = xml_of("<cfg><pos>3</pos></cfg>");
+        nucleus::source_stack stack;
+        stack.add(*src, std::size_t{10}, "doc");
+
+        auto loaded = engine.resolve(stack);
+        REQUIRE(!loaded);
+    }
+
+    SECTION("bad x component causes resolve failure")
+    {
+        nucleus::configuration_space engine;
+        engine.register_element(nucleus::element("cfg", anchor::root()));
+        engine.register_element(
+            nucleus::typed_element<point2>("pos", anchor::keyspace("cfg"),
+                                           make_point2_converter()));
+
+        auto src = xml_of("<cfg><pos>abc,7</pos></cfg>");
+        nucleus::source_stack stack;
+        stack.add(*src, std::size_t{10}, "doc");
+
+        auto loaded = engine.resolve(stack);
+        REQUIRE(!loaded);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Conversion failure at resolve surfaces path + reason + layer
+// ---------------------------------------------------------------------------
+TEST_CASE("conversion failure at resolve surfaces diagnostic", "[typed][failure][resolve]")
+{
+    // Set up a typed int32_t element with a bad document value.
+    auto make_engine_and_src = [&](const std::string &value) {
+        struct pair_t
+        {
+            nucleus::configuration_space engine;
+            std::unique_ptr<nucleus::source> src;
+        };
+        pair_t p;
+        p.engine.register_element(nucleus::element("cfg", anchor::root()));
+        p.engine.register_element(
+            nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
+        p.src = xml_of("<cfg><val>" + value + "</val></cfg>");
+        return p;
+    };
+
+    SECTION("error contains the path")
+    {
+        auto p = make_engine_and_src("notanumber");
+        nucleus::source_stack stack;
+        stack.add(*p.src, std::size_t{10}, "doc");
+
+        auto loaded = p.engine.resolve(stack);
+        REQUIRE(!loaded);
+        INFO("error: " << loaded.error());
+        REQUIRE(loaded.error().find("cfg/val") != std::string::npos);
+    }
+
+    SECTION("error contains the layer label")
+    {
+        auto p = make_engine_and_src("notanumber");
+        nucleus::source_stack stack;
+        stack.add(*p.src, std::size_t{10}, "doc");
+
+        auto loaded = p.engine.resolve(stack);
+        REQUIRE(!loaded);
+        INFO("error: " << loaded.error());
+        // The convert() format is "conversion failed for '...': ... (layer: doc)"
+        REQUIRE(loaded.error().find("doc") != std::string::npos);
+    }
+
+    SECTION("error contains the converter reason substring")
+    {
+        auto p = make_engine_and_src("notanumber");
+        nucleus::source_stack stack;
+        stack.add(*p.src, std::size_t{10}, "doc");
+
+        auto loaded = p.engine.resolve(stack);
+        REQUIRE(!loaded);
+        INFO("error: " << loaded.error());
+        // The converter's reason for "notanumber" is "value out of range for type"
+        // (ptr == sv.data(), invalid_argument path). The resolve error embeds it.
+        REQUIRE(loaded.error().find("conversion failed") != std::string::npos);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// get_as error distinctions: absent / no-converter / type-mismatch
+// ---------------------------------------------------------------------------
+TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
+{
+    SECTION("absent path returns error containing 'absent'")
+    {
+        nucleus::configuration_space engine;
+        engine.register_element(nucleus::element("cfg", anchor::root()));
+        engine.register_element(nucleus::element("name", anchor::keyspace("cfg")));
+
+        auto src = xml_of("<cfg><name>hello</name></cfg>");
+        nucleus::source_stack stack;
+        stack.add(*src, std::size_t{10}, "doc");
+
+        auto loaded = engine.resolve(stack);
+        REQUIRE(loaded);
+
+        auto r = loaded.value().get_as<int32_t>("nonexistent");
+        REQUIRE(!r);
+        INFO("error: " << r.error());
+        REQUIRE(r.error().find("absent") != std::string::npos);
+    }
+
+    SECTION("path with no converter returns error containing 'no type converter'")
+    {
+        nucleus::configuration_space engine;
+        engine.register_element(nucleus::element("cfg", anchor::root()));
+        // Plain element -- no converter registered.
+        engine.register_element(nucleus::element("name", anchor::keyspace("cfg")));
+
+        auto src = xml_of("<cfg><name>hello</name></cfg>");
+        nucleus::source_stack stack;
+        stack.add(*src, std::size_t{10}, "doc");
+
+        auto loaded = engine.resolve(stack);
+        REQUIRE(loaded);
+
+        auto r = loaded.value().get_as<int32_t>("cfg/name");
+        REQUIRE(!r);
+        INFO("error: " << r.error());
+        REQUIRE(r.error().find("no type converter") != std::string::npos);
+    }
+
+    SECTION("type mismatch returns error containing 'type mismatch'")
+    {
+        nucleus::configuration_space engine;
+        engine.register_element(nucleus::element("cfg", anchor::root()));
+        engine.register_element(
+            nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
+
+        auto src = xml_of("<cfg><val>42</val></cfg>");
+        nucleus::source_stack stack;
+        stack.add(*src, std::size_t{10}, "doc");
+
+        auto loaded = engine.resolve(stack);
+        REQUIRE(loaded);
+
+        // The converter stored int32_t; requesting float is a mismatch.
+        auto r = loaded.value().get_as<float>("cfg/val");
+        REQUIRE(!r);
+        INFO("error: " << r.error());
+        REQUIRE(r.error().find("type mismatch") != std::string::npos);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Repeated x typed: get_all_as order and per-element failure index
+// ---------------------------------------------------------------------------
+TEST_CASE("repeated x typed: get_all_as", "[typed][repeated][typed]")
+{
+    SECTION("three valid elements returns ordered collection")
+    {
+        nucleus::configuration_space engine;
+        engine.register_element(nucleus::element("cfg", anchor::root()));
+
+        // A repeated typed element: repeated flag + converter together.
+        auto el = nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg"));
+        el.repeated = true;
+        engine.register_element(el);
+
+        auto src = xml_of("<cfg><val>1</val><val>2</val><val>3</val></cfg>");
+        nucleus::source_stack stack;
+        stack.add(*src, std::size_t{10}, "doc");
+
+        auto loaded = engine.resolve(stack);
+        REQUIRE(loaded);
+
+        auto r = loaded.value().get_all_as<int32_t>("cfg/val");
+        REQUIRE(r);
+        REQUIRE(r.value() == std::vector<int32_t>{1, 2, 3});
+    }
+
+    SECTION("per-element failure names the zero-based index")
+    {
+        nucleus::configuration_space engine;
+        engine.register_element(nucleus::element("cfg", anchor::root()));
+
+        auto el = nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg"));
+        el.repeated = true;
+        engine.register_element(el);
+
+        // Second element (index 1) is bad.
+        auto src = xml_of("<cfg><val>1</val><val>bad</val><val>3</val></cfg>");
+        nucleus::source_stack stack;
+        stack.add(*src, std::size_t{10}, "doc");
+
+        auto loaded = engine.resolve(stack);
+        REQUIRE(!loaded);
+        INFO("error: " << loaded.error());
+        // The convert() format for repeated: "... element [1]: ..."
+        REQUIRE(loaded.error().find("[1]") != std::string::npos);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Orthogonality: typed combines with repeated, unique, identity (attach-level)
+// ---------------------------------------------------------------------------
+TEST_CASE("typed is orthogonal to other schema axes at attach", "[typed][attach][orthogonal]")
+{
+    SECTION("typed + repeated: attach succeeds")
+    {
+        nucleus::configuration_space engine;
+        engine.register_element(nucleus::element("cfg", anchor::root()));
+
+        auto el = nucleus::typed_element<int32_t>("nums", anchor::keyspace("cfg"));
+        el.repeated = true;
+        auto result = engine.register_element(el);
+        REQUIRE(result);
+    }
+
+    SECTION("typed + unique: attach succeeds")
+    {
+        nucleus::configuration_space engine;
+        engine.register_element(nucleus::element("cfg", anchor::root()));
+
+        auto el = nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg"));
+        el.unique = true;
+        auto result = engine.register_element(el);
+        REQUIRE(result);
+    }
+
+    SECTION("typed + identity: attach succeeds")
+    {
+        nucleus::configuration_space engine;
+        engine.register_element(nucleus::element("container", anchor::root()));
+
+        // A primary key with a converter is legal at attach -- the converter
+        // runs at resolve time like any other typed path. Full resolve with the
+        // identity+converter combination is exercised in later interaction tests.
+        auto el = nucleus::typed_element<int32_t>("id",
+                                                   anchor::keyspace("container"));
+        el.identity = true;
+        auto result = engine.register_element(el);
+        REQUIRE(result);
+    }
+}

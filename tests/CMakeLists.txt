@@ -140,6 +140,19 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         ${CMAKE_SOURCE_DIR}/src
     )
     add_test(NAME repeated_element_test COMMAND repeated_element_test)
+
+    # Typed-field converter seam: built-in scalar edge cases, custom converter,
+    # conversion failure surfacing, get_as error distinctions, repeated x typed,
+    # orthogonality checks. Links the XML module for document-driven resolution.
+    add_executable(typed_element_test typed_element_test.cpp)
+    nucleus_enable_coverage(typed_element_test)
+    target_link_libraries(typed_element_test
+        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+    target_include_directories(typed_element_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+    )
+    add_test(NAME typed_element_test COMMAND typed_element_test)
 endif()
 
 # ---------------------------------------------------------------------------
