@@ -20,6 +20,7 @@ endif()
 function(nucleus_add_test name)
     add_executable(${name} ${name}.cpp)
     target_link_libraries(${name} PRIVATE nucleus::nucleus Catch2::Catch2WithMain)
+    nucleus_enable_coverage(${name})
     target_include_directories(${name} PRIVATE
         ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_SOURCE_DIR}/src
@@ -63,6 +64,7 @@ nucleus_add_test(strain_scope_policy_test)
 # ---------------------------------------------------------------------------
 if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(buffer_lifetime_test buffer_lifetime_test.cpp)
+    nucleus_enable_coverage(buffer_lifetime_test)
     target_link_libraries(buffer_lifetime_test
         PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
     target_include_directories(buffer_lifetime_test PRIVATE
@@ -75,6 +77,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # XML document source in the precedence stack, drops every buffer, then reads
     # every value back. The single most valuable test in the project under ASan.
     add_executable(resolve_buffer_drop_test resolve_buffer_drop_test.cpp)
+    nucleus_enable_coverage(resolve_buffer_drop_test)
     target_link_libraries(resolve_buffer_drop_test
         PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
     target_include_directories(resolve_buffer_drop_test PRIVATE
@@ -87,6 +90,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # XML source must render repeated instances as distinct keyed subtrees instead
     # of collapsing them last-wins. Links the XML module for a real document walk.
     add_executable(keyed_projection_test keyed_projection_test.cpp)
+    nucleus_enable_coverage(keyed_projection_test)
     target_link_libraries(keyed_projection_test
         PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
     target_include_directories(keyed_projection_test PRIVATE
@@ -96,6 +100,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_test(NAME keyed_projection_test COMMAND keyed_projection_test)
 
     add_executable(keyed_selection_test keyed_selection_test.cpp)
+    nucleus_enable_coverage(keyed_selection_test)
     target_link_libraries(keyed_selection_test
         PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
     target_include_directories(keyed_selection_test PRIVATE
@@ -105,6 +110,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_test(NAME keyed_selection_test COMMAND keyed_selection_test)
 
     add_executable(inherit_chain_test inherit_chain_test.cpp)
+    nucleus_enable_coverage(inherit_chain_test)
     target_link_libraries(inherit_chain_test
         PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
     target_include_directories(inherit_chain_test PRIVATE
@@ -114,6 +120,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_test(NAME inherit_chain_test COMMAND inherit_chain_test)
 
     add_executable(integration_shape_test integration_shape_test.cpp)
+    nucleus_enable_coverage(integration_shape_test)
     target_link_libraries(integration_shape_test
         PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
     target_include_directories(integration_shape_test PRIVATE
@@ -125,6 +132,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # Repeated-values mode: schema flag, fold accumulation/replacement, get_all(),
     # relay through keyed containers, capability gating, scope-policy exclusion.
     add_executable(repeated_element_test repeated_element_test.cpp)
+    nucleus_enable_coverage(repeated_element_test)
     target_link_libraries(repeated_element_test
         PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
     target_include_directories(repeated_element_test PRIVATE
@@ -141,6 +149,7 @@ endif()
 # ---------------------------------------------------------------------------
 if(NUCLEUS_BUILD_TOKENIZER_HOST)
     add_executable(host_tokenizer_test host_tokenizer_test.cpp)
+    nucleus_enable_coverage(host_tokenizer_test)
     target_link_libraries(host_tokenizer_test
         PRIVATE nucleus::nucleus nucleus::tokenizer_host Catch2::Catch2WithMain)
     target_include_directories(host_tokenizer_test PRIVATE

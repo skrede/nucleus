@@ -18,14 +18,27 @@ if(NUCLEUS_BUILD_SANITIZER AND NOT MSVC)
 endif()
 
 # Coverage instrumentation, gcc/clang only and off by default -- never in a
-# normal build. When on, the library and tests are compiled with gcov-compatible
-# counters so a coverage report can be generated after ctest. MSVC has no gcov
-# equivalent here, so the flags are guarded to the GNU/Clang front ends.
-if(NUCLEUS_COVERAGE)
-    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        add_compile_options(--coverage -fprofile-arcs -ftest-coverage -O0 -g)
-        add_link_options(--coverage)
-    else()
-        message(WARNING "NUCLEUS_COVERAGE is only supported on gcc/clang; ignoring.")
-    endif()
+# normal build. Applied PER TARGET rather than globally so that fetched
+# third-party dependencies (Catch2, pugixml) are never instrumented: their gcov
+# data is noise the report filters out anyway, and their sources are not
+# resolvable relative to the project root, which newer gcovr treats as a hard
+# error. Call nucleus_enable_coverage(<target>) on every first-party target
+# whose translation units should emit counters -- the libraries AND the test
+# executables (test TUs instantiate header-inline library code that would
+# otherwise lose its counts). MSVC has no gcov equivalent here, so the flags
+# are guarded to the GNU/Clang front ends.
+if(NUCLEUS_COVERAGE AND NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    message(WARNING "NUCLEUS_COVERAGE is only supported on gcc/clang; ignoring.")
 endif()
+
+function(nucleus_enable_coverage target)
+    if(NOT NUCLEUS_COVERAGE OR NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        return()
+    endif()
+    target_compile_options(${target} PRIVATE
+        --coverage -fprofile-arcs -ftest-coverage -O0 -g)
+    # PUBLIC so every executable linking an instrumented library pulls the gcov
+    # runtime into its own link; BUILD_INTERFACE so the option never leaks into
+    # the installed export.
+    target_link_options(${target} PUBLIC $<BUILD_INTERFACE:--coverage>)
+endfunction()

@@ -97,6 +97,7 @@ set(NUCLEUS_SOURCES
 
 add_library(nucleus ${NUCLEUS_SOURCES})
 add_library(nucleus::nucleus ALIAS nucleus)
+nucleus_enable_coverage(nucleus)
 
 target_compile_features(nucleus PUBLIC cxx_std_20)
 
@@ -216,6 +217,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         src/nucleus/xml/xml_source.cpp
     )
     add_library(nucleus::source_xml ALIAS nucleus_source_xml)
+    nucleus_enable_coverage(nucleus_source_xml)
 
     target_compile_features(nucleus_source_xml PUBLIC cxx_std_20)
     target_include_directories(nucleus_source_xml
@@ -265,6 +267,7 @@ if(NUCLEUS_BUILD_TOKENIZER_HOST)
         src/nucleus/host/host_tokenizer.cpp
     )
     add_library(nucleus::tokenizer_host ALIAS nucleus_tokenizer_host)
+    nucleus_enable_coverage(nucleus_tokenizer_host)
 
     target_compile_features(nucleus_tokenizer_host PUBLIC cxx_std_20)
     target_include_directories(nucleus_tokenizer_host
