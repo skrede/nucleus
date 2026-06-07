@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <utility>
 #include <variant>
+#include <algorithm>
 
 namespace nucleus {
 
@@ -91,22 +92,22 @@ public:
             }
         }
 
-        // A container has at MOST one primary key: two identity fields under the
-        // same parent would make slicing ambiguous (which value selects the
-        // instance?). Rejected at attach so the schema can never express it.
+        // A configuration space has exactly ONE primary key: it is the single
+        // slice selector for the whole schema hierarchy (many strains shipped,
+        // one resolved through the key). A second identity element ANYWHERE --
+        // same container or not -- would make the selector ambiguous, so it is
+        // rejected at attach and the schema can never express it.
         if(el.identity)
         {
-            const std::string container = el.container().str();
-            for(const schema_element &existing : m_elements)
+            auto existing = std::ranges::find_if(
+                m_elements, [](const schema_element &e) { return e.identity; });
+            if(existing != m_elements.end())
             {
-                if(existing.identity && existing.container().str() == container)
-                {
-                    return fail(nucleus::format(
-                        "schema element '{}' cannot be the primary key of '{}': "
-                        "'{}' is already its primary key",
-                        el.name, container.empty() ? "(root)" : container,
-                        existing.name));
-                }
+                return fail(nucleus::format(
+                    "schema element '{}' cannot be a primary key: '{}' is "
+                    "already the configuration space's primary key, and a "
+                    "space has exactly one",
+                    el.name, existing->declared_path().str()));
             }
         }
 
