@@ -97,7 +97,8 @@ struct schema_element {
     bool unique = false;                     // value must be distinct across sibling instances
     std::vector<std::string> allowed_values; // closed set; empty = unconstrained
     key_path declared_path() const;          // anchor path + name
-    bool enforces_uniqueness() const;        // true if identity || unique
+    key_path container() const;              // the parent path (the repeatable container)
+    bool enforces_uniqueness() const noexcept; // true if identity || unique
 };
 
 schema_element element(std::string name, anchor at);

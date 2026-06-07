@@ -27,7 +27,11 @@ int main()
         nucleus::element("protocol", nucleus::anchor::keyspace("cluster/server")));
 
     // Select the "yin" strain before load. Only one named instance survives.
-    engine.select("yin");
+    if(auto selected = engine.select("yin"); !selected)
+    {
+        std::cerr << "select failed: " << selected.error() << '\n';
+        return 1;
+    }
 
     // One document containing an anonymous template (protocol) and two named
     // strains (yin and yang). No file on disk: the factory ignores the path

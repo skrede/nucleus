@@ -57,7 +57,7 @@ std::string filename_of(const std::string &path)
     return (pos == std::string::npos) ? path : path.substr(pos + 1);
 }
 
-} // namespace
+}
 
 // ---------------------------------------------------------------------------
 // 1. Single-file, no inherit= -- backward compatibility baseline.
