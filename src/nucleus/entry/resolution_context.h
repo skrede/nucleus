@@ -382,13 +382,13 @@ public:
                 }
             }
 
-            // Step A: Build a disposition index for fast lookup in the checks
+            // Build a disposition index for fast lookup in the checks
             // below and in the relay_strain call.
             std::map<std::pair<std::string, std::string>, extend_strength> disp_index;
             for(const extend_disposition &d : m_dispositions)
                 disp_index[{d.container_path, d.key_value}] = d.strength;
 
-            // Step B: Cross-layer re-open and extend-without-base checks.
+            // Cross-layer re-open and extend-without-base checks.
             // These checks apply only to document-band sources (rank >= base, i.e.
             // inheritance chain layers). Flat source layering (env, argv, defaults)
             // contributes to strains by design and is never a re-open error.
@@ -445,7 +445,7 @@ public:
                         key_value, container.str()));
             }
 
-            // Step C: Unique-value enforcement across sibling instances.
+            // Unique-value enforcement across sibling instances.
             // For every non-identity unique field in this container, collect the
             // field value across all named strains and fail if any value appears
             // more than once. Runs before pruning so all strains are visible.
@@ -506,7 +506,7 @@ public:
                 }
             }
 
-            // Step D: determine if the chosen strain has a wide-extend disposition.
+            // Determine if the chosen strain has a wide-extend disposition.
             bool wide_extend = false;
             {
                 auto it = disp_index.find({container.str(), chosen});

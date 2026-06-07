@@ -95,6 +95,7 @@ struct schema_element {
     bool required = false;                   // must carry a value at resolve
     bool identity = false;                   // this node's selector / primary key
     bool unique = false;                     // value must be distinct across sibling instances
+    bool repeated = false;                   // keeps ALL N same-named values as a collection
     std::vector<std::string> allowed_values; // closed set; empty = unconstrained
     key_path declared_path() const;          // anchor path + name
     key_path container() const;              // the parent path (the repeatable container)
@@ -106,6 +107,7 @@ schema_element required_element(std::string name, anchor at);
 schema_element identity_element(std::string name, anchor at);
 schema_element primary_key_element(std::string name, anchor at);  // alias for identity_element
 schema_element unique_element(std::string name, anchor at);
+schema_element repeated_element(std::string name, anchor at);
 schema_element enum_element(std::string name, anchor at, std::vector<std::string> values);
 ```
 
@@ -113,6 +115,16 @@ A primary-key field selects one instance from a repeatable container and is
 implicitly unique; a `unique_element` constrains values to be distinct across
 sibling instances without taking on the selector role. Both are checked at resolve;
 violations are loud errors.
+
+A `repeated_element` is a leaf field that keeps ALL N occurrences of a
+same-named entry as one ordered collection -- the third repetition kind,
+distinct from keyed containers (instances distinguished by the primary key) and
+template merging (anonymous instances composing). Within one source layer
+occurrences accumulate in document order; a higher-precedence layer replaces
+the collection wholesale. An element cannot be both `repeated` and `identity`,
+nor `repeated` and `unique` -- both combinations are rejected at registration.
+A source must declare the `duplicate_keys` capability to feed a repeated
+element; one that cannot fails loudly instead of silently collapsing values.
 
 ### `anchor` — where an element attaches
 
@@ -249,12 +261,19 @@ source buffers have already been dropped. Freely readable from many threads.
 
 ```cpp
 std::optional<std::string> get(const std::string &key) const;
+std::vector<std::string> get_all(const std::string &key) const;  // repeated paths: the full collection
 bool contains(const std::string &key) const;
 const origin *provenance_of(const std::string &key) const;  // "why is this value X?"
+const std::vector<origin> *collection_provenance_of(const std::string &key) const;
 std::size_t size() const;
 bool empty() const;
 std::vector<std::string> keys() const;  // canonical order
 ```
+
+For a path declared `repeated`, `get_all()` returns the full ordered collection
+and `get()` returns the LAST value in precedence order; for a single-value path
+`get_all()` returns a one-element vector. `provenance_of()` covers scalar keys
+only; a collection's per-element origins come from `collection_provenance_of()`.
 
 ---
 
