@@ -13,6 +13,11 @@
 
 namespace nucleus {
 
+// A schema-derived projection (defined in nucleus/schema/projection.h). Forward
+// declared so the seam can accept one without source.h pulling the schema header;
+// a source that actually consults it includes the projection header itself.
+class schema_projection;
+
 // A type-erased handle that pins whatever a source's view-values point into for
 // the lifetime of a batch. For a zero-copy source the entries hold string_views
 // into a retained buffer (raw bytes, or a parser's own document arena); this
@@ -74,6 +79,14 @@ public:
 
     // The affordances this source can represent. Drives feature gating.
     [[nodiscard]] virtual capability_descriptor capabilities() const = 0;
+
+    // Offers the source a schema-derived projection just before pull(). A
+    // document source uses it to project repeatable keyed containers faithfully
+    // (one instance per key value) instead of collapsing repeated siblings. The
+    // default is a no-op: flat sources (env, argv) and any source that does not
+    // opt in ignore it, so the seam stays backward-compatible. Called by the
+    // resolve fold for every source it folds.
+    virtual void apply_projection(const schema_projection &) {}
 
     // Produces this source's entries. On success the batch carries any retained
     // buffer the entries' views depend on. On failure a source_error explains

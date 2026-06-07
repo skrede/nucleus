@@ -7,6 +7,7 @@
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
+#include "nucleus/schema/projection.h"
 
 #include "nucleus/keyspace/key_path.h"
 
@@ -121,11 +122,73 @@ public:
         return m_elements;
     }
 
+    // The projection a source consults to render repeatable keyed containers: for
+    // every primary-key element, its parent container path mapped to the key
+    // field name. Built from the schema so the source need never see the registry
+    // -- the fold hands it across at resolve time. Empty when no primary keys are
+    // declared, leaving a source's structural walk unchanged.
+    [[nodiscard]] schema_projection projection() const
+    {
+        schema_projection proj;
+        for(const schema_element &el : m_elements)
+        {
+            if(el.identity)
+                proj.set_key(el.container().str(), el.name);
+        }
+        return proj;
+    }
+
     // Whether a path is a declared element -- the document/CLI target test. The
     // schema is the authority: an undeclared path is not a valid target.
     [[nodiscard]] bool recognizes(const key_path &path) const
     {
         return m_defined.find(path.str()) != m_defined.end();
+    }
+
+    // Strips transient key segments from a resolved path: walking root-down, a
+    // segment directly under a keyed container that does not extend a declared
+    // node is an instance's key value (the projection consumed the key field
+    // into it) and is dropped; every other segment is kept. `a/b/<key>/c` with
+    // `a/b` keyed therefore canonicalizes to the declared `a/b/c`. The slice
+    // step uses this to re-lay a strain's entries onto the unified hierarchy.
+    [[nodiscard]] std::string canonical_text(const key_path &path) const
+    {
+        std::string canonical;
+        for(const std::string &segment : path.segments())
+        {
+            std::string extended = canonical;
+            if(!extended.empty())
+                extended += key_path::separator;
+            extended += segment;
+
+            if(keyed_container(canonical) && !is_defined_text(extended))
+                continue;
+            canonical = std::move(extended);
+        }
+        return canonical;
+    }
+
+    // Whether `path` addresses content of a keyed instance of `container`: the
+    // container has a primary key and the path extends it by a transient key
+    // segment (one that is not itself a declared node). The identity presence
+    // check accepts such a path -- the key's value survives structurally as the
+    // instance's segment, not as a leaf.
+    [[nodiscard]] bool keyed_instance_path(const key_path &container,
+                                           const key_path &path) const
+    {
+        if(path.size() <= container.size() || !keyed_container(container.str()))
+            return false;
+
+        const std::vector<std::string> &outer = container.segments();
+        const std::vector<std::string> &inner = path.segments();
+        if(!std::equal(outer.begin(), outer.end(), inner.begin()))
+            return false;
+
+        std::string instance = container.str();
+        if(!instance.empty())
+            instance += key_path::separator;
+        instance += inner[outer.size()];
+        return !is_defined_text(instance);
     }
 
     // Text-keyed variant of recognizes() for callers (diagnostics) that already
@@ -158,16 +221,24 @@ private:
     // earlier element established.
     [[nodiscard]] bool is_defined_node(const key_path &node) const
     {
-        if(node.empty())
-            return true;
-        const std::string at = node.str();
+        return node.empty() || is_defined_text(node.str());
+    }
+
+    [[nodiscard]] bool is_defined_text(const std::string &at) const
+    {
         const std::string below = at + key_path::separator;
-        for(const std::string &defined : m_defined)
-        {
-            if(defined == at || defined.compare(0, below.size(), below) == 0)
-                return true;
-        }
-        return false;
+        return std::ranges::any_of(m_defined, [&](const std::string &defined) {
+            return defined == at || defined.compare(0, below.size(), below) == 0;
+        });
+    }
+
+    // Whether a container path has a declared primary key -- the test that makes
+    // a path segment under it eligible to be a transient key value.
+    [[nodiscard]] bool keyed_container(const std::string &container) const
+    {
+        return std::ranges::any_of(m_elements, [&](const schema_element &el) {
+            return el.identity && el.container().str() == container;
+        });
     }
 
     std::vector<registration<schema_spec>> m_entries;

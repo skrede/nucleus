@@ -81,6 +81,18 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         ${CMAKE_SOURCE_DIR}/src
     )
     add_test(NAME resolve_buffer_drop_test COMMAND resolve_buffer_drop_test)
+
+    # Keyed-projection test: the schema declares a container's primary key and the
+    # XML source must render repeated instances as distinct keyed subtrees instead
+    # of collapsing them last-wins. Links the XML module for a real document walk.
+    add_executable(keyed_projection_test keyed_projection_test.cpp)
+    target_link_libraries(keyed_projection_test
+        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+    target_include_directories(keyed_projection_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+    )
+    add_test(NAME keyed_projection_test COMMAND keyed_projection_test)
 endif()
 
 # ---------------------------------------------------------------------------

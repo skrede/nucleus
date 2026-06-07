@@ -3,6 +3,8 @@
 
 #include "nucleus/source/document_source.h"
 
+#include "nucleus/schema/projection.h"
+
 #include <string>
 #include <utility>
 
@@ -37,6 +39,14 @@ public:
 
     [[nodiscard]] source_result pull() override;
 
+    // Retains the schema-derived projection the resolve fold hands over before
+    // pull(), so the walk can render repeatable keyed containers (one instance
+    // per primary-key value) instead of collapsing repeated siblings last-wins.
+    void apply_projection(const schema_projection &projection) override
+    {
+        m_projection = projection;
+    }
+
 private:
     enum class kind
     {
@@ -51,6 +61,7 @@ private:
 
     kind m_kind;
     std::string m_input;
+    schema_projection m_projection;
 };
 
 }

@@ -88,11 +88,17 @@ public:
                              return a->rank < b->rank;
                          });
 
+        // The schema-derived projection every source is offered before it pulls,
+        // so a document source renders repeatable keyed containers faithfully.
+        // Built once from the borrowed schema; flat sources ignore it.
+        const schema_projection projection = m_schema.projection();
+
         for(const source_layer *layer : ordered)
         {
             if(layer->src == nullptr)
                 continue;
 
+            layer->src->apply_projection(projection);
             source_result pulled = layer->src->pull();
             if(!pulled)
                 return fail(nucleus::format("source '{}': {}",
@@ -126,6 +132,88 @@ public:
         return std::monostate{};
     }
 
+    // Collapses keyed-container instances into the ONE unified hierarchy the
+    // resolved configuration promises. A primary-key value is internal to
+    // resolution -- a transient path segment keeping instances distinct through
+    // the fold -- and must NEVER survive into the frozen keyspace: a key value
+    // as a resolved segment would make the tree untraversable without knowing
+    // the key. Run between fold and validate.
+    //
+    // With exactly one named instance the strain auto-resolves: its entries are
+    // re-laid onto the declared (stripped) paths, where the named instance
+    // overrides template (anonymous) content of equal or lower rank but never a
+    // higher-ranked layer's value at the unified path (a flat env/argv override
+    // addresses the unified path precisely because the key is stripped). With
+    // several named instances and no selection the resolve fails loudly --
+    // silently composing strains and leaking key segments are both forbidden.
+    [[nodiscard]] result<std::monostate, resolve_fold_error> slice()
+    {
+        for(const schema_element &el : m_schema.elements())
+        {
+            if(!el.identity)
+                continue;
+
+            const key_path container = el.container();
+
+            // Bucket every keyed leaf by its instance's key value. paths() is a
+            // snapshot, so mutating the keyspace below is safe.
+            std::map<std::string, std::vector<key_path>> strains;
+            for(const key_path &path : m_building.paths())
+            {
+                if(m_schema.keyed_instance_path(container, path))
+                    strains[path.segments()[container.size()]].push_back(path);
+            }
+
+            if(strains.empty())
+                continue;
+
+            if(strains.size() > 1)
+            {
+                std::string keys;
+                for(const auto &[key_value, _] : strains)
+                {
+                    if(!keys.empty())
+                        keys += ", ";
+                    keys += nucleus::format("'{}'", key_value);
+                }
+                return fail(nucleus::format(
+                    "container '{}' holds {} primary-keyed instances ({}) and "
+                    "no instance is selected: a configuration space resolves "
+                    "exactly one",
+                    container.str(), strains.size(), keys));
+            }
+
+            for(const key_path &keyed : strains.begin()->second)
+            {
+                auto unified = key_path::parse(m_schema.canonical_text(keyed));
+                if(!unified)
+                    continue;
+
+                const origin *from = m_provenance.of(keyed.str());
+                const origin *at = m_provenance.of(unified.value().str());
+                const bool displaced = from != nullptr && at != nullptr
+                                       && at->rank > from->rank;
+                if(!displaced)
+                {
+                    if(const value *v = m_building.find(keyed))
+                    {
+                        m_building.set(unified.value(), *v);
+                        if(from != nullptr)
+                            m_provenance.record(unified.value().str(), *from);
+                    }
+                }
+                m_building.remove(keyed);
+                m_provenance.forget(keyed.str());
+            }
+
+            // The strain's key value named the instance and was consumed; the
+            // enforcer's identity-presence check is satisfied structurally.
+            m_keyed_satisfied.push_back(container.str());
+        }
+
+        return std::monostate{};
+    }
+
     // Validates the folded keyspace against the borrowed schema -- the step that
     // makes the schema authoritative over CONTENT at resolve time, reached only
     // through ctx.schema() so the registry stays a borrowed sibling. Runs ONLY
@@ -138,7 +226,8 @@ public:
         if(m_schema.surface().empty())
             return std::monostate{};
 
-        schema_validation checked = schema_enforcer::validate(m_schema, m_building);
+        schema_validation checked = schema_enforcer::validate(m_schema, m_building,
+                                                              m_keyed_satisfied);
         if(checked)
             return std::monostate{};
 
@@ -184,6 +273,10 @@ private:
     keyspace m_building;
     provenance m_provenance;
     std::vector<retained_buffer> m_buffers;
+    // Containers whose single primary-keyed instance was sliced onto the unified
+    // hierarchy -- evidence for the enforcer that their identity is satisfied
+    // even though the key field was consumed and never appears as a leaf.
+    std::vector<std::string> m_keyed_satisfied;
 };
 
 }

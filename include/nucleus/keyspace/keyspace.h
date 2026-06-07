@@ -33,6 +33,14 @@ public:
         m_values.insert_or_assign(path.str(), std::move(v));
     }
 
+    // Removes the value at a leaf path (no-op when none is set there). Used by
+    // the resolve boundary when it re-lays entries under different paths, e.g.
+    // stripping a transient key segment onto the unified hierarchy.
+    void remove(const key_path &path)
+    {
+        m_values.erase(path.str());
+    }
+
     [[nodiscard]] bool contains(const key_path &path) const
     {
         return m_values.find(path.str()) != m_values.end();

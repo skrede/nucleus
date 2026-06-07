@@ -42,6 +42,14 @@ public:
         m_origins.insert_or_assign(key, std::move(where));
     }
 
+    // Drops the origin recorded at `key` (no-op when absent) -- the counterpart
+    // of record() for entries the resolve boundary re-lays under a different
+    // path, so provenance never names a key the keyspace no longer holds.
+    void forget(const std::string &key)
+    {
+        m_origins.erase(key);
+    }
+
     [[nodiscard]] const origin *of(const std::string &key) const
     {
         auto it = m_origins.find(key);

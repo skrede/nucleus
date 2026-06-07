@@ -99,6 +99,13 @@ public:
         if(auto folded = ctx.fold(stack); !folded)
             return fail(std::move(folded).error());
 
+        // Keyed-container instances collapse onto the unified hierarchy BEFORE
+        // the schema gates content: a primary-key value is transient resolution
+        // state and never reaches validation or the frozen configuration. An
+        // ambiguous fold (several strains, no selection) fails loudly here.
+        if(auto sliced = ctx.slice(); !sliced)
+            return fail(std::move(sliced).error());
+
         // The schema is the authority over CONTENT: a non-empty schema gates the
         // folded keyspace before it is frozen, so undeclared keys and missing
         // required/identity fields fail the resolve rather than silently shipping.

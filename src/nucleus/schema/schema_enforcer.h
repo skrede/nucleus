@@ -56,8 +56,14 @@ using schema_validation = result<std::monostate, std::vector<schema_violation>>;
 class schema_enforcer
 {
 public:
-    [[nodiscard]] static schema_validation validate(const schema_registry &schema,
-                                                    const keyspace &resolved)
+    // `keyed_satisfied` carries the container paths whose primary-keyed instance
+    // the resolve boundary already sliced onto the unified hierarchy: their
+    // identity field was consumed (its value named the instance, then the
+    // transient segment was stripped), so it is satisfied without appearing as a
+    // leaf. Callers validating a raw keyspace pass nothing.
+    [[nodiscard]] static schema_validation
+    validate(const schema_registry &schema, const keyspace &resolved,
+             const std::vector<std::string> &keyed_satisfied = {})
     {
         std::vector<schema_violation> violations;
 
@@ -88,7 +94,9 @@ public:
                                       declared.str())});
             }
 
-            if(el.identity && !present)
+            if(el.identity && !present
+               && std::ranges::find(keyed_satisfied, el.container().str())
+                      == keyed_satisfied.end())
             {
                 violations.push_back(schema_violation{
                     declared.str(),
