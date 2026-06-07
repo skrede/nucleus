@@ -41,6 +41,7 @@ set(NUCLEUS_SOURCE_HEADERS
     include/nucleus/source/parser_adapter.h
     include/nucleus/source/document_source.h
     include/nucleus/source/extension_registry.h
+    include/nucleus/source/inherit_declaration.h
 )
 
 set(NUCLEUS_SOURCE_ENV_HEADERS
@@ -57,6 +58,7 @@ set(NUCLEUS_KEYSPACE_HEADERS
 
 set(NUCLEUS_ENTRY_HEADERS
     include/nucleus/entry/precedence.h
+    include/nucleus/entry/strain_scope.h
     include/nucleus/entry/configuration.h
 )
 
@@ -68,6 +70,7 @@ set(NUCLEUS_DIAGNOSTICS_HEADERS
 set(NUCLEUS_SCHEMA_HEADERS
     include/nucleus/schema/anchor.h
     include/nucleus/schema/schema.h
+    include/nucleus/schema/converters.h
 )
 
 set(NUCLEUS_SOURCE_ARGV_HEADERS
