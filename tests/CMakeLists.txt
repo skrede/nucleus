@@ -112,6 +112,15 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         ${CMAKE_SOURCE_DIR}/src
     )
     add_test(NAME inherit_chain_test COMMAND inherit_chain_test)
+
+    add_executable(integration_shape_test integration_shape_test.cpp)
+    target_link_libraries(integration_shape_test
+        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+    target_include_directories(integration_shape_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+    )
+    add_test(NAME integration_shape_test COMMAND integration_shape_test)
 endif()
 
 # ---------------------------------------------------------------------------
