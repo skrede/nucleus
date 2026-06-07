@@ -174,7 +174,9 @@ TEST_CASE("discovery finds host-supplied base name across host-supplied paths", 
     REQUIRE(has("settings.ini"));
 
     // Host precedence is preserved: home (first search dir) outranks etc.
-    REQUIRE(hits.front().path.find((home).string()) != std::string::npos);
+    // Compare in the engine's canonical path text (generic, forward-slash):
+    // native string() would carry backslashes on Windows and never match.
+    REQUIRE(hits.front().path.find(nucleus::path_to_text(home)) != std::string::npos);
 
     // open_all builds a live source per hit through the registry's factories.
     auto sources = nucleus::discovery::open_all(base, search_paths, registry);
