@@ -1,7 +1,9 @@
 #include "xml_reader.h"
 #include "xml_source.h"
 
+#include "nucleus/format.h"
 #include "nucleus/capability.h"
+#include "nucleus/source/inherit_declaration.h"
 
 #include "nucleus/schema/projection.h"
 
@@ -10,6 +12,8 @@
 
 #include <pugixml.hpp>
 
+#include <map>
+#include <set>
 #include <memory>
 #include <string>
 #include <utility>
@@ -59,8 +63,8 @@ std::string_view keyed_value(const pugi::xml_node &node, const std::string &key_
     return {};
 }
 
-// Walks one element into entries under `path`. Attributes and pure-text leaf
-// children become value entries; nested elements recurse. Every value is a
+// Walks one element into keyspace entries under `path`. Attributes and pure-text
+// leaf children become value entries; nested elements recurse. Every value is a
 // string_view into the document arena -- never copied here -- so the batch must
 // pin the arena (the caller does).
 //
@@ -70,16 +74,62 @@ std::string_view keyed_value(const pugi::xml_node &node, const std::string &key_
 // distinct `.../node/yin/...` and `.../node/yang/...` subtrees instead of one
 // overwritten `.../node/...`). The key field itself is consumed -- suppressed via
 // `skip` at the instance's own level -- since its value already names the segment.
-void walk(const pugi::xml_node &node, std::string_view path,
-          const capability_descriptor &caps, const schema_projection &proj,
-          std::vector<keyspace_entry> &out, std::string_view skip = {})
+//
+// Grammar attributes handled here:
+//   inherit=  -- valid only on the document root element (is_root=true); absent on
+//                 root is fine (suppressed, not emitted). On a non-root element it
+//                 is a loud parse error naming the element.
+//   extend=   -- valid only on keyed container instances; absent is fine. On any
+//                 other element it is a loud parse error.
+//
+// seen_keys accumulates (container_path -> {key_values}) to detect same-document
+// duplicate primary-key values and fail loudly. The map is shared across all
+// recursive calls.
+//
+// batch is shared so the keyed-instance branch can push extend dispositions.
+result<std::monostate, source_error>
+walk(const pugi::xml_node &node, std::string_view path,
+     const capability_descriptor &caps, const schema_projection &proj,
+     source_batch &batch, std::string_view skip,
+     std::map<std::string, std::set<std::string>> &seen_keys,
+     bool is_root)
 {
     for(const pugi::xml_attribute &attr : node.attributes())
     {
-        if(!skip.empty() && skip == std::string_view(attr.name()))
+        std::string_view attr_name = std::string_view(attr.name());
+
+        // "inherit" is a grammar attribute: suppress on root (consumed by
+        // inheritance()), reject loudly on non-root elements.
+        if(attr_name == "inherit")
+        {
+            if(!is_root)
+                return fail(source_error{nucleus::format(
+                    "inherit attribute is not permitted on element '{}'; "
+                    "it is only valid on the document root element",
+                    node.name())});
+            continue; // root: skip silently -- inheritance() reads m_arena
+        }
+
+        // "extend" is a grammar attribute valid only on primary-keyed container
+        // instances. When skip is non-empty this node is a keyed instance (the
+        // caller already extracted and recorded the extend disposition before
+        // recursing); suppress the attribute so it is not emitted to keyspace
+        // entries. When skip is empty this node is NOT a keyed instance and the
+        // attribute is a user error.
+        if(attr_name == "extend")
+        {
+            if(skip.empty())
+                return fail(source_error{nucleus::format(
+                    "extend attribute is not permitted on element '{}'; "
+                    "it is only valid on a primary-keyed container instance",
+                    node.name())});
+            continue; // keyed instance: suppress from entries (already consumed by caller)
+        }
+
+        if(!skip.empty() && skip == attr_name)
             continue;
-        out.push_back(make_entry(join(path, attr.name()),
-                                 value::view(std::string_view(attr.value())), caps));
+        batch.entries.push_back(make_entry(join(path, attr.name()),
+                                           value::view(std::string_view(attr.value())), caps));
     }
 
     for(const pugi::xml_node &child : node.children())
@@ -92,8 +142,9 @@ void walk(const pugi::xml_node &node, std::string_view path,
         {
             if(!skip.empty() && skip == std::string_view(child.name()))
                 continue;
-            out.push_back(make_entry(child_path,
-                                     value::view(std::string_view(child.child_value())), caps));
+            batch.entries.push_back(make_entry(child_path,
+                                               value::view(std::string_view(child.child_value())),
+                                               caps));
             continue;
         }
 
@@ -105,13 +156,47 @@ void walk(const pugi::xml_node &node, std::string_view path,
             std::string_view key_val = keyed_value(child, *key);
             if(!key_val.empty())
             {
-                walk(child, join(child_path, key_val), caps, proj, out, *key);
+                // Same-layer duplicate primary-key detection: two instances with
+                // the same key value in one document are an error.
+                auto &seen = seen_keys[child_path];
+                if(seen.count(std::string(key_val)))
+                    return fail(source_error{nucleus::format(
+                        "duplicate primary-key value '{}' in container '{}': "
+                        "the same key value appears more than once in this document",
+                        key_val, child_path)});
+                seen.insert(std::string(key_val));
+
+                // extend= on this instance element: parse the disposition.
+                if(pugi::xml_attribute ext_attr = child.attribute("extend"))
+                {
+                    std::string_view ext_val = ext_attr.value();
+                    if(ext_val == "narrow")
+                        batch.dispositions.push_back({std::string(child_path),
+                                                      std::string(key_val),
+                                                      extend_strength::narrow});
+                    else if(ext_val == "wide")
+                        batch.dispositions.push_back({std::string(child_path),
+                                                      std::string(key_val),
+                                                      extend_strength::wide});
+                    else
+                        return fail(source_error{nucleus::format(
+                            "unknown extend value '{}' on element '{}'; "
+                            "expected \"narrow\" or \"wide\"",
+                            ext_val, child.name())});
+                }
+
+                if(auto r = walk(child, join(child_path, key_val), caps, proj,
+                                 batch, *key, seen_keys, false); !r)
+                    return r;
                 continue;
             }
         }
 
-        walk(child, child_path, caps, proj, out);
+        if(auto r = walk(child, child_path, caps, proj, batch, {}, seen_keys, false); !r)
+            return r;
     }
+
+    return std::monostate{};
 }
 
 }
@@ -127,30 +212,55 @@ capability_descriptor xml_source::capabilities() const
 
 source_result xml_source::pull()
 {
-    auto arena = std::make_shared<document_arena>();
+    m_arena = std::make_shared<document_arena>();
 
-    const bool loaded = m_kind == kind::file ? arena->load_file(m_input)
-                                             : arena->load_string(m_input);
+    const bool loaded = m_kind == kind::file ? m_arena->load_file(m_input)
+                                             : m_arena->load_string(m_input);
     if(!loaded)
         return fail(std::string("xml source: failed to parse input"));
 
-    pugi::xml_node root = arena->root();
+    pugi::xml_node root = m_arena->root();
     if(!root)
         return fail(std::string("xml source: document has no root element"));
 
     source_batch batch;
+    std::map<std::string, std::set<std::string>> seen_keys;
     // The root element name anchors the keyspace path so a document's top-level
     // element is addressable, matching the nested-element-as-path model. The
     // projection (empty unless the schema declared keyed containers) controls how
     // repeatable instances are distinguished.
-    walk(root, std::string_view(root.name()), capabilities(), m_projection,
-         batch.entries);
+    if(auto r = walk(root, std::string_view(root.name()), capabilities(), m_projection,
+                     batch, {}, seen_keys, true); !r)
+        return fail(r.error());
 
     // Pin the arena: the entries' views point into it and must stay valid until
-    // resolution copies them out. The handle owns the shared_ptr; dropping the
-    // batch drops the arena.
-    batch.buffer = retained_buffer(std::move(arena));
+    // resolution copies them out. m_arena is also kept alive as a member so
+    // inheritance() can read the root after pull() returns.
+    batch.buffer = retained_buffer(m_arena);
     return batch;
+}
+
+inherit_declaration xml_source::inheritance() const
+{
+    if(!m_arena)
+        return {}; // pull() not yet called; safe default (inherit_default)
+    pugi::xml_node root = m_arena->root();
+    if(!root)
+        return {};
+    pugi::xml_attribute attr = root.attribute("inherit");
+    if(!attr)
+        return {}; // absence = inherit_default
+    std::string_view val = attr.value();
+    if(val == "none")
+    {
+        inherit_declaration d;
+        d.which = inherit_declaration::kind::opt_out;
+        return d;
+    }
+    inherit_declaration d;
+    d.which = inherit_declaration::kind::parent_path;
+    d.path = std::string(val);
+    return d;
 }
 
 }

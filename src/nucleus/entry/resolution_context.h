@@ -14,12 +14,15 @@
 #include "nucleus/schema/schema_enforcer.h"
 #include "nucleus/schema/schema_registry.h"
 
+#include "nucleus/source/inherit_declaration.h"
+
 #include "nucleus/diagnostics/key_suggester.h"
 
 #include "nucleus/tokenizer/token_resolution.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
 
 #include <map>
+#include <set>
 #include <limits>
 #include <string>
 #include <vector>
@@ -125,6 +128,11 @@ public:
                 m_provenance.record(entry.path,
                                     origin{layer->rank, layer->label, layer->owner});
             }
+
+            // Extract extend dispositions declared by this batch (empty for flat
+            // sources; populated by document sources that parse extend= attributes).
+            for(const extend_disposition &d : batch.dispositions)
+                m_dispositions.push_back(d);
 
             // Pin the batch's buffer so its (now copied-out) views stayed valid
             // through the expansion above; it is released only at context destruction.
@@ -297,6 +305,106 @@ public:
                 }
             }
 
+            // Step A: Build a disposition index for fast lookup in the checks
+            // below and in the relay_strain call.
+            std::map<std::pair<std::string, std::string>, extend_strength> disp_index;
+            for(const extend_disposition &d : m_dispositions)
+                disp_index[{d.container_path, d.key_value}] = d.strength;
+
+            // Step B: Cross-layer re-open and extend-without-base checks.
+            // These checks apply only to document-band sources (rank >= base, i.e.
+            // inheritance chain layers). Flat source layering (env, argv, defaults)
+            // contributes to strains by design and is never a re-open error.
+            // For each named strain: compute the set of distinct first-introduction
+            // ranks in the document band. A strain present at more than one
+            // document-band layer without an extend disposition is a re-open error.
+            // A strain with an extend disposition but entries at only one document-
+            // band layer has no base (extend without base).
+            static constexpr std::size_t doc_band_min =
+                static_cast<std::size_t>(layer_rank::base);
+            for(const auto &[key_value, keyed_paths] : strains)
+            {
+                std::set<std::size_t> intro_ranks;
+                for(const key_path &kp : keyed_paths)
+                {
+                    const std::size_t *r = m_provenance.first_rank_of(kp.str());
+                    if(r != nullptr && *r >= doc_band_min)
+                        intro_ranks.insert(*r);
+                }
+
+                // No document-band entries for this strain: flat-source only,
+                // skip the inheritance chain checks.
+                if(intro_ranks.empty())
+                    continue;
+
+                const bool has_cross_layer = (intro_ranks.size() > 1);
+                auto disp_it = disp_index.find({container.str(), key_value});
+                const bool has_disposition = (disp_it != disp_index.end());
+
+                if(has_cross_layer && !has_disposition)
+                    return fail(nucleus::format(
+                        "primary-key value '{}' in container '{}' is introduced "
+                        "at multiple layers without an extend disposition: "
+                        "re-opening a named instance in a derived file requires "
+                        "an explicit extend attribute",
+                        key_value, container.str()));
+
+                if(has_disposition && !has_cross_layer)
+                    return fail(nucleus::format(
+                        "extend disposition for '{}' in container '{}' has no "
+                        "base: no layer below the extending layer provides "
+                        "entries for this instance",
+                        key_value, container.str()));
+            }
+
+            // Step C: Unique-value enforcement across sibling instances.
+            // For every non-identity unique field in this container, collect the
+            // field value across all named strains and fail if any value appears
+            // more than once. Runs before pruning so all strains are visible.
+            for(const schema_element &uel : m_schema.elements())
+            {
+                if(!uel.unique || uel.identity)
+                    continue;
+                if(uel.container() != container)
+                    continue;
+
+                // For each strain bucket, look up the unique field's keyed path
+                // and collect its value.
+                std::map<std::string, std::vector<std::string>> value_to_strains;
+                for(const auto &[kv, keyed_paths] : strains)
+                {
+                    // The unique field's path under this instance:
+                    // container / kv / unique_field_name
+                    const std::string unique_path =
+                        container.str() + key_path::separator
+                        + kv + key_path::separator + uel.name;
+                    auto unique_kp = key_path::parse(unique_path);
+                    if(!unique_kp.has_value())
+                        continue;
+                    const value *v = m_building.find(unique_kp.value());
+                    if(v)
+                        value_to_strains[std::string(v->text())].push_back(kv);
+                }
+
+                for(const auto &[val_text, kv_list] : value_to_strains)
+                {
+                    if(kv_list.size() > 1)
+                    {
+                        std::string which;
+                        for(const std::string &kv : kv_list)
+                        {
+                            if(!which.empty())
+                                which += ", ";
+                            which += nucleus::format("'{}'", kv);
+                        }
+                        return fail(nucleus::format(
+                            "unique field '{}' in container '{}' has duplicate "
+                            "value '{}' across instances: {}",
+                            uel.name, container.str(), val_text, which));
+                    }
+                }
+            }
+
             // Prune every non-chosen named strain: remove its keyed paths from
             // the building keyspace and forget their provenance.
             for(auto &[key_value, paths] : strains)
@@ -310,24 +418,40 @@ public:
                 }
             }
 
+            // Step D: determine if the chosen strain has a wide-extend disposition.
+            bool wide_extend = false;
+            {
+                auto it = disp_index.find({container.str(), chosen});
+                if(it != disp_index.end() && it->second == extend_strength::wide)
+                    wide_extend = true;
+            }
+
             // file_level general pre-pass: prune ALL paths whose winning rank
             // exceeds Ld. This sweeps keyed and general entries alike, and runs
             // on a snapshot to avoid iterator invalidation during removal.
+            // Guard: if the chosen strain is extend-wide, its entries must survive
+            // the pre-pass to compose regardless of the scope policy.
             if(policy == strain_scope_policy::file_level)
             {
+                const std::string chosen_prefix =
+                    container.str() + key_path::separator + chosen + key_path::separator;
                 const std::vector<key_path> snapshot = m_building.paths();
                 for(const key_path &path : snapshot)
                 {
                     const origin *orig = m_provenance.of(path.str());
-                    if(orig != nullptr && orig->rank > Ld)
-                    {
-                        m_building.remove(path);
-                        m_provenance.forget(path.str());
-                    }
+                    if(orig == nullptr || orig->rank <= Ld)
+                        continue;
+                    // Skip entries belonging to the chosen strain when it is
+                    // extend-wide: they must survive to compose via relay_strain.
+                    if(wide_extend && path.str().compare(0, chosen_prefix.size(),
+                                                         chosen_prefix) == 0)
+                        continue;
+                    m_building.remove(path);
+                    m_provenance.forget(path.str());
                 }
             }
 
-            relay_strain(strains.at(chosen), policy, Ld, Ls);
+            relay_strain(strains.at(chosen), policy, Ld, Ls, wide_extend);
 
             // The strain's key value named the instance and was consumed; the
             // enforcer's identity-presence check is satisfied structurally.
@@ -397,18 +521,23 @@ private:
     // them up to but excluding Ls. An entry already at the unified path with a
     // higher winning rank (a flat override such as argv) displaces the keyed
     // value -- it composes by plain rank precedence, outside the bounds.
+    //
+    // When wide_extend=true the rank filter is bypassed entirely: the chosen
+    // strain was declared with extend-wide, which is explicit consent to compose
+    // all its entries regardless of the active scope policy.
     void relay_strain(const std::vector<key_path> &keyed_paths,
-                      strain_scope_policy policy, std::size_t Ld, std::size_t Ls)
+                      strain_scope_policy policy, std::size_t Ld, std::size_t Ls,
+                      bool wide_extend = false)
     {
         for(const key_path &keyed : keyed_paths)
         {
             const origin *from = m_provenance.of(keyed.str());
             const std::size_t entry_rank = from != nullptr ? from->rank : 0;
 
-            const bool excluded =
+            const bool excluded = !wide_extend && (
                 policy == strain_scope_policy::container_open_until_next_strain
                     ? entry_rank >= Ls
-                    : entry_rank > Ld;
+                    : entry_rank > Ld);
             if(excluded)
             {
                 m_building.remove(keyed);
@@ -447,6 +576,10 @@ private:
     // hierarchy -- evidence for the enforcer that their identity is satisfied
     // even though the key field was consumed and never appears as a leaf.
     std::vector<std::string> m_keyed_satisfied;
+    // Re-open dispositions collected from all source batches during fold().
+    // Consumed by slice() to enforce cross-layer re-open rules and drive
+    // the relay_strain wide_extend bypass.
+    std::vector<extend_disposition> m_dispositions;
 };
 
 }

@@ -2,13 +2,21 @@
 #define HPP_GUARD_NUCLEUS_XML_XML_SOURCE_H
 
 #include "nucleus/source/document_source.h"
+#include "nucleus/source/inherit_declaration.h"
 
 #include "nucleus/schema/projection.h"
 
+#include <memory>
 #include <string>
 #include <utility>
 
 namespace nucleus::xml {
+
+// Forward declaration: the pugixml document arena. Defined in xml_reader.h
+// (which pulls in pugixml). The shared_ptr member only needs an incomplete type
+// here; the destructor and constructor are out-of-line in xml_source.cpp where
+// xml_reader.h is included.
+class document_arena;
 
 // A document source backed by pugixml. It walks the parsed tree into keyspace
 // entries: nested elements become `/`-separated key paths, and an element's
@@ -47,6 +55,11 @@ public:
         m_projection = projection;
     }
 
+    // Returns the inheritance declaration read from the document root's inherit=
+    // attribute. Callable after pull(); returns inherit_default when pull() has
+    // not been called yet or the document root has no inherit= attribute.
+    [[nodiscard]] inherit_declaration inheritance() const override;
+
 private:
     enum class kind
     {
@@ -62,6 +75,9 @@ private:
     kind m_kind;
     std::string m_input;
     schema_projection m_projection;
+    // Set during pull(); shared_ptr so inheritance() can read the root after
+    // pull() returns without copying the arena.
+    std::shared_ptr<document_arena> m_arena;
 };
 
 }
