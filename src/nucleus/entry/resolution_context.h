@@ -30,8 +30,8 @@
 #include <cstddef>
 #include <utility>
 #include <optional>
-#include <typeindex>
 #include <algorithm>
+#include <typeindex>
 
 namespace nucleus {
 

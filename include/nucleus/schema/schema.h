@@ -12,8 +12,8 @@
 #include <vector>
 #include <utility>
 #include <optional>
-#include <functional>
 #include <typeindex>
+#include <functional>
 
 namespace nucleus {
 

@@ -19,20 +19,21 @@
 //
 // Converters must not throw; return fail() for any conversion error.
 
-#include "nucleus/schema/schema.h"
 #include "nucleus/result.h"
 
+#include "nucleus/schema/schema.h"
+
 #include <any>
+#include <cctype>
 #include <string>
 #include <vector>
-#include <cctype>
-#include <charconv>
 #include <cstdint>
-#include <algorithm>
+#include <charconv>
 #include <optional>
+#include <algorithm>
+#include <typeindex>
 #include <functional>
 #include <string_view>
-#include <typeindex>
 
 namespace nucleus {
 
@@ -56,13 +57,15 @@ make_scalar_converter()
 //                           -> "trailing characters after value"
 //   3. errc::result_out_of_range -> "value out of range for type"
 //   4. errc::invalid_argument on non-empty input:
-//        ptr == sv.data()   -> zero characters consumed (bad leading char,
-//                              including '-' into unsigned)
-//                           -> "value out of range for type"
-//        ptr  > sv.data()   -> valid prefix with trailing garbage, but since
-//                              from_chars stops on the first bad char and we
-//                              already checked ptr==end above, this branch is
-//                              "trailing characters after value"
+//        ptr == sv.data()   -> zero characters consumed; split on leading char:
+//                              '-' or '+' -> "value out of range for type"
+//                              (a sign into an unsigned type is a range-adjacent
+//                              case; a negative into a signed type that is still
+//                              out of representable range is already caught by
+//                              case 3, so this only fires for '+' on signed types)
+//                              anything else -> "invalid characters in value"
+//                              (pure non-numeric input such as "abc")
+//        ptr  > sv.data()   -> "trailing characters after value"
 
 template<>
 [[nodiscard]] inline std::function<result<std::any, std::string>(std::string_view)>
@@ -83,7 +86,11 @@ make_scalar_converter<int8_t>()
             return fail(std::string("value out of range for type"));
         // errc::invalid_argument
         if(ptr == sv.data())
-            return fail(std::string("value out of range for type"));
+        {
+            if(!sv.empty() && (sv[0] == '-' || sv[0] == '+'))
+                return fail(std::string("value out of range for type"));
+            return fail(std::string("invalid characters in value"));
+        }
         return fail(std::string("trailing characters after value"));
     };
 }
@@ -105,8 +112,13 @@ make_scalar_converter<int16_t>()
         }
         if(ec == std::errc::result_out_of_range)
             return fail(std::string("value out of range for type"));
+        // errc::invalid_argument
         if(ptr == sv.data())
-            return fail(std::string("value out of range for type"));
+        {
+            if(!sv.empty() && (sv[0] == '-' || sv[0] == '+'))
+                return fail(std::string("value out of range for type"));
+            return fail(std::string("invalid characters in value"));
+        }
         return fail(std::string("trailing characters after value"));
     };
 }
@@ -128,8 +140,13 @@ make_scalar_converter<int32_t>()
         }
         if(ec == std::errc::result_out_of_range)
             return fail(std::string("value out of range for type"));
+        // errc::invalid_argument
         if(ptr == sv.data())
-            return fail(std::string("value out of range for type"));
+        {
+            if(!sv.empty() && (sv[0] == '-' || sv[0] == '+'))
+                return fail(std::string("value out of range for type"));
+            return fail(std::string("invalid characters in value"));
+        }
         return fail(std::string("trailing characters after value"));
     };
 }
@@ -151,8 +168,13 @@ make_scalar_converter<int64_t>()
         }
         if(ec == std::errc::result_out_of_range)
             return fail(std::string("value out of range for type"));
+        // errc::invalid_argument
         if(ptr == sv.data())
-            return fail(std::string("value out of range for type"));
+        {
+            if(!sv.empty() && (sv[0] == '-' || sv[0] == '+'))
+                return fail(std::string("value out of range for type"));
+            return fail(std::string("invalid characters in value"));
+        }
         return fail(std::string("trailing characters after value"));
     };
 }
@@ -174,8 +196,13 @@ make_scalar_converter<uint8_t>()
         }
         if(ec == std::errc::result_out_of_range)
             return fail(std::string("value out of range for type"));
+        // errc::invalid_argument
         if(ptr == sv.data())
-            return fail(std::string("value out of range for type"));
+        {
+            if(!sv.empty() && (sv[0] == '-' || sv[0] == '+'))
+                return fail(std::string("value out of range for type"));
+            return fail(std::string("invalid characters in value"));
+        }
         return fail(std::string("trailing characters after value"));
     };
 }
@@ -197,8 +224,13 @@ make_scalar_converter<uint16_t>()
         }
         if(ec == std::errc::result_out_of_range)
             return fail(std::string("value out of range for type"));
+        // errc::invalid_argument
         if(ptr == sv.data())
-            return fail(std::string("value out of range for type"));
+        {
+            if(!sv.empty() && (sv[0] == '-' || sv[0] == '+'))
+                return fail(std::string("value out of range for type"));
+            return fail(std::string("invalid characters in value"));
+        }
         return fail(std::string("trailing characters after value"));
     };
 }
@@ -220,8 +252,13 @@ make_scalar_converter<uint32_t>()
         }
         if(ec == std::errc::result_out_of_range)
             return fail(std::string("value out of range for type"));
+        // errc::invalid_argument
         if(ptr == sv.data())
-            return fail(std::string("value out of range for type"));
+        {
+            if(!sv.empty() && (sv[0] == '-' || sv[0] == '+'))
+                return fail(std::string("value out of range for type"));
+            return fail(std::string("invalid characters in value"));
+        }
         return fail(std::string("trailing characters after value"));
     };
 }
@@ -243,8 +280,13 @@ make_scalar_converter<uint64_t>()
         }
         if(ec == std::errc::result_out_of_range)
             return fail(std::string("value out of range for type"));
+        // errc::invalid_argument
         if(ptr == sv.data())
-            return fail(std::string("value out of range for type"));
+        {
+            if(!sv.empty() && (sv[0] == '-' || sv[0] == '+'))
+                return fail(std::string("value out of range for type"));
+            return fail(std::string("invalid characters in value"));
+        }
         return fail(std::string("trailing characters after value"));
     };
 }
@@ -266,8 +308,13 @@ make_scalar_converter<float>()
         }
         if(ec == std::errc::result_out_of_range)
             return fail(std::string("value out of range for type"));
+        // errc::invalid_argument
         if(ptr == sv.data())
-            return fail(std::string("value out of range for type"));
+        {
+            if(!sv.empty() && (sv[0] == '-' || sv[0] == '+'))
+                return fail(std::string("value out of range for type"));
+            return fail(std::string("invalid characters in value"));
+        }
         return fail(std::string("trailing characters after value"));
     };
 }
@@ -289,8 +336,13 @@ make_scalar_converter<double>()
         }
         if(ec == std::errc::result_out_of_range)
             return fail(std::string("value out of range for type"));
+        // errc::invalid_argument
         if(ptr == sv.data())
-            return fail(std::string("value out of range for type"));
+        {
+            if(!sv.empty() && (sv[0] == '-' || sv[0] == '+'))
+                return fail(std::string("value out of range for type"));
+            return fail(std::string("invalid characters in value"));
+        }
         return fail(std::string("trailing characters after value"));
     };
 }

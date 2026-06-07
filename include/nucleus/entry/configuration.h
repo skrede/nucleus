@@ -12,8 +12,8 @@
 #include <cstddef>
 #include <utility>
 #include <optional>
-#include <typeindex>
 #include <algorithm>
+#include <typeindex>
 
 namespace nucleus {
 
@@ -132,6 +132,9 @@ public:
         auto it = m_typed.find(key);
         if(it == m_typed.end())
         {
+            if(m_typed_collections.find(key) != m_typed_collections.end())
+                return fail(std::string("path '") + key
+                            + "' holds a typed collection; use get_all_as<T>()");
             if(contains(key))
                 return fail(std::string("path '") + key + "' declares no type converter");
             return fail(std::string("path '") + key + "' is absent");
@@ -150,6 +153,9 @@ public:
         auto it = m_typed_collections.find(key);
         if(it == m_typed_collections.end())
         {
+            if(m_typed.find(key) != m_typed.end())
+                return fail(std::string("path '") + key
+                            + "' holds a single typed value; use get_as<T>()");
             if(contains(key))
                 return fail(std::string("path '") + key + "' declares no type converter");
             return fail(std::string("path '") + key + "' is absent");
