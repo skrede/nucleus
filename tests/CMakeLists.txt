@@ -153,6 +153,20 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         ${CMAKE_SOURCE_DIR}/src
     )
     add_test(NAME typed_element_test COMMAND typed_element_test)
+
+    # Typed-seam interaction shapes: typed x inheritance chain, typed x pruned
+    # strain, typed x repeated across layers, typed x scope policy exclusion,
+    # and access surface agreement. Complements typed_element_test.cpp with
+    # composition-model integration rather than unit behavior.
+    add_executable(typed_shape_test typed_shape_test.cpp)
+    nucleus_enable_coverage(typed_shape_test)
+    target_link_libraries(typed_shape_test
+        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+    target_include_directories(typed_shape_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+    )
+    add_test(NAME typed_shape_test COMMAND typed_shape_test)
 endif()
 
 # ---------------------------------------------------------------------------

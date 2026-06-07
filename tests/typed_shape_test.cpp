@@ -1,0 +1,371 @@
+// Interaction shape tests: typed seam x composition model
+// (inheritance chain, strain selection, repeated across layers, scope policy,
+// access surface). Adds ONLY shapes not covered by typed_element_test.cpp.
+
+#include "nucleus/configuration_space.h"
+#include "nucleus/entry/configuration.h"
+#include "nucleus/entry/strain_scope.h"
+#include "nucleus/source/source.h"
+
+#include "nucleus/schema/anchor.h"
+#include "nucleus/schema/converters.h"
+#include "nucleus/schema/schema.h"
+
+#include "nucleus/xml/xml_source.h"
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+using nucleus::anchor;
+using nucleus::strain_scope_policy;
+
+namespace {
+
+std::unique_ptr<nucleus::source> xml_of(const std::string &text)
+{
+    return std::make_unique<nucleus::xml::xml_source>(
+        nucleus::xml::xml_source::from_string(text));
+}
+
+std::string filename_of(const std::string &path)
+{
+    const auto pos = path.find_last_of("/\\");
+    return (pos == std::string::npos) ? path : path.substr(pos + 1);
+}
+
+void declare_server_typed(nucleus::configuration_space &engine)
+{
+    engine.register_element(nucleus::element("cluster", anchor::root()));
+    engine.register_element(nucleus::element("server", anchor::keyspace("cluster")));
+    engine.register_element(
+        nucleus::primary_key_element("name", anchor::keyspace("cluster/server")));
+    engine.register_element(
+        nucleus::typed_element<int32_t>("port", anchor::keyspace("cluster/server")));
+}
+
+}
+
+// ---------------------------------------------------------------------------
+// Typed x inheritance chain: derived value wins and converts
+// ---------------------------------------------------------------------------
+TEST_CASE("typed x inheritance chain: derived value wins and converts",
+          "[typed][chain]")
+{
+    const char *base_doc = R"(
+        <cluster>
+            <server name="web"><port>80</port></server>
+        </cluster>)";
+
+    const char *derived_doc = R"(
+        <cluster inherit="base.xml">
+            <server name="web" extend="wide"><port>443</port></server>
+        </cluster>)";
+
+    nucleus::configuration_space engine;
+    declare_server_typed(engine);
+    REQUIRE(engine.select("web"));
+
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+        const std::string name = filename_of(path);
+        if(name == "base.xml")
+            return xml_of(base_doc);
+        if(name == "derived.xml")
+            return xml_of(derived_doc);
+        return nullptr;
+    };
+
+    auto loaded = engine.load(std::vector<std::string>{"derived.xml"}, factory);
+    REQUIRE(loaded);
+
+    auto p = loaded.value().get_as<int32_t>("cluster/server/port");
+    REQUIRE(p);
+    REQUIRE(p.value() == 443);
+
+    auto s = loaded.value().get("cluster/server/port");
+    REQUIRE(s.has_value());
+    REQUIRE(*s == "443");
+}
+
+// ---------------------------------------------------------------------------
+// Typed x inheritance chain: bad value in winning layer fails resolve
+// ---------------------------------------------------------------------------
+TEST_CASE("typed x inheritance chain: bad value in winning layer fails resolve",
+          "[typed][chain][failure]")
+{
+    const char *base_doc = R"(
+        <cluster>
+            <server name="web"><port>80</port></server>
+        </cluster>)";
+
+    const char *derived_doc = R"(
+        <cluster inherit="base.xml">
+            <server name="web" extend="wide"><port>notanumber</port></server>
+        </cluster>)";
+
+    nucleus::configuration_space engine;
+    declare_server_typed(engine);
+    REQUIRE(engine.select("web"));
+
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+        const std::string name = filename_of(path);
+        if(name == "base.xml")
+            return xml_of(base_doc);
+        if(name == "derived.xml")
+            return xml_of(derived_doc);
+        return nullptr;
+    };
+
+    auto loaded = engine.load(std::vector<std::string>{"derived.xml"}, factory);
+    REQUIRE(!loaded);
+    INFO("error: " << loaded.error());
+    // The convert() format is "conversion failed for '...': ... (layer: ...)"
+    REQUIRE(loaded.error().find("conversion failed for") != std::string::npos);
+    REQUIRE(loaded.error().find("cluster/server/port") != std::string::npos);
+    REQUIRE(loaded.error().find("invalid characters") != std::string::npos);
+    REQUIRE(loaded.error().find("derived") != std::string::npos);
+}
+
+// ---------------------------------------------------------------------------
+// Typed x pruned strain: selected strain resolves; bad value in pruned strain
+// does not fail
+// ---------------------------------------------------------------------------
+TEST_CASE("typed x pruned strain: selected strain resolves; bad value in pruned strain does not fail",
+          "[typed][strain][pruned]")
+{
+    // Document with two named strains: yin (port=80) and yang (port=notanumber).
+    const char *doc = R"(
+        <cluster>
+            <server name="yin"><port>80</port></server>
+            <server name="yang"><port>notanumber</port></server>
+        </cluster>)";
+
+    SECTION("selecting the good strain succeeds")
+    {
+        nucleus::configuration_space engine;
+        declare_server_typed(engine);
+        REQUIRE(engine.select("yin"));
+
+        auto src = xml_of(doc);
+        nucleus::source_stack stack;
+        stack.add(*src, std::size_t{10}, "doc");
+
+        auto loaded = engine.resolve(stack);
+        REQUIRE(loaded);
+
+        auto p = loaded.value().get_as<int32_t>("cluster/server/port");
+        REQUIRE(p);
+        REQUIRE(p.value() == 80);
+    }
+
+    SECTION("selecting the bad strain fails")
+    {
+        nucleus::configuration_space engine;
+        declare_server_typed(engine);
+        REQUIRE(engine.select("yang"));
+
+        auto src = xml_of(doc);
+        nucleus::source_stack stack;
+        stack.add(*src, std::size_t{10}, "doc");
+
+        auto loaded = engine.resolve(stack);
+        REQUIRE(!loaded);
+        REQUIRE(loaded.error().find("invalid characters") != std::string::npos);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Typed x repeated across layers: winning layer collection replaces base
+// ---------------------------------------------------------------------------
+TEST_CASE("typed x repeated across layers: winning layer collection replaces base",
+          "[typed][repeated][layers]")
+{
+    SECTION("winning collection converts fully")
+    {
+        nucleus::configuration_space engine;
+        engine.register_element(nucleus::element("cfg", anchor::root()));
+        auto el = nucleus::typed_element<int32_t>("nums", anchor::keyspace("cfg"));
+        el.repeated = true;
+        engine.register_element(el);
+
+        auto base_src = xml_of(
+            "<cfg><nums>1</nums><nums>2</nums><nums>3</nums></cfg>");
+        auto derived_src = xml_of(
+            "<cfg><nums>10</nums><nums>20</nums></cfg>");
+
+        nucleus::source_stack stack;
+        stack.add(*base_src, std::size_t{10}, "base");
+        stack.add(*derived_src, std::size_t{20}, "derived");
+
+        auto loaded = engine.resolve(stack);
+        REQUIRE(loaded);
+
+        auto r = loaded.value().get_all_as<int32_t>("cfg/nums");
+        REQUIRE(r);
+        REQUIRE(r.value() == std::vector<int32_t>{10, 20});
+
+        auto s = loaded.value().get_all("cfg/nums");
+        REQUIRE(s == std::vector<std::string>{"10", "20"});
+    }
+
+    SECTION("bad element in winning collection fails with element index")
+    {
+        nucleus::configuration_space engine;
+        engine.register_element(nucleus::element("cfg", anchor::root()));
+        auto el = nucleus::typed_element<int32_t>("nums", anchor::keyspace("cfg"));
+        el.repeated = true;
+        engine.register_element(el);
+
+        auto base_src = xml_of(
+            "<cfg><nums>1</nums><nums>2</nums><nums>3</nums></cfg>");
+        auto derived_src = xml_of(
+            "<cfg><nums>10</nums><nums>notanumber</nums></cfg>");
+
+        nucleus::source_stack stack;
+        stack.add(*base_src, std::size_t{10}, "base");
+        stack.add(*derived_src, std::size_t{20}, "derived");
+
+        auto loaded = engine.resolve(stack);
+        REQUIRE(!loaded);
+        INFO("error: " << loaded.error());
+        REQUIRE(loaded.error().find("cfg/nums") != std::string::npos);
+        REQUIRE(loaded.error().find("[1]") != std::string::npos);
+        REQUIRE(loaded.error().find("derived") != std::string::npos);
+    }
+
+    SECTION("bad element only in losing collection does not fail")
+    {
+        nucleus::configuration_space engine;
+        engine.register_element(nucleus::element("cfg", anchor::root()));
+        auto el = nucleus::typed_element<int32_t>("nums", anchor::keyspace("cfg"));
+        el.repeated = true;
+        engine.register_element(el);
+
+        auto base_src = xml_of(
+            "<cfg><nums>1</nums><nums>notanumber</nums></cfg>");
+        auto derived_src = xml_of(
+            "<cfg><nums>10</nums><nums>20</nums></cfg>");
+
+        nucleus::source_stack stack;
+        stack.add(*base_src, std::size_t{10}, "base");
+        stack.add(*derived_src, std::size_t{20}, "derived");
+
+        auto loaded = engine.resolve(stack);
+        REQUIRE(loaded);
+
+        auto r = loaded.value().get_all_as<int32_t>("cfg/nums");
+        REQUIRE(r);
+        REQUIRE(r.value() == std::vector<int32_t>{10, 20});
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Typed x scope policy: excluded entry above Ld is not converted
+//
+// A narrow-extend derived layer re-opens the "web" strain and adds a NEW typed
+// field ("score") with a bad value. Under space_open_container_closed (default),
+// entries in the derived layer's keyed scope that are ranked above Ld are
+// excluded before convert() runs -- so the bad "score" value is never converted
+// and the resolve succeeds. The base port value (at Ld) survives intact.
+// ---------------------------------------------------------------------------
+TEST_CASE("typed x scope policy: excluded entry above Ld is not converted",
+          "[typed][scope][policy]")
+{
+    // Schema: cluster/server keyed by name; typed int32_t port and score.
+    // base.xml introduces "web" with port=80 at the base layer (Ld).
+    // derived.xml re-opens "web" with narrow extend and adds score=notanumber.
+    // Under space_open_container_closed the derived entry's rank exceeds Ld and
+    // is excluded by relay_strain before convert() sees it.
+    const char *base_doc = R"(
+        <cluster>
+            <server name="web"><port>80</port></server>
+        </cluster>)";
+
+    const char *derived_doc = R"(
+        <cluster inherit="base.xml">
+            <server name="web" extend="narrow"><score>notanumber</score></server>
+        </cluster>)";
+
+    nucleus::configuration_space engine;
+    engine.register_element(nucleus::element("cluster", anchor::root()));
+    engine.register_element(nucleus::element("server", anchor::keyspace("cluster")));
+    engine.register_element(
+        nucleus::primary_key_element("name", anchor::keyspace("cluster/server")));
+    engine.register_element(
+        nucleus::typed_element<int32_t>("port", anchor::keyspace("cluster/server")));
+    engine.register_element(
+        nucleus::typed_element<int32_t>("score", anchor::keyspace("cluster/server")));
+    REQUIRE(engine.select("web"));
+
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+        const std::string name = filename_of(path);
+        if(name == "base.xml")
+            return xml_of(base_doc);
+        if(name == "derived.xml")
+            return xml_of(derived_doc);
+        return nullptr;
+    };
+
+    auto loaded = engine.load(std::vector<std::string>{"derived.xml"}, factory);
+    REQUIRE(loaded);
+
+    // Base port value survives at Ld; the derived score entry was excluded.
+    auto p = loaded.value().get_as<int32_t>("cluster/server/port");
+    REQUIRE(p);
+    REQUIRE(p.value() == 80);
+
+    // The excluded "score" field is absent -- it was never converted.
+    REQUIRE_FALSE(loaded.value().contains("cluster/server/score"));
+}
+
+// ---------------------------------------------------------------------------
+// Typed access surface: get and get_as agree; type mismatch pinned
+// ---------------------------------------------------------------------------
+TEST_CASE("typed access surface: get and get_as agree; type mismatch pinned",
+          "[typed][accessor]")
+{
+    SECTION("get and get_as agree on a typed int32_t path")
+    {
+        nucleus::configuration_space engine;
+        engine.register_element(nucleus::element("cfg", anchor::root()));
+        engine.register_element(
+            nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
+
+        auto src = xml_of("<cfg><val>99</val></cfg>");
+        nucleus::source_stack stack;
+        stack.add(*src, std::size_t{10}, "doc");
+
+        auto loaded = engine.resolve(stack);
+        REQUIRE(loaded);
+
+        REQUIRE(loaded.value().get("cfg/val").has_value());
+        REQUIRE(*loaded.value().get("cfg/val") == "99");
+
+        auto r = loaded.value().get_as<int32_t>("cfg/val");
+        REQUIRE(r);
+        REQUIRE(r.value() == 99);
+    }
+
+    SECTION("type mismatch error contains 'type mismatch'")
+    {
+        nucleus::configuration_space engine;
+        engine.register_element(nucleus::element("cfg", anchor::root()));
+        engine.register_element(
+            nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
+
+        auto src = xml_of("<cfg><val>99</val></cfg>");
+        nucleus::source_stack stack;
+        stack.add(*src, std::size_t{10}, "doc");
+
+        auto loaded = engine.resolve(stack);
+        REQUIRE(loaded);
+
+        // int32_t was stored; requesting double is a type mismatch.
+        auto r = loaded.value().get_as<double>("cfg/val");
+        REQUIRE(!r);
+        REQUIRE(r.error().find("type mismatch") != std::string::npos);
+    }
+}
