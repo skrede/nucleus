@@ -11,6 +11,7 @@
 
 #include "nucleus/source/argv/argv_source.h"
 
+#include "nucleus/entry/chain_walker.h"
 #include "nucleus/entry/strain_scope.h"
 #include "nucleus/entry/resolution_context.h"
 
@@ -22,6 +23,7 @@
 
 #include <map>
 #include <memory>
+#include <string>
 #include <vector>
 #include <utility>
 #include <optional>
@@ -129,6 +131,7 @@ public:
     std::optional<std::string> m_selection;
     strain_scope_policy m_strain_scope = strain_scope_policy::space_open_container_closed;
     std::shared_ptr<registration_policy> m_policy = std::make_shared<registration_policy>();
+    inherit_policy m_inherit_policy;
 
     // Per-path claim ledger and the conflict reports it produces. Keyed by claimed
     // key path so a third claim extends the same report. Surfaced, never adjudicated.
@@ -180,6 +183,14 @@ namespace {
     return registration_ok();
 }
 
+}
+
+registration_result configuration_space::set_inherit_policy(inherit_policy policy)
+{
+    if(auto guard = reject_if_resolved(m_impl->phase, "set_inherit_policy()"); !guard)
+        return guard;
+    m_impl->m_inherit_policy = std::move(policy);
+    return registration_ok();
 }
 
 registration_result configuration_space::register_schema(std::string key_path, owner_token owner)
@@ -310,22 +321,19 @@ load_result configuration_space::load(std::vector<std::string> args)
 
 load_result configuration_space::load(std::vector<std::string> paths, const document_factory &make)
 {
-    std::vector<std::unique_ptr<source>> docs;
-    docs.reserve(paths.size());
-    for(const std::string &path : paths)
-    {
-        std::unique_ptr<source> doc = make ? make(path) : nullptr;
-        if(!doc)
-            return fail(nucleus::format("no source could be built for path '{}'", path));
-        docs.push_back(std::move(doc));
-    }
+    const schema_projection projection = m_impl->schema.projection();
+    auto expanded = chain_walker::expand(paths, make, projection, m_impl->m_inherit_policy);
+    if(!expanded)
+        return fail(std::move(expanded).error());
 
-    // Later paths overlay earlier ones: the first is the base, the rest stack
-    // above it within a band clamped strictly below argv (the stable sort keeps
-    // later-wins inside the band) so no config file count can outrank the CLI.
+    // entries owns the sources and their batches; they must outlive run_resolve.
+    std::vector<chain_walker::chain_entry> entries = std::move(expanded).value();
+
+    // Root-first order: index 0 is the deepest ancestor, last is the requested file.
+    // document_rank assigns monotonically increasing ranks so derived layers win ties.
     source_stack stack;
-    for(std::size_t i = 0; i < docs.size(); ++i)
-        stack.add(*docs[i], document_rank(i), nucleus::format("path:{}", paths[i]));
+    for(std::size_t i = 0; i < entries.size(); ++i)
+        stack.add(*entries[i].src, document_rank(i), nucleus::format("path:{}", entries[i].path));
     return m_impl->run_resolve(stack);
 }
 
@@ -333,26 +341,23 @@ load_result configuration_space::load(std::vector<std::string> args,
                                       std::vector<std::string> paths,
                                       const document_factory &make)
 {
-    std::vector<std::unique_ptr<source>> docs;
-    docs.reserve(paths.size());
-    for(const std::string &path : paths)
-    {
-        std::unique_ptr<source> doc = make ? make(path) : nullptr;
-        if(!doc)
-            return fail(nucleus::format("no source could be built for path '{}'", path));
-        docs.push_back(std::move(doc));
-    }
+    const schema_projection projection = m_impl->schema.projection();
+    auto expanded = chain_walker::expand(paths, make, projection, m_impl->m_inherit_policy);
+    if(!expanded)
+        return fail(std::move(expanded).error());
+
+    // entries owns the sources and their batches; they must outlive run_resolve.
+    std::vector<chain_walker::chain_entry> entries = std::move(expanded).value();
 
     schema_registry &schema = m_impl->schema;
     argv_source argv(std::move(args));
     argv.recognize_with([&schema](const key_path &path) { return schema.recognizes(path); });
 
-    // Documents layer beneath argv (which always wins): the per-document ranks are
-    // clamped strictly below argv so even a long path list cannot tie or outrank
-    // the command line; later files still beat earlier ones inside that band.
+    // Documents layer beneath argv (which always wins): document ranks are clamped
+    // strictly below argv so even a long chain cannot tie or outrank the CLI.
     source_stack stack;
-    for(std::size_t i = 0; i < docs.size(); ++i)
-        stack.add(*docs[i], document_rank(i), nucleus::format("path:{}", paths[i]));
+    for(std::size_t i = 0; i < entries.size(); ++i)
+        stack.add(*entries[i].src, document_rank(i), nucleus::format("path:{}", entries[i].path));
     stack.add(argv, layer_rank::argv, "argv");
     return m_impl->run_resolve(stack);
 }

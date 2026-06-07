@@ -19,15 +19,16 @@ namespace nucleus {
 //
 //   defaults < env < base < overlay < argv
 //
-// A host that needs finer control sets an explicit numeric rank per layer; these
-// are just the well-known anchors.
+// The document band (base..overlay-1) spans 700 slots (200..899), supporting
+// inheritance chains up to length 700 before clamping. A host that needs finer
+// control sets an explicit numeric rank per layer; these are just the anchors.
 enum class layer_rank : std::size_t
 {
     defaults = 0,
-    env      = 1,
-    base     = 2,
-    overlay  = 3,
-    argv     = 4,
+    env      = 100,
+    base     = 200,
+    overlay  = 900,
+    argv     = 1000,
 };
 
 // One layer of the source stack: a source to pull, the precedence rank that

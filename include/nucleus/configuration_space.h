@@ -10,6 +10,7 @@
 
 #include "nucleus/source/source.h"
 #include "nucleus/source/feature_gate.h"
+#include "nucleus/source/inherit_declaration.h"
 
 #include "nucleus/entry/precedence.h"
 #include "nucleus/entry/strain_scope.h"
@@ -88,6 +89,13 @@ public:
     // Installs a host registration policy. The default policy accepts every
     // registration; the core imposes no reservation or namespacing rules itself.
     void set_registration_policy(std::shared_ptr<registration_policy> policy);
+
+    // Sets the inheritance policy for chain walking: an admissibility callback
+    // invoked on each candidate parent source after it is pulled (a non-empty
+    // return rejects that parent with the returned reason), and a configurable
+    // depth cap (default 16). Mirrors set_registration_policy. Must be called
+    // before load(); calling after resolve is a state-machine error.
+    registration_result set_inherit_policy(inherit_policy policy);
 
     // Gates a source's capabilities against a consumer's requirements: a required
     // capability the source lacks is a loud named error; an optional one degrades

@@ -4,6 +4,8 @@
 #include "nucleus/result.h"
 #include "nucleus/capability.h"
 
+#include "nucleus/source/inherit_declaration.h"
+
 #include "nucleus/keyspace/entry.h"
 
 #include <memory>
@@ -56,6 +58,7 @@ private:
 struct source_batch
 {
     std::vector<keyspace_entry> entries;
+    std::vector<extend_disposition> dispositions; // empty for flat sources
     retained_buffer buffer;
 };
 
@@ -87,6 +90,9 @@ public:
     // opt in ignore it, so the seam stays backward-compatible. Called by the
     // resolve fold for every source it folds.
     virtual void apply_projection(const schema_projection &) {}
+
+    // Returns the declared parent, if any. Called after pull(). No-op for flat sources.
+    [[nodiscard]] virtual inherit_declaration inheritance() const { return {}; }
 
     // Produces this source's entries. On success the batch carries any retained
     // buffer the entries' views depend on. On failure a source_error explains
