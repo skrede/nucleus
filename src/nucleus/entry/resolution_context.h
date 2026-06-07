@@ -139,7 +139,13 @@ public:
                 if(!path)
                     continue;
 
-                if(repeated_paths.count(entry.path))
+                // Use the canonical (key-stripped) path to classify the entry as
+                // repeated. A repeated leaf under a keyed container arrives from
+                // a document source with a transient instance segment inserted
+                // (e.g. cluster/server/yin/tags rather than cluster/server/tags);
+                // the canonical form matches the declared repeated path.
+                const std::string canonical_path = m_schema.canonical_text(path.value());
+                if(repeated_paths.count(canonical_path))
                 {
                     // Capability gate: a source without duplicate_keys cannot
                     // legally produce more than one entry for the same repeated
@@ -521,7 +527,16 @@ public:
                 for(const key_path &path : snapshot)
                 {
                     const origin *orig = m_provenance.of(path.str());
-                    if(orig == nullptr || orig->rank <= Ld)
+                    std::size_t path_rank = orig != nullptr ? orig->rank : 0;
+                    if(orig == nullptr)
+                    {
+                        // Check collection origins for repeated leaves.
+                        const std::vector<origin> *col_orig =
+                            m_provenance.collection_origins_of(path.str());
+                        if(col_orig != nullptr && !col_orig->empty())
+                            path_rank = col_orig->front().rank;
+                    }
+                    if(path_rank == 0 || path_rank <= Ld)
                         continue;
                     // Skip entries belonging to the chosen strain when it is
                     // extend-wide: they must survive to compose via relay_strain.
@@ -631,8 +646,20 @@ private:
         for(const key_path &keyed : keyed_paths)
         {
             const origin *from = m_provenance.of(keyed.str());
-            const std::size_t entry_rank = from != nullptr ? from->rank : 0;
-
+            std::size_t entry_rank = from != nullptr ? from->rank : 0;
+            if(from == nullptr)
+            {
+                // Repeated leaf: scalar provenance is absent; derive rank from the
+                // collection's winning layer instead.
+                const std::vector<origin> *col_orig =
+                    m_provenance.collection_origins_of(keyed.str());
+                if(col_orig != nullptr && !col_orig->empty())
+                    entry_rank = col_orig->front().rank;
+                // If col_orig is null or empty, entry_rank stays 0, treating the
+                // entry as introduced at the base layer. The exclusion filter will
+                // not fire (0 <= Ld always) and the relay branch below will find no
+                // data to relay -- a no-op, which is the safe default.
+            }
             const bool excluded = !wide_extend && (
                 policy == strain_scope_policy::container_open_until_next_strain
                     ? entry_rank >= Ls
@@ -648,23 +675,29 @@ private:
             if(!unified)
                 continue;
 
-            if(const std::vector<value> *col = m_building.find_collection(keyed))
+            if(!m_building.find(unified.value()))
             {
-                // Repeated leaf: relay the whole collection to the unified path.
-                const origin *at = m_provenance.of(unified.value().str());
-                const bool displaced = from != nullptr && at != nullptr
-                                       && at->rank > from->rank;
-                if(!displaced)
+                // No scalar at the unified path: collections are never displaced.
+                if(const std::vector<value> *col = m_building.find_collection(keyed))
                 {
+                    // Repeated leaf: relay the whole collection to the unified path.
                     m_building.replace_collection(unified.value(),
                                                   std::vector<value>(*col));
                     if(const std::vector<origin> *co =
                            m_provenance.collection_origins_of(keyed.str()))
                         m_provenance.record_collection(unified.value().str(), *co);
                 }
+                else if(const value *v = m_building.find(keyed))
+                {
+                    // Scalar relay: unchanged.
+                    m_building.set(unified.value(), *v);
+                    if(from != nullptr)
+                        m_provenance.record(unified.value().str(), *from);
+                }
             }
             else
             {
+                // A scalar already occupies the unified path; check displacement.
                 const origin *at = m_provenance.of(unified.value().str());
                 const bool displaced = from != nullptr && at != nullptr
                                        && at->rank > from->rank;

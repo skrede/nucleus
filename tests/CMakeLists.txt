@@ -121,6 +121,17 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         ${CMAKE_SOURCE_DIR}/src
     )
     add_test(NAME integration_shape_test COMMAND integration_shape_test)
+
+    # Repeated-values mode: schema flag, fold accumulation/replacement, get_all(),
+    # relay through keyed containers, capability gating, scope-policy exclusion.
+    add_executable(repeated_element_test repeated_element_test.cpp)
+    target_link_libraries(repeated_element_test
+        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+    target_include_directories(repeated_element_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+    )
+    add_test(NAME repeated_element_test COMMAND repeated_element_test)
 endif()
 
 # ---------------------------------------------------------------------------
