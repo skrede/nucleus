@@ -103,6 +103,15 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         ${CMAKE_SOURCE_DIR}/src
     )
     add_test(NAME keyed_selection_test COMMAND keyed_selection_test)
+
+    add_executable(inherit_chain_test inherit_chain_test.cpp)
+    target_link_libraries(inherit_chain_test
+        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+    target_include_directories(inherit_chain_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+    )
+    add_test(NAME inherit_chain_test COMMAND inherit_chain_test)
 endif()
 
 # ---------------------------------------------------------------------------

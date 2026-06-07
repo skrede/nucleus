@@ -315,8 +315,13 @@ public:
             // These checks apply only to document-band sources (rank >= base, i.e.
             // inheritance chain layers). Flat source layering (env, argv, defaults)
             // contributes to strains by design and is never a re-open error.
-            // For each named strain: compute the set of distinct first-introduction
-            // ranks in the document band. A strain present at more than one
+            // For each named strain: compute the set of distinct document-band ranks
+            // at which entries were laid down, combining first-introduction ranks
+            // with winning ranks. An entry overwritten by a higher-rank layer has its
+            // first-introduction rank (the base layer) AND its winning rank (the
+            // deriving layer) both recorded -- so a chain re-open via overwrite is
+            // correctly detected as multi-layer even when the overwrite collapses the
+            // building keyspace to a single path. A strain present at more than one
             // document-band layer without an extend disposition is a re-open error.
             // A strain with an extend disposition but entries at only one document-
             // band layer has no base (extend without base).
@@ -327,9 +332,15 @@ public:
                 std::set<std::size_t> intro_ranks;
                 for(const key_path &kp : keyed_paths)
                 {
-                    const std::size_t *r = m_provenance.first_rank_of(kp.str());
-                    if(r != nullptr && *r >= doc_band_min)
-                        intro_ranks.insert(*r);
+                    const std::size_t *first = m_provenance.first_rank_of(kp.str());
+                    if(first != nullptr && *first >= doc_band_min)
+                        intro_ranks.insert(*first);
+                    // Also include the winning rank: an overwrite by a higher-rank
+                    // layer means the winner and the first-introducer differ, and
+                    // both layers must be counted as contributing to this strain.
+                    const origin *win = m_provenance.of(kp.str());
+                    if(win != nullptr && win->rank >= doc_band_min)
+                        intro_ranks.insert(win->rank);
                 }
 
                 // No document-band entries for this strain: flat-source only,
