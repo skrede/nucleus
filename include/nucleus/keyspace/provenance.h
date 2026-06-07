@@ -5,6 +5,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 #include <cstddef>
 #include <utility>
 
@@ -50,10 +51,12 @@ public:
     // Drops the origin recorded at `key` (no-op when absent) -- the counterpart
     // of record() for entries the resolve boundary re-lays under a different
     // path, so provenance never names a key the keyspace no longer holds.
+    // Clears both scalar and collection origins.
     void forget(const std::string &key)
     {
         m_origins.erase(key);
         m_first_ranks.erase(key);
+        m_collection_origins.erase(key);
     }
 
     [[nodiscard]] const origin *of(const std::string &key) const
@@ -70,8 +73,33 @@ public:
         return it == m_first_ranks.end() ? nullptr : &it->second;
     }
 
+    // Records per-element origins for a repeated-path collection, replacing any
+    // previously stored collection origins for this key. The first-introduction
+    // rank for the path is also maintained (used by slice's Ld computation).
+    void record_collection(const std::string &key, std::vector<origin> element_origins)
+    {
+        // Capture first rank BEFORE the move to avoid use-after-move.
+        const std::size_t first_rank =
+            element_origins.empty() ? 0 : element_origins.front().rank;
+        m_collection_origins[key] = std::move(element_origins);
+        m_first_ranks.try_emplace(key, first_rank);
+    }
+
+    // The per-element origins for a repeated-path collection, or nullptr when
+    // none are recorded. Distinct from of(), which covers scalar origins only.
+    [[nodiscard]] const std::vector<origin> *
+    collection_origins_of(const std::string &key) const
+    {
+        auto it = m_collection_origins.find(key);
+        return it == m_collection_origins.end() ? nullptr : &it->second;
+    }
+
+    // scalar origin count; collection_origins_of() is the separate surface for
+    // repeated paths.
     [[nodiscard]] std::size_t size() const noexcept { return m_origins.size(); }
 
+    // Returns the scalar winning-origins map. For repeated paths, scalar origins
+    // are absent -- use collection_origins_of() instead.
     [[nodiscard]] const std::map<std::string, origin> &all() const noexcept
     {
         return m_origins;
@@ -82,6 +110,9 @@ private:
     // First-introduction ranks, kept apart from the winning origins so an
     // overwrite never erases the answer to "which layer introduced this key?".
     std::map<std::string, std::size_t> m_first_ranks;
+    // Per-element origins for repeated-path collections. A path appears here
+    // instead of m_origins when its values are collected, not last-won.
+    std::map<std::string, std::vector<origin>> m_collection_origins;
 };
 
 }

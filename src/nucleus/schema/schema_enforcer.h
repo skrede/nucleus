@@ -103,26 +103,60 @@ public:
 
             // Closed-value check: a present value must be one of the declared
             // allowed values. An unconstrained element (empty set) skips this.
-            if(present && !el.allowed_values.empty())
+            // For repeated elements, the check applies to EACH collection value.
+            if(!el.allowed_values.empty() && resolved.contains(declared))
             {
-                const value *v = resolved.find(declared);
-                const std::string actual(v ? v->text() : std::string_view{});
-                const bool admissible = std::any_of(
-                    el.allowed_values.begin(), el.allowed_values.end(),
-                    [&](const std::string &a) { return a == actual; });
-                if(!admissible)
+                if(el.repeated)
                 {
-                    std::string reason = nucleus::format(
-                        "field '{}' value '{}' is not one of the allowed values",
-                        declared.str(), actual);
-                    const std::span<const std::string> candidates(
-                        el.allowed_values.data(), el.allowed_values.size());
-                    auto nearest = suggest_keys(actual, candidates, 1);
-                    if(!nearest.empty())
-                        reason += nucleus::format(" (did you mean '{}'?)",
-                                                  nearest.front());
-                    violations.push_back(schema_violation{declared.str(),
-                                                          std::move(reason)});
+                    const std::vector<value> *col = resolved.find_collection(declared);
+                    if(col)
+                    {
+                        for(const value &v : *col)
+                        {
+                            const std::string actual(v.text());
+                            const bool admissible = std::any_of(
+                                el.allowed_values.begin(), el.allowed_values.end(),
+                                [&](const std::string &a) { return a == actual; });
+                            if(!admissible)
+                            {
+                                std::string reason = nucleus::format(
+                                    "field '{}' collection value '{}' is not one "
+                                    "of the allowed values",
+                                    declared.str(), actual);
+                                const std::span<const std::string> candidates(
+                                    el.allowed_values.data(),
+                                    el.allowed_values.size());
+                                auto nearest = suggest_keys(actual, candidates, 1);
+                                if(!nearest.empty())
+                                    reason += nucleus::format(
+                                        " (did you mean '{}'?)", nearest.front());
+                                violations.push_back(schema_violation{
+                                    declared.str(), std::move(reason)});
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    const value *v = resolved.find(declared);
+                    const std::string actual(v ? v->text() : std::string_view{});
+                    const bool admissible = std::any_of(
+                        el.allowed_values.begin(), el.allowed_values.end(),
+                        [&](const std::string &a) { return a == actual; });
+                    if(!admissible)
+                    {
+                        std::string reason = nucleus::format(
+                            "field '{}' value '{}' is not one of the allowed values",
+                            declared.str(), actual);
+                        const std::span<const std::string> candidates(
+                            el.allowed_values.data(), el.allowed_values.size());
+                        auto nearest = suggest_keys(actual, candidates, 1);
+                        if(!nearest.empty())
+                            reason += nucleus::format(" (did you mean '{}'?)",
+                                                      nearest.front());
+                        violations.push_back(schema_violation{declared.str(),
+                                                              std::move(reason)});
+                    }
                 }
             }
         }

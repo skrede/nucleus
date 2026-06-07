@@ -112,6 +112,18 @@ public:
             }
         }
 
+        if(el.repeated && el.identity)
+            return fail(nucleus::format(
+                "schema element '{}' cannot be both repeated and a primary key: "
+                "a primary key must be a unique scalar, not a collection",
+                el.name));
+
+        if(el.repeated && el.unique)
+            return fail(nucleus::format(
+                "schema element '{}' cannot be both repeated and unique: "
+                "uniqueness requires a single comparable value, not a collection",
+                el.name));
+
         m_defined.insert(el.declared_path().str());
         m_elements.push_back(std::move(el));
         return std::monostate{};

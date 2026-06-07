@@ -98,6 +98,15 @@ public:
         // Built once from the borrowed schema; flat sources ignore it.
         const schema_projection projection = m_schema.projection();
 
+        // Build a set of repeated-path strings from the schema once, so the
+        // inner entry loop classifies each path in O(log n) without rescanning.
+        std::set<std::string> repeated_paths;
+        for(const schema_element &el : m_schema.elements())
+        {
+            if(el.repeated)
+                repeated_paths.insert(el.declared_path().str());
+        }
+
         for(const source_layer *layer : ordered)
         {
             if(layer->src == nullptr)
@@ -111,8 +120,15 @@ public:
 
             source_batch &batch = pulled.value();
 
+            // Tracks which repeated paths have already received their first entry
+            // from this layer (triggering replace). Reset per layer so a new layer
+            // always starts fresh with a replace before appending.
+            std::set<std::string> seen_repeated_this_layer;
+
             for(keyspace_entry &entry : batch.entries)
             {
+                // Expand tokens FIRST, before the repeated-path branch, so each
+                // collection value is independently expanded (Pitfall 5).
                 token_result expanded = resolve_tokens(entry.value.text(), m_tokenizer);
                 if(!expanded)
                     return fail(nucleus::format(
@@ -123,10 +139,65 @@ public:
                 if(!path)
                     continue;
 
-                // Value and provenance written together: they cannot diverge.
-                m_building.set(path.value(), value::owned(std::move(expanded).value()));
-                m_provenance.record(entry.path,
-                                    origin{layer->rank, layer->label, layer->owner});
+                if(repeated_paths.count(entry.path))
+                {
+                    // Capability gate: a source without duplicate_keys cannot
+                    // legally produce more than one entry for the same repeated
+                    // path per layer. If it somehow does, that is a source-level
+                    // bug -- fail loudly.
+                    if(!entry.capabilities.supports(capability::duplicate_keys)
+                       && seen_repeated_this_layer.count(entry.path) != 0)
+                    {
+                        return fail(nucleus::format(
+                            "source '{}': repeated field '{}' received multiple "
+                            "values from a source that does not support "
+                            "duplicate_keys; a flat source can supply at most one "
+                            "value per repeated field per layer",
+                            layer->label, entry.path));
+                    }
+
+                    const bool is_first_in_layer =
+                        (seen_repeated_this_layer.count(entry.path) == 0);
+                    seen_repeated_this_layer.insert(entry.path);
+
+                    if(is_first_in_layer)
+                    {
+                        // First entry from this layer: REPLACE (clears any
+                        // lower-layer collection).
+                        std::vector<value> init;
+                        init.push_back(value::owned(std::move(expanded).value()));
+                        m_building.replace_collection(path.value(), std::move(init));
+                        // Provenance: start a fresh per-element origins vector.
+                        std::vector<origin> col_origins;
+                        col_origins.push_back(
+                            origin{layer->rank, layer->label, layer->owner});
+                        m_provenance.record_collection(path.value().str(),
+                                                       std::move(col_origins));
+                    }
+                    else
+                    {
+                        // Subsequent entry from the same layer: APPEND.
+                        m_building.append(path.value(),
+                                          value::owned(std::move(expanded).value()));
+                        // Append this element's origin to the existing vector.
+                        const std::vector<origin> *existing =
+                            m_provenance.collection_origins_of(path.value().str());
+                        std::vector<origin> updated =
+                            existing ? *existing : std::vector<origin>{};
+                        updated.push_back(
+                            origin{layer->rank, layer->label, layer->owner});
+                        m_provenance.record_collection(path.value().str(),
+                                                       std::move(updated));
+                    }
+                }
+                else
+                {
+                    // Single-value path: unchanged last-write-wins behavior.
+                    // Value and provenance written together; they cannot diverge.
+                    m_building.set(path.value(), value::owned(std::move(expanded).value()));
+                    m_provenance.record(entry.path,
+                                        origin{layer->rank, layer->label, layer->owner});
+                }
             }
 
             // Extract extend dispositions declared by this batch (empty for flat
@@ -512,16 +583,29 @@ public:
     // Copies every building value OUT into an owned snapshot and pairs it with the
     // provenance recorded alongside it, producing the immutable, self-owning
     // configuration. After this returns the context (and every retained buffer)
-    // may be dropped: the configuration holds no view into any of them.
+    // may be dropped: the configuration holds no view into any of them. The
+    // collection branch is checked FIRST: find() returns nullptr for repeated
+    // paths, so only find_collection() can reach them.
     [[nodiscard]] configuration freeze() const
     {
         std::map<std::string, std::string> owned;
+        std::map<std::string, std::vector<std::string>> collections;
         for(const key_path &path : m_building.paths())
         {
-            if(const value *v = m_building.find(path))
+            if(const std::vector<value> *col = m_building.find_collection(path))
+            {
+                std::vector<std::string> out;
+                out.reserve(col->size());
+                for(const value &v : *col)
+                    out.push_back(std::string(v.text()));
+                collections.emplace(path.str(), std::move(out));
+            }
+            else if(const value *v = m_building.find(path))
+            {
                 owned.emplace(path.str(), std::string(v->text()));
+            }
         }
-        return configuration(std::move(owned), m_provenance);
+        return configuration(std::move(owned), std::move(collections), m_provenance);
     }
 
 private:
@@ -536,6 +620,10 @@ private:
     // When wide_extend=true the rank filter is bypassed entirely: the chosen
     // strain was declared with extend-wide, which is explicit consent to compose
     // all its entries regardless of the active scope policy.
+    //
+    // Repeated (collection) leaves under the keyed container are relayed
+    // atomically: find_collection() is checked before find() so collections are
+    // never silently dropped.
     void relay_strain(const std::vector<key_path> &keyed_paths,
                       strain_scope_policy policy, std::size_t Ld, std::size_t Ls,
                       bool wide_extend = false)
@@ -560,16 +648,34 @@ private:
             if(!unified)
                 continue;
 
-            const origin *at = m_provenance.of(unified.value().str());
-            const bool displaced = from != nullptr && at != nullptr
-                                   && at->rank > from->rank;
-            if(!displaced)
+            if(const std::vector<value> *col = m_building.find_collection(keyed))
             {
-                if(const value *v = m_building.find(keyed))
+                // Repeated leaf: relay the whole collection to the unified path.
+                const origin *at = m_provenance.of(unified.value().str());
+                const bool displaced = from != nullptr && at != nullptr
+                                       && at->rank > from->rank;
+                if(!displaced)
                 {
-                    m_building.set(unified.value(), *v);
-                    if(from != nullptr)
-                        m_provenance.record(unified.value().str(), *from);
+                    m_building.replace_collection(unified.value(),
+                                                  std::vector<value>(*col));
+                    if(const std::vector<origin> *co =
+                           m_provenance.collection_origins_of(keyed.str()))
+                        m_provenance.record_collection(unified.value().str(), *co);
+                }
+            }
+            else
+            {
+                const origin *at = m_provenance.of(unified.value().str());
+                const bool displaced = from != nullptr && at != nullptr
+                                       && at->rank > from->rank;
+                if(!displaced)
+                {
+                    if(const value *v = m_building.find(keyed))
+                    {
+                        m_building.set(unified.value(), *v);
+                        if(from != nullptr)
+                            m_provenance.record(unified.value().str(), *from);
+                    }
                 }
             }
             m_building.remove(keyed);
