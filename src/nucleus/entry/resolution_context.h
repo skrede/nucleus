@@ -21,6 +21,7 @@
 #include "nucleus/tokenizer/token_resolution.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
 
+#include <any>
 #include <map>
 #include <set>
 #include <limits>
@@ -29,6 +30,7 @@
 #include <cstddef>
 #include <utility>
 #include <optional>
+#include <typeindex>
 #include <algorithm>
 
 namespace nucleus {
@@ -595,6 +597,74 @@ public:
         return fail(std::move(report));
     }
 
+    // Runs the typed conversion pass: for every schema element that has a
+    // converter, visits the corresponding path in the post-slice building
+    // keyspace. Absent typed paths are silently skipped (absence is orthogonal
+    // to required-ness, which validate() enforces). A conversion failure fails
+    // the resolve with the path, the converter's reason, and the winning layer
+    // label from provenance. Must run after validate() and before freeze().
+    [[nodiscard]] result<std::monostate, resolve_fold_error> convert()
+    {
+        for(const schema_element &el : m_schema.elements())
+        {
+            if(!el.converter || !el.type_identity.has_value())
+                continue;
+
+            const std::string path_str = el.declared_path().str();
+            const auto kp_opt = key_path::parse(path_str);
+            if(!kp_opt)
+                continue;
+            const key_path &kp = kp_opt.value();
+
+            if(el.repeated)
+            {
+                const std::vector<value> *col = m_building.find_collection(kp);
+                if(col == nullptr)
+                    continue;
+
+                std::vector<std::any> typed_col;
+                typed_col.reserve(col->size());
+                for(std::size_t i = 0; i < col->size(); ++i)
+                {
+                    auto res = el.converter((*col)[i].text());
+                    if(!res)
+                    {
+                        std::string layer_label = "unknown layer";
+                        const std::vector<origin> *co =
+                            m_provenance.collection_origins_of(path_str);
+                        if(co != nullptr && i < co->size())
+                            layer_label = (*co)[i].layer;
+                        return fail(nucleus::format(
+                            "conversion failed for '{}' element [{}]: {} (layer: {})",
+                            path_str, i, res.error(), layer_label));
+                    }
+                    typed_col.push_back(std::move(res).value());
+                }
+                m_typed_collections.emplace(path_str, std::move(typed_col));
+            }
+            else
+            {
+                const value *v = m_building.find(kp);
+                if(v == nullptr)
+                    continue;
+
+                auto res = el.converter(v->text());
+                if(!res)
+                {
+                    std::string layer_label = "unknown layer";
+                    const origin *orig = m_provenance.of(path_str);
+                    if(orig != nullptr)
+                        layer_label = orig->layer;
+                    return fail(nucleus::format(
+                        "conversion failed for '{}': {} (layer: {})",
+                        path_str, res.error(), layer_label));
+                }
+                m_typed.emplace(path_str, std::move(res).value());
+            }
+        }
+        return std::monostate{};
+    }
+
     // Copies every building value OUT into an owned snapshot and pairs it with the
     // provenance recorded alongside it, producing the immutable, self-owning
     // configuration. After this returns the context (and every retained buffer)
@@ -620,7 +690,8 @@ public:
                 owned.emplace(path.str(), std::string(v->text()));
             }
         }
-        return configuration(std::move(owned), std::move(collections), m_provenance);
+        return configuration(std::move(owned), std::move(collections),
+                             m_typed, m_typed_collections, m_provenance);
     }
 
 private:
@@ -753,6 +824,9 @@ private:
 
     keyspace m_building;
     provenance m_provenance;
+    // Typed parallel maps populated by convert() -- scalar and repeated paths.
+    std::map<std::string, std::any>              m_typed;
+    std::map<std::string, std::vector<std::any>> m_typed_collections;
     std::vector<retained_buffer> m_buffers;
     // Containers whose single primary-keyed instance was sliced onto the unified
     // hierarchy -- evidence for the enforcer that their identity is satisfied

@@ -1,13 +1,19 @@
 #ifndef HPP_GUARD_NUCLEUS_SCHEMA_SCHEMA_H
 #define HPP_GUARD_NUCLEUS_SCHEMA_SCHEMA_H
 
+#include "nucleus/result.h"
+
 #include "nucleus/schema/anchor.h"
 
 #include "nucleus/keyspace/key_path.h"
 
+#include <any>
 #include <string>
 #include <vector>
 #include <utility>
+#include <optional>
+#include <functional>
+#include <typeindex>
 
 namespace nucleus {
 
@@ -68,6 +74,17 @@ struct schema_element
     // shell completion offers for `--flag=<value>`. Kept a plain string vector so
     // the core stays domain-neutral and free of any enum-reflection dependency.
     std::vector<std::string> allowed_values;
+
+    // Optional type-erased converter: converts a resolved string_view to a typed
+    // value at the resolve boundary. Null (the default) means no conversion --
+    // the element is untyped and its value is only available as a string via
+    // get(). Set together with type_identity by the typed_element factory.
+    // Converters must not throw; return fail() for any conversion error.
+    std::function<result<std::any, std::string>(std::string_view)> converter;
+
+    // The std::type_index of the type T that the converter produces. Present iff
+    // converter is set; used by get_as<T> to enforce outright type equality.
+    std::optional<std::type_index> type_identity;
 
     // True when this element is its parent container's primary key OR is declared
     // unique -- i.e. its value must be distinct across sibling instances. A

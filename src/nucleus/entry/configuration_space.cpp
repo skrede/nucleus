@@ -117,6 +117,13 @@ public:
         if(auto checked = ctx.validate(); !checked)
             return fail(std::move(checked).error());
 
+        // Type conversion: for each schema element with a registered converter,
+        // convert the resolved string value to T at the resolve boundary.
+        // Runs after validate() so only the post-slice, schema-validated keyspace
+        // is visited; a bad value fails the resolve loudly with path + reason + layer.
+        if(auto converted = ctx.convert(); !converted)
+            return fail(std::move(converted).error());
+
         configuration result = ctx.freeze();
         // The context (and every retained source buffer) is dropped here; the
         // frozen configuration holds only owned values.

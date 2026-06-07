@@ -1,14 +1,18 @@
 #ifndef HPP_GUARD_NUCLEUS_ENTRY_CONFIGURATION_H
 #define HPP_GUARD_NUCLEUS_ENTRY_CONFIGURATION_H
 
+#include "nucleus/result.h"
+
 #include "nucleus/keyspace/provenance.h"
 
+#include <any>
 #include <map>
 #include <string>
 #include <vector>
 #include <cstddef>
 #include <utility>
 #include <optional>
+#include <typeindex>
 #include <algorithm>
 
 namespace nucleus {
@@ -41,6 +45,22 @@ public:
                   provenance origins)
         : m_values(std::move(values)),
           m_collections(std::move(collections)),
+          m_provenance(std::move(origins))
+    {
+    }
+
+    // Extended constructor carrying the typed parallel maps produced by the
+    // convert() pass. The existing two-arg and three-arg constructors are
+    // unchanged; this form is called by freeze() after convert() runs.
+    configuration(std::map<std::string, std::string> values,
+                  std::map<std::string, std::vector<std::string>> collections,
+                  std::map<std::string, std::any> typed,
+                  std::map<std::string, std::vector<std::any>> typed_collections,
+                  provenance origins)
+        : m_values(std::move(values)),
+          m_collections(std::move(collections)),
+          m_typed(std::move(typed)),
+          m_typed_collections(std::move(typed_collections)),
           m_provenance(std::move(origins))
     {
     }
@@ -98,6 +118,54 @@ public:
         return m_provenance.collection_origins_of(key);
     }
 
+    // Returns the typed value at `key` converted by the registered converter.
+    // Errors distinguish three cases:
+    //   absent path         -- the key carries no value at all
+    //   no type converter   -- the key has a string value but no converter was
+    //                          registered (untyped path)
+    //   type mismatch       -- the stored type does not equal T (outright
+    //                          type_index equality; no widening or coercion)
+    // Note: any_cast<T> produces a copy of the stored value.
+    template<typename T>
+    [[nodiscard]] result<T, std::string> get_as(const std::string &key) const
+    {
+        auto it = m_typed.find(key);
+        if(it == m_typed.end())
+        {
+            if(contains(key))
+                return fail(std::string("path '") + key + "' declares no type converter");
+            return fail(std::string("path '") + key + "' is absent");
+        }
+        if(it->second.type() != typeid(T))
+            return fail(std::string("type mismatch for path '") + key
+                        + "': stored type does not match requested type");
+        return std::any_cast<T>(it->second);
+    }
+
+    // Returns all typed elements for a repeated path.
+    // Same error distinctions as get_as<T>.
+    template<typename T>
+    [[nodiscard]] result<std::vector<T>, std::string> get_all_as(const std::string &key) const
+    {
+        auto it = m_typed_collections.find(key);
+        if(it == m_typed_collections.end())
+        {
+            if(contains(key))
+                return fail(std::string("path '") + key + "' declares no type converter");
+            return fail(std::string("path '") + key + "' is absent");
+        }
+        std::vector<T> out;
+        out.reserve(it->second.size());
+        for(const std::any &a : it->second)
+        {
+            if(a.type() != typeid(T))
+                return fail(std::string("type mismatch for path '") + key
+                            + "': stored element type does not match requested type");
+            out.push_back(std::any_cast<T>(a));
+        }
+        return out;
+    }
+
     [[nodiscard]] std::size_t size() const noexcept
     {
         return m_values.size() + m_collections.size();
@@ -126,6 +194,11 @@ private:
     std::map<std::string, std::string> m_values;
     // Parallel map for resolved collections from repeated-path schema elements.
     std::map<std::string, std::vector<std::string>> m_collections;
+    // Parallel maps for typed values produced by the convert() pass.
+    // m_typed holds scalar typed values; m_typed_collections holds per-element
+    // typed values for repeated paths.
+    std::map<std::string, std::any>              m_typed;
+    std::map<std::string, std::vector<std::any>> m_typed_collections;
     provenance m_provenance;
 };
 
