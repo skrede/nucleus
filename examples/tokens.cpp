@@ -1,6 +1,6 @@
 // tokens: values carrying `${...}` are expanded at load.
 //
-// The generic core tokenizers (env, uuid, string, ...) are installed on every
+// The generic core tokenizers (env, string, ...) are installed on every
 // configuration_space automatically. Expansion recurses to a fixpoint, so a
 // token nested inside another resolves inner-first.
 
@@ -32,7 +32,7 @@ int main()
 
     nucleus::env_source values;
     values.set("service/region", "${string.upper(${env.NUCLEUS_REGION})}")
-          .set("service/instance", "${uuid.v4()}");
+          .set("service/instance", "${string.lower(NODE-${env.NUCLEUS_REGION})}");
 
     nucleus::source_stack stack;
     stack.add(values, nucleus::layer_rank::base, "config");

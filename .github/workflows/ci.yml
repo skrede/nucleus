@@ -95,11 +95,8 @@ jobs:
           --xml-pretty --output coverage.xml
           build-coverage
 
-      - name: Upload to Codecov
-        uses: codecov/codecov-action@v4
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
         with:
-          files: coverage.xml
-          slug: skrede/nucleus
-          fail_ci_if_error: false
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+          token: ${{ secrets.CODECOV_TOKEN }}

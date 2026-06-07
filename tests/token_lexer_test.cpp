@@ -32,7 +32,7 @@ TEST_CASE("function form lexes args on top-level commas", "[lexer]")
 
 TEST_CASE("zero-arg function lexes as a function with no args", "[lexer]")
 {
-    auto r = lex_token("${uuid.v4()}");
+    auto r = lex_token("${gen.next()}");
     REQUIRE(r.has_value());
     CHECK(r.value().is_function);
     CHECK(r.value().args.empty());

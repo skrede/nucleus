@@ -1,6 +1,5 @@
 #include "nucleus/format.h"
 
-#include "nucleus/tokenizer/uuid.h"
 #include "nucleus/tokenizer/tokenizer_builder.h"
 #include "nucleus/tokenizer/builtin_tokenizers.h"
 
@@ -64,18 +63,6 @@ tokenizer make_env_tokenizer()
             return std::string(value);
         return fail(resolve_error(resolve_errc::missing_field,
                                   nucleus::format("environment variable '{}' is not set", name)));
-    });
-    return std::move(builder).build();
-}
-
-tokenizer make_uuid_tokenizer()
-{
-    tokenizer_builder builder("uuid");
-    builder.add_function("v4", [](std::span<const std::string> args) -> token_result {
-        if(!args.empty())
-            return fail(resolve_error(resolve_errc::arg_count_mismatch,
-                                      "uuid.v4 takes no arguments"));
-        return generate_uuid_v4();
     });
     return std::move(builder).build();
 }

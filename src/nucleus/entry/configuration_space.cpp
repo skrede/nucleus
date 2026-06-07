@@ -37,18 +37,17 @@ namespace nucleus {
 class configuration_space::impl
 {
 public:
-    // The generic core tokenizers are MECHANISM, not policy: ${env.*}, ${uuid.*},
+    // The generic core tokenizers are MECHANISM, not policy: ${env.*} and
     // ${string.*} (and the scope file frame, handled inside the resolver) carry no
     // host vocabulary, so they are installed by default on construction. Without
     // this a host cannot get any token expansion through load()/resolve() at all,
-    // because the fold fails loudly on every unresolved ${...}. The HOST tokenizer
-    // module stays OPT-IN -- it pulls platform vocabulary and is registered only by
-    // a host that links it and calls install_tokenizer(make_host_tokenizer()).
+    // because the fold fails loudly on every unresolved ${...}. Anything that
+    // carries platform or host vocabulary is the host's to build and inject
+    // through install_tokenizer().
     impl()
     {
         owner_token core;
         tokenizer.add(make_env_tokenizer(), core);
-        tokenizer.add(make_uuid_tokenizer(), core);
         tokenizer.add(make_string_tokenizer(), core);
     }
 

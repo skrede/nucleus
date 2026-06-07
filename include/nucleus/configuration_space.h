@@ -150,10 +150,10 @@ public:
 
     // Installs an already-constructed tokenizer (the generic core builtins are
     // installed automatically on construction; this is how a host injects an
-    // additional one -- e.g. the opt-in HOST module via install_tokenizer(
-    // make_host_tokenizer()), or a custom category). The tokenizer is moved in; a
-    // later registration of the same category shadows an earlier one. Subject to
-    // the same state-machine and registration-policy seam as register_tokenizer.
+    // additional one -- any host-built category, e.g. machine-identity or
+    // logging vocabulary). The tokenizer is moved in; a later registration of
+    // the same category shadows an earlier one. Subject to the same
+    // state-machine and registration-policy seam as register_tokenizer.
     registration_result install_tokenizer(tokenizer tok, owner_token owner = {});
 
     [[nodiscard]] std::size_t schema_count() const noexcept;

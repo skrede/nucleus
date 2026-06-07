@@ -41,9 +41,10 @@ until `load()` / `resolve()`, which yields an immutable, freely thread-readable
 `configuration`. Registration after resolve is a state-machine error.
 
 * **Token expansion** \
-A `${...}` pipeline with generic core tokenizers (env, uuid, file/dir/self,
+A `${...}` pipeline with generic core tokenizers (env, file/dir/self,
 string, scope) expands values at load, recursing to a fixpoint with depth and
-cycle guards. An opt-in `HOST` module adds machine-identity tokens.
+cycle guards. Host-specific vocabulary (machine identity, logging) is the
+host's to build and inject through `install_tokenizer()`.
 
 * **Diagnostics and provenance** \
 Nearest-key suggestions on unknown keys, non-adjudicating conflict reports, and a
@@ -67,8 +68,8 @@ ctest --test-dir build
 Catch2 and pugixml are fetched automatically via `FetchContent`. `std::format` is
 the diagnostic vocabulary; on a toolchain that lacks it, `{fmt}` is fetched as the
 fallback. Options: `NUCLEUS_BUILD_TESTS`, `NUCLEUS_BUILD_EXAMPLES`,
-`NUCLEUS_BUILD_SOURCE_XML` (on by default), `NUCLEUS_BUILD_TOKENIZER_HOST`,
-`NUCLEUS_BUILD_SANITIZER`, `NUCLEUS_COVERAGE`.
+`NUCLEUS_BUILD_SOURCE_XML` (on by default), `NUCLEUS_BUILD_SANITIZER`,
+`NUCLEUS_COVERAGE`.
 
 ## Documentation
 
@@ -123,13 +124,11 @@ another resolves inner-first.
 ```cpp
 nucleus::env_source values;
 values.set("service/region", "${string.upper(${env.NUCLEUS_REGION})}")
-      .set("service/banner", "${string.concat(node-, ${env.NUCLEUS_REGION})}")
-      .set("service/instance", "${uuid.v4()}");
+      .set("service/banner", "${string.concat(node-, ${env.NUCLEUS_REGION})}");
 ```
 
 ```txt
 service/banner = node-eu-west
-service/instance = 100d2b59-9f45-4ac1-9011-417632112711
 service/region = EU-WEST
 ```
 

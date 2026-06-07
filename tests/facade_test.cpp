@@ -46,10 +46,10 @@ TEST_CASE("the facade accepts registrations on all three surfaces", "[facade]")
 {
     nucleus::configuration_space engine;
 
-    // The generic core tokenizers (env/uuid/string) are installed by default, so
+    // The generic core tokenizers (env/string) are installed by default, so
     // a fresh facade already carries them; a host registration adds on top.
     const std::size_t builtin_tokenizers = engine.tokenizer_count();
-    REQUIRE(builtin_tokenizers >= 3);
+    REQUIRE(builtin_tokenizers >= 2);
 
     REQUIRE(engine.register_schema("logging/level"));
     REQUIRE(engine.register_tokenizer("custom"));

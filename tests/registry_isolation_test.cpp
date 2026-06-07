@@ -80,7 +80,7 @@ TEST_CASE("siblings collaborate only through a hand-built resolution context", "
     nucleus::resolution_context ctx(schema, tokenizer);
 
     ctx.schema().add(nucleus::schema_spec{"k"}, nucleus::owner_token{});
-    ctx.tokenizer().add(nucleus::tokenizer_builder("uuid").build(), nucleus::owner_token{});
+    ctx.tokenizer().add(nucleus::tokenizer_builder("noop").build(), nucleus::owner_token{});
     sources.add(nucleus::source_spec{"env"}, nucleus::owner_token{});
 
     REQUIRE(schema.size() == 1);

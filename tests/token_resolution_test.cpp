@@ -24,7 +24,6 @@ tokenizer_registry core_registry()
 {
     tokenizer_registry r;
     r.add(nucleus::make_env_tokenizer(), owner_token{});
-    r.add(nucleus::make_uuid_tokenizer(), owner_token{});
     r.add(nucleus::make_string_tokenizer(), owner_token{});
     return r;
 }
@@ -54,18 +53,6 @@ TEST_CASE("env tokenizer expands a set variable and fails on unset", "[resolve][
     auto miss = resolve_tokens("${env.NUCLEUS_DEFINITELY_UNSET_XYZ}", reg);
     REQUIRE_FALSE(miss.has_value());
     CHECK(miss.error().code == resolve_errc::missing_field);
-}
-
-TEST_CASE("uuid v4 produces a 36-char canonical id and differs per call", "[resolve][uuid]")
-{
-    auto reg = core_registry();
-    auto a = resolve_tokens("${uuid.v4()}", reg);
-    auto b = resolve_tokens("${uuid.v4()}", reg);
-    REQUIRE(a.has_value());
-    REQUIRE(b.has_value());
-    CHECK(a.value().size() == 36);
-    CHECK(a.value()[14] == '4');
-    CHECK(a.value() != b.value());
 }
 
 TEST_CASE("string tokenizer ops", "[resolve][string]")

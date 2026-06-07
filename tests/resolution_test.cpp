@@ -200,7 +200,7 @@ TEST_CASE("an unresolvable token fails the fold loudly rather than passing throu
 
     nucleus::env_source env;
     // No tokenizer answers the `nope` category (the core builtins are
-    // env/uuid/string), so the ${...} cannot resolve.
+    // env/string), so the ${...} cannot resolve.
     env.set("greeting", "${nope.whatever}");
 
     nucleus::source_stack stack;

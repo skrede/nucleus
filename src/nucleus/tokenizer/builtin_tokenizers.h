@@ -11,11 +11,6 @@ namespace nucleus {
 // enumeration -- so it reads std::getenv per lookup with no caching.
 [[nodiscard]] tokenizer make_env_tokenizer();
 
-// The uuid tokenizer: ${uuid.v4()} generates a fresh random version-4 UUID on
-// each call. Non-deterministic by contract; persisting a generated value is the
-// consumer's concern, not the tokenizer's.
-[[nodiscard]] tokenizer make_uuid_tokenizer();
-
 // The string tokenizer: pure string operations over already-resolved arguments.
 //   ${string.upper(s)}        -> s upcased (ASCII)
 //   ${string.lower(s)}        -> s downcased (ASCII)
