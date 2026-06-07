@@ -21,6 +21,14 @@ using nucleus::key_path;
 using nucleus::schema_registry;
 using nucleus::generate_completion;
 
+// MSVC spells the POSIX popen/pclose pair with leading underscores; map them so
+// the harness compiles everywhere even though the test only RUNS where the
+// bash_available() probe below says so.
+#ifdef _MSC_VER
+    #define popen _popen
+    #define pclose _pclose
+#endif
+
 namespace {
 
 key_path path_of(const char *text) { return key_path::parse(text).value(); }
@@ -35,10 +43,17 @@ schema_registry fixture()
 }
 
 // Whether a real bash interpreter is on PATH. The smoke test only runs when one
-// is; on a box without bash (or on Windows) it skips cleanly rather than failing.
+// is; on a box without bash it skips cleanly rather than failing. Windows skips
+// deterministically: a Git-Bash may well be installed, but handing it a native
+// temp-file path crosses an unverified path-translation boundary -- the bash
+// completion contract this smoke test exercises is a POSIX one.
 [[nodiscard]] bool bash_available()
 {
+#ifdef _WIN32
+    return false;
+#else
     return std::system("bash -c \"exit 0\" >/dev/null 2>&1") == 0;
+#endif
 }
 
 // Runs a bash script and returns its stdout. The script is written to a temp file

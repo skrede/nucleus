@@ -82,10 +82,16 @@ jobs:
       - name: Test (coverage)
         run: ctest --test-dir build-coverage --output-on-failure
 
+      # The coverage flags are directory-global, so the FetchContent'd test
+      # dependencies are instrumented too; their sources are not resolvable
+      # relative to --root, which newer gcovr treats as a hard error. Skip
+      # their raw coverage files outright -- only nucleus' own coverage is
+      # wanted (the report filters already restrict to include/ and src/).
       - name: Generate report
         run: >-
           gcovr --root .
           --filter 'include/nucleus/' --filter 'src/nucleus/'
+          --gcov-exclude-directories '.*/_deps/.*'
           --xml-pretty --output coverage.xml
           build-coverage
 
