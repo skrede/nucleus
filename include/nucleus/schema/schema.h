@@ -16,20 +16,30 @@ namespace nucleus {
 // dictates BOTH the document structure (what paths may carry values) and the CLI
 // surface (what flags exist), because both are projections of the same elements.
 //
-// Two constraints live here and are deliberately KEPT DISTINCT:
+// Constraints live here and are deliberately KEPT DISTINCT on separate axes:
 //
 //   required -- the element must carry a value once resolved. A presence
 //               constraint: "this field has to be set."
 //
-//   identity -- the element is the selector / primary key of its parent node:
-//               the field whose value names WHICH record/node an overlay applies
-//               to (powers file-overlay matching and multi-node documents). A
-//               role constraint: "this field identifies the node."
+//   identity -- the element is the PRIMARY KEY of its parent container: the
+//               single field whose value names WHICH instance of a repeatable
+//               container an overlay or a slice applies to. There is at MOST one
+//               identity per container (enforced at attach). It powers slicing
+//               (select the instance whose key equals a value, prune the rest)
+//               and overlay matching across multi-instance documents. A role
+//               constraint: "this field selects the instance." Primary key and
+//               identity are the same concept; `identity` is the in-code spelling.
 //
-// These are different axes. A field can be required without being an identity
-// (a mandatory setting), an identity without being required (an optional
-// selector that defaults), both, or neither. The model never collapses one into
-// the other; the enforcer checks them independently.
+//   unique   -- the element's value must be DISTINCT across sibling instances of
+//               its parent container. Unlike identity there may be MANY unique
+//               fields, and a unique field carries no selector role and is never
+//               consumed by a slice. A primary key is implicitly unique (it must
+//               distinguish instances); an ordinary unique field is just "no two
+//               siblings may share this value."
+//
+// These are independent axes. A field can be required without being a key, a key
+// without being required, unique without being a key, or any combination. The
+// model never collapses one into another; the enforcer checks each separately.
 struct schema_element
 {
     // The element's own name (the leaf segment it contributes to the keyspace).
@@ -39,8 +49,13 @@ struct schema_element
     anchor at = anchor::root();
     // Presence constraint: must carry a value at resolve.
     bool required = false;
-    // Role constraint: this element is its parent node's identity/selector.
+    // Role constraint: this element is its parent container's primary key. At
+    // most one per container; implies value-uniqueness across instances.
     bool identity = false;
+    // Constraint: this element's value is unique across sibling container
+    // instances. Many allowed; carries no selector role. (A primary key is
+    // implicitly unique whether or not this is also set.)
+    bool unique = false;
 
     // The closed set of values this element accepts, if it is constrained. An
     // empty vector (the default) means unconstrained -- any value is admissible.
@@ -50,6 +65,14 @@ struct schema_element
     // the core stays domain-neutral and free of any enum-reflection dependency.
     std::vector<std::string> allowed_values;
 
+    // True when this element is its parent container's primary key OR is declared
+    // unique -- i.e. its value must be distinct across sibling instances. A
+    // primary key is uniqueness-bearing even without the `unique` flag set.
+    [[nodiscard]] bool enforces_uniqueness() const noexcept
+    {
+        return identity || unique;
+    }
+
     // The full keyspace path this element declares: the anchor's path extended by
     // the element's name. A root element declares a single-segment top-level
     // path; a nested element declares the anchor path + name.
@@ -57,13 +80,24 @@ struct schema_element
     {
         return at.under().child(name);
     }
+
+    // The container this element is a field of: its parent path. For a primary
+    // key or a unique field this is the repeatable container whose instances the
+    // field distinguishes. Empty for a root-anchored element.
+    [[nodiscard]] key_path container() const
+    {
+        return at.under();
+    }
 };
 
 // Fluent helpers so a host declares schema elements readably without naming the
 // boolean axes positionally.
 [[nodiscard]] inline schema_element element(std::string name, anchor at)
 {
-    return schema_element{std::move(name), std::move(at), false, false, {}};
+    schema_element e;
+    e.name = std::move(name);
+    e.at = std::move(at);
+    return e;
 }
 
 [[nodiscard]] inline schema_element required_element(std::string name, anchor at)
@@ -73,10 +107,27 @@ struct schema_element
     return e;
 }
 
+// The primary key of its parent container: the one field a slice selects on. At
+// most one per container. `identity_element` is the established spelling;
+// `primary_key_element` is an alias for hosts that think in primary-key terms.
 [[nodiscard]] inline schema_element identity_element(std::string name, anchor at)
 {
     schema_element e = element(std::move(name), std::move(at));
     e.identity = true;
+    return e;
+}
+
+[[nodiscard]] inline schema_element primary_key_element(std::string name, anchor at)
+{
+    return identity_element(std::move(name), std::move(at));
+}
+
+// A field whose value must be distinct across sibling instances of its parent
+// container, without being the selector. Many such fields may exist per container.
+[[nodiscard]] inline schema_element unique_element(std::string name, anchor at)
+{
+    schema_element e = element(std::move(name), std::move(at));
+    e.unique = true;
     return e;
 }
 

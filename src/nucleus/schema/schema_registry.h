@@ -90,6 +90,26 @@ public:
                     el.name, under.str()));
             }
         }
+
+        // A container has at MOST one primary key: two identity fields under the
+        // same parent would make slicing ambiguous (which value selects the
+        // instance?). Rejected at attach so the schema can never express it.
+        if(el.identity)
+        {
+            const std::string container = el.container().str();
+            for(const schema_element &existing : m_elements)
+            {
+                if(existing.identity && existing.container().str() == container)
+                {
+                    return fail(nucleus::format(
+                        "schema element '{}' cannot be the primary key of '{}': "
+                        "'{}' is already its primary key",
+                        el.name, container.empty() ? "(root)" : container,
+                        existing.name));
+                }
+            }
+        }
+
         m_defined.insert(el.declared_path().str());
         m_elements.push_back(std::move(el));
         return std::monostate{};

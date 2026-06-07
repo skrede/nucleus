@@ -87,3 +87,61 @@ TEST_CASE("the schema is the single surface for CLI and document", "[schema]")
     REQUIRE(surface_has(reg, "logging/level"));
     REQUIRE_FALSE(reg.recognizes(path_of("logging/unknown")));
 }
+
+TEST_CASE("unique and primary-key are distinct uniqueness axes", "[schema][unique]")
+{
+    // A unique field carries the value-uniqueness constraint without the selector
+    // role of a primary key.
+    schema_element u = nucleus::unique_element("serial", anchor::root());
+    REQUIRE(u.unique);
+    REQUIRE_FALSE(u.identity);
+    REQUIRE(u.enforces_uniqueness());
+
+    // A primary key is uniqueness-bearing even without the unique flag set.
+    schema_element k = nucleus::primary_key_element("name", anchor::root());
+    REQUIRE(k.identity);
+    REQUIRE_FALSE(k.unique);
+    REQUIRE(k.enforces_uniqueness());
+
+    // primary_key_element and identity_element are the same concept.
+    schema_element id = nucleus::identity_element("name", anchor::root());
+    REQUIRE(id.identity == k.identity);
+
+    // An ordinary element bears no uniqueness constraint.
+    REQUIRE_FALSE(nucleus::element("x", anchor::root()).enforces_uniqueness());
+}
+
+TEST_CASE("many unique fields may share one container", "[schema][unique]")
+{
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::element("cluster", anchor::root())));
+    REQUIRE(reg.attach(nucleus::element("server", anchor::keyspace(path_of("cluster")))));
+
+    // Several unique fields under the same container are all admissible -- unique
+    // is a constraint, not a singular role.
+    REQUIRE(reg.attach(
+        nucleus::unique_element("serial", anchor::keyspace(path_of("cluster/server")))));
+    REQUIRE(reg.attach(
+        nucleus::unique_element("mac", anchor::keyspace(path_of("cluster/server")))));
+}
+
+TEST_CASE("a container has at most one primary key", "[schema][unique]")
+{
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::element("cluster", anchor::root())));
+    REQUIRE(reg.attach(nucleus::element("server", anchor::keyspace(path_of("cluster")))));
+
+    // The first primary key under the container is accepted.
+    REQUIRE(reg.attach(
+        nucleus::primary_key_element("name", anchor::keyspace(path_of("cluster/server")))));
+
+    // A second primary key under the SAME container is rejected at attach -- two
+    // selectors would make a slice ambiguous.
+    auto second = reg.attach(
+        nucleus::primary_key_element("id", anchor::keyspace(path_of("cluster/server"))));
+    REQUIRE_FALSE(second);
+    REQUIRE(second.error().find("already its primary key") != std::string::npos);
+
+    // A primary key under a DIFFERENT container is fine.
+    REQUIRE(reg.attach(nucleus::primary_key_element("name", anchor::keyspace(path_of("cluster")))));
+}
