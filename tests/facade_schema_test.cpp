@@ -13,6 +13,7 @@
 
 #include <string>
 #include <vector>
+#include <utility>
 
 // Schema-as-authority over CONTENT, exercised THROUGH the facade: a typed schema
 // registered via register_element gates the resolve, rejecting undeclared keys
@@ -89,7 +90,7 @@ TEST_CASE("resolve rejects a missing required field", "[facade][schema]")
     REQUIRE(loaded.error().find("required field 'server/host'") != std::string::npos);
 }
 
-TEST_CASE("resolve rejects a missing identity field separately from required",
+TEST_CASE("resolve admits an anonymous strain without the identity field",
           "[facade][schema]")
 {
     nucleus::configuration_space engine;
@@ -99,13 +100,39 @@ TEST_CASE("resolve rejects a missing identity field separately from required",
     REQUIRE(engine.register_element(
         nucleus::element("role", nucleus::anchor::keyspace(path_of("node")))));
 
+    // A flat source contributing fields without the key is an anonymous strain:
+    // it collapses into the configuration space. The primary key is a selector,
+    // not a presence obligation.
+    nucleus::env_source src = one("node/role", "primary");
+    nucleus::source_stack stack;
+    stack.add(src, nucleus::layer_rank::base, "base");
+
+    auto loaded = engine.resolve(stack);
+    REQUIRE(loaded);
+    REQUIRE(loaded.value().get("node/role") == "primary");
+}
+
+TEST_CASE("resolve rejects anonymous-only content when the identity is required",
+          "[facade][schema]")
+{
+    nucleus::configuration_space engine;
+    REQUIRE(engine.register_element(nucleus::element("node", nucleus::anchor::root())));
+    nucleus::schema_element id =
+        nucleus::identity_element("name", nucleus::anchor::keyspace(path_of("node")));
+    id.required = true;
+    REQUIRE(engine.register_element(std::move(id)));
+    REQUIRE(engine.register_element(
+        nucleus::element("role", nucleus::anchor::keyspace(path_of("node")))));
+
+    // Requiring the identity element is the host's knob for demanding a NAMED
+    // strain; anonymous-only content now fails in required-field vocabulary.
     nucleus::env_source src = one("node/role", "primary");
     nucleus::source_stack stack;
     stack.add(src, nucleus::layer_rank::base, "base");
 
     auto loaded = engine.resolve(stack);
     REQUIRE_FALSE(loaded);
-    REQUIRE(loaded.error().find("identity field 'node/name'") != std::string::npos);
+    REQUIRE(loaded.error().find("required field 'node/name'") != std::string::npos);
 }
 
 TEST_CASE("resolve admits a document that satisfies the schema", "[facade][schema]")

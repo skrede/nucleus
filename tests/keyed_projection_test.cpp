@@ -141,6 +141,30 @@ TEST_CASE("a named strain composes on top of anonymous template instances",
     REQUIRE_FALSE(config.contains("cluster/server/web/port"));
 }
 
+TEST_CASE("anonymous strains alone collapse into the configuration space",
+          "[projection][keyed]")
+{
+    // No named strain anywhere: the composed template IS the configuration.
+    // Later template parts override earlier ones in document order.
+    const char *doc = R"(
+        <cluster>
+            <server><port>1</port></server>
+            <server><port>8080</port><protocol>tcp</protocol></server>
+        </cluster>)";
+
+    nucleus::configuration_space engine;
+    declare_cluster(engine);
+
+    auto loaded = engine.load(std::vector<std::string>{"doc.xml"},
+                              [doc](const std::string &) { return xml_of(doc); });
+    REQUIRE(loaded);
+    const nucleus::configuration &config = loaded.value();
+
+    REQUIRE(config.get("cluster/server/port") == "8080");
+    REQUIRE(config.get("cluster/server/protocol") == "tcp");
+    REQUIRE_FALSE(config.contains("cluster/server/name"));
+}
+
 TEST_CASE("without a declared primary key the structural walk is unchanged",
           "[projection][keyed]")
 {

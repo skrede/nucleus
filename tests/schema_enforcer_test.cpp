@@ -11,6 +11,7 @@
 
 #include <string>
 #include <vector>
+#include <utility>
 #include <algorithm>
 
 using nucleus::anchor;
@@ -57,21 +58,45 @@ TEST_CASE("a missing required field is a violation", "[enforcer]")
     REQUIRE(violation_mentions(v.error(), "required field"));
 }
 
-TEST_CASE("identity is enforced separately from required", "[enforcer]")
+TEST_CASE("identity alone imposes no presence obligation", "[enforcer]")
 {
     schema_registry reg;
     reg.attach(nucleus::element("node", anchor::root()));
-    // An identity field that is NOT marked required.
     reg.attach(nucleus::identity_element("name", anchor::keyspace(path_of("node"))));
+    reg.attach(nucleus::element("role", anchor::keyspace(path_of("node"))));
 
-    keyspace ks; // name absent
+    // An empty keyspace validates: a space with no strain at all is legal.
+    keyspace ks;
+    REQUIRE(schema_enforcer::validate(reg, ks));
 
+    // So does an anonymous strain -- fields without the key collapse into the
+    // configuration space; the primary key is a selector, not an obligation.
+    ks.set(path_of("node/role"), nucleus::value::owned("primary"));
+    REQUIRE(schema_enforcer::validate(reg, ks));
+}
+
+TEST_CASE("a required identity demands a named strain", "[enforcer]")
+{
+    schema_registry reg;
+    reg.attach(nucleus::element("node", anchor::root()));
+    nucleus::schema_element id =
+        nucleus::identity_element("name", anchor::keyspace(path_of("node")));
+    id.required = true;
+    reg.attach(std::move(id));
+    reg.attach(nucleus::element("role", anchor::keyspace(path_of("node"))));
+
+    // Anonymous-only content violates: the host required a NAMED strain. The
+    // failure speaks the required-field vocabulary -- identity adds no separate
+    // presence check.
+    keyspace ks;
+    ks.set(path_of("node/role"), nucleus::value::owned("primary"));
     auto v = schema_enforcer::validate(reg, ks);
     REQUIRE_FALSE(v);
-    // The failure is reported as an identity/selector failure, distinct from the
-    // required-field wording -- proving the two constraints are separate.
-    REQUIRE(violation_mentions(v.error(), "identity field"));
-    REQUIRE_FALSE(violation_mentions(v.error(), "required field"));
+    REQUIRE(violation_mentions(v.error(), "required field"));
+
+    // A sliced strain satisfies it structurally: the key value named the
+    // instance and was consumed, so no literal leaf can exist.
+    REQUIRE(schema_enforcer::validate(reg, ks, {"node"}));
 }
 
 TEST_CASE("a value within a declared allowed set passes", "[enforcer]")

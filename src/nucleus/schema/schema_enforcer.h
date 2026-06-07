@@ -41,12 +41,15 @@ using schema_validation = result<std::monostate, std::vector<schema_violation>>;
 //   * unknown paths   -- every value in the keyspace must correspond to a
 //                        declared element (the schema is the single authority;
 //                        a value at an undeclared path is rejected).
-//   * required        -- every element marked required must carry a value.
-//   * identity        -- every element marked identity (selector/primary key)
-//                        must carry a value so the node it identifies is
-//                        addressable. Checked SEPARATELY from required: an
-//                        identity is validated for its selector role even when
-//                        the host did not also mark it required.
+//   * required        -- every element marked required must carry a value. The
+//                        identity (primary-key) element imposes NO presence
+//                        obligation of its own: anonymous (keyless) strains are
+//                        legal and collapse into the configuration space.
+//                        Marking the identity element required is the host's
+//                        knob for demanding a NAMED strain -- a sliced strain
+//                        satisfies it structurally (the key value named the
+//                        instance and was consumed), anonymous-only content
+//                        violates it.
 //   * allowed values  -- when an element declares a closed value set, a present
 //                        value outside that set is rejected; the nearest allowed
 //                        value (by edit distance) is offered as a suggestion.
@@ -79,28 +82,22 @@ public:
             }
         }
 
-        // Required and identity checks: walked per declared element, kept as two
-        // separate constraints so neither is implied by the other.
+        // Required check: walked per declared element. A sliced strain satisfies
+        // a required identity element structurally -- its key value named the
+        // instance and was consumed, so no literal leaf can exist.
         for(const schema_element &el : schema.elements())
         {
             const key_path declared = el.declared_path();
             const bool present = resolved.contains(declared);
+            const bool keyed_ok = el.identity
+                && std::ranges::find(keyed_satisfied, el.container().str())
+                       != keyed_satisfied.end();
 
-            if(el.required && !present)
+            if(el.required && !present && !keyed_ok)
             {
                 violations.push_back(schema_violation{
                     declared.str(),
                     nucleus::format("required field '{}' is missing",
-                                      declared.str())});
-            }
-
-            if(el.identity && !present
-               && std::ranges::find(keyed_satisfied, el.container().str())
-                      == keyed_satisfied.end())
-            {
-                violations.push_back(schema_violation{
-                    declared.str(),
-                    nucleus::format("identity field '{}' has no value to select on",
                                       declared.str())});
             }
 

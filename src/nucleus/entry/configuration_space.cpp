@@ -108,7 +108,7 @@ public:
 
         // The schema is the authority over CONTENT: a non-empty schema gates the
         // folded keyspace before it is frozen, so undeclared keys and missing
-        // required/identity fields fail the resolve rather than silently shipping.
+        // required fields fail the resolve rather than silently shipping.
         if(auto checked = ctx.validate(); !checked)
             return fail(std::move(checked).error());
 

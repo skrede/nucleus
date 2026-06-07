@@ -220,7 +220,7 @@ public:
     // when the schema declares a surface: a host that registers no schema gets no
     // content gate (an empty schema is not a claim that nothing is allowed). An
     // undeclared key is reported with its nearest declared neighbor so a typo is
-    // actionable; missing required/identity fields are reported by the enforcer.
+    // actionable; missing required fields are reported by the enforcer.
     [[nodiscard]] result<std::monostate, resolve_fold_error> validate()
     {
         if(m_schema.surface().empty())
