@@ -7,7 +7,7 @@
 
 #include "nucleus/keyspace/key_path.h"
 
-#include "nucleus/configuration_source/env/env_source.h"
+#include "support/capable_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -29,9 +29,11 @@ nucleus::key_path path_of(const std::string &text)
     return parsed.value();
 }
 
-nucleus::env_source one(std::string path, std::string text)
+// A flat (path -> value) feeder that declares the structural capabilities, so the
+// auto-gate admits the nested schemas these schema-authority tests exercise.
+nucleus::testing::capable_source one(std::string path, std::string text)
 {
-    nucleus::env_source src;
+    nucleus::testing::capable_source src;
     src.set(std::move(path), std::move(text));
     return src;
 }
@@ -70,7 +72,7 @@ TEST_CASE("resolve rejects an undeclared key and suggests the nearest declared o
         nucleus::element("level", nucleus::anchor::keyspace(path_of("logging")))));
     nucleus::configuration_space space = engine.build();
 
-    nucleus::env_source src = one("logging/levle", "debug"); // typo'd key
+    auto src = one("logging/levle", "debug"); // typo'd key
     nucleus::source_stack_options opts = base_layer(src);
 
     auto loaded = nucleus::load_configuration(space, opts);
@@ -91,7 +93,7 @@ TEST_CASE("resolve rejects a missing required field", "[facade][schema]")
     nucleus::configuration_space space = engine.build();
 
     // Only the optional port is supplied; the required host is missing.
-    nucleus::env_source src = one("server/port", "8080");
+    auto src = one("server/port", "8080");
     nucleus::source_stack_options opts = base_layer(src);
 
     auto loaded = nucleus::load_configuration(space, opts);
@@ -113,7 +115,7 @@ TEST_CASE("resolve admits an anonymous strain without the identity field",
     // A flat source contributing fields without the key is an anonymous strain:
     // it collapses into the configuration space. The primary key is a selector,
     // not a presence obligation.
-    nucleus::env_source src = one("node/role", "primary");
+    auto src = one("node/role", "primary");
     nucleus::source_stack_options opts = base_layer(src);
 
     auto loaded = nucleus::load_configuration(space, opts);
@@ -136,7 +138,7 @@ TEST_CASE("resolve rejects anonymous-only content when the identity is required"
 
     // Requiring the identity element is the host's knob for demanding a NAMED
     // strain; anonymous-only content now fails in required-field vocabulary.
-    nucleus::env_source src = one("node/role", "primary");
+    auto src = one("node/role", "primary");
     nucleus::source_stack_options opts = base_layer(src);
 
     auto loaded = nucleus::load_configuration(space, opts);
@@ -154,7 +156,7 @@ TEST_CASE("resolve admits a document that satisfies the schema", "[facade][schem
         nucleus::element("port", nucleus::anchor::keyspace(path_of("server")))));
     nucleus::configuration_space space = engine.build();
 
-    nucleus::env_source src;
+    nucleus::testing::capable_source src;
     src.set("server/host", "localhost").set("server/port", "8080");
     nucleus::source_stack_options opts = base_layer(src);
 

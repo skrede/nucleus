@@ -63,7 +63,9 @@ std::size_t tokenizer_count() const noexcept;   // includes the auto-installed c
 std::size_t source_count() const noexcept;
 std::vector<conflict_report> conflicts() const;
 std::string generate_completion(shell which, std::string_view prog) const;
-gate_result gate_capabilities(/* see api-extending.md */) const;
+
+// Free function (auto-gate pre-flight) -- load_configuration auto-gates anyway:
+gate_result check_capabilities(const configuration_space &, const source_stack_options &);
 ```
 
 - `registration_result` is `result<std::monostate, std::string>`: truthy on

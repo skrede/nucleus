@@ -275,11 +275,15 @@ gate_result gate_features(std::string_view consumer, std::string_view source_nam
                           log_sink &log);
 ```
 
-It is reachable on the facade as `configuration_space::gate_capabilities(...)`. It
-is a host-callable step, not auto-driven by the resolve fold: the current schema
-model expresses presence and identity per element but not per-element capability
-requirements, so the host supplies the requirements it knows rather than the fold
-faking a half-wired integration.
+`load_configuration` runs this gate automatically: it derives the schema's
+capability requirements from element shape and gates the assembled source stack
+(whole-stack union -- a hard capability is satisfied when ANY layer provides it)
+before folding, so a hard shortfall is a loud named error and a soft one degrades
+observably. No host call is required. `check_capabilities(const configuration_space &,
+const source_stack_options &)` runs the same gate as a standalone pre-flight, without
+folding or pulling for resolution, so a host can validate fit ahead of a load; the
+pre-flight and the load never disagree. `gate_features` above remains the per-source
+primitive for hosts that gate a single source directly.
 
 ---
 

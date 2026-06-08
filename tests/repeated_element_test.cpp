@@ -14,6 +14,8 @@
 
 #include "nucleus/configuration_source/env/env_source.h"
 
+#include "support/capable_source.h"
+
 #include "nucleus/xml/xml_source.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -306,12 +308,14 @@ TEST_CASE("attach-time rejection of repeated + unique", "[repeated][attach][reje
 TEST_CASE("capability degradation -- non-duplicate_keys source into repeated field fails",
           "[repeated][capability]")
 {
+    // A flat repeated leaf isolates the duplicate_keys gate: the only structural
+    // capability the schema needs is duplicate_keys, so a source lacking it fails
+    // naming that capability specifically (not nesting).
     nucleus::configuration_space_builder engine;
-    engine.register_element(nucleus::element("config", anchor::root()));
-    engine.register_element(nucleus::repeated_element("tag", anchor::keyspace("config")));
+    engine.register_element(nucleus::repeated_element("tag", anchor::root()));
     nucleus::configuration_space space = engine.build();
 
-    auto fake = std::make_unique<dual_entry_source>("config/tag");
+    auto fake = std::make_unique<dual_entry_source>("tag");
     nucleus::source_stack_options opts;
     add_layer(opts, *fake, 10, "fake");
 
@@ -412,11 +416,11 @@ TEST_CASE("collection scope-policy exclusion and admission",
         declare_cluster_tags(engine);
         nucleus::configuration_space space = engine.build();
 
-        nucleus::env_source L0;
+        nucleus::testing::capable_source L0;
         L0.set("cluster/server/primary/name", "primary")
           .set("cluster/server/primary/tags", "base");
 
-        nucleus::env_source Lderived;
+        nucleus::testing::capable_source Lderived;
         Lderived.set("cluster/server/primary/tags", "derived");
 
         nucleus::source_stack_options opts;
@@ -439,11 +443,11 @@ TEST_CASE("collection scope-policy exclusion and admission",
         declare_cluster_tags(engine);
         nucleus::configuration_space space = engine.build();
 
-        nucleus::env_source L0;
+        nucleus::testing::capable_source L0;
         L0.set("cluster/server/primary/name", "primary")
           .set("cluster/server/primary/tags", "base");
 
-        nucleus::env_source Lderived;
+        nucleus::testing::capable_source Lderived;
         Lderived.set("cluster/server/primary/tags", "derived");
 
         nucleus::source_stack_options opts;

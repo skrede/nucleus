@@ -201,14 +201,6 @@ public:
     // and bound to `prog`. A pure read of the schema.
     [[nodiscard]] std::string generate_completion(shell which, std::string_view prog) const;
 
-    // Host-callable capability gate: a required capability the configuration_source
-    // lacks is a loud named error; an optional one degrades observably.
-    [[nodiscard]] gate_result gate_capabilities(std::string_view consumer,
-                                                std::string_view source_name,
-                                                const capability_descriptor &caps,
-                                                const std::vector<feature_requirement> &required,
-                                                log_sink &log) const;
-
     // Returns a NEW builder pre-populated with a DEEP COPY of this sealed space's
     // four registries + policy + claim/conflict ledger. Base and derived are fully
     // independent: building or mutating one never affects the other, and no
@@ -218,6 +210,7 @@ public:
 private:
     friend class configuration_space_builder;
     friend load_result load_configuration(const configuration_space &, const source_stack_options &);
+    friend gate_result check_capabilities(const configuration_space &, const source_stack_options &);
     class impl;
     explicit configuration_space(std::unique_ptr<impl> sealed);
     std::unique_ptr<impl> m_impl;
@@ -230,6 +223,13 @@ private:
 // calls on one shared const configuration_space need no synchronization. It never
 // mutates the space.
 [[nodiscard]] load_result load_configuration(const configuration_space &space,
+                                             const source_stack_options &options);
+
+// The standalone auto-gate pre-flight: assembles the same source stack a load would
+// and runs the SAME capability gate WITHOUT folding or pulling for resolution, so a
+// host can validate source/schema fit ahead of time. load_configuration auto-gates
+// on its own regardless of whether this was called first; the two never disagree.
+[[nodiscard]] gate_result check_capabilities(const configuration_space &space,
                                              const source_stack_options &options);
 
 }

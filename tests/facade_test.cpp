@@ -147,31 +147,29 @@ TEST_CASE("a typed element double-claiming a path conflicts with a path registra
     REQUIRE(reports.front().size() == 2);
 }
 
-TEST_CASE("capability gating is reachable through the facade", "[facade][capability]")
+TEST_CASE("the per-source capability gate applies the loud/quiet contract", "[facade][capability]")
 {
-    // The gating mechanism is host-callable through the facade: the v0.1 schema
-    // model does not carry per-element capability requirements, so the host
-    // supplies them. A required capability env lacks fails loudly; an optional one
-    // degrades observably.
+    // gate_features is the per-source primitive a host calls directly to gate a
+    // single source's capabilities. A required capability env lacks fails loudly;
+    // an optional one degrades observably.
     struct counting_sink final : nucleus::log_sink
     {
         void log(nucleus::log_level, std::string_view) override { ++count; }
         int count = 0;
     } sink;
 
-    nucleus::configuration_space engine = nucleus::configuration_space_builder{}.build();
     nucleus::env_source env;
 
     std::vector<nucleus::feature_requirement> required{
         {nucleus::capability::nesting, nucleus::requirement_strength::required}};
-    auto refused = engine.gate_capabilities("schema", "env", env.capabilities(), required, sink);
+    auto refused = nucleus::gate_features("schema", "env", env.capabilities(), required, sink);
     REQUIRE_FALSE(refused);
     REQUIRE(refused.error().find("nesting") != std::string::npos);
     REQUIRE(refused.error().find("env") != std::string::npos);
 
     std::vector<nucleus::feature_requirement> optional{
         {nucleus::capability::ordering, nucleus::requirement_strength::optional}};
-    auto degraded = engine.gate_capabilities("schema", "env", env.capabilities(), optional, sink);
+    auto degraded = nucleus::gate_features("schema", "env", env.capabilities(), optional, sink);
     REQUIRE(degraded);
     REQUIRE(degraded.value().degraded.size() == 1);
     REQUIRE(sink.count == 1); // the degradation was surfaced through the sink.

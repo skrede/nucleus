@@ -9,7 +9,10 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
+#include "nucleus/entry/precedence.h"
 #include "nucleus/entry/configuration.h"
+
+#include "support/capable_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -21,21 +24,6 @@
 
 using nucleus::anchor;
 
-namespace {
-
-// A self-contained env layer (no borrowed source needed across threads): each
-// thread builds its OWN options on its own stack so nothing mutable is shared.
-nucleus::source_stack_options thread_options()
-{
-    nucleus::source_stack_options opts;
-    opts.env = nucleus::env_source_options{{
-        {"server/host", "localhost"},
-        {"server/port", "8080"},
-    }};
-    return opts;
-}
-
-}
 
 TEST_CASE("N threads load one shared const space lock-free with identical results",
           "[concurrent][load]")
@@ -55,8 +43,14 @@ TEST_CASE("N threads load one shared const space lock-free with identical result
     for(std::size_t i = 0; i < thread_count; ++i)
     {
         threads.emplace_back([&space, &results, &ok, i]() {
-            // Borrow the shared space by const reference -- NO mutex anywhere.
-            const nucleus::source_stack_options opts = thread_options();
+            // Borrow the shared space by const reference -- NO mutex anywhere. Each
+            // thread owns its source and options on its own stack so nothing mutable
+            // is shared; the feeder declares nesting so the auto-gate admits it.
+            nucleus::testing::capable_source src;
+            src.set("server/host", "localhost").set("server/port", "8080");
+            nucleus::source_stack_options opts;
+            opts.custom_layers.push_back(nucleus::configuration_source_layer{
+                &src, static_cast<std::size_t>(nucleus::layer_rank::env), "env", {}});
             auto loaded = nucleus::load_configuration(space, opts);
             if(!loaded)
                 return;

@@ -7,6 +7,7 @@
 #include "nucleus/schema/schema_enforcer.h"
 #include "nucleus/schema/schema_registry.h"
 #include "nucleus/schema/converter_registry.h"
+#include "nucleus/schema/capability_requirements.h"
 
 #include "nucleus/configuration_source/configuration_source_registry.h"
 
@@ -141,6 +142,24 @@ namespace {
         return unexpected(nucleus::format(
             "{} is not allowed: the builder has already been built", what));
     return registration_ok();
+}
+
+// The shared auto-gate: derives the schema's capability requirements and gates the
+// assembled stack with whole-stack union semantics. load_configuration and
+// check_capabilities both call this over the SAME stack shape, so the pre-flight and
+// the load can never disagree about fit.
+[[nodiscard]] gate_result gate_assembled_stack(const schema_registry &schema,
+                                               const configuration_source_stack &stack,
+                                               log_sink &log)
+{
+    std::vector<std::pair<std::string, capability_descriptor>> descriptors;
+    descriptors.reserve(stack.layers().size());
+    for(const configuration_source_layer &layer : stack.layers())
+    {
+        if(layer.src != nullptr)
+            descriptors.emplace_back(layer.label, layer.src->capabilities());
+    }
+    return gate_stack("schema", descriptors, derive_capability_requirements(schema), log);
 }
 
 }
@@ -301,15 +320,6 @@ std::string configuration_space::generate_completion(shell which, std::string_vi
     return nucleus::generate_completion(which, m_impl->schema, prog);
 }
 
-gate_result configuration_space::gate_capabilities(std::string_view consumer,
-                                       std::string_view source_name,
-                                       const capability_descriptor &caps,
-                                       const std::vector<feature_requirement> &required,
-                                       log_sink &log) const
-{
-    return gate_features(consumer, source_name, caps, required, log);
-}
-
 configuration_space_builder configuration_space::expand() const
 {
     // Deep copy: all four registries + ledger are value-copied into a fresh builder
@@ -381,6 +391,14 @@ load_result load_configuration(const configuration_space &space, const source_st
             stack.add(*layer.src, layer.rank, layer.label, layer.owner);
     }
 
+    // Auto-gate the assembled stack BEFORE folding: a hard shortfall is a loud
+    // named error here, a soft one degrades through the log sink and the load
+    // proceeds. No host call is required -- gating is part of every load.
+    log_sink default_log;
+    log_sink &log = (options.argv && options.argv->log) ? *options.argv->log : default_log;
+    if(auto gated = gate_assembled_stack(state.schema, stack, log); !gated)
+        return unexpected(std::move(gated).error());
+
     // Stack-local, const-borrowing context: fold -> slice -> validate -> convert ->
     // freeze, surfacing each error verbatim. The space is never mutated.
     resolution_context ctx(state.schema, state.tokenizer, state.converters);
@@ -393,6 +411,59 @@ load_result load_configuration(const configuration_space &space, const source_st
     if(auto converted = ctx.convert(); !converted)
         return unexpected(std::move(converted).error());
     return ctx.freeze();
+}
+
+// --- check_capabilities (auto-gate pre-flight) ------------------------------
+
+gate_result check_capabilities(const configuration_space &space, const source_stack_options &options)
+{
+    // Borrow the sealed space's core by CONST reference and assemble the SAME stack
+    // shape a load would, reading each source's capabilities() and label only --
+    // no pull(), no fold. This is the load's auto-gate without the resolve.
+    const space_core &state = *space.m_impl;
+
+    configuration_source_stack stack;
+    std::optional<argv_source> argv_src;
+    std::optional<env_source> env_src;
+    std::vector<chain_walker::chain_entry> entries;
+
+    if(options.env)
+    {
+        env_src.emplace(options.env->entries);
+        stack.add(*env_src, layer_rank::env, "env");
+    }
+
+    if(!options.document_paths.empty())
+    {
+        const schema_projection projection = state.schema.projection();
+        auto expanded = chain_walker::expand(options.document_paths, options.make_document,
+                                             projection, options.inherit);
+        if(!expanded)
+            return unexpected(std::move(expanded).error());
+        entries = std::move(expanded).value();
+        for(std::size_t i = 0; i < entries.size(); ++i)
+            stack.add(*entries[i].src, document_rank(i),
+                      nucleus::format("path:{}", entries[i].path));
+    }
+
+    if(options.argv)
+    {
+        argv_src.emplace(options.argv->args);
+        argv_src->policy(options.argv->policy);
+        if(options.argv->log != nullptr)
+            argv_src->log_to(*options.argv->log);
+        stack.add(*argv_src, layer_rank::argv, "argv");
+    }
+
+    for(const configuration_source_layer &layer : options.custom_layers)
+    {
+        if(layer.src != nullptr)
+            stack.add(*layer.src, layer.rank, layer.label, layer.owner);
+    }
+
+    log_sink default_log;
+    log_sink &log = (options.argv && options.argv->log) ? *options.argv->log : default_log;
+    return gate_assembled_stack(state.schema, stack, log);
 }
 
 }
