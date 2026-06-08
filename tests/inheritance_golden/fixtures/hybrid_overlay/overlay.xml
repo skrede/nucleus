@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<cluster inherit="base.xml">
+    <server name="primary" extend="wide">
+        <profile name="demo">
+            <message>
+                <description>primary's specialized description from the overlay</description>
+            </message>
+        </profile>
+    </server>
+</cluster>

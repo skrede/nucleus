@@ -1,0 +1,12 @@
+# hybrid_overlay: a top-of-chain template (base.xml) carrying generic defaults plus
+# two named strains, specialized downstream by overlay.xml. The overlay re-opens the
+# named instance "primary" via an EXPLICIT extend disposition -- the only valid way
+# to re-open a named instance across an inheritance layer.
+#
+# Design note: an earlier naive layout re-opened a named instance in a derived
+# document WITHOUT an explicit extend disposition (relying on plain document-stack
+# overlay). The engine correctly rejects that as a duplicate, because cross-layer
+# re-open of a named instance requires explicit consent. The fixture is authored to
+# the engine's contract; the engine is not weakened to accept the malformed form.
+input=overlay.xml
+selection=primary

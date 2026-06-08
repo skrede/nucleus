@@ -45,7 +45,7 @@ inline void declare_schema(nucleus::configuration_space_builder &builder)
     builder.register_element(
         nucleus::element("profile", anchor::keyspace("cluster/server")));
     builder.register_element(
-        nucleus::element("name", anchor::keyspace("cluster/server/profile")));
+        nucleus::unique_element("name", anchor::keyspace("cluster/server/profile")));
     builder.register_element(
         nucleus::element("message", anchor::keyspace("cluster/server/profile")));
     builder.register_element(

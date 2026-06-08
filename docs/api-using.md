@@ -206,6 +206,14 @@ value names which instance was selected, not a permanent path segment.
 Duplicate primary-key values within one parse stack are a loud error. Duplicate
 `unique` values across sibling instances are a loud error.
 
+Re-opening a named instance across an inheritance layer requires explicit consent:
+a derived document that wants to extend a base document's named instance must mark
+that instance with an `extend` disposition. Re-declaring a named instance in a
+derived layer without `extend` is rejected as a duplicate. This is deliberate — a
+plain overlay that silently re-opened a named instance across layers would let an
+unrelated downstream document mutate an upstream instance by name collision alone.
+The narrow/wide strengths are covered under [strain scope](#selection).
+
 ```cpp
 engine.register_element(nucleus::element("server", anchor::keyspace("cluster")));
 engine.register_element(nucleus::primary_key_element("name", anchor::keyspace("cluster/server")));

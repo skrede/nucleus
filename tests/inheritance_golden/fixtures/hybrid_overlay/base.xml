@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<cluster>
+    <server>
+        <logger log_level="info"/>
+        <profile name="demo">
+            <message>
+                <greeting>hello from the shared template</greeting>
+                <description>default description carried by the base template</description>
+            </message>
+        </profile>
+    </server>
+    <server name="primary">
+        <logger log_level="info"/>
+        <profile name="demo">
+            <message>
+                <greeting>hello from primary (hybrid_overlay layout)</greeting>
+            </message>
+        </profile>
+    </server>
+    <server name="secondary">
+        <logger log_level="warn"/>
+        <profile name="demo">
+            <message>
+                <greeting>hello from secondary (hybrid_overlay layout)</greeting>
+            </message>
+        </profile>
+    </server>
+</cluster>
