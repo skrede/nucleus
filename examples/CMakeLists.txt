@@ -29,6 +29,7 @@ nucleus_add_example(completion)
 nucleus_add_example(diagnostics)
 nucleus_add_example(registration_policy)
 nucleus_add_example(capability_gating)
+nucleus_add_example(emit_template)
 
 # The XML example layers an XML document under the command line, so it links the
 # XML source module. That module's header lives under the internal src/ tree (the

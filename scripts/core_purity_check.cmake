@@ -13,11 +13,12 @@ if(NOT DEFINED NUCLEUS_ROOT)
 endif()
 
 # Forbidden vocabulary. Case-insensitive substrings that must not appear in core:
-# format-specific (xml/pugi) and host-specific (vagus/node-vocabulary) symbols.
-# Kept in lockstep with the shell gate (scripts/core_purity_check.sh): both
-# forbid the bare substring "xml" so a stray mention anywhere in core trips the
-# gate, not only the "pugixml" spelling.
-set(forbidden "xml" "pugi" "vagus" "<vagus>" "<node>")
+# the parser DEPENDENCY (pugi/pugixml) and host-specific (vagus/node-vocabulary)
+# symbols. The core may NAME xml -- it projects a schema into an XML template string
+# (a pure, dependency-free string build) -- but must never COUPLE to the pugixml
+# library or carry host vocabulary. Kept in lockstep with the shell gate
+# (scripts/core_purity_check.sh).
+set(forbidden "pugi" "vagus" "<vagus>" "<node>")
 
 # Directories that are allowed to mention parser/host vocabulary because they ARE
 # the quarantined module: the xml source module (src/nucleus/xml/) now exists and

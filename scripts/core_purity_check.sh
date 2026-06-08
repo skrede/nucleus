@@ -11,9 +11,10 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Forbidden vocabulary: format-specific (xml/pugi) and host-specific (vagus,
-# node-vocabulary tags) symbols.
-pattern='pugi|xml|<vagus>|<node>|\bvagus\b'
+# Forbidden vocabulary: the parser DEPENDENCY (pugi/pugixml) and host-specific
+# (vagus, node-vocabulary tags) symbols. The core may NAME xml (it emits an XML
+# template string with no library dependency) but must never couple to pugixml.
+pattern='pugi|<vagus>|<node>|\bvagus\b'
 
 # The quarantined module that is ALLOWED to mention parser/host vocabulary
 # because it IS the wrapper (does not exist yet; excluded so the gate stays
