@@ -162,11 +162,11 @@ TEST_CASE("typed x inheritance chain: bad value in winning layer fails resolve",
 TEST_CASE("typed x pruned strain: selected strain resolves; bad value in pruned strain does not fail",
           "[typed][strain][pruned]")
 {
-    // Document with two named strains: yin (port=80) and yang (port=notanumber).
+    // Document with two named strains: primary (port=80) and secondary (port=notanumber).
     const char *doc = R"(
         <cluster>
-            <server name="yin"><port>80</port></server>
-            <server name="yang"><port>notanumber</port></server>
+            <server name="primary"><port>80</port></server>
+            <server name="secondary"><port>notanumber</port></server>
         </cluster>)";
 
     SECTION("selecting the good strain succeeds")
@@ -178,7 +178,7 @@ TEST_CASE("typed x pruned strain: selected strain resolves; bad value in pruned 
         auto src = xml_of(doc);
         nucleus::source_stack_options opts;
         add_layer(opts, *src, 10, "doc");
-        opts.selection = "yin";
+        opts.selection = "primary";
 
         auto loaded = nucleus::load_configuration(space, opts);
         REQUIRE(loaded);
@@ -197,7 +197,7 @@ TEST_CASE("typed x pruned strain: selected strain resolves; bad value in pruned 
         auto src = xml_of(doc);
         nucleus::source_stack_options opts;
         add_layer(opts, *src, 10, "doc");
-        opts.selection = "yang";
+        opts.selection = "secondary";
 
         auto loaded = nucleus::load_configuration(space, opts);
         REQUIRE(!loaded);

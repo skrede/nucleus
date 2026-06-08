@@ -151,7 +151,7 @@ public:
                 // Use the canonical (key-stripped) path to classify the entry as
                 // repeated. A repeated leaf under a keyed container arrives from
                 // a document source with a transient instance segment inserted
-                // (e.g. cluster/server/yin/tags rather than cluster/server/tags);
+                // (e.g. cluster/server/primary/tags rather than cluster/server/tags);
                 // the canonical form matches the declared repeated path.
                 const std::string canonical_path = m_schema.canonical_text(path.value());
                 if(repeated_paths.count(canonical_path))

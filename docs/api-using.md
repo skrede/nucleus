@@ -200,7 +200,7 @@ compose in document order and are inherited by all named instances. Named
 instances compose on top of the template.
 
 Resolution always strips the transient key segment: the resolved keyspace
-contains `cluster/server/port`, never `cluster/server/yin/port`. The primary-key
+contains `cluster/server/port`, never `cluster/server/primary/port`. The primary-key
 value names which instance was selected, not a permanent path segment.
 
 Duplicate primary-key values within one parse stack are a loud error. Duplicate
@@ -220,7 +220,7 @@ engine.register_element(nucleus::unique_element("serial", anchor::keyspace("clus
 Select a specific strain before resolve:
 
 ```cpp
-engine.select("yin");  // keep only the instance whose name == "yin"
+engine.select("primary");  // keep only the instance whose name == "primary"
 ```
 
 Rules:

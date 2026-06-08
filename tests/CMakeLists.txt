@@ -178,24 +178,24 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     )
     add_test(NAME typed_shape_test COMMAND typed_shape_test)
 
-    # Vagus parity harness: drives real vagus-shaped fixture documents through the
-    # public load_configuration() surface and diffs the serialized resolved keyspace
-    # against pre-committed goldens hand-authored from nucleus's own semantics. Cases
-    # are discovered by directory scan under the fixture dir, so new topology fixtures
-    # are added as data files with no source/CMake edit. Runs in the default ctest set
-    # (this XML-module block), making it the merge-blocking parity gate.
-    add_executable(vagus_parity_test vagus_parity/vagus_parity_test.cpp)
-    nucleus_enable_coverage(vagus_parity_test)
-    target_link_libraries(vagus_parity_test
+    # Inheritance golden harness: drives real fixture documents through the public
+    # load_configuration() surface and diffs the serialized resolved keyspace against
+    # pre-committed goldens derived from nucleus's own semantics. Cases are discovered
+    # by directory scan under the fixture dir, so new topology fixtures are added as
+    # data files with no source/CMake edit. Runs in the default ctest set (this
+    # XML-module block), making it the merge-blocking resolution gate.
+    add_executable(inheritance_golden_test inheritance_golden/inheritance_golden_test.cpp)
+    nucleus_enable_coverage(inheritance_golden_test)
+    target_link_libraries(inheritance_golden_test
         PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
-    target_include_directories(vagus_parity_test PRIVATE
+    target_include_directories(inheritance_golden_test PRIVATE
         ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_SOURCE_DIR}/src
-        ${CMAKE_CURRENT_SOURCE_DIR}/vagus_parity
+        ${CMAKE_CURRENT_SOURCE_DIR}/inheritance_golden
     )
-    target_compile_definitions(vagus_parity_test PRIVATE
-        NUCLEUS_PARITY_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/vagus_parity/fixtures")
-    add_test(NAME vagus_parity_test COMMAND vagus_parity_test)
+    target_compile_definitions(inheritance_golden_test PRIVATE
+        NUCLEUS_GOLDEN_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/inheritance_golden/fixtures")
+    add_test(NAME inheritance_golden_test COMMAND inheritance_golden_test)
 endif()
 
 # ---------------------------------------------------------------------------

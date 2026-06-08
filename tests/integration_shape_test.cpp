@@ -89,14 +89,14 @@ nucleus::load_result load_chain(const nucleus::configuration_space &space,
 const char *ROOT_DOC = R"(
     <cluster>
         <server><port>9090</port></server>
-        <server name="yin" serial="SN001"><port>8080</port></server>
+        <server name="primary" serial="SN001"><port>8080</port></server>
     </cluster>)";
 
 const char *MID_DOC = R"(
     <cluster inherit="root.xml">
         <server><protocol>tcp</protocol></server>
-        <server name="yin" extend="wide"><port>443</port></server>
-        <server name="yang" serial="SN002"><port>22</port></server>
+        <server name="primary" extend="wide"><port>443</port></server>
+        <server name="secondary" serial="SN002"><port>22</port></server>
     </cluster>)";
 
 const char *LEAF_DOC = R"(
@@ -123,17 +123,17 @@ auto make_main_factory()
 
 const char *ROOT_DOC_TC4 = R"(
     <cluster>
-        <server name="yin"><port>8080</port></server>
+        <server name="primary"><port>8080</port></server>
     </cluster>)";
 
 const char *MID_DOC_TC4 = R"(
     <cluster inherit="root_tc4.xml">
-        <server name="yin" extend="narrow"><protocol>tcp</protocol></server>
+        <server name="primary" extend="narrow"><protocol>tcp</protocol></server>
     </cluster>)";
 
 const char *YANG_DOC_TC4 = R"(
     <cluster inherit="mid_tc4.xml">
-        <server name="yang" serial="SN002"><port>22</port></server>
+        <server name="secondary" serial="SN002"><port>22</port></server>
     </cluster>)";
 
 auto make_tc4_factory()
@@ -153,16 +153,16 @@ auto make_tc4_factory()
 }
 
 // ---------------------------------------------------------------------------
-// TC-1: select yin, full 3-doc chain; verify unified keyspace, no pkey segments.
+// TC-1: select primary, full 3-doc chain; verify unified keyspace, no pkey segments.
 // ---------------------------------------------------------------------------
-TEST_CASE("integration: select yin resolves unified keyspace with template composition",
+TEST_CASE("integration: select primary resolves unified keyspace with template composition",
           "[integration][keyed]")
 {
     nucleus::configuration_space_builder engine;
     declare_cluster_with_unique(engine);
     nucleus::configuration_space space = engine.build();
 
-    auto loaded = load_chain(space, {"leaf.xml"}, make_main_factory(), "yin");
+    auto loaded = load_chain(space, {"leaf.xml"}, make_main_factory(), "primary");
     REQUIRE(loaded);
 
     const nucleus::configuration &config = loaded.value();
@@ -173,10 +173,10 @@ TEST_CASE("integration: select yin resolves unified keyspace with template compo
     // Anonymous template from mid (protocol="tcp") survives into the unified keyspace.
     REQUIRE(config.get("cluster/server/protocol") == "tcp");
 
-    // Primary-key segment "yin" must never appear as a path segment.
-    REQUIRE_FALSE(config.contains("cluster/server/yin/port"));
+    // Primary-key segment "primary" must never appear as a path segment.
+    REQUIRE_FALSE(config.contains("cluster/server/primary/port"));
 
-    // Serial "SN001" on yin is relayed to the unified path cluster/server/serial.
+    // Serial "SN001" on primary is relayed to the unified path cluster/server/serial.
     REQUIRE(config.get("cluster/server/serial") == "SN001");
 }
 
@@ -189,7 +189,7 @@ TEST_CASE("integration: auto-resolve single named strain succeeds without select
     const char *base_doc = R"(
         <cluster>
             <server><port>9090</port></server>
-            <server name="yin"><port>8080</port></server>
+            <server name="primary"><port>8080</port></server>
         </cluster>)";
 
     const char *derived_doc = R"(
@@ -213,7 +213,7 @@ TEST_CASE("integration: auto-resolve single named strain succeeds without select
     auto loaded = load_chain(space, {"derived2.xml"}, factory);
     REQUIRE(loaded);
 
-    // yin's port survives; anonymous template port (9090) is the fallback.
+    // primary's port survives; anonymous template port (9090) is the fallback.
     REQUIRE(loaded.value().get("cluster/server/port") == "8080");
 }
 
@@ -225,12 +225,12 @@ TEST_CASE("integration: file_level scope policy excludes derived-layer entries",
 {
     const char *root3_doc = R"(
         <cluster>
-            <server name="yin"><port>8080</port></server>
+            <server name="primary"><port>8080</port></server>
         </cluster>)";
 
     const char *derived3_doc = R"(
         <cluster inherit="root3.xml">
-            <server name="yin" extend="narrow"><protocol>tcp</protocol></server>
+            <server name="primary" extend="narrow"><protocol>tcp</protocol></server>
         </cluster>)";
 
     auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
@@ -246,7 +246,7 @@ TEST_CASE("integration: file_level scope policy excludes derived-layer entries",
     declare_cluster_with_unique(engine);
     nucleus::configuration_space space = engine.build();
 
-    auto loaded = load_chain(space, {"derived3.xml"}, factory, "yin",
+    auto loaded = load_chain(space, {"derived3.xml"}, factory, "primary",
                              strain_scope_policy::file_level);
     REQUIRE(loaded);
 
@@ -261,39 +261,39 @@ TEST_CASE("integration: file_level scope policy excludes derived-layer entries",
 // TC-4: scope-policy contrast: container_open_until_next_strain vs.
 //        space_open_container_closed, same fileset, opposite outcomes.
 // ---------------------------------------------------------------------------
-TEST_CASE("integration: scope-policy contrast for yin's derived entry",
+TEST_CASE("integration: scope-policy contrast for primary's derived entry",
           "[integration][keyed]")
 {
-    SECTION("container_open_until_next_strain admits yin's extend up to Ls")
+    SECTION("container_open_until_next_strain admits primary's extend up to Ls")
     {
         nucleus::configuration_space_builder engine;
         declare_cluster_with_unique(engine);
         nucleus::configuration_space space = engine.build();
 
-        auto loaded = load_chain(space, {"yang_tc4.xml"}, make_tc4_factory(), "yin",
+        auto loaded = load_chain(space, {"yang_tc4.xml"}, make_tc4_factory(), "primary",
                                  strain_scope_policy::container_open_until_next_strain);
         REQUIRE(loaded);
 
-        // yin's protocol rank (MID) is in [Ld, Ls) -- admitted.
+        // primary's protocol rank (MID) is in [Ld, Ls) -- admitted.
         REQUIRE(loaded.value().contains("cluster/server/protocol"));
 
         REQUIRE(loaded.value().get("cluster/server/port") == "8080");
     }
 
-    SECTION("space_open_container_closed excludes yin's derived entry")
+    SECTION("space_open_container_closed excludes primary's derived entry")
     {
         nucleus::configuration_space_builder engine;
         declare_cluster_with_unique(engine);
         nucleus::configuration_space space = engine.build();
 
-        auto loaded = load_chain(space, {"yang_tc4.xml"}, make_tc4_factory(), "yin",
+        auto loaded = load_chain(space, {"yang_tc4.xml"}, make_tc4_factory(), "primary",
                                  strain_scope_policy::space_open_container_closed);
         REQUIRE(loaded);
 
-        // yin's protocol rank (MID) > Ld (ROOT) -- excluded.
+        // primary's protocol rank (MID) > Ld (ROOT) -- excluded.
         REQUIRE_FALSE(loaded.value().contains("cluster/server/protocol"));
 
-        // The exclusion is surgical: yin's defining-layer entry still resolves.
+        // The exclusion is surgical: primary's defining-layer entry still resolves.
         REQUIRE(loaded.value().get("cluster/server/port") == "8080");
     }
 }
@@ -306,7 +306,7 @@ TEST_CASE("integration: opt-out terminates the chain by declaration",
 {
     const char *mid5_doc = R"(
         <cluster inherit="none">
-            <server name="yin"><port>7070</port></server>
+            <server name="primary"><port>7070</port></server>
         </cluster>)";
 
     const char *leaf5_doc = R"(
@@ -326,7 +326,7 @@ TEST_CASE("integration: opt-out terminates the chain by declaration",
     declare_cluster_with_unique(engine);
     nucleus::configuration_space space = engine.build();
 
-    auto loaded = load_chain(space, {"leaf5.xml"}, factory, "yin");
+    auto loaded = load_chain(space, {"leaf5.xml"}, factory, "primary");
     REQUIRE(loaded);
 
     // The chain ends at mid5 by explicit opt-out; mid's value resolves.
@@ -341,12 +341,12 @@ TEST_CASE("integration: multiple strains with no selection is a loud error",
 {
     const char *base6_doc = R"(
         <cluster>
-            <server name="yin"><port>8080</port></server>
+            <server name="primary"><port>8080</port></server>
         </cluster>)";
 
     const char *derived6_doc = R"(
         <cluster inherit="base6.xml">
-            <server name="yang"><port>22</port></server>
+            <server name="secondary"><port>22</port></server>
         </cluster>)";
 
     auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
@@ -376,12 +376,12 @@ TEST_CASE("integration: select with unknown key value is a loud error",
 {
     const char *base7_doc = R"(
         <cluster>
-            <server name="yin"><port>8080</port></server>
+            <server name="primary"><port>8080</port></server>
         </cluster>)";
 
     const char *derived7_doc = R"(
         <cluster inherit="base7.xml">
-            <server name="yang"><port>22</port></server>
+            <server name="secondary"><port>22</port></server>
         </cluster>)";
 
     auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
@@ -410,18 +410,18 @@ TEST_CASE("integration: duplicate unique field value across strains is a loud er
 {
     const char *doc8 = R"(
         <cluster>
-            <server name="yin" serial="SN001"><port>8080</port></server>
-            <server name="yang" serial="SN001"><port>22</port></server>
+            <server name="primary" serial="SN001"><port>8080</port></server>
+            <server name="secondary" serial="SN001"><port>22</port></server>
         </cluster>)";
 
     nucleus::configuration_space_builder engine;
     declare_cluster_with_unique(engine);
     nucleus::configuration_space space = engine.build();
 
-    // Select "yin" so the unique check runs before the multiple-strains-no-selection
+    // Select "primary" so the unique check runs before the multiple-strains-no-selection
     // guard, which would fire first otherwise.
     auto loaded = load_chain(space, {"doc8.xml"},
-                             [&](const std::string &) { return xml_of(doc8); }, "yin");
+                             [&](const std::string &) { return xml_of(doc8); }, "primary");
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().find("unique field") != std::string::npos);
     REQUIRE(loaded.error().find("SN001") != std::string::npos);

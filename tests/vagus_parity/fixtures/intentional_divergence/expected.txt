@@ -1,3 +1,0 @@
-vagus/node/configuration/message/greeting = hola [path:source.xml]
-vagus/node/configuration/name = demo [path:source.xml]
-vagus/node/logger/log_level = info [path:source.xml]

@@ -1,11 +1,11 @@
 <?xml version="1.0"?>
-<vagus>
-    <node name="solo">
+<cluster>
+    <server name="solo">
         <logger log_level="info"/>
-        <configuration name="demo">
+        <profile name="demo">
             <message>
                 <greeting>hello</greeting>
             </message>
-        </configuration>
-    </node>
-</vagus>
+        </profile>
+    </server>
+</cluster>

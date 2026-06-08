@@ -1,3 +1,0 @@
-# single_topology: one XML lists every node; a selection picks the active block.
-input=vagus.xml
-selection=yin

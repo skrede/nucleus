@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<cluster>
+    <server name="primary">
+        <logger log_level="info"/>
+        <profile name="demo">
+            <message>
+                <greeting>hello from primary (per_node_files layout)</greeting>
+                <description>each binary loads its own standalone XML; no shared base</description>
+            </message>
+        </profile>
+    </server>
+</cluster>

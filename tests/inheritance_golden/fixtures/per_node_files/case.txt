@@ -1,0 +1,3 @@
+# per_node_files: each server has its own standalone file; the single server resolves
+# without a selection.
+input=primary.xml

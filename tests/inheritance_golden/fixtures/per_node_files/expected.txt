@@ -1,0 +1,4 @@
+cluster/server/logger/log_level = info [path:primary.xml]
+cluster/server/profile/message/description = each binary loads its own standalone XML; no shared base [path:primary.xml]
+cluster/server/profile/message/greeting = hello from primary (per_node_files layout) [path:primary.xml]
+cluster/server/profile/name = demo [path:primary.xml]

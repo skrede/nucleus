@@ -1,4 +1,0 @@
-vagus/node/configuration/message/description = one XML lists every node; each binary picks its block via --vagus-node-name [path:vagus.xml]
-vagus/node/configuration/message/greeting = hello from yin (single_topology layout) [path:vagus.xml]
-vagus/node/configuration/name = demo [path:vagus.xml]
-vagus/node/logger/log_level = info [path:vagus.xml]

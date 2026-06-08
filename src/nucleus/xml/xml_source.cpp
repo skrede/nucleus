@@ -69,9 +69,9 @@ std::string_view keyed_value(const pugi::xml_node &node, const std::string &key_
 //
 // `proj` is the schema-derived projection: when a child element's path names a
 // keyed container, its instances are placed under a transient path segment equal
-// to the key value (so `<node name="yin"/>` and `<node name="yang"/>` become
-// distinct `.../node/yin/...` and `.../node/yang/...` subtrees instead of one
-// overwritten `.../node/...`). The key field itself is consumed -- suppressed via
+// to the key value (so `<server name="primary"/>` and `<server name="secondary"/>` become
+// distinct `.../server/primary/...` and `.../server/secondary/...` subtrees instead of one
+// overwritten `.../server/...`). The key field itself is consumed -- suppressed via
 // `skip` at the instance's own level -- since its value already names the segment.
 //
 // Grammar attributes handled here:

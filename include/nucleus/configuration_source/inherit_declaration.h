@@ -24,7 +24,7 @@ enum class extend_strength { narrow, wide };
 struct extend_disposition
 {
     std::string container_path; // canonical container path, e.g. "cluster/server"
-    std::string key_value;      // the instance's primary-key value, e.g. "yin"
+    std::string key_value;      // the instance's primary-key value, e.g. "primary"
     extend_strength strength;
 };
 

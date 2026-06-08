@@ -1,0 +1,3 @@
+cluster/server/logger/log_level = info [path:source.xml]
+cluster/server/profile/message/greeting = hola [path:source.xml]
+cluster/server/profile/name = demo [path:source.xml]

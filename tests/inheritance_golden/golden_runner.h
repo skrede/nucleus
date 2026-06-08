@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_NUCLEUS_TESTS_VAGUS_PARITY_PARITY_RUNNER_H
-#define HPP_GUARD_NUCLEUS_TESTS_VAGUS_PARITY_PARITY_RUNNER_H
+#ifndef HPP_GUARD_NUCLEUS_TESTS_INHERITANCE_GOLDEN_GOLDEN_RUNNER_H
+#define HPP_GUARD_NUCLEUS_TESTS_INHERITANCE_GOLDEN_GOLDEN_RUNNER_H
 
 #include "nucleus/configuration_space.h"
 
@@ -23,35 +23,35 @@
 // A thin, format-aware adapter that drives real fixture documents through the
 // public load_configuration() surface and renders the resolved keyspace to a
 // canonical text form an exact golden diff can gate on. It owns no host
-// vocabulary: the shape it declares is the generic vagus document model, and the
-// only third-party touch is the already-wrapped XML source.
-namespace nucleus::parity {
+// vocabulary: the shape it declares is a generic hierarchical document model, and
+// the only third-party touch is the already-wrapped XML source.
+namespace nucleus::golden {
 
-// Declares the vagus-shaped schema once: vagus(root) / node keyed by name /
-// logger@log_level / configuration / message / {greeting, description}. A
-// configuration space carries exactly one primary key, so `node/name` is THE
-// selector and `configuration/name` is a plain leaf. Elements are registered
-// parent-first so each anchor references an already-declared node.
-inline void declare_vagus_schema(nucleus::configuration_space_builder &builder)
+// Declares the schema once: cluster(root) / server keyed by name /
+// logger@log_level / profile / message / {greeting, description}. A configuration
+// space carries exactly one primary key, so `server/name` is THE selector and
+// `profile/name` is a plain leaf. Elements are registered parent-first so each
+// anchor references an already-declared node.
+inline void declare_schema(nucleus::configuration_space_builder &builder)
 {
     using nucleus::anchor;
-    builder.register_element(nucleus::element("vagus", anchor::root()));
-    builder.register_element(nucleus::element("node", anchor::keyspace("vagus")));
+    builder.register_element(nucleus::element("cluster", anchor::root()));
+    builder.register_element(nucleus::element("server", anchor::keyspace("cluster")));
     builder.register_element(
-        nucleus::primary_key_element("name", anchor::keyspace("vagus/node")));
-    builder.register_element(nucleus::element("logger", anchor::keyspace("vagus/node")));
+        nucleus::primary_key_element("name", anchor::keyspace("cluster/server")));
+    builder.register_element(nucleus::element("logger", anchor::keyspace("cluster/server")));
     builder.register_element(
-        nucleus::element("log_level", anchor::keyspace("vagus/node/logger")));
+        nucleus::element("log_level", anchor::keyspace("cluster/server/logger")));
     builder.register_element(
-        nucleus::element("configuration", anchor::keyspace("vagus/node")));
+        nucleus::element("profile", anchor::keyspace("cluster/server")));
     builder.register_element(
-        nucleus::element("name", anchor::keyspace("vagus/node/configuration")));
+        nucleus::element("name", anchor::keyspace("cluster/server/profile")));
     builder.register_element(
-        nucleus::element("message", anchor::keyspace("vagus/node/configuration")));
+        nucleus::element("message", anchor::keyspace("cluster/server/profile")));
     builder.register_element(
-        nucleus::element("greeting", anchor::keyspace("vagus/node/configuration/message")));
+        nucleus::element("greeting", anchor::keyspace("cluster/server/profile/message")));
     builder.register_element(
-        nucleus::element("description", anchor::keyspace("vagus/node/configuration/message")));
+        nucleus::element("description", anchor::keyspace("cluster/server/profile/message")));
 }
 
 // The filename portion of a (possibly absolute) path, so the factory can dispatch

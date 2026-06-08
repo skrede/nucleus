@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<cluster>
+    <server name="primary">
+        <logger log_level="info"/>
+        <profile name="demo">
+            <message>
+                <greeting>hello from primary (single_topology layout)</greeting>
+                <description>one XML lists every server; each binary picks its block via --server-name</description>
+            </message>
+        </profile>
+    </server>
+    <server name="secondary">
+        <logger log_level="info"/>
+        <profile name="demo">
+            <message>
+                <greeting>hello from secondary (single_topology layout)</greeting>
+                <description>one XML lists every server; each binary picks its block via --server-name</description>
+            </message>
+        </profile>
+    </server>
+</cluster>

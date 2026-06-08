@@ -1,4 +1,4 @@
-#include "parity_runner.h"
+#include "golden_runner.h"
 
 #include "nucleus/configuration_space.h"
 
@@ -12,7 +12,7 @@
 #include <optional>
 #include <filesystem>
 
-// Data-driven parity harness: discovers every fixture case directory under the
+// Data-driven golden harness: discovers every fixture case directory under the
 // compile-time fixture root, drives its document stack through load_configuration,
 // and asserts the serialized resolved keyspace matches the pre-committed golden
 // exactly. One fixture is a deliberate divergence whose case.txt sets
@@ -20,15 +20,15 @@
 // mismatch, proving detection works on a real diff. This ctest target runs in the
 // default CI set (NUCLEUS_BUILD_SOURCE_XML=ON), so any divergence blocks merge.
 
-#ifndef NUCLEUS_PARITY_FIXTURE_DIR
-#error "NUCLEUS_PARITY_FIXTURE_DIR must be defined by the build"
+#ifndef NUCLEUS_GOLDEN_FIXTURE_DIR
+#error "NUCLEUS_GOLDEN_FIXTURE_DIR must be defined by the build"
 #endif
 
 namespace {
 
 // A parsed case descriptor: the ordered document_paths stack, an optional strain
 // selection, and whether this case is a negative (designed-to-diverge) case.
-struct parity_case
+struct fixture_case
 {
     std::vector<std::string> inputs;
     std::optional<std::string> selection;
@@ -46,9 +46,9 @@ std::string read_file(const std::filesystem::path &path)
 // Parses a case.txt: `input=<file>` lines (order preserved -> the precedence
 // stack), an optional `selection=<value>` line, and an optional
 // `expect_divergence=true` line. Blank lines and `#` comments are ignored.
-parity_case parse_case(const std::string &text)
+fixture_case parse_case(const std::string &text)
 {
-    parity_case parsed;
+    fixture_case parsed;
     std::istringstream in(text);
     std::string line;
     while(std::getline(in, line))
@@ -75,9 +75,9 @@ parity_case parse_case(const std::string &text)
 
 }
 
-TEST_CASE("vagus parity fixtures match nucleus-derived goldens", "[parity]")
+TEST_CASE("inheritance golden fixtures match nucleus-derived resolution", "[golden]")
 {
-    const std::filesystem::path fixture_root(NUCLEUS_PARITY_FIXTURE_DIR);
+    const std::filesystem::path fixture_root(NUCLEUS_GOLDEN_FIXTURE_DIR);
     REQUIRE(std::filesystem::is_directory(fixture_root));
 
     // Discover case directories deterministically (sorted) so the run is stable.
@@ -97,26 +97,26 @@ TEST_CASE("vagus parity fixtures match nucleus-derived goldens", "[parity]")
     {
         DYNAMIC_SECTION("case: " << name)
         {
-            const parity_case spec = parse_case(read_file(dir / "case.txt"));
+            const fixture_case spec = parse_case(read_file(dir / "case.txt"));
             REQUIRE_FALSE(spec.inputs.empty());
 
             nucleus::configuration_space_builder builder;
-            nucleus::parity::declare_vagus_schema(builder);
+            nucleus::golden::declare_schema(builder);
             const nucleus::configuration_space space = builder.build();
 
             nucleus::source_stack_options opts;
             opts.document_paths = spec.inputs;
-            opts.make_document = nucleus::parity::file_factory(dir.string());
+            opts.make_document = nucleus::golden::file_factory(dir.string());
             opts.selection = spec.selection;
 
             nucleus::load_result loaded = nucleus::load_configuration(space, opts);
             INFO("load error (if any): " << (loaded ? std::string("<none>") : loaded.error()));
             REQUIRE(loaded);
 
-            const std::string actual = nucleus::parity::serialize(loaded.value());
+            const std::string actual = nucleus::golden::serialize(loaded.value());
             const std::string expected = read_file(dir / "expected.txt");
             const std::optional<std::string> mismatch =
-                nucleus::parity::diff(expected, actual);
+                nucleus::golden::diff(expected, actual);
 
             if(spec.expect_divergence)
             {

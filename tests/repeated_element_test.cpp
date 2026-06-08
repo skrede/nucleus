@@ -233,13 +233,13 @@ TEST_CASE("repeated leaf under keyed container with selection resolves to collec
 
     const char *doc = R"(
         <cluster>
-            <server name="yin"><tags>alpha</tags><tags>beta</tags></server>
+            <server name="primary"><tags>alpha</tags><tags>beta</tags></server>
         </cluster>)";
 
     auto src = xml_of(doc);
     nucleus::source_stack_options opts;
     add_layer(opts, *src, 10, "doc");
-    opts.selection = "yin";
+    opts.selection = "primary";
 
     auto loaded = nucleus::load_configuration(space, opts);
     REQUIRE(loaded);
@@ -355,14 +355,14 @@ TEST_CASE("relay_strain: higher-rank keyed collection wins over lower-rank flat 
 
     const char *doc = R"(
         <cluster>
-            <server name="yin"><tags>alpha</tags><tags>beta</tags></server>
+            <server name="primary"><tags>alpha</tags><tags>beta</tags></server>
         </cluster>)";
 
     auto src = xml_of(doc);
     nucleus::source_stack_options opts;
     add_layer(opts, flat, 5, "flat-low");
     add_layer(opts, *src, 10, "xml-high");
-    opts.selection = "yin";
+    opts.selection = "primary";
 
     auto loaded = nucleus::load_configuration(space, opts);
     REQUIRE(loaded);
@@ -383,7 +383,7 @@ TEST_CASE("relay_strain: higher-rank flat override wins over lower-rank keyed co
 
     const char *doc = R"(
         <cluster>
-            <server name="yin"><tags>alpha</tags><tags>beta</tags></server>
+            <server name="primary"><tags>alpha</tags><tags>beta</tags></server>
         </cluster>)";
 
     nucleus::env_source flat;
@@ -393,7 +393,7 @@ TEST_CASE("relay_strain: higher-rank flat override wins over lower-rank keyed co
     nucleus::source_stack_options opts;
     add_layer(opts, *src, 10, "xml-low");
     add_layer(opts, flat, 20, "flat-high");
-    opts.selection = "yin";
+    opts.selection = "primary";
 
     auto loaded = nucleus::load_configuration(space, opts);
     REQUIRE(loaded);
@@ -413,16 +413,16 @@ TEST_CASE("collection scope-policy exclusion and admission",
         nucleus::configuration_space space = engine.build();
 
         nucleus::env_source L0;
-        L0.set("cluster/server/yin/name", "yin")
-          .set("cluster/server/yin/tags", "base");
+        L0.set("cluster/server/primary/name", "primary")
+          .set("cluster/server/primary/tags", "base");
 
         nucleus::env_source Lderived;
-        Lderived.set("cluster/server/yin/tags", "derived");
+        Lderived.set("cluster/server/primary/tags", "derived");
 
         nucleus::source_stack_options opts;
         add_layer(opts, L0, 10, "L0");
         add_layer(opts, Lderived, 20, "Lderived");
-        opts.selection = "yin";
+        opts.selection = "primary";
         // Default policy is space_open_container_closed.
 
         auto loaded = nucleus::load_configuration(space, opts);
@@ -440,16 +440,16 @@ TEST_CASE("collection scope-policy exclusion and admission",
         nucleus::configuration_space space = engine.build();
 
         nucleus::env_source L0;
-        L0.set("cluster/server/yin/name", "yin")
-          .set("cluster/server/yin/tags", "base");
+        L0.set("cluster/server/primary/name", "primary")
+          .set("cluster/server/primary/tags", "base");
 
         nucleus::env_source Lderived;
-        Lderived.set("cluster/server/yin/tags", "derived");
+        Lderived.set("cluster/server/primary/tags", "derived");
 
         nucleus::source_stack_options opts;
         add_layer(opts, L0, 10, "L0");
         add_layer(opts, Lderived, 20, "Lderived");
-        opts.selection = "yin";
+        opts.selection = "primary";
         opts.scope = nucleus::strain_scope_policy::container_open_until_next_strain;
 
         auto loaded = nucleus::load_configuration(space, opts);
