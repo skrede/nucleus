@@ -767,3 +767,155 @@ TEST_CASE("unknown extend value is a loud parse error", "[chain]")
     REQUIRE(loaded.error().find("extend") != std::string::npos);
     REQUIRE(loaded.error().find("diagonal") != std::string::npos);
 }
+
+// Schema for the guard-axis cases below: anonymous (no primary key) so multi-file
+// and multi-route chains compose freely by rank, isolating the depth/cycle/
+// duplicate-canonical/re-entry guards from the keyed-instance re-open rules.
+namespace {
+
+void declare_anon_cluster(nucleus::configuration_space_builder &engine)
+{
+    engine.register_element(nucleus::element("cluster", anchor::root()));
+    engine.register_element(nucleus::element("server", anchor::keyspace("cluster")));
+    engine.register_element(nucleus::element("port", anchor::keyspace("cluster/server")));
+    engine.register_element(
+        nucleus::element("protocol", anchor::keyspace("cluster/server")));
+}
+
+}
+
+// ---------------------------------------------------------------------------
+// 20. Depth-cap boundary: a chain EXACTLY at depth_cap loads; depth_cap+1 fails.
+// ---------------------------------------------------------------------------
+TEST_CASE("depth-cap boundary: exactly at the cap loads, one beyond fails", "[chain]")
+{
+    // a -> b -> c is a three-deep walk (depth 3). Anonymous content composes,
+    // so the only thing under test is the depth guard itself.
+    const char *a_doc = R"(<cluster inherit="b.xml"><server><port>1</port></server></cluster>)";
+    const char *b_doc = R"(<cluster inherit="c.xml"><server><port>2</port></server></cluster>)";
+    const char *c_doc = R"(<cluster><server><port>3</port></server></cluster>)";
+
+    nucleus::configuration_space_builder engine;
+    declare_anon_cluster(engine);
+    nucleus::configuration_space space = engine.build();
+
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+        const std::string name = filename_of(path);
+        if(name == "a.xml") return xml_of(a_doc);
+        if(name == "b.xml") return xml_of(b_doc);
+        if(name == "c.xml") return xml_of(c_doc);
+        return nullptr;
+    };
+
+    SECTION("exactly at the cap loads")
+    {
+        nucleus::inherit_policy policy;
+        policy.depth_cap = 3;
+        auto loaded = load_chain(space, {"a.xml"}, factory, std::nullopt, std::move(policy));
+        REQUIRE(loaded);
+        // a is the requested file (highest rank); its port wins the contest.
+        REQUIRE(loaded.value().get("cluster/server/port") == "1");
+    }
+
+    SECTION("one beyond the cap fails naming depth and the limit")
+    {
+        nucleus::inherit_policy policy;
+        policy.depth_cap = 2;
+        auto loaded = load_chain(space, {"a.xml"}, factory, std::nullopt, std::move(policy));
+        REQUIRE_FALSE(loaded);
+        REQUIRE(loaded.error().find("depth") != std::string::npos);
+        REQUIRE(loaded.error().find("2") != std::string::npos);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 21. Three-file cycle (a -> b -> c -> a) fails loudly naming a path on the cycle.
+// ---------------------------------------------------------------------------
+TEST_CASE("three-file cycle fails loudly naming a path on the cycle", "[chain]")
+{
+    const char *a_doc = R"(<cluster inherit="b.xml"><server><port>1</port></server></cluster>)";
+    const char *b_doc = R"(<cluster inherit="c.xml"><server><port>2</port></server></cluster>)";
+    const char *c_doc = R"(<cluster inherit="a.xml"><server><port>3</port></server></cluster>)";
+
+    nucleus::configuration_space_builder engine;
+    declare_anon_cluster(engine);
+    nucleus::configuration_space space = engine.build();
+
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+        const std::string name = filename_of(path);
+        if(name == "a.xml") return xml_of(a_doc);
+        if(name == "b.xml") return xml_of(b_doc);
+        if(name == "c.xml") return xml_of(c_doc);
+        return nullptr;
+    };
+
+    auto loaded = load_chain(space, {"a.xml"}, factory);
+    REQUIRE_FALSE(loaded);
+    REQUIRE(loaded.error().find("cycle") != std::string::npos);
+    // The reported path names a file on the cycle (a.xml is re-entered).
+    REQUIRE(loaded.error().find("a.xml") != std::string::npos);
+}
+
+// ---------------------------------------------------------------------------
+// 22. Duplicate-canonical path: the SAME file reached via two routes resolves
+//     deterministically (NOT a cycle error). The walker releases a path from the
+//     visited set on return, so requesting base directly AND pulling it through a
+//     derived file's inherit= is a duplicate pull, not a cycle.
+// ---------------------------------------------------------------------------
+TEST_CASE("duplicate-canonical path reached two ways resolves deterministically",
+          "[chain]")
+{
+    const char *base_doc = R"(<cluster><server><port>80</port></server></cluster>)";
+    const char *derived_doc =
+        R"(<cluster inherit="base.xml"><server><protocol>tcp</protocol></server></cluster>)";
+
+    nucleus::configuration_space_builder engine;
+    declare_anon_cluster(engine);
+    nucleus::configuration_space space = engine.build();
+
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+        const std::string name = filename_of(path);
+        if(name == "base.xml") return xml_of(base_doc);
+        if(name == "derived.xml") return xml_of(derived_doc);
+        return nullptr;
+    };
+
+    // Request base directly AND derived (which inherits base): base is canonically
+    // pulled twice via different routes. This must NOT be flagged as a cycle.
+    auto loaded = load_chain(space, {"base.xml", "derived.xml"}, factory);
+    REQUIRE(loaded);
+    // Deterministic composition: base supplies port, derived supplies protocol.
+    REQUIRE(loaded.value().get("cluster/server/port") == "80");
+    REQUIRE(loaded.value().get("cluster/server/protocol") == "tcp");
+}
+
+// ---------------------------------------------------------------------------
+// 23. Function-chain re-entry: a second independent requested path re-enters the
+//     walk; the visited set is released between top-level walks (RAII path_guard),
+//     so the second path is NOT falsely flagged as a cycle.
+// ---------------------------------------------------------------------------
+TEST_CASE("independent second requested path is not falsely flagged as a cycle",
+          "[chain]")
+{
+    const char *first_doc = R"(<cluster><server><port>80</port></server></cluster>)";
+    const char *second_doc = R"(<cluster><server><protocol>tcp</protocol></server></cluster>)";
+
+    nucleus::configuration_space_builder engine;
+    declare_anon_cluster(engine);
+    nucleus::configuration_space space = engine.build();
+
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+        const std::string name = filename_of(path);
+        if(name == "first.xml") return xml_of(first_doc);
+        if(name == "second.xml") return xml_of(second_doc);
+        return nullptr;
+    };
+
+    // Two independent top-level walks in one expand(): the first walk's visited
+    // entries must be released before the second begins, or the second would
+    // spuriously trip the cycle guard.
+    auto loaded = load_chain(space, {"first.xml", "second.xml"}, factory);
+    REQUIRE(loaded);
+    REQUIRE(loaded.value().get("cluster/server/port") == "80");
+    REQUIRE(loaded.value().get("cluster/server/protocol") == "tcp");
+}
