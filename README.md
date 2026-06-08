@@ -7,8 +7,8 @@
 
 # nucleus
 
-A program's configuration arrives from many places -- a command line, one or
-more documents, the environment -- and nothing keeps them in agreement.
+A program's configuration arrives from many places &mdash; a command line, one or
+more documents, the environment &mdash; and nothing keeps them in agreement.
 
 `nucleus` is a domain-neutral C++20 configuration engine that resolves all of
 them onto a single hierarchical keyspace (`/`-separated, FQN-style key paths),
@@ -19,7 +19,7 @@ to any embedding application and is useful to any C++ program.
 Command-line flags (`--a-b-c=v`), XML elements, and environment values all map
 onto the *same* keyspace. The schema dictates what keys may exist, so a `--flag`
 the schema does not declare is an error and a document key it does not declare is
-caught -- the source never decides what is admissible. Sources are pluggable, not
+caught &mdash; the source never decides what is admissible. Sources are pluggable, not
 built-in assumptions; ownership, reservation, and filename conventions live in the
 host that embeds the engine, never in the core.
 
@@ -55,7 +55,7 @@ Nearest-key suggestions on unknown keys, non-adjudicating conflict reports, and 
 
 * **Schema-projected shell completion** \
 `generate_completion` projects the registered schema into a static bash or zsh
-completion script -- flag names plus each element's declared value set -- through
+completion script &mdash; flag names plus each element's declared value set &mdash; through
 the SAME flag mapping the CLI surface uses, so completion cannot drift from the
 CLI.
 
@@ -90,7 +90,7 @@ them with `-DNUCLEUS_BUILD_EXAMPLES=ON`.
 
 Register a small schema, then resolve a document and a command line onto the same
 keyspace. The command line outranks the document, so it overrides `mode`, while
-the document's `host` survives because no flag contests it -- and provenance
+the document's `host` survives because no flag contests it &mdash; and provenance
 records which layer won each key.
 
 ```cpp
@@ -152,14 +152,14 @@ public:
 ```
 
 ```txt
-[app/warn] unknown CLI flag '--service-mode=fast'; lenient mode -- stored as string at 'service/mode'
+[app/warn] unknown CLI flag '--service-mode=fast'; lenient mode &mdash; stored as string at 'service/mode'
 the engine routed 1 message(s) through the injected sink
 ```
 
 ### Completion
 
 Project a registered schema into a shell completion script. `nucleus` is a
-library, not a CLI, so it ships no `completion` subcommand -- it returns the
+library, not a CLI, so it ships no `completion` subcommand &mdash; it returns the
 script as a string and the host decides how to surface it.
 
 ```cpp
@@ -178,7 +178,7 @@ _mytool_complete()
     ...
     case "$flag" in
     '--logging-level')
-        COMPREPLY=( $(compgen -W 'debug info warn error' -- "$val") )
+        COMPREPLY=( $(compgen -W 'debug info warn error' &mdash; "$val") )
         ...
     esac
     ...
@@ -195,7 +195,7 @@ values the schema validates.
 This is the first release, and its scope is deliberately narrow.
 
 * **Sources**: XML documents plus argv and env. Other document formats (YAML,
-  INI, JSON) are not yet implemented -- the `source` seam is the extension point,
+  INI, JSON) are not yet implemented &mdash; the `source` seam is the extension point,
   but only the XML module ships.
 * **Completion** is static, for **bash and zsh** only. There is no dynamic
   (runtime) completion and no fish support; both are future single-file additions
