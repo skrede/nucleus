@@ -29,7 +29,7 @@ int main()
 
     // Parse from an in-memory string so the example needs no file on disk.
     const char *document = R"(<server host="127.0.0.1" mode="http"/>)";
-    auto make = [document](const std::string &) -> std::unique_ptr<nucleus::source> {
+    auto make = [document](const std::string &) -> std::unique_ptr<nucleus::configuration_source> {
         return std::make_unique<nucleus::xml::xml_source>(
             nucleus::xml::xml_source::from_string(document));
     };

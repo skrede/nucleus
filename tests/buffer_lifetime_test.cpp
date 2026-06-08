@@ -1,4 +1,4 @@
-#include "nucleus/source/source.h"
+#include "nucleus/configuration_source/configuration_source.h"
 
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
@@ -27,7 +27,7 @@ constexpr const char *kDocument = R"(<app>
 
 // Copies every entry's value out into an owned map, severing the dependency on
 // the document arena. This is the copy-out resolution performs at its boundary.
-std::map<std::string, std::string> copy_out(nucleus::source &src)
+std::map<std::string, std::string> copy_out(nucleus::configuration_source &src)
 {
     auto pulled = src.pull();
     REQUIRE(pulled);
@@ -94,7 +94,7 @@ TEST_CASE("a document source reaches the engine only as a source", "[xml]")
     // the same path env and the fake parser use. The arena lives inside the
     // batch's retained_buffer, invisible to this call site.
     auto src = nucleus::xml::xml_source::from_string("<root key=\"v\"/>");
-    nucleus::source &as_source = src;
+    nucleus::configuration_source &as_source = src;
 
     auto pulled = as_source.pull();
     REQUIRE(pulled);

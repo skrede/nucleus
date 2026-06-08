@@ -4,7 +4,7 @@
 
 #include "nucleus/schema/schema_registry.h"
 
-#include "nucleus/source/source_registry.h"
+#include "nucleus/configuration_source/configuration_source_registry.h"
 
 #include "nucleus/entry/resolution_context.h"
 
@@ -22,7 +22,7 @@
 // converse explicitly.)
 static_assert(nucleus::flat_registry<nucleus::schema_registry>);
 static_assert(nucleus::flat_registry<nucleus::tokenizer_registry>);
-static_assert(nucleus::flat_registry<nucleus::source_registry>);
+static_assert(nucleus::flat_registry<nucleus::configuration_source_registry>);
 
 // Strengthened pin: each registry is independently constructible AND exposes no
 // constructor that takes either of its siblings by reference or pointer. Naming
@@ -31,13 +31,13 @@ static_assert(nucleus::flat_registry<nucleus::source_registry>);
 static_assert(nucleus::independently_constructible<
               nucleus::schema_registry,
               nucleus::tokenizer_registry,
-              nucleus::source_registry>::value);
+              nucleus::configuration_source_registry>::value);
 static_assert(nucleus::independently_constructible<
               nucleus::tokenizer_registry,
               nucleus::schema_registry,
-              nucleus::source_registry>::value);
+              nucleus::configuration_source_registry>::value);
 static_assert(nucleus::independently_constructible<
-              nucleus::source_registry,
+              nucleus::configuration_source_registry,
               nucleus::schema_registry,
               nucleus::tokenizer_registry>::value);
 
@@ -59,8 +59,8 @@ TEST_CASE("each registry is constructed and exercised with no sibling in scope",
 
     SECTION("source registry alone")
     {
-        nucleus::source_registry sources;
-        sources.add(nucleus::source_spec{"argv"}, nucleus::owner_token{});
+        nucleus::configuration_source_registry sources;
+        sources.add(nucleus::configuration_source_spec{"argv"}, nucleus::owner_token{});
         REQUIRE(sources.size() == 1);
     }
 }
@@ -75,13 +75,13 @@ TEST_CASE("siblings collaborate only through a hand-built resolution context", "
     // registry), which is precisely the point of the flat topology.
     nucleus::schema_registry schema;
     nucleus::tokenizer_registry tokenizer;
-    nucleus::source_registry sources;
+    nucleus::configuration_source_registry sources;
 
     nucleus::resolution_context ctx(schema, tokenizer);
 
     ctx.schema().add(nucleus::schema_spec{"k"}, nucleus::owner_token{});
     ctx.tokenizer().add(nucleus::tokenizer_builder("noop").build(), nucleus::owner_token{});
-    sources.add(nucleus::source_spec{"env"}, nucleus::owner_token{});
+    sources.add(nucleus::configuration_source_spec{"env"}, nucleus::owner_token{});
 
     REQUIRE(schema.size() == 1);
     REQUIRE(tokenizer.size() == 1);

@@ -1,10 +1,10 @@
-#ifndef HPP_GUARD_NUCLEUS_SOURCE_SOURCE_H
-#define HPP_GUARD_NUCLEUS_SOURCE_SOURCE_H
+#ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_CONFIGURATION_SOURCE_H
+#define HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_CONFIGURATION_SOURCE_H
 
 #include "nucleus/expected.h"
 #include "nucleus/capability.h"
 
-#include "nucleus/source/inherit_declaration.h"
+#include "nucleus/configuration_source/inherit_declaration.h"
 
 #include "nucleus/keyspace/entry.h"
 
@@ -55,7 +55,7 @@ private:
 // The product of one pull: the entries a source produced plus the handle that
 // keeps their backing buffer alive. Entries and handle travel together so the
 // lifetime dependency is never separated from the data.
-struct source_batch
+struct configuration_source_batch
 {
     std::vector<keyspace_entry> entries;
     std::vector<extend_disposition> dispositions; // empty for flat sources
@@ -63,10 +63,10 @@ struct source_batch
 };
 
 // The error a pull can report (e.g. a missing file or a malformed document).
-using source_error = std::string;
+using configuration_source_error = std::string;
 
 // The result of pulling from a source.
-using source_result = expected<source_batch, source_error>;
+using configuration_source_result = expected<configuration_source_batch, configuration_source_error>;
 
 // The runtime-virtual source/provider seam -- THE boundary of the engine. A
 // source yields keyspace entries (path -> value + capability flags) from its
@@ -75,10 +75,10 @@ using source_result = expected<source_batch, source_error>;
 // the common subcategory that shares a view-node model. Authors who prefer a
 // compile-time surface write a Parser-concept struct and inject it through
 // parser_adapter<T>, which satisfies this same interface.
-class source
+class configuration_source
 {
 public:
-    virtual ~source() = default;
+    virtual ~configuration_source() = default;
 
     // The affordances this source can represent. Drives feature gating.
     [[nodiscard]] virtual capability_descriptor capabilities() const = 0;
@@ -95,9 +95,9 @@ public:
     [[nodiscard]] virtual inherit_declaration inheritance() const { return {}; }
 
     // Produces this source's entries. On success the batch carries any retained
-    // buffer the entries' views depend on. On failure a source_error explains
+    // buffer the entries' views depend on. On failure a configuration_source_error explains
     // why (the core never silently drops a source).
-    [[nodiscard]] virtual source_result pull() = 0;
+    [[nodiscard]] virtual configuration_source_result pull() = 0;
 };
 
 }

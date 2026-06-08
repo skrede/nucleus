@@ -1,9 +1,9 @@
-#ifndef HPP_GUARD_NUCLEUS_SOURCE_DISCOVERY_H
-#define HPP_GUARD_NUCLEUS_SOURCE_DISCOVERY_H
+#ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_DISCOVERY_H
+#define HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_DISCOVERY_H
 
-#include "nucleus/source/source.h"
-#include "nucleus/source/path_text.h"
-#include "nucleus/source/extension_registry.h"
+#include "nucleus/configuration_source/configuration_source.h"
+#include "nucleus/configuration_source/path_text.h"
+#include "nucleus/configuration_source/extension_registry.h"
 
 #include <memory>
 #include <string>
@@ -62,12 +62,12 @@ public:
 
     // Builds sources for every discovered candidate using the registry's parser
     // factories. The returned sources are ready to pull, in discovery order.
-    [[nodiscard]] static std::vector<std::unique_ptr<source>>
+    [[nodiscard]] static std::vector<std::unique_ptr<configuration_source>>
     open_all(std::string_view base_name,
              const std::vector<std::filesystem::path> &search_paths,
              const extension_registry &registry)
     {
-        std::vector<std::unique_ptr<source>> sources;
+        std::vector<std::unique_ptr<configuration_source>> sources;
         for(const discovered_source &hit : find(base_name, search_paths, registry))
             if(auto src = registry.open(hit.path))
                 sources.push_back(std::move(src));

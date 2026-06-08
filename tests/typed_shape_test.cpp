@@ -11,7 +11,7 @@
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/converters.h"
 
-#include "nucleus/source/source.h"
+#include "nucleus/configuration_source/configuration_source.h"
 
 #include "nucleus/xml/xml_source.h"
 
@@ -27,7 +27,7 @@ using nucleus::strain_scope_policy;
 
 namespace {
 
-std::unique_ptr<nucleus::source> xml_of(const std::string &text)
+std::unique_ptr<nucleus::configuration_source> xml_of(const std::string &text)
 {
     return std::make_unique<nucleus::xml::xml_source>(
         nucleus::xml::xml_source::from_string(text));
@@ -71,7 +71,7 @@ TEST_CASE("typed x inheritance chain: derived value wins and converts",
     declare_server_typed(engine);
     REQUIRE(engine.select("web"));
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
@@ -112,7 +112,7 @@ TEST_CASE("typed x inheritance chain: bad value in winning layer fails resolve",
     declare_server_typed(engine);
     REQUIRE(engine.select("web"));
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
@@ -152,10 +152,10 @@ TEST_CASE("typed x pruned strain: selected strain resolves; bad value in pruned 
         REQUIRE(engine.select("yin"));
 
         auto src = xml_of(doc);
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*src, std::size_t{10}, "doc");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(loaded);
 
         auto p = loaded.value().get_as<int32_t>("cluster/server/port");
@@ -170,10 +170,10 @@ TEST_CASE("typed x pruned strain: selected strain resolves; bad value in pruned 
         REQUIRE(engine.select("yang"));
 
         auto src = xml_of(doc);
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*src, std::size_t{10}, "doc");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(!loaded);
         REQUIRE(loaded.error().find("invalid characters") != std::string::npos);
     }
@@ -198,11 +198,11 @@ TEST_CASE("typed x repeated across layers: winning layer collection replaces bas
         auto derived_src = xml_of(
             "<cfg><nums>10</nums><nums>20</nums></cfg>");
 
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*base_src, std::size_t{10}, "base");
         stack.add(*derived_src, std::size_t{20}, "derived");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(loaded);
 
         auto r = loaded.value().get_all_as<int32_t>("cfg/nums");
@@ -226,11 +226,11 @@ TEST_CASE("typed x repeated across layers: winning layer collection replaces bas
         auto derived_src = xml_of(
             "<cfg><nums>10</nums><nums>notanumber</nums></cfg>");
 
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*base_src, std::size_t{10}, "base");
         stack.add(*derived_src, std::size_t{20}, "derived");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(!loaded);
         INFO("error: " << loaded.error());
         REQUIRE(loaded.error().find("cfg/nums") != std::string::npos);
@@ -251,11 +251,11 @@ TEST_CASE("typed x repeated across layers: winning layer collection replaces bas
         auto derived_src = xml_of(
             "<cfg><nums>10</nums><nums>20</nums></cfg>");
 
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*base_src, std::size_t{10}, "base");
         stack.add(*derived_src, std::size_t{20}, "derived");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(loaded);
 
         auto r = loaded.value().get_all_as<int32_t>("cfg/nums");
@@ -302,7 +302,7 @@ TEST_CASE("typed x scope policy: excluded entry above Ld is not converted",
         nucleus::typed_element<int32_t>("score", anchor::keyspace("cluster/server")));
     REQUIRE(engine.select("web"));
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
@@ -337,10 +337,10 @@ TEST_CASE("typed access surface: get and get_as agree; type mismatch pinned",
             nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
 
         auto src = xml_of("<cfg><val>99</val></cfg>");
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*src, std::size_t{10}, "doc");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(loaded);
 
         REQUIRE(loaded.value().get("cfg/val").has_value());
@@ -359,10 +359,10 @@ TEST_CASE("typed access surface: get and get_as agree; type mismatch pinned",
             nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
 
         auto src = xml_of("<cfg><val>99</val></cfg>");
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*src, std::size_t{10}, "doc");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(loaded);
 
         // int32_t was stored; requesting double is a type mismatch.

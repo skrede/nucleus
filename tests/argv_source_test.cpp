@@ -1,11 +1,11 @@
 #include "nucleus/log_sink.h"
 
-#include "nucleus/source/source.h"
+#include "nucleus/configuration_source/configuration_source.h"
 
 #include "nucleus/keyspace/key_path.h"
 
-#include "nucleus/source/argv/argv_source.h"
-#include "nucleus/source/argv/cli_surface.h"
+#include "nucleus/configuration_source/argv/argv_source.h"
+#include "nucleus/configuration_source/argv/cli_surface.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -77,7 +77,7 @@ TEST_CASE("argv_source emits keyspace entries through the source seam", "[argv]"
     argv_source src(std::vector<std::string>{
         "--plexus-udp-auth_mode=auth", "--node-name=alpha"});
 
-    nucleus::source &seam = src; // pulled through the virtual seam
+    nucleus::configuration_source &seam = src; // pulled through the virtual seam
     auto batch = seam.pull();
     REQUIRE(batch);
     REQUIRE(batch.value().entries.size() == 2);

@@ -7,7 +7,7 @@
 
 #include "nucleus/keyspace/key_path.h"
 
-#include "nucleus/source/env/env_source.h"
+#include "nucleus/configuration_source/env/env_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -61,10 +61,10 @@ TEST_CASE("resolve rejects an undeclared key and suggests the nearest declared o
         nucleus::element("level", nucleus::anchor::keyspace(path_of("logging")))));
 
     nucleus::env_source src = one("logging/levle", "debug"); // typo'd key
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(src, nucleus::layer_rank::base, "base");
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().find("not declared") != std::string::npos);
     REQUIRE(loaded.error().find("did you mean") != std::string::npos);
@@ -82,10 +82,10 @@ TEST_CASE("resolve rejects a missing required field", "[facade][schema]")
 
     // Only the optional port is supplied; the required host is missing.
     nucleus::env_source src = one("server/port", "8080");
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(src, nucleus::layer_rank::base, "base");
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().find("required field 'server/host'") != std::string::npos);
 }
@@ -104,10 +104,10 @@ TEST_CASE("resolve admits an anonymous strain without the identity field",
     // it collapses into the configuration space. The primary key is a selector,
     // not a presence obligation.
     nucleus::env_source src = one("node/role", "primary");
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(src, nucleus::layer_rank::base, "base");
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     REQUIRE(loaded.value().get("node/role") == "primary");
 }
@@ -127,10 +127,10 @@ TEST_CASE("resolve rejects anonymous-only content when the identity is required"
     // Requiring the identity element is the host's knob for demanding a NAMED
     // strain; anonymous-only content now fails in required-field vocabulary.
     nucleus::env_source src = one("node/role", "primary");
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(src, nucleus::layer_rank::base, "base");
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().find("required field 'node/name'") != std::string::npos);
 }
@@ -146,10 +146,10 @@ TEST_CASE("resolve admits a document that satisfies the schema", "[facade][schem
 
     nucleus::env_source src;
     src.set("server/host", "localhost").set("server/port", "8080");
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(src, nucleus::layer_rank::base, "base");
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     REQUIRE(loaded.value().get("server/host") == "localhost");
     REQUIRE(loaded.value().get("server/port") == "8080");

@@ -10,9 +10,9 @@
 
 #include "nucleus/capability.h"
 
-#include "nucleus/source/source.h"
+#include "nucleus/configuration_source/configuration_source.h"
 
-#include "nucleus/source/env/env_source.h"
+#include "nucleus/configuration_source/env/env_source.h"
 
 #include "nucleus/xml/xml_source.h"
 
@@ -26,7 +26,7 @@ using nucleus::anchor;
 
 namespace {
 
-std::unique_ptr<nucleus::source> xml_of(const std::string &text)
+std::unique_ptr<nucleus::configuration_source> xml_of(const std::string &text)
 {
     return std::make_unique<nucleus::xml::xml_source>(
         nucleus::xml::xml_source::from_string(text));
@@ -54,14 +54,14 @@ void declare_cluster_tags(nucleus::configuration_space &engine)
 
 // A minimal source that emits two entries for the same repeated path with
 // no duplicate_keys capability -- used to verify the capability gate fires.
-struct dual_entry_source : nucleus::source
+struct dual_entry_source : nucleus::configuration_source
 {
     std::string path;
     explicit dual_entry_source(std::string p) : path(std::move(p)) {}
 
-    nucleus::source_result pull() override
+    nucleus::configuration_source_result pull() override
     {
-        nucleus::source_batch batch;
+        nucleus::configuration_source_batch batch;
         nucleus::capability_descriptor no_caps{};
         batch.entries.push_back({path, nucleus::value::owned("v1"), no_caps});
         batch.entries.push_back({path, nucleus::value::owned("v2"), no_caps});
@@ -82,10 +82,10 @@ TEST_CASE("N values in one layer -- order preserved", "[repeated][ordering]")
     declare_tags_schema(engine);
 
     auto src = xml_of("<config><tag>a</tag><tag>b</tag><tag>c</tag></config>");
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(*src, std::size_t{10}, "doc");
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -101,11 +101,11 @@ TEST_CASE("cross-layer replace -- higher rank replaces lower collection wholesal
     auto src1 = xml_of("<config><tag>x</tag><tag>y</tag></config>");
     auto src2 = xml_of("<config><tag>p</tag></config>");
 
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(*src1, std::size_t{10}, "base");
     stack.add(*src2, std::size_t{20}, "overlay");
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -119,10 +119,10 @@ TEST_CASE("get() on repeated path returns last value", "[repeated][accessor]")
     declare_tags_schema(engine);
 
     auto src = xml_of("<config><tag>a</tag><tag>b</tag><tag>c</tag></config>");
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(*src, std::size_t{10}, "doc");
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -137,10 +137,10 @@ TEST_CASE("get_all() on single-value path returns one-element vector", "[repeate
     engine.register_element(nucleus::element("key", anchor::keyspace("config")));
 
     auto src = xml_of("<config><key>v</key></config>");
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(*src, std::size_t{10}, "doc");
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -154,10 +154,10 @@ TEST_CASE("get_all() on absent path returns empty vector", "[repeated][accessor]
     engine.register_element(nucleus::element("key", anchor::keyspace("config")));
 
     auto src = xml_of("<config><key>v</key></config>");
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(*src, std::size_t{10}, "doc");
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -172,10 +172,10 @@ TEST_CASE("keys() returns repeated path exactly once", "[repeated][accessor]")
     engine.register_element(nucleus::repeated_element("tag", anchor::keyspace("config")));
 
     auto src = xml_of("<config><other>x</other><tag>a</tag><tag>b</tag></config>");
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(*src, std::size_t{10}, "doc");
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -198,11 +198,11 @@ TEST_CASE("repeated path with required flag satisfies required check", "[repeate
     engine.register_element(el);
 
     auto src = xml_of("<config><tag>present</tag></config>");
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(*src, std::size_t{10}, "doc");
 
     // One value satisfies the required check.
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     REQUIRE(loaded.value().get_all("config/tag") == std::vector<std::string>{"present"});
 }
@@ -220,10 +220,10 @@ TEST_CASE("repeated leaf under keyed container with selection resolves to collec
         </cluster>)";
 
     auto src = xml_of(doc);
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(*src, std::size_t{10}, "doc");
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -246,10 +246,10 @@ TEST_CASE("token expansion per value -- each value expanded independently",
         "<val>${string.upper(alpha)}_1</val>"
         "<val>${string.upper(beta)}_2</val>"
         "</config>");
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(*src, std::size_t{10}, "doc");
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -294,10 +294,10 @@ TEST_CASE("capability degradation -- non-duplicate_keys source into repeated fie
     engine.register_element(nucleus::repeated_element("tag", anchor::keyspace("config")));
 
     auto fake = std::make_unique<dual_entry_source>("config/tag");
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(*fake, std::size_t{10}, "fake");
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(!loaded);
     REQUIRE(loaded.error().find("duplicate_keys") != std::string::npos);
 }
@@ -312,10 +312,10 @@ TEST_CASE("ASan: freeze copies values out before buffer drop", "[repeated][lifet
         engine.register_element(nucleus::repeated_element("tag", anchor::keyspace("config")));
 
         auto src = xml_of("<config><tag>x</tag><tag>y</tag></config>");
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*src, std::size_t{10}, "doc");
 
-        auto result = engine.resolve(stack);
+        auto result = engine.load_configuration(stack);
         REQUIRE(result);
         return std::move(result).value();
     }(); // engine, src, and all buffers destroyed here
@@ -344,11 +344,11 @@ TEST_CASE("relay_strain: higher-rank keyed collection wins over lower-rank flat 
         </cluster>)";
 
     auto src = xml_of(doc);
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(flat, std::size_t{5},  "flat-low");
     stack.add(*src, std::size_t{10}, "xml-high");
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -378,11 +378,11 @@ TEST_CASE("relay_strain: higher-rank flat override wins over lower-rank keyed co
     flat.set("cluster/server/tags", "high");
 
     auto src = xml_of(doc);
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(*src,  std::size_t{10}, "xml-low");
     stack.add(flat,  std::size_t{20}, "flat-high");
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -423,11 +423,11 @@ TEST_CASE("collection scope-policy exclusion and admission",
         nucleus::env_source Lderived;
         Lderived.set("cluster/server/yin/tags", "derived");
 
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(L0,       std::size_t{10}, "L0");
         stack.add(Lderived, std::size_t{20}, "Lderived");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(loaded);
         const nucleus::configuration &config = loaded.value();
 
@@ -450,11 +450,11 @@ TEST_CASE("collection scope-policy exclusion and admission",
         nucleus::env_source Lderived;
         Lderived.set("cluster/server/yin/tags", "derived");
 
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(L0,       std::size_t{10}, "L0");
         stack.add(Lderived, std::size_t{20}, "Lderived");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(loaded);
         const nucleus::configuration &config = loaded.value();
 

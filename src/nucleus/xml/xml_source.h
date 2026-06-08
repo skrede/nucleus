@@ -1,8 +1,8 @@
 #ifndef HPP_GUARD_NUCLEUS_XML_XML_SOURCE_H
 #define HPP_GUARD_NUCLEUS_XML_XML_SOURCE_H
 
-#include "nucleus/source/document_source.h"
-#include "nucleus/source/inherit_declaration.h"
+#include "nucleus/configuration_source/document_source.h"
+#include "nucleus/configuration_source/inherit_declaration.h"
 
 #include "nucleus/schema/projection.h"
 
@@ -45,7 +45,7 @@ public:
 
     [[nodiscard]] capability_descriptor capabilities() const override;
 
-    [[nodiscard]] source_result pull() override;
+    [[nodiscard]] configuration_source_result pull() override;
 
     // Retains the schema-derived projection the resolve fold hands over before
     // pull(), so the walk can render repeatable keyed containers (one instance

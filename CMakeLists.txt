@@ -39,19 +39,19 @@ set(NUCLEUS_DETAIL_HEADERS
 # Public source-seam and keyspace headers. These are header-only contracts; they
 # install under their subdirectory so the include paths stay stable for adopters.
 set(NUCLEUS_SOURCE_HEADERS
-    include/nucleus/source/source.h
-    include/nucleus/source/parser.h
-    include/nucleus/source/discovery.h
-    include/nucleus/source/path_text.h
-    include/nucleus/source/feature_gate.h
-    include/nucleus/source/parser_adapter.h
-    include/nucleus/source/document_source.h
-    include/nucleus/source/extension_registry.h
-    include/nucleus/source/inherit_declaration.h
+    include/nucleus/configuration_source/configuration_source.h
+    include/nucleus/configuration_source/parser.h
+    include/nucleus/configuration_source/discovery.h
+    include/nucleus/configuration_source/path_text.h
+    include/nucleus/configuration_source/feature_gate.h
+    include/nucleus/configuration_source/parser_adapter.h
+    include/nucleus/configuration_source/document_source.h
+    include/nucleus/configuration_source/extension_registry.h
+    include/nucleus/configuration_source/inherit_declaration.h
 )
 
 set(NUCLEUS_SOURCE_ENV_HEADERS
-    include/nucleus/source/env/env_source.h
+    include/nucleus/configuration_source/env/env_source.h
 )
 
 set(NUCLEUS_KEYSPACE_HEADERS
@@ -80,8 +80,8 @@ set(NUCLEUS_SCHEMA_HEADERS
 )
 
 set(NUCLEUS_SOURCE_ARGV_HEADERS
-    include/nucleus/source/argv/cli_surface.h
-    include/nucleus/source/argv/argv_source.h
+    include/nucleus/configuration_source/argv/cli_surface.h
+    include/nucleus/configuration_source/argv/argv_source.h
 )
 
 set(NUCLEUS_COMPLETION_HEADERS
@@ -194,9 +194,9 @@ install(EXPORT nucleus-targets
 # Subdirectory headers preserve their relative path under the include root
 # (PUBLIC_HEADER flattens, which would collide source/ and keyspace/ names).
 install(FILES ${NUCLEUS_SOURCE_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/source)
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/configuration_source)
 install(FILES ${NUCLEUS_SOURCE_ENV_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/source/env)
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/configuration_source/env)
 install(FILES ${NUCLEUS_KEYSPACE_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/keyspace)
 install(FILES ${NUCLEUS_ENTRY_HEADERS}
@@ -206,7 +206,7 @@ install(FILES ${NUCLEUS_DIAGNOSTICS_HEADERS}
 install(FILES ${NUCLEUS_SCHEMA_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/schema)
 install(FILES ${NUCLEUS_SOURCE_ARGV_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/source/argv)
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/configuration_source/argv)
 install(FILES ${NUCLEUS_COMPLETION_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/completion)
 install(FILES ${NUCLEUS_UTILITY_HEADERS}

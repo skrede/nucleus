@@ -21,7 +21,7 @@ namespace nucleus {
 // The lifetime contract for the view alternative is external and load-bearing:
 // the buffer the view points into must outlive every read of that view. A
 // source that produces views attaches the owning handle that pins that buffer
-// (see source_batch). At the resolve boundary, typed values are copied out and
+// (see configuration_source_batch). At the resolve boundary, typed values are copied out and
 // the buffers are dropped -- after which only owned values survive.
 class value
 {

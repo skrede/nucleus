@@ -36,7 +36,7 @@ using nucleus::strain_scope_policy;
 
 namespace {
 
-std::unique_ptr<nucleus::source> xml_of(const std::string &text)
+std::unique_ptr<nucleus::configuration_source> xml_of(const std::string &text)
 {
     return std::make_unique<nucleus::xml::xml_source>(
         nucleus::xml::xml_source::from_string(text));
@@ -96,7 +96,7 @@ const char *LEAF_DOC = R"(
 // Factory for the main 3-file chain.
 auto make_main_factory()
 {
-    return [](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    return [](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "root.xml")
             return xml_of(ROOT_DOC);
@@ -136,7 +136,7 @@ const char *YANG_DOC_TC4 = R"(
 
 auto make_tc4_factory()
 {
-    return [](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    return [](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "root_tc4.xml")
             return xml_of(ROOT_DOC_TC4);
@@ -195,7 +195,7 @@ TEST_CASE("integration: auto-resolve single named strain succeeds without select
         <cluster inherit="base2.xml">
         </cluster>)";
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "base2.xml")
             return xml_of(base_doc);
@@ -236,7 +236,7 @@ TEST_CASE("integration: file_level scope policy excludes derived-layer entries",
             <server name="yin" extend="narrow"><protocol>tcp</protocol></server>
         </cluster>)";
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "root3.xml")
             return xml_of(root3_doc);
@@ -330,7 +330,7 @@ TEST_CASE("integration: opt-out terminates the chain by declaration",
         <cluster inherit="mid5.xml">
         </cluster>)";
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "mid5.xml")
             return xml_of(mid5_doc);
@@ -367,7 +367,7 @@ TEST_CASE("integration: multiple strains with no selection is a loud error",
             <server name="yang"><port>22</port></server>
         </cluster>)";
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "base6.xml")
             return xml_of(base6_doc);
@@ -402,7 +402,7 @@ TEST_CASE("integration: select with unknown key value is a loud error",
             <server name="yang"><port>22</port></server>
         </cluster>)";
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "base7.xml")
             return xml_of(base7_doc);

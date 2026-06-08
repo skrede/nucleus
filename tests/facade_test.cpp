@@ -9,9 +9,9 @@
 
 #include "nucleus/keyspace/key_path.h"
 
-#include "nucleus/source/feature_gate.h"
+#include "nucleus/configuration_source/feature_gate.h"
 
-#include "nucleus/source/env/env_source.h"
+#include "nucleus/configuration_source/env/env_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -31,7 +31,7 @@ public:
     nucleus::policy_verdict review(const nucleus::registration_request &request) override
     {
         seen.push_back(request.kind);
-        if(request.kind == nucleus::registration_kind::source && reject_sources)
+        if(request.kind == nucleus::registration_kind::configuration_source && reject_sources)
             return nucleus::policy_verdict::reject("sources are reserved by the host");
         return nucleus::policy_verdict::accept();
     }
@@ -92,7 +92,7 @@ TEST_CASE("the registration-policy seam can intercept a registration", "[facade]
     // The policy saw both reviews before either committed.
     REQUIRE(policy->seen.size() == 2);
     REQUIRE(policy->seen[0] == nucleus::registration_kind::schema);
-    REQUIRE(policy->seen[1] == nucleus::registration_kind::source);
+    REQUIRE(policy->seen[1] == nucleus::registration_kind::configuration_source);
 }
 
 TEST_CASE("two registrations claiming the same key path surface a non-adjudicating conflict",

@@ -1,6 +1,6 @@
 #include "nucleus/configuration_space.h"
 #include "nucleus/entry/configuration.h"
-#include "nucleus/source/inherit_declaration.h"
+#include "nucleus/configuration_source/inherit_declaration.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -21,7 +21,7 @@ using nucleus::anchor;
 
 namespace {
 
-std::unique_ptr<nucleus::source> xml_of(const std::string &text)
+std::unique_ptr<nucleus::configuration_source> xml_of(const std::string &text)
 {
     return std::make_unique<nucleus::xml::xml_source>(
         nucleus::xml::xml_source::from_string(text));
@@ -99,7 +99,7 @@ TEST_CASE("two-file chain assembles root-first, derived overrides root", "[chain
     declare_cluster(engine);
     REQUIRE(engine.select("web"));
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
@@ -138,7 +138,7 @@ TEST_CASE("anonymous instances compose across chain in document order", "[chain]
     engine.register_element(
         nucleus::element("protocol", anchor::keyspace("cluster/server")));
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
@@ -175,7 +175,7 @@ TEST_CASE("named strain in derived composes on template from root", "[chain]")
     declare_cluster(engine);
     // Single named strain auto-resolves; no select() call needed.
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
@@ -217,7 +217,7 @@ TEST_CASE("opt-out truncates chain below declaring file", "[chain]")
     declare_cluster(engine);
     REQUIRE(engine.select("web"));
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "grandparent.xml")
         {
@@ -255,7 +255,7 @@ TEST_CASE("depth cap exceeded returns loud error naming the limit", "[chain]")
     policy.depth_cap = 2;
     REQUIRE(engine.set_inherit_policy(std::move(policy)));
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "a.xml")
             return xml_of(a_doc);
@@ -283,7 +283,7 @@ TEST_CASE("cycle in inheritance chain fails loudly naming the path", "[chain]")
     nucleus::configuration_space engine;
     declare_cluster(engine);
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "a.xml")
             return xml_of(a_doc);
@@ -317,12 +317,12 @@ TEST_CASE("admissibility callback rejection fails naming the parent", "[chain]")
     REQUIRE(engine.select("web"));
 
     nucleus::inherit_policy policy;
-    policy.admissibility = [](const nucleus::source &) -> std::string {
+    policy.admissibility = [](const nucleus::configuration_source &) -> std::string {
         return "not allowed in test";
     };
     REQUIRE(engine.set_inherit_policy(std::move(policy)));
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
@@ -357,7 +357,7 @@ TEST_CASE("admissibility reject-all does not block a single-file load", "[chain]
     REQUIRE(engine.select("web"));
 
     nucleus::inherit_policy policy;
-    policy.admissibility = [](const nucleus::source &) -> std::string {
+    policy.admissibility = [](const nucleus::configuration_source &) -> std::string {
         return "reject everything";
     };
     REQUIRE(engine.set_inherit_policy(std::move(policy)));
@@ -391,12 +391,12 @@ TEST_CASE("admissibility reject-all fails naming the parent in a two-file chain"
     REQUIRE(engine.select("web"));
 
     nucleus::inherit_policy policy;
-    policy.admissibility = [](const nucleus::source &) -> std::string {
+    policy.admissibility = [](const nucleus::configuration_source &) -> std::string {
         return "reject everything";
     };
     REQUIRE(engine.set_inherit_policy(std::move(policy)));
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
@@ -431,7 +431,7 @@ TEST_CASE("default admit-all policy allows all parents", "[chain]")
     REQUIRE(engine.select("web"));
     // No set_inherit_policy -- default admits all parents.
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
@@ -469,7 +469,7 @@ TEST_CASE("extend-narrow obeys default scope policy", "[chain]")
     declare_cluster(engine);
     REQUIRE(engine.select("web"));
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
@@ -506,7 +506,7 @@ TEST_CASE("extend-wide bypasses scope policy", "[chain]")
     declare_cluster(engine);
     REQUIRE(engine.select("web"));
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
@@ -546,7 +546,7 @@ TEST_CASE("extend-without-base fails loudly", "[chain]")
     // before the extend-without-base check in Step B.
     REQUIRE(engine.select("web"));
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
@@ -583,7 +583,7 @@ TEST_CASE("re-open without extend disposition fails loudly", "[chain]")
     nucleus::configuration_space engine;
     declare_cluster(engine);
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
@@ -642,7 +642,7 @@ TEST_CASE("duplicate primary-key across chain layers without extend fails", "[ch
     nucleus::configuration_space engine;
     declare_cluster(engine);
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
@@ -706,7 +706,7 @@ TEST_CASE("duplicate unique-field value across chain files fails", "[chain]")
     // "multiple strains, no selection" guard would fire.
     REQUIRE(engine.select("web"));
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);

@@ -8,7 +8,7 @@
 
 #include "nucleus/entry/precedence.h"
 
-#include "nucleus/source/env/env_source.h"
+#include "nucleus/configuration_source/env/env_source.h"
 
 #include <iostream>
 
@@ -18,11 +18,11 @@ int main()
     values.set("service/region", "eu-west")
           .set("service/tier", "gold");
 
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(values, nucleus::layer_rank::env, "env");
 
     nucleus::configuration_space engine;
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     if(!loaded)
     {
         std::cerr << "resolve failed: " << loaded.error() << '\n';

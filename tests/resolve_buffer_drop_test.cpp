@@ -5,7 +5,7 @@
 #include "nucleus/entry/precedence.h"
 #include "nucleus/entry/configuration.h"
 
-#include "nucleus/source/env/env_source.h"
+#include "nucleus/configuration_source/env/env_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -44,11 +44,11 @@ TEST_CASE("resolved values survive dropping every source buffer", "[resolution][
         nucleus::env_source overlay;
         overlay.set("app/server/port", "9090");
 
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(doc, nucleus::layer_rank::base, "base-document");
         stack.add(overlay, nucleus::layer_rank::overlay, "overlay");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(loaded);
         config = std::move(loaded).value();
 

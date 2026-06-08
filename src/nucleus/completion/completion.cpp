@@ -6,7 +6,7 @@
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/schema_registry.h"
 
-#include "nucleus/source/argv/cli_surface.h"
+#include "nucleus/configuration_source/argv/cli_surface.h"
 
 #include "nucleus/keyspace/key_path.h"
 

@@ -1,6 +1,6 @@
 #include "nucleus/format.h"
 
-#include "nucleus/source/path_text.h"
+#include "nucleus/configuration_source/path_text.h"
 
 #include "nucleus/tokenizer/scope_keys.h"
 

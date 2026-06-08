@@ -23,7 +23,7 @@ using nucleus::anchor;
 
 namespace {
 
-std::unique_ptr<nucleus::source> xml_of(const std::string &text)
+std::unique_ptr<nucleus::configuration_source> xml_of(const std::string &text)
 {
     return std::make_unique<nucleus::xml::xml_source>(
         nucleus::xml::xml_source::from_string(text));

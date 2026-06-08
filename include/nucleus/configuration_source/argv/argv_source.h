@@ -1,18 +1,18 @@
-#ifndef HPP_GUARD_NUCLEUS_SOURCE_ARGV_ARGV_SOURCE_H
-#define HPP_GUARD_NUCLEUS_SOURCE_ARGV_ARGV_SOURCE_H
+#ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_ARGV_ARGV_SOURCE_H
+#define HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_ARGV_ARGV_SOURCE_H
 
 #include "nucleus/format.h"
 #include "nucleus/expected.h"
 #include "nucleus/log_sink.h"
 #include "nucleus/capability.h"
 
-#include "nucleus/source/source.h"
+#include "nucleus/configuration_source/configuration_source.h"
 
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
 #include "nucleus/keyspace/key_path.h"
 
-#include "nucleus/source/argv/cli_surface.h"
+#include "nucleus/configuration_source/argv/cli_surface.h"
 
 #include <string>
 #include <vector>
@@ -54,7 +54,7 @@ using key_recognizer = std::function<bool(const key_path &)>;
 // nesting structure of its own -- the hierarchy comes from the path), carries no
 // typed scalars, comments, or ordering guarantees. Like env, that makes it a real
 // exerciser of feature degradation rather than a source that claims everything.
-class argv_source final : public source
+class argv_source final : public configuration_source
 {
 public:
     argv_source() = default;
@@ -95,9 +95,9 @@ public:
         return descriptor();
     }
 
-    [[nodiscard]] source_result pull() override
+    [[nodiscard]] configuration_source_result pull() override
     {
-        source_batch batch;
+        configuration_source_batch batch;
         batch.entries.reserve(m_args.size());
 
         for(const std::string &token : m_args)

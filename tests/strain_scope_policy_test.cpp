@@ -7,7 +7,7 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/source/env/env_source.h"
+#include "nucleus/configuration_source/env/env_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -41,11 +41,11 @@ void declare_cluster_with_app(nucleus::configuration_space &engine)
     engine.register_element(nucleus::element("name", anchor::keyspace("app")));
 }
 
-// Builds a three-layer source_stack:
+// Builds a three-layer configuration_source_stack:
 //   rank=10: web/port=80 (web's defining layer; Ld=10)
 //   rank=20: web/protocol=tcp, app/name=core (derived layer above Ld; general entry)
 //   rank=30: db/port=5432 (competing strain first appears; Ls=30)
-nucleus::source_stack three_layer_stack(nucleus::env_source &L0,
+nucleus::configuration_source_stack three_layer_stack(nucleus::env_source &L0,
                                         nucleus::env_source &Lderived,
                                         nucleus::env_source &Lcompeting)
 {
@@ -56,7 +56,7 @@ nucleus::source_stack three_layer_stack(nucleus::env_source &L0,
     Lcompeting.set("cluster/server/db/name", "db")
               .set("cluster/server/db/port", "5432");
 
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(L0, std::size_t{10}, "L0");
     stack.add(Lderived, std::size_t{20}, "Lderived");
     stack.add(Lcompeting, std::size_t{30}, "Lcompeting");
@@ -70,14 +70,14 @@ TEST_CASE("default policy (space-open container-closed) excludes container entri
           "[scope_policy][keyed]")
 {
     nucleus::env_source L0, Lderived, Lcompeting;
-    nucleus::source_stack stack = three_layer_stack(L0, Lderived, Lcompeting);
+    nucleus::configuration_source_stack stack = three_layer_stack(L0, Lderived, Lcompeting);
 
     nucleus::configuration_space engine;
     declare_cluster_with_app(engine);
     REQUIRE(engine.select("web"));
     // No set_strain_scope call -- default is space_open_container_closed.
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -100,14 +100,14 @@ TEST_CASE("file_level policy excludes container entries and general entries abov
           "[scope_policy][keyed]")
 {
     nucleus::env_source L0, Lderived, Lcompeting;
-    nucleus::source_stack stack = three_layer_stack(L0, Lderived, Lcompeting);
+    nucleus::configuration_source_stack stack = three_layer_stack(L0, Lderived, Lcompeting);
 
     nucleus::configuration_space engine;
     declare_cluster_with_app(engine);
     REQUIRE(engine.select("web"));
     REQUIRE(engine.set_strain_scope(strain_scope_policy::file_level));
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -126,14 +126,14 @@ TEST_CASE("container_open_until_next_strain admits container entries below Ls an
           "[scope_policy][keyed]")
 {
     nucleus::env_source L0, Lderived, Lcompeting;
-    nucleus::source_stack stack = three_layer_stack(L0, Lderived, Lcompeting);
+    nucleus::configuration_source_stack stack = three_layer_stack(L0, Lderived, Lcompeting);
 
     nucleus::configuration_space engine;
     declare_cluster_with_app(engine);
     REQUIRE(engine.select("web"));
     REQUIRE(engine.set_strain_scope(strain_scope_policy::container_open_until_next_strain));
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -161,7 +161,7 @@ TEST_CASE("container_open_until_next_strain with no competing strain is fully op
       .set("cluster/server/web/port", "80");
     Lderived.set("cluster/server/web/protocol", "tcp");
 
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(L0, std::size_t{10}, "L0");
     stack.add(Lderived, std::size_t{20}, "Lderived");
 
@@ -170,7 +170,7 @@ TEST_CASE("container_open_until_next_strain with no competing strain is fully op
     REQUIRE(engine.select("web"));
     REQUIRE(engine.set_strain_scope(strain_scope_policy::container_open_until_next_strain));
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -195,7 +195,7 @@ TEST_CASE("a competing strain introduced below the defining layer never bounds t
         .set("cluster/server/web/port", "80");
     Lderived.set("cluster/server/web/protocol", "tcp");
 
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(Learly, std::size_t{10}, "Learly");
     stack.add(Lweb, std::size_t{30}, "Lweb");
     stack.add(Lderived, std::size_t{40}, "Lderived");
@@ -205,7 +205,7 @@ TEST_CASE("a competing strain introduced below the defining layer never bounds t
     REQUIRE(engine.select("web"));
     REQUIRE(engine.set_strain_scope(strain_scope_policy::container_open_until_next_strain));
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -234,7 +234,7 @@ TEST_CASE("Ls is bound by the layer that INTRODUCES the competing strain, not th
     Lbetween.set("cluster/server/web/protocol", "tcp");
     Loverwrite.set("cluster/server/db/port", "5433");
 
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(L0, std::size_t{10}, "L0");
     stack.add(Lcompeting, std::size_t{30}, "Lcompeting");
     stack.add(Lbetween, std::size_t{40}, "Lbetween");
@@ -245,7 +245,7 @@ TEST_CASE("Ls is bound by the layer that INTRODUCES the competing strain, not th
     REQUIRE(engine.select("web"));
     REQUIRE(engine.set_strain_scope(strain_scope_policy::container_open_until_next_strain));
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -270,7 +270,7 @@ TEST_CASE("scope policies apply when the single named strain auto-resolves",
     Lderived.set("cluster/server/web/protocol", "tcp")
             .set("app/name", "core");
 
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(L0, std::size_t{10}, "L0");
     stack.add(Lderived, std::size_t{20}, "Lderived");
 
@@ -278,7 +278,7 @@ TEST_CASE("scope policies apply when the single named strain auto-resolves",
     declare_cluster_with_app(engine);
     // No select(), no set_strain_scope() -- default space_open_container_closed.
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -296,7 +296,7 @@ TEST_CASE("file_level applies on auto-resolve and cuts general entries above the
       .set("cluster/server/web/port", "80");
     Lderived.set("app/name", "core");
 
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(L0, std::size_t{10}, "L0");
     stack.add(Lderived, std::size_t{20}, "Lderived");
 
@@ -305,7 +305,7 @@ TEST_CASE("file_level applies on auto-resolve and cuts general entries above the
     REQUIRE(engine.set_strain_scope(strain_scope_policy::file_level));
     // No select(): the single named strain auto-resolves with the policy active.
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -321,14 +321,14 @@ TEST_CASE("set_strain_scope() after resolve() is rejected",
     src.set("cluster/server/web/name", "web")
        .set("cluster/server/web/port", "80");
 
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(src, std::size_t{10}, "L0");
 
     nucleus::configuration_space engine;
     declare_cluster_with_app(engine);
 
     // Resolve without setting scope.
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
 
     // After resolve the facade is sealed; set_strain_scope is a state-machine

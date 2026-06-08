@@ -1,8 +1,8 @@
 #include "nucleus/capability.h"
 
-#include "nucleus/source/parser.h"
-#include "nucleus/source/source.h"
-#include "nucleus/source/parser_adapter.h"
+#include "nucleus/configuration_source/parser.h"
+#include "nucleus/configuration_source/configuration_source.h"
+#include "nucleus/configuration_source/parser_adapter.h"
 
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
@@ -17,7 +17,7 @@ namespace {
 
 // A hand-written runtime-virtual source. It emits owned entries directly -- the
 // "I subclass the interface myself" authoring path.
-class handwritten_source final : public nucleus::source
+class handwritten_source final : public nucleus::configuration_source
 {
 public:
     [[nodiscard]] nucleus::capability_descriptor capabilities() const override
@@ -25,9 +25,9 @@ public:
         return {nucleus::capability::nesting};
     }
 
-    [[nodiscard]] nucleus::source_result pull() override
+    [[nodiscard]] nucleus::configuration_source_result pull() override
     {
-        nucleus::source_batch batch;
+        nucleus::configuration_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(
             "a/b", nucleus::value::owned("from-virtual"), capabilities()));
         return batch;
@@ -45,9 +45,9 @@ struct fake_parser
         return {nucleus::capability::ordering};
     }
 
-    [[nodiscard]] nucleus::source_result pull() const
+    [[nodiscard]] nucleus::configuration_source_result pull() const
     {
-        nucleus::source_batch batch;
+        nucleus::configuration_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(
             "x/y", nucleus::value::owned("from-parser"), capabilities()));
         return batch;
@@ -59,7 +59,7 @@ static_assert(nucleus::Parser<fake_parser>,
 
 // Drives any source through the abstract virtual interface only -- it cannot see
 // whether the source was hand-written or adapter-wrapped.
-std::vector<nucleus::keyspace_entry> drive(nucleus::source &src)
+std::vector<nucleus::keyspace_entry> drive(nucleus::configuration_source &src)
 {
     auto pulled = src.pull();
     REQUIRE(pulled);
@@ -74,7 +74,7 @@ TEST_CASE("a hand-written source and an adapted fake parser share one virtual pa
     auto adapted = nucleus::adapt_parser(fake_parser{});
 
     // Both are reached only as `source&` -- the same abstract pull path.
-    std::vector<nucleus::source *> sources{&virtual_src, adapted.get()};
+    std::vector<nucleus::configuration_source *> sources{&virtual_src, adapted.get()};
 
     auto a = drive(*sources[0]);
     auto b = drive(*sources[1]);
@@ -91,7 +91,7 @@ TEST_CASE("a hand-written source and an adapted fake parser share one virtual pa
 TEST_CASE("the adapter preserves the parser's capability descriptor", "[source]")
 {
     auto adapted = nucleus::adapt_parser(fake_parser{});
-    nucleus::source &as_source = *adapted;
+    nucleus::configuration_source &as_source = *adapted;
 
     auto caps = as_source.capabilities();
     REQUIRE(caps.supports(nucleus::capability::ordering));

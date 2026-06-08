@@ -8,9 +8,9 @@
 
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/source/source.h"
-#include "nucleus/source/feature_gate.h"
-#include "nucleus/source/inherit_declaration.h"
+#include "nucleus/configuration_source/configuration_source.h"
+#include "nucleus/configuration_source/feature_gate.h"
+#include "nucleus/configuration_source/inherit_declaration.h"
 
 #include "nucleus/entry/precedence.h"
 #include "nucleus/entry/strain_scope.h"
@@ -185,10 +185,10 @@ public:
     // immutable self-owning configuration, drops the source buffers, and
     // transitions the facade to `resolved`. A second call on an already-resolved
     // facade is a state-machine error.
-    [[nodiscard]] load_result resolve(const source_stack &stack);
+    [[nodiscard]] load_result load_configuration(const configuration_source_stack &stack);
 
-    // Convenience overload: load an explicit source stack (alias for resolve).
-    [[nodiscard]] load_result load(const source_stack &stack);
+    // Convenience overload: load an explicit source stack (alias for load_configuration).
+    [[nodiscard]] load_result load(const configuration_source_stack &stack);
 
     // Convenience overload: args-only. Builds an argv source from the command line
     // at the argv precedence rank and resolves it alone, wiring the argv source's
@@ -199,7 +199,7 @@ public:
     // core never knows a file format, so the path-based overloads delegate the
     // "path -> source" decision to the host. Returning nullptr fails the load with
     // a message naming the path.
-    using document_factory = std::function<std::unique_ptr<source>(const std::string &)>;
+    using document_factory = std::function<std::unique_ptr<configuration_source>(const std::string &)>;
 
     // Convenience overload: paths-only. Builds a document source per path through
     // the host factory and layers them at the base rank (later paths overlay

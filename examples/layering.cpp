@@ -9,8 +9,8 @@
 #include "nucleus/entry/precedence.h"
 #include "nucleus/keyspace/provenance.h"
 
-#include "nucleus/source/env/env_source.h"
-#include "nucleus/source/argv/argv_source.h"
+#include "nucleus/configuration_source/env/env_source.h"
+#include "nucleus/configuration_source/argv/argv_source.h"
 
 #include <vector>
 #include <iostream>
@@ -22,12 +22,12 @@ int main()
 
     nucleus::argv_source argv(std::vector<std::string>{"--service-tier=gold"});
 
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(env, nucleus::layer_rank::env, "env");
     stack.add(argv, nucleus::layer_rank::argv, "argv");
 
     nucleus::configuration_space engine;
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     if(!loaded)
     {
         std::cerr << "resolve failed: " << loaded.error() << '\n';

@@ -6,8 +6,8 @@
 
 #include "nucleus/schema/projection.h"
 
-#include "nucleus/source/source.h"
-#include "nucleus/source/inherit_declaration.h"
+#include "nucleus/configuration_source/configuration_source.h"
+#include "nucleus/configuration_source/inherit_declaration.h"
 
 #include <memory>
 #include <string>
@@ -86,13 +86,13 @@ public:
     struct chain_entry
     {
         std::string path;
-        std::unique_ptr<source> src;
+        std::unique_ptr<configuration_source> src;
     };
 
-    // Factory type: given a path string, return a non-null unique_ptr<source>
+    // Factory type: given a path string, return a non-null unique_ptr<configuration_source>
     // or null (null is surfaced as a load error). This matches
     // configuration_space::document_factory.
-    using factory_fn = std::function<std::unique_ptr<source>(const std::string &)>;
+    using factory_fn = std::function<std::unique_ptr<configuration_source>(const std::string &)>;
 
     // Expands `requested_paths` into a root-first ordered chain. For each path
     // the walker follows the inheritance declaration recursively before appending
@@ -180,14 +180,14 @@ private:
             return unexpected(std::move(dg).error());
 
         // Build the source via the host factory.
-        std::unique_ptr<source> src = make ? make(path) : nullptr;
+        std::unique_ptr<configuration_source> src = make ? make(path) : nullptr;
         if(!src)
             return unexpected(nucleus::format(
                 "inheritance chain: no source could be built for path '{}'", path));
 
         src->apply_projection(projection);
 
-        source_result pulled = src->pull();
+        configuration_source_result pulled = src->pull();
         if(!pulled)
             return unexpected(nucleus::format(
                 "inheritance chain: source '{}': {}", path, pulled.error()));
@@ -244,7 +244,7 @@ private:
     std::size_t m_depth = 0;
     std::size_t m_cap;
     std::unordered_set<std::string> m_visited;
-    std::function<std::string(const source &)> m_admissibility;
+    std::function<std::string(const configuration_source &)> m_admissibility;
 };
 
 }

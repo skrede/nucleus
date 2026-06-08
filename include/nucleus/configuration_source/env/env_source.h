@@ -1,9 +1,9 @@
-#ifndef HPP_GUARD_NUCLEUS_SOURCE_ENV_ENV_SOURCE_H
-#define HPP_GUARD_NUCLEUS_SOURCE_ENV_ENV_SOURCE_H
+#ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_ENV_ENV_SOURCE_H
+#define HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_ENV_ENV_SOURCE_H
 
 #include "nucleus/capability.h"
 
-#include "nucleus/source/source.h"
+#include "nucleus/configuration_source/configuration_source.h"
 
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
@@ -30,7 +30,7 @@ namespace nucleus {
 // pairs. The host decides which environment variables map to which key paths and
 // how names are translated -- the core never reads the process environment on
 // its own or imposes a naming convention.
-class env_source final : public source
+class env_source final : public configuration_source
 {
 public:
     env_source() = default;
@@ -58,9 +58,9 @@ public:
         return descriptor();
     }
 
-    [[nodiscard]] source_result pull() override
+    [[nodiscard]] configuration_source_result pull() override
     {
-        source_batch batch;
+        configuration_source_batch batch;
         batch.entries.reserve(m_entries.size());
         for(const auto &[path, text] : m_entries)
             batch.entries.push_back(make_entry(path, value::owned(text), descriptor()));

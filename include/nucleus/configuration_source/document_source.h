@@ -1,7 +1,7 @@
-#ifndef HPP_GUARD_NUCLEUS_SOURCE_DOCUMENT_SOURCE_H
-#define HPP_GUARD_NUCLEUS_SOURCE_DOCUMENT_SOURCE_H
+#ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_DOCUMENT_SOURCE_H
+#define HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_DOCUMENT_SOURCE_H
 
-#include "nucleus/source/source.h"
+#include "nucleus/configuration_source/configuration_source.h"
 
 namespace nucleus {
 
@@ -22,7 +22,7 @@ namespace nucleus {
 // single, named home that every concrete document source inherits, keeping the
 // rule auditable in one place. (Concrete document sources live in their own
 // quarantined parser modules; the core only ever sees this base.)
-class document_source : public source
+class document_source : public configuration_source
 {
 public:
     // Document sources are inherently tree-structured, so the structural baseline
@@ -30,7 +30,7 @@ public:
     // format actually preserves (duplicate keys, ordering, comments, ...).
     [[nodiscard]] capability_descriptor capabilities() const override = 0;
 
-    [[nodiscard]] source_result pull() override = 0;
+    [[nodiscard]] configuration_source_result pull() override = 0;
 };
 
 }

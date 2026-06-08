@@ -65,7 +65,7 @@ int main()
 
     // In-memory document -- no file on disk required.
     const char *document = R"(<body><pos>1.0,2.5,3.0</pos><mass>42</mass></body>)";
-    auto make = [document](const std::string &) -> std::unique_ptr<nucleus::source> {
+    auto make = [document](const std::string &) -> std::unique_ptr<nucleus::configuration_source> {
         return std::make_unique<nucleus::xml::xml_source>(
             nucleus::xml::xml_source::from_string(document));
     };

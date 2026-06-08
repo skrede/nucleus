@@ -1,11 +1,11 @@
-#ifndef HPP_GUARD_NUCLEUS_SOURCE_EXTENSION_REGISTRY_H
-#define HPP_GUARD_NUCLEUS_SOURCE_EXTENSION_REGISTRY_H
+#ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_EXTENSION_REGISTRY_H
+#define HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_EXTENSION_REGISTRY_H
 
 #include "nucleus/format.h"
 #include "nucleus/expected.h"
 #include "nucleus/identity.h"
 
-#include "nucleus/source/source.h"
+#include "nucleus/configuration_source/configuration_source.h"
 
 #include <map>
 #include <memory>
@@ -23,7 +23,7 @@ namespace nucleus {
 // Builds a source for a concrete file path. A parser registration carries one of
 // these; discovery invokes it to turn a found path into a live source. The core
 // stays format-neutral: it never names a parser, only stores the host's factory.
-using parser_factory = std::function<std::unique_ptr<source>(const std::string &path)>;
+using parser_factory = std::function<std::unique_ptr<configuration_source>(const std::string &path)>;
 
 // The error a registration can produce.
 using extension_error = std::string;
@@ -85,7 +85,7 @@ public:
 
     // Builds a source for `path` if its extension is claimed; nullptr otherwise.
     // The extension is the final dot-suffix of the path's last segment.
-    [[nodiscard]] std::unique_ptr<source> open(const std::string &path) const
+    [[nodiscard]] std::unique_ptr<configuration_source> open(const std::string &path) const
     {
         auto it = m_parsers.find(extension_of(path));
         if(it == m_parsers.end())

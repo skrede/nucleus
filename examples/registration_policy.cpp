@@ -19,7 +19,7 @@ class reserve_sources final : public nucleus::registration_policy
 public:
     nucleus::policy_verdict review(const nucleus::registration_request &request) override
     {
-        if(request.kind == nucleus::registration_kind::source)
+        if(request.kind == nucleus::registration_kind::configuration_source)
             return nucleus::policy_verdict::reject("sources are reserved by the host");
         return nucleus::policy_verdict::accept();
     }

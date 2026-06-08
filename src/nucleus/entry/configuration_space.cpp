@@ -7,9 +7,9 @@
 #include "nucleus/schema/schema_enforcer.h"
 #include "nucleus/schema/schema_registry.h"
 
-#include "nucleus/source/source_registry.h"
+#include "nucleus/configuration_source/configuration_source_registry.h"
 
-#include "nucleus/source/argv/argv_source.h"
+#include "nucleus/configuration_source/argv/argv_source.h"
 
 #include "nucleus/entry/chain_walker.h"
 #include "nucleus/entry/strain_scope.h"
@@ -93,7 +93,7 @@ public:
     // The shared resolve path: build the transient borrowing context, fold the
     // stack (expand-then-layer with provenance), freeze the immutable result, and
     // transition the state machine. Enforces the no-resolve-after-resolve rule.
-    load_result run_resolve(const source_stack &stack)
+    load_result run_resolve(const configuration_source_stack &stack)
     {
         if(phase != facade_phase::configurable)
             return unexpected(std::string(
@@ -132,7 +132,7 @@ public:
 
     schema_registry schema;
     tokenizer_registry tokenizer;
-    source_registry sources;
+    configuration_source_registry sources;
     facade_phase phase = facade_phase::configurable;
     std::optional<std::string> m_selection;
     strain_scope_policy m_strain_scope = strain_scope_policy::space_open_container_closed;
@@ -266,9 +266,9 @@ registration_result configuration_space::register_source(std::string name, owner
 {
     if(auto guard = reject_if_resolved(m_impl->phase, "registering a source"); !guard)
         return guard;
-    if(auto verdict = m_impl->review(registration_kind::source, owner); !verdict)
+    if(auto verdict = m_impl->review(registration_kind::configuration_source, owner); !verdict)
         return verdict;
-    m_impl->sources.add(source_spec{std::move(name)}, std::move(owner));
+    m_impl->sources.add(configuration_source_spec{std::move(name)}, std::move(owner));
     return registration_ok();
 }
 
@@ -301,12 +301,12 @@ std::string configuration_space::generate_completion(shell which, std::string_vi
 
 facade_phase configuration_space::phase() const noexcept { return m_impl->phase; }
 
-load_result configuration_space::resolve(const source_stack &stack)
+load_result configuration_space::load_configuration(const configuration_source_stack &stack)
 {
     return m_impl->run_resolve(stack);
 }
 
-load_result configuration_space::load(const source_stack &stack)
+load_result configuration_space::load(const configuration_source_stack &stack)
 {
     return m_impl->run_resolve(stack);
 }
@@ -320,7 +320,7 @@ load_result configuration_space::load(std::vector<std::string> args)
     argv_source argv(std::move(args));
     argv.recognize_with([&schema](const key_path &path) { return schema.recognizes(path); });
 
-    source_stack stack;
+    configuration_source_stack stack;
     stack.add(argv, layer_rank::argv, "argv");
     return m_impl->run_resolve(stack);
 }
@@ -337,7 +337,7 @@ load_result configuration_space::load(std::vector<std::string> paths, const docu
 
     // Root-first order: index 0 is the deepest ancestor, last is the requested file.
     // document_rank assigns monotonically increasing ranks so derived layers win ties.
-    source_stack stack;
+    configuration_source_stack stack;
     for(std::size_t i = 0; i < entries.size(); ++i)
         stack.add(*entries[i].src, document_rank(i), nucleus::format("path:{}", entries[i].path));
     return m_impl->run_resolve(stack);
@@ -361,7 +361,7 @@ load_result configuration_space::load(std::vector<std::string> args,
 
     // Documents layer beneath argv (which always wins): document ranks are clamped
     // strictly below argv so even a long chain cannot tie or outrank the CLI.
-    source_stack stack;
+    configuration_source_stack stack;
     for(std::size_t i = 0; i < entries.size(); ++i)
         stack.add(*entries[i].src, document_rank(i), nucleus::format("path:{}", entries[i].path));
     stack.add(argv, layer_rank::argv, "argv");

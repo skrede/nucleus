@@ -43,7 +43,7 @@ int main()
             <server name="yang"><port>22</port></server>
         </cluster>)";
 
-    auto make = [document](const std::string &) -> std::unique_ptr<nucleus::source> {
+    auto make = [document](const std::string &) -> std::unique_ptr<nucleus::configuration_source> {
         return std::make_unique<nucleus::xml::xml_source>(
             nucleus::xml::xml_source::from_string(document));
     };

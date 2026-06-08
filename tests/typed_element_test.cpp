@@ -13,7 +13,7 @@
 
 #include "nucleus/entry/configuration.h"
 
-#include "nucleus/source/source.h"
+#include "nucleus/configuration_source/configuration_source.h"
 
 #include "nucleus/xml/xml_source.h"
 
@@ -29,7 +29,7 @@ using nucleus::anchor;
 
 namespace {
 
-std::unique_ptr<nucleus::source> xml_of(const std::string &text)
+std::unique_ptr<nucleus::configuration_source> xml_of(const std::string &text)
 {
     return std::make_unique<nucleus::xml::xml_source>(
         nucleus::xml::xml_source::from_string(text));
@@ -80,10 +80,10 @@ TEST_CASE("built-in int32_t converter", "[typed][builtin][integer]")
             nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
 
         auto src = xml_of("<cfg><val>42</val></cfg>");
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*src, std::size_t{10}, "doc");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(loaded);
         auto r = loaded.value().get_as<int32_t>("cfg/val");
         REQUIRE(r);
@@ -98,10 +98,10 @@ TEST_CASE("built-in int32_t converter", "[typed][builtin][integer]")
             nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
 
         auto src = xml_of("<cfg><val>-1</val></cfg>");
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*src, std::size_t{10}, "doc");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(loaded);
         auto r = loaded.value().get_as<int32_t>("cfg/val");
         REQUIRE(r);
@@ -449,10 +449,10 @@ TEST_CASE("custom point2 converter round-trips through typed_element", "[typed][
                                            make_point2_converter()));
 
         auto src = xml_of("<cfg><pos>3,7</pos></cfg>");
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*src, std::size_t{10}, "doc");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(loaded);
         auto r = loaded.value().get_as<point2>("cfg/pos");
         REQUIRE(r);
@@ -468,10 +468,10 @@ TEST_CASE("custom point2 converter round-trips through typed_element", "[typed][
                                            make_point2_converter()));
 
         auto src = xml_of("<cfg><pos>3</pos></cfg>");
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*src, std::size_t{10}, "doc");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(!loaded);
     }
 
@@ -484,10 +484,10 @@ TEST_CASE("custom point2 converter round-trips through typed_element", "[typed][
                                            make_point2_converter()));
 
         auto src = xml_of("<cfg><pos>abc,7</pos></cfg>");
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*src, std::size_t{10}, "doc");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(!loaded);
     }
 }
@@ -502,7 +502,7 @@ TEST_CASE("conversion failure at resolve surfaces diagnostic", "[typed][failure]
         struct pair_t
         {
             nucleus::configuration_space engine;
-            std::unique_ptr<nucleus::source> src;
+            std::unique_ptr<nucleus::configuration_source> src;
         };
         pair_t p;
         p.engine.register_element(nucleus::element("cfg", anchor::root()));
@@ -515,10 +515,10 @@ TEST_CASE("conversion failure at resolve surfaces diagnostic", "[typed][failure]
     SECTION("error contains the path")
     {
         auto p = make_engine_and_src("notanumber");
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*p.src, std::size_t{10}, "doc");
 
-        auto loaded = p.engine.resolve(stack);
+        auto loaded = p.engine.load_configuration(stack);
         REQUIRE(!loaded);
         INFO("error: " << loaded.error());
         REQUIRE(loaded.error().find("cfg/val") != std::string::npos);
@@ -527,10 +527,10 @@ TEST_CASE("conversion failure at resolve surfaces diagnostic", "[typed][failure]
     SECTION("error contains the layer label")
     {
         auto p = make_engine_and_src("notanumber");
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*p.src, std::size_t{10}, "doc");
 
-        auto loaded = p.engine.resolve(stack);
+        auto loaded = p.engine.load_configuration(stack);
         REQUIRE(!loaded);
         INFO("error: " << loaded.error());
         // The convert() format is "conversion failed for '...': ... (layer: doc)"
@@ -540,10 +540,10 @@ TEST_CASE("conversion failure at resolve surfaces diagnostic", "[typed][failure]
     SECTION("error contains the converter reason substring")
     {
         auto p = make_engine_and_src("notanumber");
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*p.src, std::size_t{10}, "doc");
 
-        auto loaded = p.engine.resolve(stack);
+        auto loaded = p.engine.load_configuration(stack);
         REQUIRE(!loaded);
         INFO("error: " << loaded.error());
         // "notanumber" is pure alphabetic: the corrected converter returns
@@ -574,10 +574,10 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
         engine.register_element(nucleus::element("name", anchor::keyspace("cfg")));
 
         auto src = xml_of("<cfg><name>hello</name></cfg>");
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*src, std::size_t{10}, "doc");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(loaded);
 
         auto r = loaded.value().get_as<int32_t>("nonexistent");
@@ -594,10 +594,10 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
         engine.register_element(nucleus::element("name", anchor::keyspace("cfg")));
 
         auto src = xml_of("<cfg><name>hello</name></cfg>");
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*src, std::size_t{10}, "doc");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(loaded);
 
         auto r = loaded.value().get_as<int32_t>("cfg/name");
@@ -614,10 +614,10 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
             nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
 
         auto src = xml_of("<cfg><val>42</val></cfg>");
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*src, std::size_t{10}, "doc");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(loaded);
 
         // The converter stored int32_t; requesting float is a mismatch.
@@ -636,10 +636,10 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
         engine.register_element(el);
 
         auto src = xml_of("<cfg><nums>1</nums><nums>2</nums></cfg>");
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*src, std::size_t{10}, "doc");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(loaded);
 
         // The path carries a typed collection; get_as is the wrong accessor.
@@ -663,10 +663,10 @@ TEST_CASE("get_all_as error distinctions", "[typed][accessor][errors]")
             nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
 
         auto src = xml_of("<cfg><val>42</val></cfg>");
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*src, std::size_t{10}, "doc");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(loaded);
 
         // The path carries a scalar typed value; get_all_as is the wrong accessor.
@@ -693,10 +693,10 @@ TEST_CASE("repeated x typed: get_all_as", "[typed][repeated][typed]")
         engine.register_element(el);
 
         auto src = xml_of("<cfg><val>1</val><val>2</val><val>3</val></cfg>");
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*src, std::size_t{10}, "doc");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(loaded);
 
         auto r = loaded.value().get_all_as<int32_t>("cfg/val");
@@ -715,10 +715,10 @@ TEST_CASE("repeated x typed: get_all_as", "[typed][repeated][typed]")
 
         // Second element (index 1) is bad.
         auto src = xml_of("<cfg><val>1</val><val>bad</val><val>3</val></cfg>");
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*src, std::size_t{10}, "doc");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(!loaded);
         INFO("error: " << loaded.error());
         // The convert() format for repeated: "... element [1]: ..."
@@ -800,10 +800,10 @@ TEST_CASE("typed + identity: resolve interaction", "[typed][identity][resolve]")
             "  <id>42</id>"
             "  <score>100</score>"
             "</container>");
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*src, std::size_t{10}, "doc");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(loaded);
 
         // The typed non-key field converts normally.
@@ -848,10 +848,10 @@ TEST_CASE("typed + identity: resolve interaction", "[typed][identity][resolve]")
             "  <id>7</id>"
             "  <score>5</score>"
             "</container>");
-        nucleus::source_stack stack;
+        nucleus::configuration_source_stack stack;
         stack.add(*src, std::size_t{10}, "doc");
 
-        auto loaded = engine.resolve(stack);
+        auto loaded = engine.load_configuration(stack);
         REQUIRE(loaded);
         REQUIRE(!loaded.value().empty());
     }

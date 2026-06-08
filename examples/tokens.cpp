@@ -8,7 +8,7 @@
 
 #include "nucleus/entry/precedence.h"
 
-#include "nucleus/source/env/env_source.h"
+#include "nucleus/configuration_source/env/env_source.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -34,11 +34,11 @@ int main()
     values.set("service/region", "${string.upper(${env.NUCLEUS_REGION})}")
           .set("service/instance", "${string.lower(NODE-${env.NUCLEUS_REGION})}");
 
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(values, nucleus::layer_rank::base, "config");
 
     nucleus::configuration_space engine;
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     if(!loaded)
     {
         std::cerr << "resolve failed: " << loaded.error() << '\n';

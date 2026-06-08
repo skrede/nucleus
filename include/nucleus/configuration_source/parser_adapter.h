@@ -1,8 +1,8 @@
-#ifndef HPP_GUARD_NUCLEUS_SOURCE_PARSER_ADAPTER_H
-#define HPP_GUARD_NUCLEUS_SOURCE_PARSER_ADAPTER_H
+#ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_PARSER_ADAPTER_H
+#define HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_PARSER_ADAPTER_H
 
-#include "nucleus/source/parser.h"
-#include "nucleus/source/source.h"
+#include "nucleus/configuration_source/parser.h"
+#include "nucleus/configuration_source/configuration_source.h"
 
 #include <memory>
 #include <utility>
@@ -15,7 +15,7 @@ namespace nucleus {
 // through exactly the same virtual path a hand-written source does, so the seam
 // has one contract, not two. The adapter owns the parser by value.
 template <Parser T>
-class parser_adapter final : public source
+class parser_adapter final : public configuration_source
 {
 public:
     explicit parser_adapter(T parser) : m_parser(std::move(parser)) {}
@@ -25,7 +25,7 @@ public:
         return m_parser.capabilities();
     }
 
-    [[nodiscard]] source_result pull() override { return m_parser.pull(); }
+    [[nodiscard]] configuration_source_result pull() override { return m_parser.pull(); }
 
 private:
     T m_parser;
@@ -34,7 +34,7 @@ private:
 // Adapts a Parser-concept struct into an owning `source` handle ready for
 // registration through the virtual seam.
 template <Parser T>
-[[nodiscard]] std::unique_ptr<source> adapt_parser(T parser)
+[[nodiscard]] std::unique_ptr<configuration_source> adapt_parser(T parser)
 {
     return std::make_unique<parser_adapter<T>>(std::move(parser));
 }

@@ -1,10 +1,10 @@
 #include "nucleus/log_sink.h"
 #include "nucleus/capability.h"
 
-#include "nucleus/source/source.h"
-#include "nucleus/source/feature_gate.h"
+#include "nucleus/configuration_source/configuration_source.h"
+#include "nucleus/configuration_source/feature_gate.h"
 
-#include "nucleus/source/env/env_source.h"
+#include "nucleus/configuration_source/env/env_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 

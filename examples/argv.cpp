@@ -4,7 +4,7 @@
 // recognizer ties the source to the set of admissible keys. In lenient mode an
 // unrecognized flag is stored with a warning; in strict mode it fails the pull.
 
-#include "nucleus/source/argv/argv_source.h"
+#include "nucleus/configuration_source/argv/argv_source.h"
 
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"

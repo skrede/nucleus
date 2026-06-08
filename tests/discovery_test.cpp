@@ -1,8 +1,8 @@
 #include "nucleus/capability.h"
 
-#include "nucleus/source/source.h"
-#include "nucleus/source/discovery.h"
-#include "nucleus/source/extension_registry.h"
+#include "nucleus/configuration_source/configuration_source.h"
+#include "nucleus/configuration_source/discovery.h"
+#include "nucleus/configuration_source/extension_registry.h"
 
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
@@ -21,7 +21,7 @@ namespace {
 
 // A trivial source that reports which file it was built from, so a test can
 // assert discovery wired the right factory to the right path.
-class labelled_source final : public nucleus::source
+class labelled_source final : public nucleus::configuration_source
 {
 public:
     explicit labelled_source(std::string label) : m_label(std::move(label)) {}
@@ -31,9 +31,9 @@ public:
         return {};
     }
 
-    [[nodiscard]] nucleus::source_result pull() override
+    [[nodiscard]] nucleus::configuration_source_result pull() override
     {
-        nucleus::source_batch batch;
+        nucleus::configuration_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(
             "where", nucleus::value::owned(m_label), capabilities()));
         return batch;
@@ -47,7 +47,7 @@ private:
 // see which parser claimed the discovered file.
 nucleus::parser_factory tagging_factory(std::string format)
 {
-    return [format](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    return [format](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         return std::make_unique<labelled_source>(format + ":" + path);
     };
 }

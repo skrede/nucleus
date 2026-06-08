@@ -12,7 +12,7 @@
 
 #include "nucleus/entry/precedence.h"
 
-#include "nucleus/source/env/env_source.h"
+#include "nucleus/configuration_source/env/env_source.h"
 
 #include <iostream>
 
@@ -30,10 +30,10 @@ int main()
     nucleus::env_source values;
     values.set("server/mode", "http");
 
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(values, nucleus::layer_rank::base, "config");
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     if(!loaded)
     {
         std::cout << "rejected as expected: " << loaded.error() << '\n';

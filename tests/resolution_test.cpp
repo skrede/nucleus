@@ -4,13 +4,13 @@
 #include "nucleus/entry/precedence.h"
 #include "nucleus/entry/resolution_context.h"
 
-#include "nucleus/source/env/env_source.h"
+#include "nucleus/configuration_source/env/env_source.h"
 
 #include "nucleus/schema/schema_registry.h"
 
-#include "nucleus/source/source_registry.h"
+#include "nucleus/configuration_source/configuration_source_registry.h"
 
-#include "nucleus/source/argv/argv_source.h"
+#include "nucleus/configuration_source/argv/argv_source.h"
 
 #include "nucleus/tokenizer/tokenizer_builder.h"
 #include "nucleus/tokenizer/builtin_tokenizers.h"
@@ -38,13 +38,13 @@ TEST_CASE("resolve folds a precedence stack and freezes an immutable result", "[
     nucleus::env_source env;
     env.set("server/port", "8080"); // overrides the default port
 
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(defaults, nucleus::layer_rank::defaults, "defaults");
     stack.add(env, nucleus::layer_rank::env, "env");
 
     REQUIRE(engine.phase() == nucleus::facade_phase::configurable);
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -66,11 +66,11 @@ TEST_CASE("value and provenance are recorded in the same fold and cannot diverge
     nucleus::env_source over;
     over.set("a", "from-overlay");
 
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(base, nucleus::layer_rank::base, "base");
     stack.add(over, nucleus::layer_rank::overlay, "overlay");
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     const auto &config = loaded.value();
 
@@ -98,14 +98,14 @@ TEST_CASE("explicit precedence is argv over overlay over base over env over defa
     nucleus::argv_source argv(std::vector<std::string>{"--k=argv"});
 
     // Added out of rank order on purpose: the fold sorts by rank, not arrival.
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(overlay,  nucleus::layer_rank::overlay,  "overlay");
     stack.add(defaults, nucleus::layer_rank::defaults, "defaults");
     stack.add(argv,     nucleus::layer_rank::argv,     "argv");
     stack.add(env,      nucleus::layer_rank::env,      "env");
     stack.add(base,     nucleus::layer_rank::base,     "base");
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     REQUIRE(loaded.value().get("k") == "argv");
     REQUIRE(loaded.value().provenance_of("k")->layer == "argv");
@@ -115,17 +115,17 @@ TEST_CASE("registration after resolve is a state-machine error", "[resolution][l
 {
     nucleus::configuration_space engine;
     nucleus::env_source one; one.set("k", "v");
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(one, nucleus::layer_rank::base, "base");
 
-    REQUIRE(engine.resolve(stack));
+    REQUIRE(engine.load_configuration(stack));
 
     auto reg = engine.register_schema("late");
     REQUIRE_FALSE(reg);
     REQUIRE(reg.error().find("resolved") != std::string::npos);
 
     // A second resolve is likewise refused by the state machine.
-    auto again = engine.resolve(stack);
+    auto again = engine.load_configuration(stack);
     REQUIRE_FALSE(again);
     REQUIRE(again.error().find("already resolved") != std::string::npos);
 }
@@ -159,7 +159,7 @@ TEST_CASE("argv outranks any number of config documents", "[resolution][preceden
     // winning value names which layer won. With four-plus documents a naive
     // base+index rank would push a document to or past the argv rank; the clamp
     // keeps every document strictly below argv.
-    auto make = [](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto make = [](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         auto src = std::make_unique<nucleus::env_source>();
         src->set("k", path);
         return src;
@@ -179,7 +179,7 @@ TEST_CASE("the last config document wins among layered paths", "[resolution][pre
 {
     // No argv: the last path in the list must still win over earlier ones even
     // though all documents past the base are clamped to the same band.
-    auto make = [](const std::string &path) -> std::unique_ptr<nucleus::source> {
+    auto make = [](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         auto src = std::make_unique<nucleus::env_source>();
         src->set("k", path);
         return src;
@@ -203,12 +203,12 @@ TEST_CASE("an unresolvable token fails the fold loudly rather than passing throu
     // env/string), so the ${...} cannot resolve.
     env.set("greeting", "${nope.whatever}");
 
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(env, nucleus::layer_rank::base, "base");
 
     // The fold reports the offending key instead of silently layering the
     // unexpanded text.
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().find("greeting") != std::string::npos);
 }
@@ -223,10 +223,10 @@ TEST_CASE("the facade resolves core builtin tokens with no extra registration", 
     env.set("greeting", "${string.upper(hi)}");
     env.set("token", "${string.concat(a,b,c)}");
 
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(env, nucleus::layer_rank::base, "base");
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     REQUIRE(loaded.value().get("greeting") == "HI");
     REQUIRE(loaded.value().get("token") == "abc");
@@ -246,10 +246,10 @@ TEST_CASE("install_tokenizer injects an additional tokenizer reachable at resolv
     nucleus::env_source env;
     env.set("msg", "${greet.world}");
 
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(env, nucleus::layer_rank::base, "base");
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     REQUIRE(loaded);
     REQUIRE(loaded.value().get("msg") == "hello world");
 }
@@ -266,7 +266,7 @@ TEST_CASE("tokens are expanded per-source before layering (expand-then-layer)", 
     nucleus::env_source env;
     env.set("loud", "${string.upper(hi)}").set("plain", "kept");
 
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(env, nucleus::layer_rank::base, "base");
 
     nucleus::resolution_context ctx(schema, tokenizer);

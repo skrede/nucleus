@@ -7,8 +7,8 @@
 #include "nucleus/keyspace/key_path.h"
 #include "nucleus/keyspace/keyspace.h"
 
-#include "nucleus/source/argv/argv_source.h"
-#include "nucleus/source/argv/cli_surface.h"
+#include "nucleus/configuration_source/argv/argv_source.h"
+#include "nucleus/configuration_source/argv/cli_surface.h"
 
 #include <catch2/catch_test_macros.hpp>
 

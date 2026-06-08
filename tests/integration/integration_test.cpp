@@ -11,7 +11,7 @@
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/converters.h"
 
-#include "nucleus/source/env/env_source.h"
+#include "nucleus/configuration_source/env/env_source.h"
 
 #include <cstdint>
 #include <iostream>
@@ -28,10 +28,10 @@ int main()
     nucleus::env_source values;
     values.set("server/port", "8080").set("server/name", "edge");
 
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(values, nucleus::layer_rank::base, "base");
 
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     if(!loaded)
     {
         std::cerr << "resolve failed: " << loaded.error() << '\n';

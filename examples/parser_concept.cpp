@@ -6,9 +6,9 @@
 
 #include "nucleus/capability.h"
 
-#include "nucleus/source/parser.h"
-#include "nucleus/source/source.h"
-#include "nucleus/source/parser_adapter.h"
+#include "nucleus/configuration_source/parser.h"
+#include "nucleus/configuration_source/configuration_source.h"
+#include "nucleus/configuration_source/parser_adapter.h"
 
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
@@ -26,9 +26,9 @@ struct table_parser
         return {nucleus::capability::ordering};
     }
 
-    [[nodiscard]] nucleus::source_result pull() const
+    [[nodiscard]] nucleus::configuration_source_result pull() const
     {
-        nucleus::source_batch batch;
+        nucleus::configuration_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(
             "x/y", nucleus::value::owned("from-parser"), capabilities()));
         return batch;
@@ -42,7 +42,7 @@ static_assert(nucleus::Parser<table_parser>,
 
 int main()
 {
-    std::unique_ptr<nucleus::source> source = nucleus::adapt_parser(table_parser{});
+    std::unique_ptr<nucleus::configuration_source> source = nucleus::adapt_parser(table_parser{});
 
     auto pulled = source->pull();
     if(!pulled)

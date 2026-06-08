@@ -9,7 +9,7 @@
 #include "nucleus/capability.h"
 #include "nucleus/entry/precedence.h"
 
-#include "nucleus/source/source.h"
+#include "nucleus/configuration_source/configuration_source.h"
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
 
@@ -19,7 +19,7 @@ namespace {
 
 // A source backed by an in-memory table. It owns its values, so views never
 // outlive a backing buffer and no retained_buffer is needed.
-class table_source final : public nucleus::source
+class table_source final : public nucleus::configuration_source
 {
 public:
     [[nodiscard]] nucleus::capability_descriptor capabilities() const override
@@ -27,9 +27,9 @@ public:
         return {nucleus::capability::nesting};
     }
 
-    [[nodiscard]] nucleus::source_result pull() override
+    [[nodiscard]] nucleus::configuration_source_result pull() override
     {
-        nucleus::source_batch batch;
+        nucleus::configuration_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(
             "service/name", nucleus::value::owned("edge"), capabilities()));
         batch.entries.push_back(nucleus::make_entry(
@@ -44,11 +44,11 @@ int main()
 {
     table_source source;
 
-    nucleus::source_stack stack;
+    nucleus::configuration_source_stack stack;
     stack.add(source, nucleus::layer_rank::base, "table");
 
     nucleus::configuration_space engine;
-    auto loaded = engine.resolve(stack);
+    auto loaded = engine.load_configuration(stack);
     if(!loaded)
     {
         std::cerr << "resolve failed: " << loaded.error() << '\n';

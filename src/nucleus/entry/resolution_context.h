@@ -14,7 +14,7 @@
 #include "nucleus/schema/schema_enforcer.h"
 #include "nucleus/schema/schema_registry.h"
 
-#include "nucleus/source/inherit_declaration.h"
+#include "nucleus/configuration_source/inherit_declaration.h"
 
 #include "nucleus/diagnostics/key_suggester.h"
 
@@ -84,14 +84,14 @@ public:
     // arrival) rank overwrites a lower one (last-writer-wins within rank). Every
     // batch's retained buffer is pinned in this context until freeze() copies the
     // values out, so no view dangles mid-fold.
-    [[nodiscard]] expected<std::monostate, resolve_fold_error> fold(const source_stack &stack)
+    [[nodiscard]] expected<std::monostate, resolve_fold_error> fold(const configuration_source_stack &stack)
     {
-        std::vector<const source_layer *> ordered;
+        std::vector<const configuration_source_layer *> ordered;
         ordered.reserve(stack.layers().size());
-        for(const source_layer &layer : stack.layers())
+        for(const configuration_source_layer &layer : stack.layers())
             ordered.push_back(&layer);
         std::stable_sort(ordered.begin(), ordered.end(),
-                         [](const source_layer *a, const source_layer *b) {
+                         [](const configuration_source_layer *a, const configuration_source_layer *b) {
                              return a->rank < b->rank;
                          });
 
@@ -109,18 +109,18 @@ public:
                 repeated_paths.insert(el.declared_path().str());
         }
 
-        for(const source_layer *layer : ordered)
+        for(const configuration_source_layer *layer : ordered)
         {
             if(layer->src == nullptr)
                 continue;
 
             layer->src->apply_projection(projection);
-            source_result pulled = layer->src->pull();
+            configuration_source_result pulled = layer->src->pull();
             if(!pulled)
                 return unexpected(nucleus::format("source '{}': {}",
                                               layer->label, pulled.error()));
 
-            source_batch &batch = pulled.value();
+            configuration_source_batch &batch = pulled.value();
 
             // Tracks which repeated paths have already received their first entry
             // from this layer (triggering replace). Reset per layer so a new layer
