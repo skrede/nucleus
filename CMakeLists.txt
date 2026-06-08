@@ -238,6 +238,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
 
     add_library(nucleus_source_xml
         src/nucleus/xml/xml_source.cpp
+        src/nucleus/xml/xml_writer.cpp
     )
     add_library(nucleus::source_xml ALIAS nucleus_source_xml)
     nucleus_enable_coverage(nucleus_source_xml)

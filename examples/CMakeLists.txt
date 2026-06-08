@@ -57,4 +57,11 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_SOURCE_DIR}/src
     )
+
+    add_executable(xml_persist xml_persist.cpp)
+    target_link_libraries(xml_persist PRIVATE nucleus::nucleus nucleus::source_xml)
+    target_include_directories(xml_persist PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+    )
 endif()

@@ -132,6 +132,19 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     )
     add_test(NAME inherit_chain_test COMMAND inherit_chain_test)
 
+    # XML persistence round-trip: load a configuration from XML, write it back via
+    # the pugixml WRITE API inside the xml module, and re-load it -- keys, scalar
+    # values, and repeated collections must survive intact.
+    add_executable(xml_persist_test xml_persist_test.cpp)
+    nucleus_enable_coverage(xml_persist_test)
+    target_link_libraries(xml_persist_test
+        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+    target_include_directories(xml_persist_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+    )
+    add_test(NAME xml_persist_test COMMAND xml_persist_test)
+
     add_executable(integration_shape_test integration_shape_test.cpp)
     nucleus_enable_coverage(integration_shape_test)
     target_link_libraries(integration_shape_test
