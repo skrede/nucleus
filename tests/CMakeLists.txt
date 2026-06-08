@@ -177,6 +177,25 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         ${CMAKE_SOURCE_DIR}/src
     )
     add_test(NAME typed_shape_test COMMAND typed_shape_test)
+
+    # Vagus parity harness: drives real vagus-shaped fixture documents through the
+    # public load_configuration() surface and diffs the serialized resolved keyspace
+    # against pre-committed goldens hand-authored from nucleus's own semantics. Cases
+    # are discovered by directory scan under the fixture dir, so new topology fixtures
+    # are added as data files with no source/CMake edit. Runs in the default ctest set
+    # (this XML-module block), making it the merge-blocking parity gate.
+    add_executable(vagus_parity_test vagus_parity/vagus_parity_test.cpp)
+    nucleus_enable_coverage(vagus_parity_test)
+    target_link_libraries(vagus_parity_test
+        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+    target_include_directories(vagus_parity_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/vagus_parity
+    )
+    target_compile_definitions(vagus_parity_test PRIVATE
+        NUCLEUS_PARITY_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/vagus_parity/fixtures")
+    add_test(NAME vagus_parity_test COMMAND vagus_parity_test)
 endif()
 
 # ---------------------------------------------------------------------------

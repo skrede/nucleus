@@ -1,0 +1,7 @@
+# Intentional-divergence fixture. The committed expected.txt below is DELIBERATELY
+# wrong relative to nucleus's real resolved output (the greeting value is altered).
+# expect_divergence=true makes the harness assert the diff routine REPORTS a
+# mismatch -- proving detection works on a real diff, not only on matching runs.
+# Do NOT "fix" this golden to agree with the engine: its divergence is the point.
+input=source.xml
+expect_divergence=true
