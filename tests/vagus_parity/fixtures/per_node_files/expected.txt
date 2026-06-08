@@ -1,0 +1,4 @@
+vagus/node/configuration/message/description = each binary loads its own per-node XML; no shared base [path:yin.xml]
+vagus/node/configuration/message/greeting = hello from yin (per_node_files layout) [path:yin.xml]
+vagus/node/configuration/name = demo [path:yin.xml]
+vagus/node/logger/log_level = info [path:yin.xml]

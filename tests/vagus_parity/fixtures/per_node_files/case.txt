@@ -1,0 +1,3 @@
+# per_node_files: each node has its own standalone file; the single node resolves
+# without a selection.
+input=yin.xml
