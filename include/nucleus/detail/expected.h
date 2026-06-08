@@ -183,28 +183,28 @@ public:
     }
 
     template <typename F>
-    constexpr auto and_then(F &&f) &
+    [[nodiscard]] constexpr auto and_then(F &&f) &
     {
         using U = std::remove_cvref_t<std::invoke_result_t<F, T &>>;
         if (has_value()) return std::invoke(std::forward<F>(f), std::get<0>(m_data));
         return U(unexpect, std::get<1>(m_data));
     }
     template <typename F>
-    constexpr auto and_then(F &&f) const &
+    [[nodiscard]] constexpr auto and_then(F &&f) const &
     {
         using U = std::remove_cvref_t<std::invoke_result_t<F, const T &>>;
         if (has_value()) return std::invoke(std::forward<F>(f), std::get<0>(m_data));
         return U(unexpect, std::get<1>(m_data));
     }
     template <typename F>
-    constexpr auto and_then(F &&f) &&
+    [[nodiscard]] constexpr auto and_then(F &&f) &&
     {
         using U = std::remove_cvref_t<std::invoke_result_t<F, T &&>>;
         if (has_value()) return std::invoke(std::forward<F>(f), std::get<0>(std::move(m_data)));
         return U(unexpect, std::get<1>(std::move(m_data)));
     }
     template <typename F>
-    constexpr auto and_then(F &&f) const &&
+    [[nodiscard]] constexpr auto and_then(F &&f) const &&
     {
         using U = std::remove_cvref_t<std::invoke_result_t<F, const T &&>>;
         if (has_value()) return std::invoke(std::forward<F>(f), std::get<0>(std::move(m_data)));
@@ -212,28 +212,28 @@ public:
     }
 
     template <typename F>
-    constexpr auto or_else(F &&f) &
+    [[nodiscard]] constexpr auto or_else(F &&f) &
     {
         using G = std::remove_cvref_t<std::invoke_result_t<F, E &>>;
         if (has_value()) return G(std::in_place, std::get<0>(m_data));
         return std::invoke(std::forward<F>(f), std::get<1>(m_data));
     }
     template <typename F>
-    constexpr auto or_else(F &&f) const &
+    [[nodiscard]] constexpr auto or_else(F &&f) const &
     {
         using G = std::remove_cvref_t<std::invoke_result_t<F, const E &>>;
         if (has_value()) return G(std::in_place, std::get<0>(m_data));
         return std::invoke(std::forward<F>(f), std::get<1>(m_data));
     }
     template <typename F>
-    constexpr auto or_else(F &&f) &&
+    [[nodiscard]] constexpr auto or_else(F &&f) &&
     {
         using G = std::remove_cvref_t<std::invoke_result_t<F, E &&>>;
         if (has_value()) return G(std::in_place, std::get<0>(std::move(m_data)));
         return std::invoke(std::forward<F>(f), std::get<1>(std::move(m_data)));
     }
     template <typename F>
-    constexpr auto or_else(F &&f) const &&
+    [[nodiscard]] constexpr auto or_else(F &&f) const &&
     {
         using G = std::remove_cvref_t<std::invoke_result_t<F, const E &&>>;
         if (has_value()) return G(std::in_place, std::get<0>(std::move(m_data)));
@@ -241,43 +241,43 @@ public:
     }
 
     template <typename F>
-    constexpr auto transform(F &&f) &
+    [[nodiscard]] constexpr auto transform(F &&f) &
     {
         return transform_impl(std::forward<F>(f), *this);
     }
     template <typename F>
-    constexpr auto transform(F &&f) const &
+    [[nodiscard]] constexpr auto transform(F &&f) const &
     {
         return transform_impl(std::forward<F>(f), *this);
     }
     template <typename F>
-    constexpr auto transform(F &&f) &&
+    [[nodiscard]] constexpr auto transform(F &&f) &&
     {
         return transform_impl(std::forward<F>(f), std::move(*this));
     }
     template <typename F>
-    constexpr auto transform(F &&f) const &&
+    [[nodiscard]] constexpr auto transform(F &&f) const &&
     {
         return transform_impl(std::forward<F>(f), std::move(*this));
     }
 
     template <typename F>
-    constexpr auto transform_error(F &&f) &
+    [[nodiscard]] constexpr auto transform_error(F &&f) &
     {
         return transform_error_impl(std::forward<F>(f), *this);
     }
     template <typename F>
-    constexpr auto transform_error(F &&f) const &
+    [[nodiscard]] constexpr auto transform_error(F &&f) const &
     {
         return transform_error_impl(std::forward<F>(f), *this);
     }
     template <typename F>
-    constexpr auto transform_error(F &&f) &&
+    [[nodiscard]] constexpr auto transform_error(F &&f) &&
     {
         return transform_error_impl(std::forward<F>(f), std::move(*this));
     }
     template <typename F>
-    constexpr auto transform_error(F &&f) const &&
+    [[nodiscard]] constexpr auto transform_error(F &&f) const &&
     {
         return transform_error_impl(std::forward<F>(f), std::move(*this));
     }
@@ -397,28 +397,28 @@ public:
     }
 
     template <typename F>
-    constexpr auto and_then(F &&f) &
+    [[nodiscard]] constexpr auto and_then(F &&f) &
     {
         using U = std::remove_cvref_t<std::invoke_result_t<F>>;
         if (has_value()) return std::invoke(std::forward<F>(f));
         return U(unexpect, std::get<1>(m_data));
     }
     template <typename F>
-    constexpr auto and_then(F &&f) const &
+    [[nodiscard]] constexpr auto and_then(F &&f) const &
     {
         using U = std::remove_cvref_t<std::invoke_result_t<F>>;
         if (has_value()) return std::invoke(std::forward<F>(f));
         return U(unexpect, std::get<1>(m_data));
     }
     template <typename F>
-    constexpr auto and_then(F &&f) &&
+    [[nodiscard]] constexpr auto and_then(F &&f) &&
     {
         using U = std::remove_cvref_t<std::invoke_result_t<F>>;
         if (has_value()) return std::invoke(std::forward<F>(f));
         return U(unexpect, std::get<1>(std::move(m_data)));
     }
     template <typename F>
-    constexpr auto and_then(F &&f) const &&
+    [[nodiscard]] constexpr auto and_then(F &&f) const &&
     {
         using U = std::remove_cvref_t<std::invoke_result_t<F>>;
         if (has_value()) return std::invoke(std::forward<F>(f));
@@ -426,28 +426,28 @@ public:
     }
 
     template <typename F>
-    constexpr auto or_else(F &&f) &
+    [[nodiscard]] constexpr auto or_else(F &&f) &
     {
         using G = std::remove_cvref_t<std::invoke_result_t<F, E &>>;
         if (has_value()) return G();
         return std::invoke(std::forward<F>(f), std::get<1>(m_data));
     }
     template <typename F>
-    constexpr auto or_else(F &&f) const &
+    [[nodiscard]] constexpr auto or_else(F &&f) const &
     {
         using G = std::remove_cvref_t<std::invoke_result_t<F, const E &>>;
         if (has_value()) return G();
         return std::invoke(std::forward<F>(f), std::get<1>(m_data));
     }
     template <typename F>
-    constexpr auto or_else(F &&f) &&
+    [[nodiscard]] constexpr auto or_else(F &&f) &&
     {
         using G = std::remove_cvref_t<std::invoke_result_t<F, E &&>>;
         if (has_value()) return G();
         return std::invoke(std::forward<F>(f), std::get<1>(std::move(m_data)));
     }
     template <typename F>
-    constexpr auto or_else(F &&f) const &&
+    [[nodiscard]] constexpr auto or_else(F &&f) const &&
     {
         using G = std::remove_cvref_t<std::invoke_result_t<F, const E &&>>;
         if (has_value()) return G();
@@ -455,43 +455,43 @@ public:
     }
 
     template <typename F>
-    constexpr auto transform(F &&f) &
+    [[nodiscard]] constexpr auto transform(F &&f) &
     {
         return transform_impl(std::forward<F>(f), *this);
     }
     template <typename F>
-    constexpr auto transform(F &&f) const &
+    [[nodiscard]] constexpr auto transform(F &&f) const &
     {
         return transform_impl(std::forward<F>(f), *this);
     }
     template <typename F>
-    constexpr auto transform(F &&f) &&
+    [[nodiscard]] constexpr auto transform(F &&f) &&
     {
         return transform_impl(std::forward<F>(f), std::move(*this));
     }
     template <typename F>
-    constexpr auto transform(F &&f) const &&
+    [[nodiscard]] constexpr auto transform(F &&f) const &&
     {
         return transform_impl(std::forward<F>(f), std::move(*this));
     }
 
     template <typename F>
-    constexpr auto transform_error(F &&f) &
+    [[nodiscard]] constexpr auto transform_error(F &&f) &
     {
         return transform_error_impl(std::forward<F>(f), *this);
     }
     template <typename F>
-    constexpr auto transform_error(F &&f) const &
+    [[nodiscard]] constexpr auto transform_error(F &&f) const &
     {
         return transform_error_impl(std::forward<F>(f), *this);
     }
     template <typename F>
-    constexpr auto transform_error(F &&f) &&
+    [[nodiscard]] constexpr auto transform_error(F &&f) &&
     {
         return transform_error_impl(std::forward<F>(f), std::move(*this));
     }
     template <typename F>
-    constexpr auto transform_error(F &&f) const &&
+    [[nodiscard]] constexpr auto transform_error(F &&f) const &&
     {
         return transform_error_impl(std::forward<F>(f), std::move(*this));
     }

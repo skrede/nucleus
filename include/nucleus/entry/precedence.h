@@ -12,16 +12,11 @@
 
 namespace nucleus {
 
-// The canonical precedence ranks for the v0.1 layering, lowest -> highest. A
-// higher rank wins a key contest. The names describe ROLES, not formats: a
-// document source can be a base or an overlay; argv and env are flat sources. The
-// order is the locked one -- argv overrides everything, defaults are the floor:
-//
+// Canonical precedence ranks, lowest -> highest (a higher rank wins a key contest);
+// the names describe roles, not formats. Locked order:
 //   defaults < env < base < overlay < argv
-//
-// The document band (base..overlay-1) spans 700 slots (200..899), supporting
-// inheritance chains up to length 700 before clamping. A host that needs finer
-// control sets an explicit numeric rank per layer; these are just the anchors.
+// The document band (200..899) spans 700 slots for inheritance chains; a host may
+// set an explicit numeric rank per layer instead of these anchors.
 enum class layer_rank : std::size_t
 {
     defaults = 0,
@@ -45,9 +40,9 @@ struct configuration_source_layer
     owner_token owner;
 };
 
-// An ordered set of source layers with explicit precedence -- the argument
-// load()/resolve() folds. It is just a list of borrowed sources plus their ranks;
-// the same fold runs whether there is one layer or five (no per-format branch).
+// An ordered set of layers with explicit precedence -- the argument
+// load_configuration() folds. A list of borrowed sources plus ranks; the same fold
+// runs for one layer or five (no per-format branch).
 class configuration_source_stack
 {
 public:

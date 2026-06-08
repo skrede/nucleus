@@ -8,18 +8,11 @@
 
 namespace nucleus {
 
-// The typed anchor a host attaches a schema registration to. An anchor names the
-// keyspace position a schema element hangs under -- it is code/schema-side only
-// and NEVER appears in document text (a document carries values, not anchors).
-//
-// Two forms, both typed values (not strings the way the keyspace path is):
-//
-//   anchor::root()            -- attach a top-level keyspace (e.g. "plexus")
-//   anchor::keyspace("name")  -- attach UNDER an already-defined keyspace node
-//
-// The distinction is the referential-integrity hinge: a root anchor introduces a
-// new top-level keyspace; a keyspace anchor may only resolve if that keyspace was
-// already defined. The registry enforces that (see schema_registry).
+// The typed keyspace position a schema element hangs under -- code/schema-side only,
+// never in document text. Two forms: anchor::root() introduces a new top-level
+// keyspace; anchor::keyspace("name") attaches under an already-defined node. The
+// distinction is the referential-integrity hinge a keyspace anchor may only attach
+// under a node that already exists (enforced by schema_registry).
 class anchor
 {
 public:

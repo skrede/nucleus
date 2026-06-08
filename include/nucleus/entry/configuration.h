@@ -17,19 +17,11 @@
 
 namespace nucleus {
 
-// The immutable, self-owning resolved result of a load()/resolve().
-//
-// It is produced by copying OUT every resolved value into an owned std::string at
-// the resolve boundary, after which the source buffers (raw bytes, document
-// parser arenas) are dropped. Because it holds only owned strings -- never a
-// view into any dropped buffer -- it outlives every source by construction and is
-// freely, safely readable from any thread (it exposes only const reads). This is
-// the same copy-out-then-freeze snapshot mechanism a future clone/transfer will
-// reuse.
-//
-// Provenance travels with the values: alongside each value's text the
-// configuration carries the origin recorded in the SAME fold step that set the
-// value, so get() and provenance_of() can never disagree about a key.
+// The immutable, self-owning result of a load. Every value is copied out into an
+// owned string at the load boundary and the source buffers are dropped, so it holds
+// no view into any dropped buffer, outlives every source, and is freely thread-safe
+// to read (const reads only). Provenance travels with the values -- recorded in the
+// same fold step -- so get() and provenance_of() can never disagree about a key.
 class configuration
 {
 public:

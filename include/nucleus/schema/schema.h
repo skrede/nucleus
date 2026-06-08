@@ -17,35 +17,13 @@
 
 namespace nucleus {
 
-// One declared element of a schema: a named node attached under an anchor. The
-// schema is the single upstream authority -- the set of registered elements
-// dictates BOTH the document structure (what paths may carry values) and the CLI
-// surface (what flags exist), because both are projections of the same elements.
-//
-// Constraints live here and are deliberately KEPT DISTINCT on separate axes:
-//
-//   required -- the element must carry a value once resolved. A presence
-//               constraint: "this field has to be set."
-//
-//   identity -- the element is the PRIMARY KEY of its parent container: the
-//               single field whose value names WHICH instance of a repeatable
-//               container an overlay or a slice applies to. There is at MOST one
-//               identity per container (enforced at attach). It powers slicing
-//               (select the instance whose key equals a value, prune the rest)
-//               and overlay matching across multi-instance documents. A role
-//               constraint: "this field selects the instance." Primary key and
-//               identity are the same concept; `identity` is the in-code spelling.
-//
-//   unique   -- the element's value must be DISTINCT across sibling instances of
-//               its parent container. Unlike identity there may be MANY unique
-//               fields, and a unique field carries no selector role and is never
-//               consumed by a slice. A primary key is implicitly unique (it must
-//               distinguish instances); an ordinary unique field is just "no two
-//               siblings may share this value."
-//
-// These are independent axes. A field can be required without being a key, a key
-// without being required, unique without being a key, or any combination. The
-// model never collapses one into another; the enforcer checks each separately.
+// One declared element of a schema: a named node under an anchor. The set of
+// elements is the single upstream authority dictating both the document structure
+// and the CLI surface (both are projections of the same elements). Its constraints
+// are independent axes the enforcer checks separately: required (must carry a
+// value), identity (the parent container's single primary key / slice selector,
+// at most one per container), and unique (value distinct across sibling instances,
+// many allowed, no selector role; a primary key is implicitly unique).
 struct schema_element
 {
     // The element's own name (the leaf segment it contributes to the keyspace).
@@ -53,7 +31,7 @@ struct schema_element
     // Where it attaches. root() introduces `name` as a top-level keyspace;
     // keyspace(path) attaches `name` under an already-defined node at `path`.
     anchor at = anchor::root();
-    // Presence constraint: must carry a value at resolve.
+    // Presence constraint: must carry a value at load.
     bool required = false;
     // Role constraint: this element is its parent container's primary key. At
     // most one per container; implies value-uniqueness across instances.
@@ -76,10 +54,9 @@ struct schema_element
     std::vector<std::string> allowed_values;
 
     // Optional type-erased converter: converts a resolved string_view to a typed
-    // value at the resolve boundary. Null (the default) means no conversion --
-    // the element is untyped and its value is only available as a string via
-    // get(). Set together with type_identity by the typed_element factory.
-    // Converters must not throw; return unexpected() for any conversion error.
+    // value at the load boundary. Null (default) means untyped (string-only via
+    // get()). Set with type_identity by the typed_element factory. Converters must
+    // not throw; return unexpected() for any conversion error.
     std::function<expected<std::any, std::string>(std::string_view)> converter;
 
     // The std::type_index of the type T that the converter produces. Present iff
@@ -128,13 +105,10 @@ struct schema_element
     return e;
 }
 
-// The primary key of its parent container: the one field a slice selects on.
-// Exactly one per configuration space -- it is the single slice selector for
-// the whole schema hierarchy. A key VALUE must not shadow a declared sibling
-// element's name (an instance literally named like a leaf can never be
-// bucketed; resolve rejects the collision loudly). `identity_element` is the
-// established spelling; `primary_key_element` is an alias for hosts that think
-// in primary-key terms.
+// The primary key of its parent container: the single slice selector for the whole
+// schema hierarchy (exactly one per configuration space). A key VALUE must not shadow
+// a declared sibling element's name (the load rejects the collision loudly).
+// `primary_key_element` is an alias for hosts that think in primary-key terms.
 [[nodiscard]] inline schema_element identity_element(std::string name, anchor at)
 {
     schema_element e = element(std::move(name), std::move(at));

@@ -26,32 +26,27 @@ struct origin
     owner_token owner;
 };
 
-// The provenance map: key path (canonical string) -> winning origin. It is
-// written in the SAME fold step that sets the value, so a value and its origin
-// are recorded together and cannot diverge. Like the keyspace it is built mutable
-// during resolution and copied out into the immutable configuration.
+// The provenance map: key path -> winning origin, written in the SAME fold step that
+// sets the value so the two cannot diverge. Like the keyspace it is built mutable
+// during the load and copied out into the immutable configuration.
 class provenance
 {
 public:
     provenance() = default;
 
-    // Records (last-write-wins, mirroring the keyspace fold) the origin of the
-    // value at `key`. Called in lockstep with keyspace::set so the two never
-    // disagree about which source provided the winning value. The rank of the
-    // FIRST layer to set the key is retained separately across overwrites: the
-    // winning origin answers "who provided this value?", the first rank answers
-    // "which layer introduced this key?" -- the slice step bounds a strain's
-    // defining layer by introduction, not by whoever overwrote it last.
+    // Records (last-write-wins, in lockstep with keyspace::set) the origin at `key`.
+    // The FIRST layer's rank is retained separately across overwrites: the winning
+    // origin answers "who provided this value?", the first rank "which layer
+    // introduced this key?" -- the slice step bounds a strain by introduction.
     void record(const std::string &key, origin where)
     {
         m_first_ranks.try_emplace(key, where.rank);
         m_origins.insert_or_assign(key, std::move(where));
     }
 
-    // Drops the origin recorded at `key` (no-op when absent) -- the counterpart
-    // of record() for entries the resolve boundary re-lays under a different
-    // path, so provenance never names a key the keyspace no longer holds.
-    // Clears both scalar and collection origins.
+    // Drops the origin at `key` (no-op when absent) -- the counterpart of record()
+    // for entries the load re-lays under a different path, so provenance never names
+    // a key the keyspace no longer holds. Clears scalar and collection origins.
     void forget(const std::string &key)
     {
         m_origins.erase(key);

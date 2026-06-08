@@ -15,21 +15,14 @@
 
 namespace nucleus {
 
-// A schema-derived projection (defined in nucleus/schema/projection.h). Forward
-// declared so the seam can accept one without source.h pulling the schema header;
-// a source that actually consults it includes the projection header itself.
+// A schema-derived projection (nucleus/schema/projection.h). Forward declared so
+// the seam can accept one without pulling the schema header.
 class schema_projection;
 
-// A type-erased handle that pins whatever a source's view-values point into for
-// the lifetime of a batch. For a zero-copy source the entries hold string_views
-// into a retained buffer (raw bytes, or a parser's own document arena); this
-// handle owns that buffer so the views stay valid until the batch is dropped.
-// A source whose entries are all owned attaches an empty handle.
-//
-// The contract: a batch's entries are only safe to read while its
-// retained_buffer is alive. Resolution copies values out (value::to_owned) and
-// then drops the batch -- after which no view escapes. This is the single
-// load-bearing lifetime invariant of the source layer.
+// Type-erased handle owning the buffer a batch's view-values point into, keeping
+// them valid until the batch is dropped (an all-owned source attaches an empty one).
+// Load-bearing invariant: entries are safe to read only while the retained_buffer is
+// alive; the load copies values out (value::to_owned) and then drops the batch.
 class retained_buffer
 {
 public:
@@ -68,13 +61,11 @@ using configuration_source_error = std::string;
 // The result of pulling from a source.
 using configuration_source_result = expected<configuration_source_batch, configuration_source_error>;
 
-// The runtime-virtual source/provider seam -- THE boundary of the engine. A
-// source yields keyspace entries (path -> value + capability flags) from its
-// input, and declares a capability descriptor. It is deliberately NOT a
-// "document parser": env and argv are sources too; a document source is just
-// the common subcategory that shares a view-node model. Authors who prefer a
-// compile-time surface write a Parser-concept struct and inject it through
-// parser_adapter<T>, which satisfies this same interface.
+// The runtime-virtual source/provider seam -- THE boundary of the engine. It yields
+// keyspace entries (path -> value + capability flags) and a capability descriptor.
+// Deliberately not a "document parser": env and argv are sources too; a document
+// source is just the subcategory sharing a view-node model. A compile-time author
+// writes a Parser-concept struct injected through parser_adapter<T>.
 class configuration_source
 {
 public:
@@ -83,20 +74,16 @@ public:
     // The affordances this source can represent. Drives feature gating.
     [[nodiscard]] virtual capability_descriptor capabilities() const = 0;
 
-    // Offers the source a schema-derived projection just before pull(). A
-    // document source uses it to project repeatable keyed containers faithfully
-    // (one instance per key value) instead of collapsing repeated siblings. The
-    // default is a no-op: flat sources (env, argv) and any source that does not
-    // opt in ignore it, so the seam stays backward-compatible. Called by the
-    // resolve fold for every source it folds.
+    // Offers a schema-derived projection just before pull() so a document source can
+    // project repeatable keyed containers faithfully. Default no-op (flat sources
+    // ignore it). Called by the load fold for every source it folds.
     virtual void apply_projection(const schema_projection &) {}
 
     // Returns the declared parent, if any. Called after pull(). No-op for flat sources.
     [[nodiscard]] virtual inherit_declaration inheritance() const { return {}; }
 
-    // Produces this source's entries. On success the batch carries any retained
-    // buffer the entries' views depend on. On failure a configuration_source_error explains
-    // why (the core never silently drops a source).
+    // Produces this source's entries. On success the batch carries any retained buffer
+    // the views depend on; on failure a configuration_source_error explains why.
     [[nodiscard]] virtual configuration_source_result pull() = 0;
 };
 

@@ -9,23 +9,13 @@
 
 namespace nucleus {
 
-// A schema-derived view a source consults to project repeatable containers
-// faithfully. The schema is the single authority over document structure, but a
-// source is built before resolve and cannot see the schema directly; the resolve
-// fold hands it this projection (via source::apply_projection) just before
-// pulling, so a document source can distinguish container instances instead of
-// collapsing repeated siblings last-wins.
-//
-// It carries one fact: for a container path (the keyspace path of a repeatable
-// element), the name of its PRIMARY KEY field -- the child whose value names which
-// instance an entry belongs to. A repeatable `server` element under `cluster`
-// with primary key `name` registers container "cluster/server" -> key "name", so
-// a source emits `cluster/server/<name-value>/...` for each instance rather than
-// overwriting one `cluster/server/...`.
-//
-// Domain-neutral: it names no format and no host vocabulary, only keyspace paths
-// and field names the schema declared. An empty projection (no keyed containers,
-// or no schema) leaves a source's default structural walk unchanged.
+// A schema-derived view the load fold hands a source (via apply_projection) just
+// before pulling, so a document source can distinguish container instances instead
+// of collapsing repeated siblings last-wins. It carries one fact per container path:
+// the name of its PRIMARY KEY field, so a source emits cluster/server/<name>/... per
+// instance rather than overwriting one cluster/server/.... Domain-neutral: only
+// keyspace paths and declared field names; an empty projection leaves the default
+// structural walk unchanged.
 class schema_projection
 {
 public:

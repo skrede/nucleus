@@ -9,20 +9,12 @@
 
 namespace nucleus {
 
-// A view-or-owned keyspace value.
-//
-// A zero-copy source yields a view: a string_view into a retained buffer (the
-// raw bytes of a non-document source, or a parser's own document arena). A
-// transforming source yields an owned value: a string it built itself. The
-// engine never mandates ownership -- the source decides, and the discriminator
-// here makes the wrong state unrepresentable: a view always carries a stable
-// string_view; an owned value always carries the std::string that backs it.
-//
-// The lifetime contract for the view alternative is external and load-bearing:
-// the buffer the view points into must outlive every read of that view. A
-// source that produces views attaches the owning handle that pins that buffer
-// (see configuration_source_batch). At the resolve boundary, typed values are copied out and
-// the buffers are dropped -- after which only owned values survive.
+// A view-or-owned keyspace value: a zero-copy source yields a view (string_view into
+// a retained buffer), a transforming source yields an owned string. The discriminator
+// makes the wrong state unrepresentable.
+// Load-bearing view contract: the buffer a view points into must outlive every read;
+// the producing source pins it (see configuration_source_batch). At the load boundary
+// values are copied out and the buffers are dropped, leaving only owned values.
 class value
 {
 public:
@@ -50,9 +42,8 @@ public:
         return std::get<1>(m_data);
     }
 
-    // Severs any buffer dependency: returns an owned value holding a copy of the
-    // text. This is the copy-out performed at the resolve boundary so the result
-    // outlives every source buffer.
+    // Severs any buffer dependency: an owned copy of the text. This is the copy-out
+    // at the load boundary so the result outlives every source buffer.
     [[nodiscard]] value to_owned() const { return owned(std::string(text())); }
 
 private:

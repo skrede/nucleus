@@ -12,15 +12,11 @@
 
 namespace nucleus {
 
-// The hierarchical keyspace -- the path -> value store every source writes into
-// and every consumer reads from. It is build-mutable here; the resolve boundary
-// copies its values out into the immutable configuration (a later phase).
-//
-// Hierarchy is structural, not just lexical: a value lives at a leaf path, and
-// the intermediate paths that lead to it are addressable as nodes. children_of()
-// surfaces the immediate sub-segments under a prefix, which is what schema
-// referential integrity and the CLI surface projection walk. Ordering is
-// deterministic (std::map) so iteration and diagnostics are stable.
+// The hierarchical path -> value store every source writes into and every consumer
+// reads from. Build-mutable here; the load copies its values out into the immutable
+// configuration. Hierarchy is structural: children_of() surfaces the immediate
+// sub-segments under a prefix (what schema referential integrity and the CLI surface
+// projection walk). Ordering is deterministic (std::map) for stable diagnostics.
 class keyspace
 {
 public:
@@ -33,10 +29,9 @@ public:
         m_values.insert_or_assign(path.str(), std::move(v));
     }
 
-    // Removes the value at a leaf path (no-op when none is set there). Used by
-    // the resolve boundary when it re-lays entries under different paths, e.g.
-    // stripping a transient key segment onto the unified hierarchy. Clears both
-    // the scalar map and the collection map at this path.
+    // Removes the value at a leaf path (no-op when none is set there). Used by the
+    // load when it re-lays entries under different paths (e.g. stripping a transient
+    // key segment). Clears both the scalar and the collection map at this path.
     void remove(const key_path &path)
     {
         m_values.erase(path.str());
