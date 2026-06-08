@@ -262,6 +262,7 @@ TEST_CASE("tokens are expanded per-source before layering (expand-then-layer)", 
     nucleus::schema_registry schema;
     nucleus::tokenizer_registry tokenizer;
     tokenizer.add(nucleus::make_string_tokenizer(), nucleus::owner_token{});
+    nucleus::converter_registry converters;
 
     nucleus::env_source env;
     env.set("loud", "${string.upper(hi)}").set("plain", "kept");
@@ -269,7 +270,7 @@ TEST_CASE("tokens are expanded per-source before layering (expand-then-layer)", 
     nucleus::configuration_source_stack stack;
     stack.add(env, nucleus::layer_rank::base, "base");
 
-    nucleus::resolution_context ctx(schema, tokenizer);
+    nucleus::resolution_context ctx(schema, tokenizer, converters);
     auto folded = ctx.fold(stack);
     REQUIRE(folded);
 

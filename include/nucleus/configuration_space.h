@@ -18,11 +18,13 @@
 
 #include "nucleus/diagnostics/conflict_report.h"
 
+#include <any>
 #include <memory>
 #include <string>
 #include <vector>
 #include <cstddef>
 #include <variant>
+#include <typeindex>
 #include <functional>
 #include <string_view>
 
@@ -112,6 +114,23 @@ public:
     registration_result register_tokenizer(std::string name, owner_token owner = {});
     registration_result register_source(std::string name, owner_token owner = {});
 
+    // Registers a value converter for a type, keyed by std::type_index. At resolve
+    // a typed element with no per-element converter uses the converter registered
+    // here for its type; a per-element converter on the element overrides it. Same
+    // state-machine/policy seam as the other registrations.
+    registration_result register_converter(std::type_index id,
+        std::function<expected<std::any, std::string>(std::string_view)> conv,
+        owner_token owner = {});
+
+    // Convenience: register a converter for T (keyed by typeid(T)).
+    template<typename T>
+    registration_result register_converter(
+        std::function<expected<std::any, std::string>(std::string_view)> conv,
+        owner_token owner = {})
+    {
+        return register_converter(std::type_index(typeid(T)), std::move(conv), std::move(owner));
+    }
+
     // Installs an already-built tokenizer (core builtins install automatically; this
     // injects an additional host-built category). Moved in; a later registration of
     // the same category shadows it. Same state-machine/policy seam as register_tokenizer.
@@ -120,6 +139,7 @@ public:
     [[nodiscard]] std::size_t schema_count() const noexcept;
     [[nodiscard]] std::size_t tokenizer_count() const noexcept;
     [[nodiscard]] std::size_t source_count() const noexcept;
+    [[nodiscard]] std::size_t converter_count() const noexcept;
 
     // Key-path collisions detected during registration: each report names the key
     // and every claimant (location + owner token) WITHOUT choosing a winner. The

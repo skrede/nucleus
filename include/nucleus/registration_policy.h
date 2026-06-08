@@ -17,6 +17,7 @@ enum class registration_kind : std::uint8_t
     schema,
     tokenizer,
     configuration_source,
+    converter,
 };
 
 [[nodiscard]] constexpr std::string_view to_string(registration_kind kind) noexcept
@@ -26,6 +27,7 @@ enum class registration_kind : std::uint8_t
         case registration_kind::schema:    return "schema";
         case registration_kind::tokenizer: return "tokenizer";
         case registration_kind::configuration_source: return "source";
+        case registration_kind::converter: return "converter";
     }
     return "schema";
 }

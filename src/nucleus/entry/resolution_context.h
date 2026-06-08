@@ -13,6 +13,7 @@
 
 #include "nucleus/schema/schema_enforcer.h"
 #include "nucleus/schema/schema_registry.h"
+#include "nucleus/schema/converter_registry.h"
 
 #include "nucleus/configuration_source/inherit_declaration.h"
 
@@ -63,13 +64,17 @@ class resolution_context
 {
 public:
     resolution_context(schema_registry &schema,
-                        tokenizer_registry &tokenizer) noexcept
-        : m_schema(schema), m_tokenizer(tokenizer)
+                        tokenizer_registry &tokenizer,
+                        converter_registry &converters) noexcept
+        : m_schema(schema), m_tokenizer(tokenizer), m_converters(converters)
     {
     }
 
     [[nodiscard]] schema_registry &schema() noexcept { return m_schema; }
     [[nodiscard]] tokenizer_registry &tokenizer() noexcept { return m_tokenizer; }
+    // Borrowed (never owned), like the other siblings; read by convert() to supply
+    // a converter for a typed element that carries no per-element converter.
+    [[nodiscard]] converter_registry &converters() noexcept { return m_converters; }
 
     [[nodiscard]] keyspace &building() noexcept { return m_building; }
     [[nodiscard]] provenance &origins() noexcept { return m_provenance; }
@@ -597,17 +602,29 @@ public:
         return unexpected(std::move(report));
     }
 
-    // Runs the typed conversion pass: for every schema element that has a
-    // converter, visits the corresponding path in the post-slice building
-    // keyspace. Absent typed paths are silently skipped (absence is orthogonal
-    // to required-ness, which validate() enforces). A conversion failure fails
-    // the resolve with the path, the converter's reason, and the winning layer
-    // label from provenance. Must run after validate() and before freeze().
+    // Runs the typed conversion pass: for every typed schema element, resolves the
+    // effective converter -- the element's own per-element converter if present,
+    // otherwise the converter the borrowed converter_registry holds for the
+    // element's type_identity -- and converts the corresponding path in the
+    // post-slice building keyspace. A typed element with neither a per-element nor
+    // a registry converter is left unconverted (absence, not error). Absent typed
+    // paths are silently skipped (absence is orthogonal to required-ness, which
+    // validate() enforces). A conversion failure fails the resolve with the path,
+    // the converter's reason, and the winning layer label from provenance. Must
+    // run after validate() and before freeze().
     [[nodiscard]] expected<std::monostate, resolve_fold_error> convert()
     {
         for(const schema_element &el : m_schema.elements())
         {
-            if(!el.converter || !el.type_identity.has_value())
+            if(!el.type_identity.has_value())
+                continue;
+
+            // The element's own converter wins; otherwise the registry's converter
+            // for the element's type. Neither resolved leaves the element untyped.
+            const converter_registry::converter *conv =
+                el.converter ? &el.converter
+                             : m_converters.find(el.type_identity.value());
+            if(conv == nullptr)
                 continue;
 
             const std::string path_str = el.declared_path().str();
@@ -626,7 +643,7 @@ public:
                 typed_col.reserve(col->size());
                 for(std::size_t i = 0; i < col->size(); ++i)
                 {
-                    auto res = el.converter((*col)[i].text());
+                    auto res = (*conv)((*col)[i].text());
                     if(!res)
                     {
                         std::string layer_label = "unknown layer";
@@ -648,7 +665,7 @@ public:
                 if(v == nullptr)
                     continue;
 
-                auto res = el.converter(v->text());
+                auto res = (*conv)(v->text());
                 if(!res)
                 {
                     std::string layer_label = "unknown layer";
@@ -821,6 +838,7 @@ private:
 
     schema_registry &m_schema;
     tokenizer_registry &m_tokenizer;
+    converter_registry &m_converters;
 
     keyspace m_building;
     provenance m_provenance;

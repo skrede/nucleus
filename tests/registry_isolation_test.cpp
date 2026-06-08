@@ -3,6 +3,8 @@
 #include "nucleus/registry/flat_registry.h"
 
 #include "nucleus/schema/schema_registry.h"
+#include "nucleus/schema/converter_registry.h"
+#include "nucleus/schema/converters.h"
 
 #include "nucleus/configuration_source/configuration_source_registry.h"
 
@@ -23,23 +25,32 @@
 static_assert(nucleus::flat_registry<nucleus::schema_registry>);
 static_assert(nucleus::flat_registry<nucleus::tokenizer_registry>);
 static_assert(nucleus::flat_registry<nucleus::configuration_source_registry>);
+static_assert(nucleus::flat_registry<nucleus::converter_registry>);
 
 // Strengthened pin: each registry is independently constructible AND exposes no
-// constructor that takes either of its siblings by reference or pointer. Naming
-// the two siblings of each registry makes the entangling-constructor check span
-// the whole flat set.
+// constructor that takes any of its siblings by reference or pointer. Naming the
+// three siblings of each registry makes the entangling-constructor check span the
+// whole flat set of four registries.
 static_assert(nucleus::independently_constructible<
               nucleus::schema_registry,
               nucleus::tokenizer_registry,
-              nucleus::configuration_source_registry>::value);
+              nucleus::configuration_source_registry,
+              nucleus::converter_registry>::value);
 static_assert(nucleus::independently_constructible<
               nucleus::tokenizer_registry,
               nucleus::schema_registry,
-              nucleus::configuration_source_registry>::value);
+              nucleus::configuration_source_registry,
+              nucleus::converter_registry>::value);
 static_assert(nucleus::independently_constructible<
               nucleus::configuration_source_registry,
               nucleus::schema_registry,
-              nucleus::tokenizer_registry>::value);
+              nucleus::tokenizer_registry,
+              nucleus::converter_registry>::value);
+static_assert(nucleus::independently_constructible<
+              nucleus::converter_registry,
+              nucleus::schema_registry,
+              nucleus::tokenizer_registry,
+              nucleus::configuration_source_registry>::value);
 
 TEST_CASE("each registry is constructed and exercised with no sibling in scope", "[isolation]")
 {
@@ -63,6 +74,13 @@ TEST_CASE("each registry is constructed and exercised with no sibling in scope",
         sources.add(nucleus::configuration_source_spec{"argv"}, nucleus::owner_token{});
         REQUIRE(sources.size() == 1);
     }
+
+    SECTION("converter registry alone")
+    {
+        nucleus::converter_registry converters;
+        converters.set<int>(nucleus::make_scalar_converter<int>());
+        REQUIRE(converters.size() == 1);
+    }
 }
 
 TEST_CASE("siblings collaborate only through a hand-built resolution context", "[isolation]")
@@ -76,14 +94,17 @@ TEST_CASE("siblings collaborate only through a hand-built resolution context", "
     nucleus::schema_registry schema;
     nucleus::tokenizer_registry tokenizer;
     nucleus::configuration_source_registry sources;
+    nucleus::converter_registry converters;
 
-    nucleus::resolution_context ctx(schema, tokenizer);
+    nucleus::resolution_context ctx(schema, tokenizer, converters);
 
     ctx.schema().add(nucleus::schema_spec{"k"}, nucleus::owner_token{});
     ctx.tokenizer().add(nucleus::tokenizer_builder("noop").build(), nucleus::owner_token{});
+    ctx.converters().set<int>(nucleus::make_scalar_converter<int>());
     sources.add(nucleus::configuration_source_spec{"env"}, nucleus::owner_token{});
 
     REQUIRE(schema.size() == 1);
     REQUIRE(tokenizer.size() == 1);
     REQUIRE(sources.size() == 1);
+    REQUIRE(converters.size() == 1);
 }

@@ -500,6 +500,20 @@ template<typename T>
     return typed_element<T>(std::move(name), std::move(at), make_scalar_converter<T>());
 }
 
+// registered_element<T>(name, at) -- declares a typed element carrying ONLY a
+// type identity and NO inline converter. The converter is supplied at resolve by
+// the configuration_space's converter registry (keyed by this type_identity); a
+// per-element converter is left empty so the registry's converter applies.
+template<typename T>
+[[nodiscard]] schema_element registered_element(std::string name, anchor at)
+{
+    schema_element el;
+    el.name = std::move(name);
+    el.at = std::move(at);
+    el.type_identity = std::type_index(typeid(T));
+    return el;
+}
+
 }
 
 #endif

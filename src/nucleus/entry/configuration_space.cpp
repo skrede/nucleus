@@ -6,6 +6,7 @@
 
 #include "nucleus/schema/schema_enforcer.h"
 #include "nucleus/schema/schema_registry.h"
+#include "nucleus/schema/converter_registry.h"
 
 #include "nucleus/configuration_source/configuration_source_registry.h"
 
@@ -31,7 +32,7 @@
 
 namespace nucleus {
 
-// The facade composition-owns the three flat sibling registries plus the host
+// The facade composition-owns the four flat sibling registries plus the host
 // registration policy. This is the single place the registries are owned; they
 // hold no references to one another.
 class configuration_space::impl
@@ -99,7 +100,7 @@ public:
             return unexpected(std::string(
                 "load/resolve is not allowed: the facade is already resolved"));
 
-        resolution_context ctx(schema, tokenizer);
+        resolution_context ctx(schema, tokenizer, converters);
         if(auto folded = ctx.fold(stack); !folded)
             return unexpected(std::move(folded).error());
 
@@ -133,6 +134,7 @@ public:
     schema_registry schema;
     tokenizer_registry tokenizer;
     configuration_source_registry sources;
+    converter_registry converters;
     facade_phase phase = facade_phase::configurable;
     std::optional<std::string> m_selection;
     strain_scope_policy m_strain_scope = strain_scope_policy::space_open_container_closed;
@@ -272,11 +274,26 @@ registration_result configuration_space::register_source(std::string name, owner
     return registration_ok();
 }
 
+registration_result configuration_space::register_converter(
+    std::type_index id,
+    std::function<expected<std::any, std::string>(std::string_view)> conv,
+    owner_token owner)
+{
+    if(auto guard = reject_if_resolved(m_impl->phase, "registering a converter"); !guard)
+        return guard;
+    if(auto verdict = m_impl->review(registration_kind::converter, owner); !verdict)
+        return verdict;
+    m_impl->converters.add(id, std::move(conv));
+    return registration_ok();
+}
+
 std::size_t configuration_space::schema_count() const noexcept { return m_impl->schema.size(); }
 
 std::size_t configuration_space::tokenizer_count() const noexcept { return m_impl->tokenizer.size(); }
 
 std::size_t configuration_space::source_count() const noexcept { return m_impl->sources.size(); }
+
+std::size_t configuration_space::converter_count() const noexcept { return m_impl->converters.size(); }
 
 std::vector<conflict_report> configuration_space::conflicts() const { return m_impl->conflicts(); }
 
