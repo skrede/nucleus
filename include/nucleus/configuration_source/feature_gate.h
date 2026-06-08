@@ -102,6 +102,60 @@ using gate_result = expected<gated_features, gate_error>;
     return out;
 }
 
+// The whole-stack generalization of gate_features. A HARD capability is satisfied
+// when ANY layer in the stack supports it (union): the flat env/argv layers are
+// always present, so a single capable layer (e.g. a document) suffices. On a HARD
+// shortfall the error names the consumer, the capability, and EVERY layer label
+// (none provide it). A SOFT shortfall degrades observably (warn + recorded note)
+// and resolution proceeds. An empty stack with a HARD requirement is still loud.
+[[nodiscard]] inline gate_result gate_stack(std::string_view consumer,
+        const std::vector<std::pair<std::string, capability_descriptor>> &layers,
+        const std::vector<feature_requirement> &required,
+        log_sink &log)
+{
+    gated_features out;
+    for(const feature_requirement &req : required)
+    {
+        bool provided = false;
+        for(const auto &layer : layers)
+        {
+            if(layer.second.supports(req.cap))
+            {
+                provided = true;
+                break;
+            }
+        }
+        if(provided)
+        {
+            out.honored.push_back(req.cap);
+            continue;
+        }
+
+        // No layer provides it -- name every lacking layer so the diagnostic is actionable.
+        std::string lacking;
+        for(const auto &layer : layers)
+        {
+            if(!lacking.empty())
+                lacking += ", ";
+            lacking += layer.first;
+        }
+
+        if(req.strength == requirement_strength::required)
+        {
+            return unexpected(nucleus::format(
+                "no source can satisfy capability '{}' required by '{}'; lacking layers: {}",
+                to_string(req.cap), consumer, lacking));
+        }
+
+        std::string note = nucleus::format(
+            "'{}' degraded: no source provides optional capability '{}'",
+            consumer, to_string(req.cap));
+        log.log(log_level::warn, note);
+        out.degraded.push_back(degradation{req.cap, std::move(note)});
+    }
+    return out;
+}
+
 }
 
 #endif
