@@ -11,11 +11,14 @@
 //   char
 //   std::string
 //
-// Numeric converters use std::from_chars for locale-independent parsing.
-// Toolchain floor required for floating-point from_chars:
-//   GCC 11+, LLVM Clang 14+, MSVC 19.29+, Apple Clang 15+
-// (Apple's libc++ gained FP from_chars only in Xcode 15; plain "Clang 14+"
-// is NOT sufficient on macOS.)
+// Numeric converters use std::from_chars for locale-independent parsing. The
+// integral overloads are universally available; the floating-point ones are
+// not -- Apple's libc++ (through at least the Xcode 15/16 toolchains) ships the
+// integral from_chars while leaving float/double =deleted. The float and double
+// converters therefore route through detail::fp_from_chars, which uses
+// std::from_chars where <charconv> is complete and falls back to strtof/strtod
+// otherwise (see the shim below for the exact capability probe and the locale
+// caveat on the fallback path).
 //
 // Converters must not throw; return fail() for any conversion error.
 
@@ -25,17 +28,102 @@
 
 #include <any>
 #include <cctype>
+#include <cerrno>
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <cstdlib>
 #include <charconv>
 #include <optional>
 #include <algorithm>
 #include <typeindex>
 #include <functional>
 #include <string_view>
+#include <type_traits>
 
 namespace nucleus {
+
+// ---------------------------------------------------------------------------
+// Floating-point from_chars shim
+//
+// std::from_chars for float/double belongs to <charconv>, but several shipping
+// standard libraries provide the integral overloads while still *lacking* the
+// floating-point ones -- notably Apple's libc++ through (at least) the Xcode 15
+// and 16 toolchains, where the float/double overloads are explicitly =deleted.
+// A direct std::from_chars call on a float there is a hard compile error.
+//
+// __cpp_lib_to_chars is defined by the standard library only once <charconv> is
+// complete *including* the floating-point overloads, so it cleanly separates the
+// full implementations (libstdc++ 11+, MSVC STL, non-Apple libc++ 14+) from the
+// integral-only ones. Where it is absent we fall back to strtof/strtod over a
+// NUL-terminated copy and translate the outcome back into a from_chars-shaped
+// {ptr, ec} expressed in the original view's coordinates, so the dispatch in the
+// converters below is byte-for-byte identical on every toolchain.
+//
+// NOTE: on the fallback path the parse follows the active C locale's numeric
+// conventions; the std::from_chars path (every modern toolchain) is
+// unconditionally locale-independent.
+//
+// Define NUCLEUS_FORCE_FP_FROM_CHARS_FALLBACK to exercise the strtof/strtod path
+// on a toolchain that does have floating-point from_chars (used by the tests to
+// cover the fallback everywhere).
+// ---------------------------------------------------------------------------
+namespace detail {
+
+struct fp_parse_result
+{
+    const char *ptr;
+    std::errc   ec;
+};
+
+#if defined(__cpp_lib_to_chars) && !defined(NUCLEUS_FORCE_FP_FROM_CHARS_FALLBACK)
+
+template<typename Float>
+[[nodiscard]] inline fp_parse_result fp_from_chars(std::string_view sv, Float &out)
+{
+    auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), out);
+    return {ptr, ec};
+}
+
+#else
+
+template<typename Float>
+[[nodiscard]] inline fp_parse_result fp_from_chars(std::string_view sv, Float &out)
+{
+    // from_chars rejects leading whitespace and a leading '+'; strtof/strtod
+    // accept both. Reject them up front -- reported as zero characters consumed
+    // (invalid_argument at the start), exactly as from_chars would, so the two
+    // paths agree on these inputs.
+    const char lead = sv.front();
+    if(lead == '+' || lead == ' ' || lead == '\t' || lead == '\n'
+       || lead == '\v' || lead == '\f' || lead == '\r')
+        return {sv.data(), std::errc::invalid_argument};
+
+    // strtof/strtod scan to a NUL terminator and would read past a view that is
+    // a window into a larger buffer, so parse a terminated copy and map the
+    // consumed length back onto the original view's coordinates.
+    const std::string buf(sv);
+    const char *const begin = buf.c_str();
+    char *end = nullptr;
+    errno = 0;
+    Float value{};
+    if constexpr(std::is_same_v<Float, float>)
+        value = std::strtof(begin, &end);
+    else
+        value = std::strtod(begin, &end);
+
+    if(end == begin)
+        return {sv.data(), std::errc::invalid_argument};
+    const auto consumed = static_cast<std::size_t>(end - begin);
+    if(errno == ERANGE)
+        return {sv.data() + consumed, std::errc::result_out_of_range};
+    out = value;
+    return {sv.data() + consumed, std::errc{}};
+}
+
+#endif
+
+}
 
 // Returns a converter lambda for the built-in scalar type T. Only instantiable
 // for the types listed in the toolchain floor comment above. Exposed so a host
@@ -299,7 +387,7 @@ make_scalar_converter<float>()
         if(sv.empty())
             return fail(std::string("empty input"));
         float out{};
-        auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), out);
+        auto [ptr, ec] = detail::fp_from_chars(sv, out);
         if(ec == std::errc{})
         {
             if(ptr != sv.data() + sv.size())
@@ -327,7 +415,7 @@ make_scalar_converter<double>()
         if(sv.empty())
             return fail(std::string("empty input"));
         double out{};
-        auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), out);
+        auto [ptr, ec] = detail::fp_from_chars(sv, out);
         if(ec == std::errc{})
         {
             if(ptr != sv.data() + sv.size())

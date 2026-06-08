@@ -1,7 +1,9 @@
-[![Build](https://github.com/skrede/nucleus/actions/workflows/ci.yml/badge.svg)](https://github.com/skrede/nucleus/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/skrede/nucleus/branch/main/graph/badge.svg)](https://codecov.io/gh/skrede/nucleus)
+[![Linux](https://github.com/skrede/nucleus/actions/workflows/linux.yml/badge.svg?branch=master)](https://github.com/skrede/nucleus/actions/workflows/linux.yml)
+[![macOS](https://github.com/skrede/nucleus/actions/workflows/macos.yml/badge.svg?branch=master)](https://github.com/skrede/nucleus/actions/workflows/macos.yml)
+[![Windows](https://github.com/skrede/nucleus/actions/workflows/windows.yml/badge.svg?branch=master)](https://github.com/skrede/nucleus/actions/workflows/windows.yml)
+[![codecov](https://codecov.io/gh/skrede/nucleus/branch/master/graph/badge.svg)](https://codecov.io/gh/skrede/nucleus)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-blue.svg)](https://en.cppreference.com/w/cpp/20)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 # nucleus
 

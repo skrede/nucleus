@@ -15,6 +15,17 @@ if(@NUCLEUS_XML_INSTALLED@)
     find_dependency(pugixml)
 endif()
 
+# When the standard library lacks std::format the diagnostic seam falls back to
+# {fmt}, which appears in a public header and therefore in the exported link
+# interface. A consumer of the export must be able to resolve fmt::fmt, so the
+# package requires fmt whenever the fallback was active at build time. (The build
+# pulls fmt via FetchContent with FIND_PACKAGE_ARGS NAMES fmt, so an adopter
+# satisfies this by having fmt discoverable through find_package -- e.g. a system
+# or vcpkg/Conan package.)
+if(@NUCLEUS_FMT_REQUIRED@)
+    find_dependency(fmt)
+endif()
+
 include("${CMAKE_CURRENT_LIST_DIR}/nucleus-targets.cmake")
 
 check_required_components(nucleus)

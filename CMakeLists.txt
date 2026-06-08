@@ -136,6 +136,12 @@ check_cxx_source_compiles(
 )
 unset(CMAKE_REQUIRED_FLAGS)
 
+# Whether {fmt} is part of the link interface. When the fallback is active, fmt
+# appears PUBLICly (the fallback lives in a public header), so the installed
+# package config must find_dependency(fmt) for the exported reference to resolve
+# downstream. Recorded here and consumed by the config template below.
+set(NUCLEUS_FMT_REQUIRED FALSE)
+
 if(NOT NUCLEUS_HAVE_STD_FORMAT)
     include(FetchContent)
     FetchContent_Declare(
@@ -146,6 +152,7 @@ if(NOT NUCLEUS_HAVE_STD_FORMAT)
     )
     FetchContent_MakeAvailable(fmt)
     target_link_libraries(nucleus PUBLIC fmt::fmt)
+    set(NUCLEUS_FMT_REQUIRED TRUE)
 endif()
 
 set_target_properties(nucleus PROPERTIES

@@ -47,6 +47,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Apple's libc++ lacks std::format on these runners, so the diagnostic
+      # seam falls back to {fmt} and it enters the exported link interface. A
+      # discoverable system fmt lets the build resolve it via find_package and,
+      # crucially, lets the installed package's find_dependency(fmt) resolve for
+      # the downstream consumer below.
+      - name: Install fmt
+        run: brew install fmt
+
       - name: Build and install
         run: |
           cmake . -B build -DCMAKE_BUILD_TYPE=Release \
