@@ -86,6 +86,10 @@ set(NUCLEUS_COMPLETION_HEADERS
     include/nucleus/completion/zsh_emitter.h
 )
 
+set(NUCLEUS_UTILITY_HEADERS
+    include/nucleus/utility/type_info.h
+)
+
 set(NUCLEUS_SOURCES
     src/nucleus/version.cpp
     src/nucleus/entry/configuration_space.cpp
@@ -199,6 +203,8 @@ install(FILES ${NUCLEUS_SOURCE_ARGV_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/source/argv)
 install(FILES ${NUCLEUS_COMPLETION_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/completion)
+install(FILES ${NUCLEUS_UTILITY_HEADERS}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/utility)
 
 # ---------------------------------------------------------------------------
 # XML source module

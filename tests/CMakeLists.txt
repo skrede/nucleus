@@ -30,6 +30,7 @@ endfunction()
 
 nucleus_add_test(version_test)
 nucleus_add_test(result_test)
+nucleus_add_test(type_info_test)
 nucleus_add_test(format_test)
 nucleus_add_test(identity_test)
 nucleus_add_test(log_sink_test)
