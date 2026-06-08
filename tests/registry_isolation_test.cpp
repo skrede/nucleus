@@ -96,15 +96,17 @@ TEST_CASE("siblings collaborate only through a hand-built resolution context", "
     nucleus::configuration_source_registry sources;
     nucleus::converter_registry converters;
 
-    nucleus::resolution_context ctx(schema, tokenizer, converters);
-
-    ctx.schema().add(nucleus::schema_spec{"k"}, nucleus::owner_token{});
-    ctx.tokenizer().add(nucleus::tokenizer_builder("noop").build(), nucleus::owner_token{});
-    ctx.converters().set<int>(nucleus::make_scalar_converter<int>());
+    // Populate the registries directly; the context borrows them by CONST reference
+    // (read-only) and exposes them through const accessors.
+    schema.add(nucleus::schema_spec{"k"}, nucleus::owner_token{});
+    tokenizer.add(nucleus::tokenizer_builder("noop").build(), nucleus::owner_token{});
+    converters.set<int>(nucleus::make_scalar_converter<int>());
     sources.add(nucleus::configuration_source_spec{"env"}, nucleus::owner_token{});
 
-    REQUIRE(schema.size() == 1);
-    REQUIRE(tokenizer.size() == 1);
+    nucleus::resolution_context ctx(schema, tokenizer, converters);
+
+    REQUIRE(ctx.schema().size() == 1);
+    REQUIRE(ctx.tokenizer().size() == 1);
+    REQUIRE(ctx.converters().size() == 1);
     REQUIRE(sources.size() == 1);
-    REQUIRE(converters.size() == 1);
 }

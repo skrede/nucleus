@@ -12,12 +12,13 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <optional>
 
-// Selection-path tests: the facade select() method designates a single named
-// strain by primary-key value; resolve() prunes non-matching strains and strips
-// the transient key segment. Unknown selections and missing primary keys both
-// fail loudly. The shapes here are generic (a cluster of servers) -- no host
-// vocabulary.
+// Selection-path tests: the per-load source_stack_options.selection designates a
+// single named strain by primary-key value; resolve prunes non-matching strains
+// and strips the transient key segment. Unknown selections and missing primary
+// keys both fail loudly. The shapes here are generic (a cluster of servers) -- no
+// host vocabulary.
 
 using nucleus::anchor;
 
@@ -26,12 +27,12 @@ namespace {
 std::unique_ptr<nucleus::configuration_source> xml_of(const std::string &text)
 {
     return std::make_unique<nucleus::xml::xml_source>(
-        nucleus::xml::xml_source::from_string(text));
+        nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(text)));
 }
 
 // A schema where <cluster> contains repeatable <server> instances keyed by the
 // `name` field; each server carries non-key `port` / `protocol` leaves.
-void declare_cluster(nucleus::configuration_space &engine)
+void declare_cluster(nucleus::configuration_space_builder &engine)
 {
     engine.register_element(nucleus::element("cluster", anchor::root()));
     engine.register_element(nucleus::element("server", anchor::keyspace("cluster")));
@@ -42,9 +43,19 @@ void declare_cluster(nucleus::configuration_space &engine)
         nucleus::element("protocol", anchor::keyspace("cluster/server")));
 }
 
+nucleus::load_result load_doc(const nucleus::configuration_space &space, const char *doc,
+                              std::optional<std::string> selection = std::nullopt)
+{
+    nucleus::source_stack_options opts;
+    opts.document_paths = {"doc.xml"};
+    opts.make_document = [doc](const std::string &) { return xml_of(doc); };
+    opts.selection = std::move(selection);
+    return nucleus::load_configuration(space, opts);
 }
 
-TEST_CASE("select() resolves the matching strain and prunes others",
+}
+
+TEST_CASE("a selection resolves the matching strain and prunes others",
           "[selection][keyed]")
 {
     const char *doc = R"(
@@ -53,13 +64,11 @@ TEST_CASE("select() resolves the matching strain and prunes others",
             <server name="db"><port>5432</port></server>
         </cluster>)";
 
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     declare_cluster(engine);
+    nucleus::configuration_space space = engine.build();
 
-    REQUIRE(engine.select("web"));
-
-    auto loaded = engine.load(std::vector<std::string>{"doc.xml"},
-                              [doc](const std::string &) { return xml_of(doc); });
+    auto loaded = load_doc(space, doc, "web");
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -73,7 +82,7 @@ TEST_CASE("select() resolves the matching strain and prunes others",
     REQUIRE_FALSE(config.contains("cluster/server/db/port"));
 }
 
-TEST_CASE("select() strips the key segment from the resolved path",
+TEST_CASE("a selection strips the key segment from the resolved path",
           "[selection][keyed]")
 {
     const char *doc = R"(
@@ -81,13 +90,11 @@ TEST_CASE("select() strips the key segment from the resolved path",
             <server name="web"><port>80</port></server>
         </cluster>)";
 
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     declare_cluster(engine);
+    nucleus::configuration_space space = engine.build();
 
-    REQUIRE(engine.select("web"));
-
-    auto loaded = engine.load(std::vector<std::string>{"doc.xml"},
-                              [doc](const std::string &) { return xml_of(doc); });
+    auto loaded = load_doc(space, doc, "web");
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -105,13 +112,11 @@ TEST_CASE("selecting an unknown strain value fails with available listed",
             <server name="db"><port>5432</port></server>
         </cluster>)";
 
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     declare_cluster(engine);
+    nucleus::configuration_space space = engine.build();
 
-    REQUIRE(engine.select("missing"));
-
-    auto loaded = engine.load(std::vector<std::string>{"doc.xml"},
-                              [doc](const std::string &) { return xml_of(doc); });
+    auto loaded = load_doc(space, doc, "missing");
     REQUIRE_FALSE(loaded);
 
     // The error must name the requested value and list every available strain.
@@ -129,58 +134,32 @@ TEST_CASE("selecting when schema has no primary key fails",
         </cluster>)";
 
     // Schema with only plain elements -- no identity / primary_key_element.
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     engine.register_element(nucleus::element("cluster", anchor::root()));
     engine.register_element(nucleus::element("server", anchor::keyspace("cluster")));
     engine.register_element(nucleus::element("port", anchor::keyspace("cluster/server")));
+    nucleus::configuration_space space = engine.build();
 
-    REQUIRE(engine.select("anything"));
-
-    auto loaded = engine.load(std::vector<std::string>{"doc.xml"},
-                              [doc](const std::string &) { return xml_of(doc); });
+    auto loaded = load_doc(space, doc, "anything");
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().find("no primary key") != std::string::npos);
-}
-
-TEST_CASE("select() after resolve() is rejected",
-          "[selection][facade]")
-{
-    const char *doc = R"(
-        <cluster>
-            <server name="web"><port>80</port></server>
-        </cluster>)";
-
-    nucleus::configuration_space engine;
-    declare_cluster(engine);
-
-    // First resolve succeeds without a selection (single strain auto-resolves).
-    auto loaded = engine.load(std::vector<std::string>{"doc.xml"},
-                              [doc](const std::string &) { return xml_of(doc); });
-    REQUIRE(loaded);
-
-    // After resolve the facade is sealed; select() is a state-machine error,
-    // and the diagnostic names the operation that was attempted.
-    auto result = engine.select("web");
-    REQUIRE_FALSE(result);
-    REQUIRE(result.error().find("select") != std::string::npos);
-    REQUIRE(result.error().find("resolved") != std::string::npos);
 }
 
 TEST_CASE("anonymous-only content collapses without a selection",
           "[selection][keyed]")
 {
     // No named strain anywhere -- the composed template is the configuration.
-    // No select() call: the anonymous-only path should resolve without error.
+    // No selection: the anonymous-only path should resolve without error.
     const char *doc = R"(
         <cluster>
             <server><port>8080</port><protocol>tcp</protocol></server>
         </cluster>)";
 
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     declare_cluster(engine);
+    nucleus::configuration_space space = engine.build();
 
-    auto loaded = engine.load(std::vector<std::string>{"doc.xml"},
-                              [doc](const std::string &) { return xml_of(doc); });
+    auto loaded = load_doc(space, doc);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -188,7 +167,7 @@ TEST_CASE("anonymous-only content collapses without a selection",
     REQUIRE(config.get("cluster/server/protocol") == "tcp");
 }
 
-TEST_CASE("select() against anonymous-only content fails loudly",
+TEST_CASE("a selection against anonymous-only content fails loudly",
           "[selection][keyed]")
 {
     // The container holds only an anonymous template instance: a selection is
@@ -199,13 +178,11 @@ TEST_CASE("select() against anonymous-only content fails loudly",
             <server><port>8080</port></server>
         </cluster>)";
 
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     declare_cluster(engine);
+    nucleus::configuration_space space = engine.build();
 
-    REQUIRE(engine.select("web"));
-
-    auto loaded = engine.load(std::vector<std::string>{"doc.xml"},
-                              [doc](const std::string &) { return xml_of(doc); });
+    auto loaded = load_doc(space, doc, "web");
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().find("web") != std::string::npos);
     REQUIRE(loaded.error().find("no primary-keyed instances") != std::string::npos);
@@ -223,11 +200,11 @@ TEST_CASE("a key value shadowing a declared element name is a loud error",
             <server name="port"><port>80</port></server>
         </cluster>)";
 
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     declare_cluster(engine);
+    nucleus::configuration_space space = engine.build();
 
-    auto loaded = engine.load(std::vector<std::string>{"doc.xml"},
-                              [doc](const std::string &) { return xml_of(doc); });
+    auto loaded = load_doc(space, doc);
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().find("primary-key value 'port'") != std::string::npos);
     REQUIRE(loaded.error().find("collides") != std::string::npos);

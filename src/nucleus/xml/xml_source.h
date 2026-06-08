@@ -18,6 +18,32 @@ namespace nucleus::xml {
 // xml_reader.h is included.
 class document_arena;
 
+// Value-semantics options describing where an xml_source reads its document from:
+// an in-memory XML string, or a file path read at pull time. This struct lives in
+// the xml module and is reached by core ONLY through a host-supplied
+// document_factory -- it is never referenced by any header under include/.
+struct xml_source_options
+{
+    enum class input_kind
+    {
+        string,
+        file,
+    };
+
+    input_kind  kind = input_kind::string;
+    std::string data;  // XML text when kind==string; file path when kind==file
+
+    [[nodiscard]] static xml_source_options of_string(std::string text)
+    {
+        return xml_source_options{input_kind::string, std::move(text)};
+    }
+
+    [[nodiscard]] static xml_source_options of_file(std::string path)
+    {
+        return xml_source_options{input_kind::file, std::move(path)};
+    }
+};
+
 // A document source backed by pugixml. It walks the parsed tree into keyspace
 // entries: nested elements become `/`-separated key paths, and an element's
 // attributes and pure-text leaf children become values. Every value is a VIEW
@@ -31,16 +57,13 @@ class document_arena;
 class xml_source final : public document_source
 {
 public:
-    // Parses XML directly from an in-memory string.
-    [[nodiscard]] static xml_source from_string(std::string text)
+    // Builds an xml_source from a value-semantics options struct: parse from an
+    // in-memory string or from a file path read at pull time.
+    [[nodiscard]] static xml_source from(xml_source_options options)
     {
-        return xml_source(kind::string, std::move(text));
-    }
-
-    // Parses XML from a file path at pull time.
-    [[nodiscard]] static xml_source from_file(std::string path)
-    {
-        return xml_source(kind::file, std::move(path));
+        const kind k = options.kind == xml_source_options::input_kind::file
+                           ? kind::file : kind::string;
+        return xml_source(k, std::move(options.data));
     }
 
     [[nodiscard]] capability_descriptor capabilities() const override;

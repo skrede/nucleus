@@ -15,15 +15,16 @@
 
 int main()
 {
-    nucleus::configuration_space engine;
-    engine.register_element(nucleus::element("logging", nucleus::anchor::root()));
-    engine.register_element(
+    nucleus::configuration_space_builder builder;
+    builder.register_element(nucleus::element("logging", nucleus::anchor::root()));
+    builder.register_element(
         nucleus::enum_element("level", nucleus::anchor::keyspace("logging"),
                               {"debug", "info", "warn", "error"}));
+    nucleus::configuration_space space = builder.build();
 
     std::cout << "# ---- bash ----\n";
-    std::cout << engine.generate_completion(nucleus::shell::bash, "mytool");
+    std::cout << space.generate_completion(nucleus::shell::bash, "mytool");
     std::cout << "\n# ---- zsh ----\n";
-    std::cout << engine.generate_completion(nucleus::shell::zsh, "mytool");
+    std::cout << space.generate_completion(nucleus::shell::zsh, "mytool");
     return 0;
 }

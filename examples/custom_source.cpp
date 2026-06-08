@@ -44,11 +44,15 @@ int main()
 {
     table_source source;
 
-    nucleus::configuration_source_stack stack;
-    stack.add(source, nucleus::layer_rank::base, "table");
+    nucleus::configuration_space space = nucleus::configuration_space_builder{}.build();
 
-    nucleus::configuration_space engine;
-    auto loaded = engine.load_configuration(stack);
+    // The runtime-virtual source seam is unchanged: a borrowed custom source is
+    // layered through the per-load options.
+    nucleus::source_stack_options options;
+    options.custom_layers.push_back(nucleus::configuration_source_layer{
+        &source, static_cast<std::size_t>(nucleus::layer_rank::base), "table", {}});
+
+    auto loaded = nucleus::load_configuration(space, options);
     if(!loaded)
     {
         std::cerr << "resolve failed: " << loaded.error() << '\n';

@@ -13,12 +13,15 @@
 
 int main()
 {
-    nucleus::configuration_space engine;
-    engine.register_element(nucleus::element("server", nucleus::anchor::root()));
-    engine.register_element(
+    nucleus::configuration_space_builder builder;
+    builder.register_element(nucleus::element("server", nucleus::anchor::root()));
+    builder.register_element(
         nucleus::element("port", nucleus::anchor::keyspace("server")));
+    nucleus::configuration_space space = builder.build();
 
-    auto loaded = engine.load(std::vector<std::string>{"--server-port=8080"});
+    nucleus::source_stack_options options;
+    options.argv = nucleus::argv_source_options{{"--server-port=8080"}};
+    auto loaded = nucleus::load_configuration(space, options);
     if(!loaded)
     {
         std::cerr << "load failed: " << loaded.error() << '\n';

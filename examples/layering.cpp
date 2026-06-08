@@ -22,12 +22,16 @@ int main()
 
     nucleus::argv_source argv(std::vector<std::string>{"--service-tier=gold"});
 
-    nucleus::configuration_source_stack stack;
-    stack.add(env, nucleus::layer_rank::env, "env");
-    stack.add(argv, nucleus::layer_rank::argv, "argv");
+    nucleus::configuration_space space = nucleus::configuration_space_builder{}.build();
 
-    nucleus::configuration_space engine;
-    auto loaded = engine.load_configuration(stack);
+    // Borrowed custom layers at explicit ranks; higher ranks win.
+    nucleus::source_stack_options options;
+    options.custom_layers.push_back(nucleus::configuration_source_layer{
+        &env, static_cast<std::size_t>(nucleus::layer_rank::env), "env", {}});
+    options.custom_layers.push_back(nucleus::configuration_source_layer{
+        &argv, static_cast<std::size_t>(nucleus::layer_rank::argv), "argv", {}});
+
+    auto loaded = nucleus::load_configuration(space, options);
     if(!loaded)
     {
         std::cerr << "resolve failed: " << loaded.error() << '\n';

@@ -22,11 +22,11 @@ int main()
         std::cout << "did you mean: " << hit << '\n';
 
     // Two owners claim the same path -> one conflict report, no winner chosen.
-    nucleus::configuration_space engine;
-    engine.register_schema("server/port", nucleus::owner_token(std::string("plugin.a")));
-    engine.register_schema("server/port", nucleus::owner_token(std::string("plugin.b")));
+    nucleus::configuration_space_builder builder;
+    builder.register_schema("server/port", nucleus::owner_token(std::string("plugin.a")));
+    builder.register_schema("server/port", nucleus::owner_token(std::string("plugin.b")));
 
-    for(const nucleus::conflict_report &report : engine.conflicts())
+    for(const nucleus::conflict_report &report : builder.conflicts())
         std::cout << report.describe() << '\n';
     return 0;
 }

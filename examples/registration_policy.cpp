@@ -29,14 +29,14 @@ public:
 
 int main()
 {
-    nucleus::configuration_space engine;
-    engine.set_registration_policy(std::make_shared<reserve_sources>());
+    nucleus::configuration_space_builder builder;
+    builder.set_registration_policy(std::make_shared<reserve_sources>());
 
-    auto schema = engine.register_schema("logging/level");
+    auto schema = builder.register_schema("logging/level");
     std::cout << "schema registration accepted: " << std::boolalpha
               << static_cast<bool>(schema) << '\n';
 
-    auto source = engine.register_source("argv");
+    auto source = builder.register_source("argv");
     if(!source)
         std::cout << "source registration rejected: " << source.error() << '\n';
     return 0;

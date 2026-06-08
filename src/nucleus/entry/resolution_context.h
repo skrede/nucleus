@@ -63,18 +63,20 @@ using resolve_fold_error = std::string;
 class resolution_context
 {
 public:
-    resolution_context(schema_registry &schema,
-                        tokenizer_registry &tokenizer,
-                        converter_registry &converters) noexcept
+    resolution_context(const schema_registry &schema,
+                        const tokenizer_registry &tokenizer,
+                        const converter_registry &converters) noexcept
         : m_schema(schema), m_tokenizer(tokenizer), m_converters(converters)
     {
     }
 
-    [[nodiscard]] schema_registry &schema() noexcept { return m_schema; }
-    [[nodiscard]] tokenizer_registry &tokenizer() noexcept { return m_tokenizer; }
+    // Borrowed by CONST reference and read-only, so concurrent loads on one shared
+    // const configuration_space share nothing mutable and need no synchronization.
+    [[nodiscard]] const schema_registry &schema() const noexcept { return m_schema; }
+    [[nodiscard]] const tokenizer_registry &tokenizer() const noexcept { return m_tokenizer; }
     // Borrowed (never owned), like the other siblings; read by convert() to supply
     // a converter for a typed element that carries no per-element converter.
-    [[nodiscard]] converter_registry &converters() noexcept { return m_converters; }
+    [[nodiscard]] const converter_registry &converters() const noexcept { return m_converters; }
 
     [[nodiscard]] keyspace &building() noexcept { return m_building; }
     [[nodiscard]] provenance &origins() noexcept { return m_provenance; }
@@ -836,9 +838,9 @@ private:
         }
     }
 
-    schema_registry &m_schema;
-    tokenizer_registry &m_tokenizer;
-    converter_registry &m_converters;
+    const schema_registry &m_schema;
+    const tokenizer_registry &m_tokenizer;
+    const converter_registry &m_converters;
 
     keyspace m_building;
     provenance m_provenance;

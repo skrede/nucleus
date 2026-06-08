@@ -35,24 +35,27 @@ TEST_CASE("resolved values survive dropping every source buffer", "[resolution][
     std::optional<nucleus::configuration> config;
 
     {
-        nucleus::configuration_space engine;
+        nucleus::configuration_space space = nucleus::configuration_space_builder{}.build();
 
         // A document source (views into the parser arena) layered beneath an env
         // overlay that overrides one key -- so both a view-backed and an
         // owned-backed value reach the freeze, and one key is contested.
-        auto doc = nucleus::xml::xml_source::from_string(kDocument);
+        auto doc = nucleus::xml::xml_source::from(
+            nucleus::xml::xml_source_options::of_string(kDocument));
         nucleus::env_source overlay;
         overlay.set("app/server/port", "9090");
 
-        nucleus::configuration_source_stack stack;
-        stack.add(doc, nucleus::layer_rank::base, "base-document");
-        stack.add(overlay, nucleus::layer_rank::overlay, "overlay");
+        nucleus::source_stack_options opts;
+        opts.custom_layers.push_back(nucleus::configuration_source_layer{
+            &doc, static_cast<std::size_t>(nucleus::layer_rank::base), "base-document", {}});
+        opts.custom_layers.push_back(nucleus::configuration_source_layer{
+            &overlay, static_cast<std::size_t>(nucleus::layer_rank::overlay), "overlay", {}});
 
-        auto loaded = engine.load_configuration(stack);
+        auto loaded = nucleus::load_configuration(space, opts);
         REQUIRE(loaded);
         config = std::move(loaded).value();
 
-        // engine, doc, overlay, and the pulled batch (and thus the pugixml arena)
+        // space, doc, overlay, and the pulled batch (and thus the pugixml arena)
         // are all destroyed at the end of this scope.
     }
 

@@ -34,11 +34,13 @@ int main()
     values.set("service/region", "${string.upper(${env.NUCLEUS_REGION})}")
           .set("service/instance", "${string.lower(NODE-${env.NUCLEUS_REGION})}");
 
-    nucleus::configuration_source_stack stack;
-    stack.add(values, nucleus::layer_rank::base, "config");
+    nucleus::configuration_space space = nucleus::configuration_space_builder{}.build();
 
-    nucleus::configuration_space engine;
-    auto loaded = engine.load_configuration(stack);
+    nucleus::source_stack_options options;
+    options.custom_layers.push_back(nucleus::configuration_source_layer{
+        &values, static_cast<std::size_t>(nucleus::layer_rank::base), "config", {}});
+
+    auto loaded = nucleus::load_configuration(space, options);
     if(!loaded)
     {
         std::cerr << "resolve failed: " << loaded.error() << '\n';

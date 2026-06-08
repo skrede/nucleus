@@ -18,22 +18,24 @@
 
 int main()
 {
-    nucleus::configuration_space engine;
-    engine.register_element(nucleus::element("server", nucleus::anchor::root()));
-    engine.register_element(
+    nucleus::configuration_space_builder builder;
+    builder.register_element(nucleus::element("server", nucleus::anchor::root()));
+    builder.register_element(
         nucleus::required_element("host", nucleus::anchor::keyspace("server")));
-    engine.register_element(
+    builder.register_element(
         nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
                               {"http", "https"}));
+    nucleus::configuration_space space = builder.build();
 
     // A source that supplies `mode` but not the required `host`.
     nucleus::env_source values;
     values.set("server/mode", "http");
 
-    nucleus::configuration_source_stack stack;
-    stack.add(values, nucleus::layer_rank::base, "config");
+    nucleus::source_stack_options options;
+    options.custom_layers.push_back(nucleus::configuration_source_layer{
+        &values, static_cast<std::size_t>(nucleus::layer_rank::base), "config", {}});
 
-    auto loaded = engine.load_configuration(stack);
+    auto loaded = nucleus::load_configuration(space, options);
     if(!loaded)
     {
         std::cout << "rejected as expected: " << loaded.error() << '\n';

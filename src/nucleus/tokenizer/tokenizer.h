@@ -49,9 +49,11 @@ struct token_function
 };
 
 // A built tokenizer: one category and the field / function / wildcard surface it
-// answers for. Move-only and immutable once built; the registry stores it and
-// dispatches against it. The category string is the ${category....} head a token
-// must name to reach this tokenizer.
+// answers for. Immutable once built (no setters); the registry stores it and
+// dispatches against it. It is value-copyable -- a copy deep-copies its fields,
+// functions, and wildcard closures -- so a sealed configuration_space's tokenizer
+// registry can be deep-copied by expand() with no shared state. The category
+// string is the ${category....} head a token must name to reach this tokenizer.
 class tokenizer
 {
 public:
@@ -68,8 +70,8 @@ public:
     {
     }
 
-    tokenizer(const tokenizer &) = delete;
-    tokenizer &operator=(const tokenizer &) = delete;
+    tokenizer(const tokenizer &) = default;
+    tokenizer &operator=(const tokenizer &) = default;
 
     tokenizer(tokenizer &&) noexcept = default;
     tokenizer &operator=(tokenizer &&) noexcept = default;

@@ -21,6 +21,9 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <utility>
+#include <optional>
+#include <algorithm>
 
 using nucleus::anchor;
 
@@ -29,12 +32,11 @@ namespace {
 std::unique_ptr<nucleus::configuration_source> xml_of(const std::string &text)
 {
     return std::make_unique<nucleus::xml::xml_source>(
-        nucleus::xml::xml_source::from_string(text));
+        nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(text)));
 }
 
 // Registers a flat schema: a <config> root container with a repeated <tag> leaf.
-// All simple repeated-element tests use this schema and the path "config/tag".
-void declare_tags_schema(nucleus::configuration_space &engine)
+void declare_tags_schema(nucleus::configuration_space_builder &engine)
 {
     engine.register_element(nucleus::element("config", anchor::root()));
     engine.register_element(
@@ -42,7 +44,7 @@ void declare_tags_schema(nucleus::configuration_space &engine)
 }
 
 // Registers: cluster/server keyed by name, plus a repeated leaf "tags".
-void declare_cluster_tags(nucleus::configuration_space &engine)
+void declare_cluster_tags(nucleus::configuration_space_builder &engine)
 {
     engine.register_element(nucleus::element("cluster", anchor::root()));
     engine.register_element(nucleus::element("server", anchor::keyspace("cluster")));
@@ -50,6 +52,14 @@ void declare_cluster_tags(nucleus::configuration_space &engine)
         nucleus::primary_key_element("name", anchor::keyspace("cluster/server")));
     engine.register_element(
         nucleus::repeated_element("tags", anchor::keyspace("cluster/server")));
+}
+
+// Borrows one source at an explicit numeric rank into the per-load options.
+void add_layer(nucleus::source_stack_options &opts, nucleus::configuration_source &src,
+               std::size_t rank, std::string label)
+{
+    opts.custom_layers.push_back(
+        nucleus::configuration_source_layer{&src, rank, std::move(label), {}});
 }
 
 // A minimal source that emits two entries for the same repeated path with
@@ -78,14 +88,15 @@ struct dual_entry_source : nucleus::configuration_source
 
 TEST_CASE("N values in one layer -- order preserved", "[repeated][ordering]")
 {
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     declare_tags_schema(engine);
+    nucleus::configuration_space space = engine.build();
 
     auto src = xml_of("<config><tag>a</tag><tag>b</tag><tag>c</tag></config>");
-    nucleus::configuration_source_stack stack;
-    stack.add(*src, std::size_t{10}, "doc");
+    nucleus::source_stack_options opts;
+    add_layer(opts, *src, 10, "doc");
 
-    auto loaded = engine.load_configuration(stack);
+    auto loaded = nucleus::load_configuration(space, opts);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -95,17 +106,18 @@ TEST_CASE("N values in one layer -- order preserved", "[repeated][ordering]")
 TEST_CASE("cross-layer replace -- higher rank replaces lower collection wholesale",
           "[repeated][layering]")
 {
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     declare_tags_schema(engine);
+    nucleus::configuration_space space = engine.build();
 
     auto src1 = xml_of("<config><tag>x</tag><tag>y</tag></config>");
     auto src2 = xml_of("<config><tag>p</tag></config>");
 
-    nucleus::configuration_source_stack stack;
-    stack.add(*src1, std::size_t{10}, "base");
-    stack.add(*src2, std::size_t{20}, "overlay");
+    nucleus::source_stack_options opts;
+    add_layer(opts, *src1, 10, "base");
+    add_layer(opts, *src2, 20, "overlay");
 
-    auto loaded = engine.load_configuration(stack);
+    auto loaded = nucleus::load_configuration(space, opts);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -115,14 +127,15 @@ TEST_CASE("cross-layer replace -- higher rank replaces lower collection wholesal
 
 TEST_CASE("get() on repeated path returns last value", "[repeated][accessor]")
 {
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     declare_tags_schema(engine);
+    nucleus::configuration_space space = engine.build();
 
     auto src = xml_of("<config><tag>a</tag><tag>b</tag><tag>c</tag></config>");
-    nucleus::configuration_source_stack stack;
-    stack.add(*src, std::size_t{10}, "doc");
+    nucleus::source_stack_options opts;
+    add_layer(opts, *src, 10, "doc");
 
-    auto loaded = engine.load_configuration(stack);
+    auto loaded = nucleus::load_configuration(space, opts);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -132,15 +145,16 @@ TEST_CASE("get() on repeated path returns last value", "[repeated][accessor]")
 
 TEST_CASE("get_all() on single-value path returns one-element vector", "[repeated][accessor]")
 {
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     engine.register_element(nucleus::element("config", anchor::root()));
     engine.register_element(nucleus::element("key", anchor::keyspace("config")));
+    nucleus::configuration_space space = engine.build();
 
     auto src = xml_of("<config><key>v</key></config>");
-    nucleus::configuration_source_stack stack;
-    stack.add(*src, std::size_t{10}, "doc");
+    nucleus::source_stack_options opts;
+    add_layer(opts, *src, 10, "doc");
 
-    auto loaded = engine.load_configuration(stack);
+    auto loaded = nucleus::load_configuration(space, opts);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -149,15 +163,16 @@ TEST_CASE("get_all() on single-value path returns one-element vector", "[repeate
 
 TEST_CASE("get_all() on absent path returns empty vector", "[repeated][accessor]")
 {
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     engine.register_element(nucleus::element("config", anchor::root()));
     engine.register_element(nucleus::element("key", anchor::keyspace("config")));
+    nucleus::configuration_space space = engine.build();
 
     auto src = xml_of("<config><key>v</key></config>");
-    nucleus::configuration_source_stack stack;
-    stack.add(*src, std::size_t{10}, "doc");
+    nucleus::source_stack_options opts;
+    add_layer(opts, *src, 10, "doc");
 
-    auto loaded = engine.load_configuration(stack);
+    auto loaded = nucleus::load_configuration(space, opts);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -166,16 +181,17 @@ TEST_CASE("get_all() on absent path returns empty vector", "[repeated][accessor]
 
 TEST_CASE("keys() returns repeated path exactly once", "[repeated][accessor]")
 {
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     engine.register_element(nucleus::element("config", anchor::root()));
     engine.register_element(nucleus::element("other", anchor::keyspace("config")));
     engine.register_element(nucleus::repeated_element("tag", anchor::keyspace("config")));
+    nucleus::configuration_space space = engine.build();
 
     auto src = xml_of("<config><other>x</other><tag>a</tag><tag>b</tag></config>");
-    nucleus::configuration_source_stack stack;
-    stack.add(*src, std::size_t{10}, "doc");
+    nucleus::source_stack_options opts;
+    add_layer(opts, *src, 10, "doc");
 
-    auto loaded = engine.load_configuration(stack);
+    auto loaded = nucleus::load_configuration(space, opts);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -190,19 +206,20 @@ TEST_CASE("keys() returns repeated path exactly once", "[repeated][accessor]")
 
 TEST_CASE("repeated path with required flag satisfies required check", "[repeated][required]")
 {
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     engine.register_element(nucleus::element("config", anchor::root()));
 
     auto el = nucleus::repeated_element("tag", anchor::keyspace("config"));
     el.required = true;
     engine.register_element(el);
+    nucleus::configuration_space space = engine.build();
 
     auto src = xml_of("<config><tag>present</tag></config>");
-    nucleus::configuration_source_stack stack;
-    stack.add(*src, std::size_t{10}, "doc");
+    nucleus::source_stack_options opts;
+    add_layer(opts, *src, 10, "doc");
 
     // One value satisfies the required check.
-    auto loaded = engine.load_configuration(stack);
+    auto loaded = nucleus::load_configuration(space, opts);
     REQUIRE(loaded);
     REQUIRE(loaded.value().get_all("config/tag") == std::vector<std::string>{"present"});
 }
@@ -210,9 +227,9 @@ TEST_CASE("repeated path with required flag satisfies required check", "[repeate
 TEST_CASE("repeated leaf under keyed container with selection resolves to collection",
           "[repeated][keyed][relay]")
 {
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     declare_cluster_tags(engine);
-    REQUIRE(engine.select("yin"));
+    nucleus::configuration_space space = engine.build();
 
     const char *doc = R"(
         <cluster>
@@ -220,10 +237,11 @@ TEST_CASE("repeated leaf under keyed container with selection resolves to collec
         </cluster>)";
 
     auto src = xml_of(doc);
-    nucleus::configuration_source_stack stack;
-    stack.add(*src, std::size_t{10}, "doc");
+    nucleus::source_stack_options opts;
+    add_layer(opts, *src, 10, "doc");
+    opts.selection = "yin";
 
-    auto loaded = engine.load_configuration(stack);
+    auto loaded = nucleus::load_configuration(space, opts);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -234,22 +252,21 @@ TEST_CASE("repeated leaf under keyed container with selection resolves to collec
 TEST_CASE("token expansion per value -- each value expanded independently",
           "[repeated][tokens]")
 {
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     engine.register_element(nucleus::element("config", anchor::root()));
     engine.register_element(nucleus::repeated_element("val", anchor::keyspace("config")));
+    nucleus::configuration_space space = engine.build();
 
     // ${string.upper(x)} is the built-in string tokenizer's upper function.
-    // Two values use different arguments so they expand to distinct strings,
-    // confirming each element is independently expanded before accumulation.
     auto src = xml_of(
         "<config>"
         "<val>${string.upper(alpha)}_1</val>"
         "<val>${string.upper(beta)}_2</val>"
         "</config>");
-    nucleus::configuration_source_stack stack;
-    stack.add(*src, std::size_t{10}, "doc");
+    nucleus::source_stack_options opts;
+    add_layer(opts, *src, 10, "doc");
 
-    auto loaded = engine.load_configuration(stack);
+    auto loaded = nucleus::load_configuration(space, opts);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -261,7 +278,7 @@ TEST_CASE("token expansion per value -- each value expanded independently",
 
 TEST_CASE("attach-time rejection of repeated + identity", "[repeated][attach][reject]")
 {
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
 
     // primary_key_element sets identity=true; adding repeated=true is illegal.
     auto el = nucleus::primary_key_element("id", anchor::root());
@@ -274,7 +291,7 @@ TEST_CASE("attach-time rejection of repeated + identity", "[repeated][attach][re
 
 TEST_CASE("attach-time rejection of repeated + unique", "[repeated][attach][reject]")
 {
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     engine.register_element(nucleus::element("container", anchor::root()));
 
     // unique_element sets unique=true; adding repeated=true is illegal.
@@ -289,36 +306,38 @@ TEST_CASE("attach-time rejection of repeated + unique", "[repeated][attach][reje
 TEST_CASE("capability degradation -- non-duplicate_keys source into repeated field fails",
           "[repeated][capability]")
 {
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     engine.register_element(nucleus::element("config", anchor::root()));
     engine.register_element(nucleus::repeated_element("tag", anchor::keyspace("config")));
+    nucleus::configuration_space space = engine.build();
 
     auto fake = std::make_unique<dual_entry_source>("config/tag");
-    nucleus::configuration_source_stack stack;
-    stack.add(*fake, std::size_t{10}, "fake");
+    nucleus::source_stack_options opts;
+    add_layer(opts, *fake, 10, "fake");
 
-    auto loaded = engine.load_configuration(stack);
+    auto loaded = nucleus::load_configuration(space, opts);
     REQUIRE(!loaded);
     REQUIRE(loaded.error().find("duplicate_keys") != std::string::npos);
 }
 
 TEST_CASE("ASan: freeze copies values out before buffer drop", "[repeated][lifetime]")
 {
-    // Resolve inside a lambda scope so the configuration_space and its source
-    // buffers are destroyed before we read from the returned configuration.
+    // Resolve inside a lambda scope so the space and its source buffers are
+    // destroyed before we read from the returned configuration.
     nucleus::configuration cfg = [&]() {
-        nucleus::configuration_space engine;
+        nucleus::configuration_space_builder engine;
         engine.register_element(nucleus::element("config", anchor::root()));
         engine.register_element(nucleus::repeated_element("tag", anchor::keyspace("config")));
+        nucleus::configuration_space space = engine.build();
 
         auto src = xml_of("<config><tag>x</tag><tag>y</tag></config>");
-        nucleus::configuration_source_stack stack;
-        stack.add(*src, std::size_t{10}, "doc");
+        nucleus::source_stack_options opts;
+        add_layer(opts, *src, 10, "doc");
 
-        auto result = engine.load_configuration(stack);
+        auto result = nucleus::load_configuration(space, opts);
         REQUIRE(result);
         return std::move(result).value();
-    }(); // engine, src, and all buffers destroyed here
+    }(); // space, src, and all buffers destroyed here
 
     // Any use-after-free would trip under ASan.
     REQUIRE(cfg.get_all("config/tag") == std::vector<std::string>{"x", "y"});
@@ -327,13 +346,9 @@ TEST_CASE("ASan: freeze copies values out before buffer drop", "[repeated][lifet
 TEST_CASE("relay_strain: higher-rank keyed collection wins over lower-rank flat scalar",
           "[repeated][keyed][relay][rank]")
 {
-    // Rank-inversion regression: a flat scalar at the unified path (rank 5) must
-    // not silence a higher-ranked keyed collection (rank 10) during relay_strain.
-    // Expected: collection wins; get_all returns {"alpha","beta"} and the scalar
-    // is replaced.
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     declare_cluster_tags(engine);
-    REQUIRE(engine.select("yin"));
+    nucleus::configuration_space space = engine.build();
 
     nucleus::env_source flat;
     flat.set("cluster/server/tags", "low");
@@ -344,11 +359,12 @@ TEST_CASE("relay_strain: higher-rank keyed collection wins over lower-rank flat 
         </cluster>)";
 
     auto src = xml_of(doc);
-    nucleus::configuration_source_stack stack;
-    stack.add(flat, std::size_t{5},  "flat-low");
-    stack.add(*src, std::size_t{10}, "xml-high");
+    nucleus::source_stack_options opts;
+    add_layer(opts, flat, 5, "flat-low");
+    add_layer(opts, *src, 10, "xml-high");
+    opts.selection = "yin";
 
-    auto loaded = engine.load_configuration(stack);
+    auto loaded = nucleus::load_configuration(space, opts);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -361,13 +377,9 @@ TEST_CASE("relay_strain: higher-rank keyed collection wins over lower-rank flat 
 TEST_CASE("relay_strain: higher-rank flat override wins over lower-rank keyed collection",
           "[repeated][keyed][relay][rank]")
 {
-    // Argv-style override: a flat source at rank 20 must displace a lower-ranked
-    // keyed collection (rank 10) during relay_strain. The flat source feeds the
-    // unified repeated path directly, producing a single-element collection that
-    // should survive because its rank is higher than the keyed collection.
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     declare_cluster_tags(engine);
-    REQUIRE(engine.select("yin"));
+    nucleus::configuration_space space = engine.build();
 
     const char *doc = R"(
         <cluster>
@@ -378,11 +390,12 @@ TEST_CASE("relay_strain: higher-rank flat override wins over lower-rank keyed co
     flat.set("cluster/server/tags", "high");
 
     auto src = xml_of(doc);
-    nucleus::configuration_source_stack stack;
-    stack.add(*src,  std::size_t{10}, "xml-low");
-    stack.add(flat,  std::size_t{20}, "flat-high");
+    nucleus::source_stack_options opts;
+    add_layer(opts, *src, 10, "xml-low");
+    add_layer(opts, flat, 20, "flat-high");
+    opts.selection = "yin";
 
-    auto loaded = engine.load_configuration(stack);
+    auto loaded = nucleus::load_configuration(space, opts);
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -393,28 +406,11 @@ TEST_CASE("relay_strain: higher-rank flat override wins over lower-rank keyed co
 TEST_CASE("collection scope-policy exclusion and admission",
           "[repeated][keyed][scope_policy]")
 {
-    // Schema: cluster/server keyed by name, with a repeated leaf "tags".
-    // Two-layer env_source stack (ranks below the document band so the
-    // cross-layer re-open guard does not apply):
-    //   L0 (rank 10): introduces "yin" (name + tags="base") -- Ld = 10.
-    //   Lderived (rank 20): re-sets tags="derived" for "yin"; because the fold
-    //     treats this as a new layer, replace_collection fires and the collection
-    //     becomes {"derived"} with provenance rank 20.
-    //
-    // Under space_open_container_closed (excluded when rank > Ld=10):
-    //   The relay filter sees rank 20 > Ld=10 and excludes the collection;
-    //   cluster/server/tags is absent from the resolved configuration.
-    //
-    // Under container_open_until_next_strain (admitted below Ls):
-    //   No competing strain above Ld, so Ls = max. Rank 20 < max, so the
-    //   collection is admitted and relayed to cluster/server/tags = {"derived"}.
-
     SECTION("space_open_container_closed excludes collection above Ld")
     {
-        nucleus::configuration_space engine;
+        nucleus::configuration_space_builder engine;
         declare_cluster_tags(engine);
-        REQUIRE(engine.select("yin"));
-        // Default policy is space_open_container_closed.
+        nucleus::configuration_space space = engine.build();
 
         nucleus::env_source L0;
         L0.set("cluster/server/yin/name", "yin")
@@ -423,11 +419,13 @@ TEST_CASE("collection scope-policy exclusion and admission",
         nucleus::env_source Lderived;
         Lderived.set("cluster/server/yin/tags", "derived");
 
-        nucleus::configuration_source_stack stack;
-        stack.add(L0,       std::size_t{10}, "L0");
-        stack.add(Lderived, std::size_t{20}, "Lderived");
+        nucleus::source_stack_options opts;
+        add_layer(opts, L0, 10, "L0");
+        add_layer(opts, Lderived, 20, "Lderived");
+        opts.selection = "yin";
+        // Default policy is space_open_container_closed.
 
-        auto loaded = engine.load_configuration(stack);
+        auto loaded = nucleus::load_configuration(space, opts);
         REQUIRE(loaded);
         const nucleus::configuration &config = loaded.value();
 
@@ -437,11 +435,9 @@ TEST_CASE("collection scope-policy exclusion and admission",
 
     SECTION("container_open_until_next_strain admits collection up to Ls")
     {
-        nucleus::configuration_space engine;
+        nucleus::configuration_space_builder engine;
         declare_cluster_tags(engine);
-        REQUIRE(engine.select("yin"));
-        REQUIRE(engine.set_strain_scope(
-            nucleus::strain_scope_policy::container_open_until_next_strain));
+        nucleus::configuration_space space = engine.build();
 
         nucleus::env_source L0;
         L0.set("cluster/server/yin/name", "yin")
@@ -450,11 +446,13 @@ TEST_CASE("collection scope-policy exclusion and admission",
         nucleus::env_source Lderived;
         Lderived.set("cluster/server/yin/tags", "derived");
 
-        nucleus::configuration_source_stack stack;
-        stack.add(L0,       std::size_t{10}, "L0");
-        stack.add(Lderived, std::size_t{20}, "Lderived");
+        nucleus::source_stack_options opts;
+        add_layer(opts, L0, 10, "L0");
+        add_layer(opts, Lderived, 20, "Lderived");
+        opts.selection = "yin";
+        opts.scope = nucleus::strain_scope_policy::container_open_until_next_strain;
 
-        auto loaded = engine.load_configuration(stack);
+        auto loaded = nucleus::load_configuration(space, opts);
         REQUIRE(loaded);
         const nucleus::configuration &config = loaded.value();
 

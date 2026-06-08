@@ -54,7 +54,7 @@ TEST_CASE("xml source values survive dropping the document arena", "[xml][lifeti
 {
     std::map<std::string, std::string> values;
     {
-        auto src = nucleus::xml::xml_source::from_string(kDocument);
+        auto src = nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(kDocument));
         values = copy_out(src);
         // src and the pulled batch are destroyed at the end of this scope; the
         // pugixml document arena is freed here.
@@ -71,7 +71,7 @@ TEST_CASE("xml source values survive dropping the document arena", "[xml][lifeti
 
 TEST_CASE("the xml source declares document-shaped capabilities", "[xml]")
 {
-    auto src = nucleus::xml::xml_source::from_string("<r a=\"1\"/>");
+    auto src = nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string("<r a=\"1\"/>"));
     auto caps = src.capabilities();
     REQUIRE(caps.supports(nucleus::capability::nesting));
     REQUIRE(caps.supports(nucleus::capability::ordering));
@@ -82,7 +82,7 @@ TEST_CASE("the xml source declares document-shaped capabilities", "[xml]")
 
 TEST_CASE("the xml source reports a parse failure rather than dangling", "[xml]")
 {
-    auto src = nucleus::xml::xml_source::from_string("<unterminated>");
+    auto src = nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string("<unterminated>"));
     auto pulled = src.pull();
     REQUIRE_FALSE(pulled);
     REQUIRE(pulled.error().find("xml source") != std::string::npos);
@@ -93,7 +93,7 @@ TEST_CASE("a document source reaches the engine only as a source", "[xml]")
     // The xml source is driven purely through the virtual source interface --
     // the same path env and the fake parser use. The arena lives inside the
     // batch's retained_buffer, invisible to this call site.
-    auto src = nucleus::xml::xml_source::from_string("<root key=\"v\"/>");
+    auto src = nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string("<root key=\"v\"/>"));
     nucleus::configuration_source &as_source = src;
 
     auto pulled = as_source.pull();

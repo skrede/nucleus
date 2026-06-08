@@ -16,22 +16,16 @@
 int main()
 {
     // Schema: cluster/server keyed by name, leaves port and protocol.
-    nucleus::configuration_space engine;
-    engine.register_element(nucleus::element("cluster", nucleus::anchor::root()));
-    engine.register_element(nucleus::element("server", nucleus::anchor::keyspace("cluster")));
-    engine.register_element(
+    nucleus::configuration_space_builder builder;
+    builder.register_element(nucleus::element("cluster", nucleus::anchor::root()));
+    builder.register_element(nucleus::element("server", nucleus::anchor::keyspace("cluster")));
+    builder.register_element(
         nucleus::primary_key_element("name", nucleus::anchor::keyspace("cluster/server")));
-    engine.register_element(
+    builder.register_element(
         nucleus::element("port", nucleus::anchor::keyspace("cluster/server")));
-    engine.register_element(
+    builder.register_element(
         nucleus::element("protocol", nucleus::anchor::keyspace("cluster/server")));
-
-    // Select the "yin" strain before load. Only one named instance survives.
-    if(auto selected = engine.select("yin"); !selected)
-    {
-        std::cerr << "select failed: " << selected.error() << '\n';
-        return 1;
-    }
+    nucleus::configuration_space space = builder.build();
 
     // One document containing an anonymous template (protocol) and two named
     // strains (yin and yang). No file on disk: the factory ignores the path
@@ -45,10 +39,17 @@ int main()
 
     auto make = [document](const std::string &) -> std::unique_ptr<nucleus::configuration_source> {
         return std::make_unique<nucleus::xml::xml_source>(
-            nucleus::xml::xml_source::from_string(document));
+            nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(document)));
     };
 
-    auto loaded = engine.load(std::vector<std::string>{"config.xml"}, make);
+    // Select the "yin" strain for this load -- a per-load parameter now. Only one
+    // named instance survives the resolve.
+    nucleus::source_stack_options options;
+    options.document_paths = {"config.xml"};
+    options.make_document = make;
+    options.selection = "yin";
+
+    auto loaded = nucleus::load_configuration(space, options);
     if(!loaded)
     {
         std::cerr << "load failed: " << loaded.error() << '\n';

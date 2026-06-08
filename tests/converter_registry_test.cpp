@@ -1,6 +1,6 @@
 // Behavior of the type_index-keyed converter registry as the fourth flat sibling,
-// exercised end-to-end through the facade load/resolve so the borrowed-registry
-// convert pass is the real path under test:
+// exercised end-to-end through the builder/space + free load_configuration so the
+// borrowed-registry convert pass is the real path under test:
 //   - a registry converter supplies the conversion for a deferred-converter element;
 //   - a per-element converter overrides the registry converter for the same element;
 //   - an element whose type has no registered converter is left unconverted (no error).
@@ -10,8 +10,6 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/converters.h"
 
-#include "nucleus/configuration_source/env/env_source.h"
-
 #include <catch2/catch_test_macros.hpp>
 
 #include <any>
@@ -19,18 +17,27 @@
 
 using nucleus::anchor;
 
+namespace {
+
+// The env layer carrying one (path, text) pair, by value.
+nucleus::source_stack_options env_with(std::string path, std::string text)
+{
+    nucleus::source_stack_options opts;
+    opts.env = nucleus::env_source_options{{{std::move(path), std::move(text)}}};
+    return opts;
+}
+
+} // namespace
+
 TEST_CASE("registry supplies the converter for a deferred-converter element", "[converter][registry]")
 {
-    nucleus::configuration_space space;
-    space.register_converter<int>(nucleus::make_scalar_converter<int>());
-    space.register_element(nucleus::registered_element<int>("port", anchor::root()));
+    nucleus::configuration_space_builder builder;
+    builder.register_converter<int>(nucleus::make_scalar_converter<int>());
+    builder.register_element(nucleus::registered_element<int>("port", anchor::root()));
+    nucleus::configuration_space space = builder.build();
 
-    nucleus::env_source env;
-    env.set("port", "8080");
-    nucleus::configuration_source_stack stack;
-    stack.add(env, nucleus::layer_rank::env, "env");
-
-    auto loaded = space.load_configuration(stack);
+    nucleus::source_stack_options opts = env_with("port", "8080");
+    auto loaded = nucleus::load_configuration(space, opts);
     REQUIRE(loaded);
 
     auto typed = loaded.value().get_as<int>("port");
@@ -46,17 +53,14 @@ TEST_CASE("a per-element converter overrides the registry converter", "[converte
         return nucleus::unexpected(std::string("registry converter must not run"));
     };
 
-    nucleus::configuration_space space;
-    space.register_converter<int>(failing);
-    space.register_element(
+    nucleus::configuration_space_builder builder;
+    builder.register_converter<int>(failing);
+    builder.register_element(
         nucleus::typed_element<int>("port", anchor::root(), nucleus::make_scalar_converter<int>()));
+    nucleus::configuration_space space = builder.build();
 
-    nucleus::env_source env;
-    env.set("port", "8080");
-    nucleus::configuration_source_stack stack;
-    stack.add(env, nucleus::layer_rank::env, "env");
-
-    auto loaded = space.load_configuration(stack);
+    nucleus::source_stack_options opts = env_with("port", "8080");
+    auto loaded = nucleus::load_configuration(space, opts);
     REQUIRE(loaded);
 
     auto typed = loaded.value().get_as<int>("port");
@@ -68,15 +72,12 @@ TEST_CASE("a type with no registered converter is left unconverted", "[converter
 {
     // A deferred-converter element whose type has NO registered converter resolves
     // without error: convert() skips it and the raw string remains reachable.
-    nucleus::configuration_space space;
-    space.register_element(nucleus::registered_element<int>("port", anchor::root()));
+    nucleus::configuration_space_builder builder;
+    builder.register_element(nucleus::registered_element<int>("port", anchor::root()));
+    nucleus::configuration_space space = builder.build();
 
-    nucleus::env_source env;
-    env.set("port", "8080");
-    nucleus::configuration_source_stack stack;
-    stack.add(env, nucleus::layer_rank::env, "env");
-
-    auto loaded = space.load_configuration(stack);
+    nucleus::source_stack_options opts = env_with("port", "8080");
+    auto loaded = nucleus::load_configuration(space, opts);
     REQUIRE(loaded);
 
     REQUIRE(loaded.value().get("port") == std::string("8080"));

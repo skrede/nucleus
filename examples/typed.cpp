@@ -56,21 +56,26 @@ make_vec3_converter()
 
 int main()
 {
-    nucleus::configuration_space engine;
-    engine.register_element(nucleus::element("body", nucleus::anchor::root()));
-    engine.register_element(
+    nucleus::configuration_space_builder builder;
+    builder.register_element(nucleus::element("body", nucleus::anchor::root()));
+    builder.register_element(
         nucleus::typed_element<vec3>("pos", nucleus::anchor::keyspace("body"), make_vec3_converter()));
-    engine.register_element(
+    builder.register_element(
         nucleus::typed_element<int32_t>("mass", nucleus::anchor::keyspace("body")));
+    nucleus::configuration_space space = builder.build();
 
     // In-memory document -- no file on disk required.
     const char *document = R"(<body><pos>1.0,2.5,3.0</pos><mass>42</mass></body>)";
     auto make = [document](const std::string &) -> std::unique_ptr<nucleus::configuration_source> {
         return std::make_unique<nucleus::xml::xml_source>(
-            nucleus::xml::xml_source::from_string(document));
+            nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(document)));
     };
 
-    auto loaded = engine.load(std::vector<std::string>{"config.xml"}, make);
+    nucleus::source_stack_options options;
+    options.document_paths = {"config.xml"};
+    options.make_document = make;
+
+    auto loaded = nucleus::load_configuration(space, options);
     if(!loaded) {
         std::cerr << "load failed: " << loaded.error() << '\n';
         return 1;

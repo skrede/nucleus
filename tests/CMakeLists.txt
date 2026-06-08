@@ -56,6 +56,14 @@ nucleus_add_test(completion_smoke_test)
 nucleus_add_test(facade_completion_test)
 nucleus_add_test(strain_scope_policy_test)
 nucleus_add_test(converter_registry_test)
+nucleus_add_test(builder_lifecycle_test)
+nucleus_add_test(expand_independence_test)
+nucleus_add_test(concurrent_load_test)
+
+# The concurrent-load guarantee test spawns std::threads; link the platform's
+# threading library so the shared-const-read design is exercised under ASan.
+find_package(Threads REQUIRED)
+target_link_libraries(concurrent_load_test PRIVATE Threads::Threads)
 
 # ---------------------------------------------------------------------------
 # Buffer-lifetime test: exercises the XML document source through the seam and

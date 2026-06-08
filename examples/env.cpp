@@ -14,15 +14,17 @@
 
 int main()
 {
-    nucleus::env_source values;
-    values.set("service/region", "eu-west")
-          .set("service/tier", "gold");
+    nucleus::configuration_space space = nucleus::configuration_space_builder{}.build();
 
-    nucleus::configuration_source_stack stack;
-    stack.add(values, nucleus::layer_rank::env, "env");
+    // env_source_options carries the host-mapped (path, value) entries by value;
+    // it is layered at the env rank by load_configuration.
+    nucleus::source_stack_options options;
+    options.env = nucleus::env_source_options{{
+        {"service/region", "eu-west"},
+        {"service/tier", "gold"},
+    }};
 
-    nucleus::configuration_space engine;
-    auto loaded = engine.load_configuration(stack);
+    auto loaded = nucleus::load_configuration(space, options);
     if(!loaded)
     {
         std::cerr << "resolve failed: " << loaded.error() << '\n';

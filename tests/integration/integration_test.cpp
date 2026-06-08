@@ -18,20 +18,22 @@
 
 int main()
 {
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     engine.register_element(nucleus::element("server", nucleus::anchor::root()));
     engine.register_element(
         nucleus::typed_element<std::int32_t>("port", nucleus::anchor::keyspace("server")));
     engine.register_element(
         nucleus::element("name", nucleus::anchor::keyspace("server")));
+    nucleus::configuration_space space = engine.build();
 
     nucleus::env_source values;
     values.set("server/port", "8080").set("server/name", "edge");
 
-    nucleus::configuration_source_stack stack;
-    stack.add(values, nucleus::layer_rank::base, "base");
+    nucleus::source_stack_options opts;
+    opts.custom_layers.push_back(nucleus::configuration_source_layer{
+        &values, static_cast<std::size_t>(nucleus::layer_rank::base), "base", {}});
 
-    auto loaded = engine.load_configuration(stack);
+    auto loaded = nucleus::load_configuration(space, opts);
     if(!loaded)
     {
         std::cerr << "resolve failed: " << loaded.error() << '\n';

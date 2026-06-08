@@ -44,7 +44,7 @@ public:
 
 TEST_CASE("the facade accepts registrations on all three surfaces", "[facade]")
 {
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
 
     // The generic core tokenizers (env/string) are installed by default, so
     // a fresh facade already carries them; a host registration adds on top.
@@ -62,7 +62,7 @@ TEST_CASE("the facade accepts registrations on all three surfaces", "[facade]")
 
 TEST_CASE("each registration carries an opaque owner token", "[facade]")
 {
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     nucleus::owner_token host_a(std::string("plugin.a"));
     nucleus::owner_token host_b(42);
 
@@ -77,7 +77,7 @@ TEST_CASE("the registration-policy seam can intercept a registration", "[facade]
     auto policy = std::make_shared<recording_policy>();
     policy->reject_sources = true;
 
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     engine.set_registration_policy(policy);
 
     REQUIRE(engine.register_schema("a"));
@@ -98,7 +98,7 @@ TEST_CASE("the registration-policy seam can intercept a registration", "[facade]
 TEST_CASE("two registrations claiming the same key path surface a non-adjudicating conflict",
           "[facade][conflict]")
 {
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     nucleus::owner_token plugin_a(std::string("plugin.a"));
     nucleus::owner_token plugin_b(std::string("plugin.b"));
 
@@ -131,7 +131,7 @@ TEST_CASE("two registrations claiming the same key path surface a non-adjudicati
 TEST_CASE("a typed element double-claiming a path conflicts with a path registration",
           "[facade][conflict]")
 {
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     auto logging = nucleus::key_path::parse("logging");
     REQUIRE(logging);
 
@@ -159,7 +159,7 @@ TEST_CASE("capability gating is reachable through the facade", "[facade][capabil
         int count = 0;
     } sink;
 
-    nucleus::configuration_space engine;
+    nucleus::configuration_space engine = nucleus::configuration_space_builder{}.build();
     nucleus::env_source env;
 
     std::vector<nucleus::feature_requirement> required{
@@ -182,7 +182,7 @@ TEST_CASE("clearing the policy restores accept-all behavior", "[facade]")
     auto policy = std::make_shared<recording_policy>();
     policy->reject_sources = true;
 
-    nucleus::configuration_space engine;
+    nucleus::configuration_space_builder engine;
     engine.set_registration_policy(policy);
     REQUIRE_FALSE(engine.register_source("argv"));
 
