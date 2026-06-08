@@ -500,6 +500,27 @@ template<typename T>
     return typed_element<T>(std::move(name), std::move(at), make_scalar_converter<T>());
 }
 
+// repeated_typed_element<T>(name, at, conv) -- a single element that is BOTH a
+// repeated collection AND typed: every occurrence is kept in document/fold order
+// and each is converted to T. Exactly typed_element<T> plus el.repeated = true.
+template<typename T>
+[[nodiscard]] schema_element repeated_typed_element(std::string name, anchor at,
+    std::function<expected<std::any, std::string>(std::string_view)> conv)
+{
+    schema_element el = typed_element<T>(std::move(name), std::move(at), std::move(conv));
+    el.repeated = true;
+    return el;
+}
+
+// repeated_typed_element<T>(name, at) -- built-in-scalar overload: a typed
+// repeated collection converted by the built-in scalar converter for T. Only
+// instantiable for types with a make_scalar_converter specialization.
+template<typename T>
+[[nodiscard]] schema_element repeated_typed_element(std::string name, anchor at)
+{
+    return repeated_typed_element<T>(std::move(name), std::move(at), make_scalar_converter<T>());
+}
+
 // registered_element<T>(name, at) -- declares a typed element carrying ONLY a
 // type identity and NO inline converter. The converter is supplied at resolve by
 // the configuration_space's converter registry (keyed by this type_identity); a

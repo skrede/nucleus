@@ -17,12 +17,15 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <any>
 #include <memory>
 #include <string>
 #include <vector>
 #include <cstdint>
 #include <utility>
 #include <optional>
+#include <typeindex>
+#include <string_view>
 
 using nucleus::anchor;
 using nucleus::strain_scope_policy;
@@ -386,5 +389,170 @@ TEST_CASE("typed access surface: get and get_as agree; type mismatch pinned",
         auto r = loaded.value().get_as<double>("cfg/val");
         REQUIRE(!r);
         REQUIRE(r.error().find("type mismatch") != std::string::npos);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// repeated_typed_element<T>: factory shape -- repeated, typed, type-identified
+// ---------------------------------------------------------------------------
+TEST_CASE("repeated_typed_element<T> sets repeated, converter, and type identity",
+          "[typed][repeated][factory]")
+{
+    SECTION("built-in-scalar overload")
+    {
+        auto el = nucleus::repeated_typed_element<int32_t>("tags", anchor::keyspace("cfg"));
+        REQUIRE(el.repeated);
+        REQUIRE(static_cast<bool>(el.converter));
+        REQUIRE(el.type_identity.has_value());
+        REQUIRE(el.type_identity.value() == std::type_index(typeid(int32_t)));
+    }
+
+    SECTION("explicit-converter overload")
+    {
+        // A custom converter that uppercases the leading character is enough to
+        // prove the supplied converter is the one attached.
+        auto conv = [](std::string_view sv) -> nucleus::expected<std::any, std::string> {
+            return std::any(std::string(sv));
+        };
+        auto el = nucleus::repeated_typed_element<std::string>(
+            "tags", anchor::keyspace("cfg"), conv);
+        REQUIRE(el.repeated);
+        REQUIRE(static_cast<bool>(el.converter));
+        REQUIRE(el.type_identity.value() == std::type_index(typeid(std::string)));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Typed+repeated round-trip: schema -> XML parse -> fold -> convert -> get_all_as
+// ---------------------------------------------------------------------------
+TEST_CASE("repeated_typed_element<T> round-trips the full pipeline in fold order",
+          "[typed][repeated][roundtrip]")
+{
+    nucleus::configuration_space_builder engine;
+    engine.register_element(nucleus::element("cfg", anchor::root()));
+    engine.register_element(
+        nucleus::repeated_typed_element<int32_t>("nums", anchor::keyspace("cfg")));
+    nucleus::configuration_space space = engine.build();
+
+    auto src = xml_of("<cfg><nums>1</nums><nums>2</nums><nums>3</nums></cfg>");
+    nucleus::source_stack_options opts;
+    add_layer(opts, *src, 10, "doc");
+
+    auto loaded = nucleus::load_configuration(space, opts);
+    REQUIRE(loaded);
+
+    // The typed collection arrives in document/fold order...
+    auto typed = loaded.value().get_all_as<int32_t>("cfg/nums");
+    REQUIRE(typed);
+    REQUIRE(typed.value() == std::vector<int32_t>{1, 2, 3});
+
+    // ...and the raw collection agrees on order and count.
+    auto raw = loaded.value().get_all("cfg/nums");
+    REQUIRE(raw == std::vector<std::string>{"1", "2", "3"});
+    REQUIRE(raw.size() == typed.value().size());
+}
+
+// ---------------------------------------------------------------------------
+// Convert-pass defect probe: a single bad element fails with its index + layer
+// ---------------------------------------------------------------------------
+TEST_CASE("repeated_typed_element<T> convert pass fails on a mid-collection defect "
+          "naming the element index and winning layer",
+          "[typed][repeated][failure]")
+{
+    nucleus::configuration_space_builder engine;
+    engine.register_element(nucleus::element("cfg", anchor::root()));
+    engine.register_element(
+        nucleus::repeated_typed_element<int32_t>("nums", anchor::keyspace("cfg")));
+    nucleus::configuration_space space = engine.build();
+
+    // The winning layer's collection has a non-numeric element at index 1.
+    auto src = xml_of("<cfg><nums>10</nums><nums>notanumber</nums><nums>30</nums></cfg>");
+    nucleus::source_stack_options opts;
+    add_layer(opts, *src, 20, "winning-layer");
+
+    auto loaded = nucleus::load_configuration(space, opts);
+    REQUIRE_FALSE(loaded);
+    INFO("error: " << loaded.error());
+    REQUIRE(loaded.error().find("conversion failed for") != std::string::npos);
+    REQUIRE(loaded.error().find("cfg/nums") != std::string::npos);
+    // The exact failing element index...
+    REQUIRE(loaded.error().find("[1]") != std::string::npos);
+    REQUIRE(loaded.error().find("invalid characters") != std::string::npos);
+    // ...and the winning layer label.
+    REQUIRE(loaded.error().find("winning-layer") != std::string::npos);
+}
+
+// ---------------------------------------------------------------------------
+// Same-rank fold order + cross-layer replace for repeated typed collections
+// ---------------------------------------------------------------------------
+TEST_CASE("repeated_typed_element<T> appends within a layer and replaces across layers",
+          "[typed][repeated][foldorder]")
+{
+    SECTION("append accumulates the occurrences WITHIN a single layer")
+    {
+        nucleus::configuration_space_builder engine;
+        engine.register_element(nucleus::element("cfg", anchor::root()));
+        engine.register_element(
+            nucleus::repeated_typed_element<int32_t>("nums", anchor::keyspace("cfg")));
+        nucleus::configuration_space space = engine.build();
+
+        // One layer carrying several occurrences: the first replaces any lower
+        // collection, the rest append -- so all occurrences accumulate in order.
+        auto single = xml_of("<cfg><nums>1</nums><nums>2</nums></cfg>");
+        nucleus::source_stack_options opts;
+        add_layer(opts, *single, 10, "single");
+
+        auto loaded = nucleus::load_configuration(space, opts);
+        REQUIRE(loaded);
+        auto typed = loaded.value().get_all_as<int32_t>("cfg/nums");
+        REQUIRE(typed);
+        REQUIRE(typed.value() == std::vector<int32_t>{1, 2});
+    }
+
+    SECTION("equal-rank layers fold in stack insertion order; the later one REPLACES")
+    {
+        nucleus::configuration_space_builder engine;
+        engine.register_element(nucleus::element("cfg", anchor::root()));
+        engine.register_element(
+            nucleus::repeated_typed_element<int32_t>("nums", anchor::keyspace("cfg")));
+        nucleus::configuration_space space = engine.build();
+
+        // Two SEPARATE layers at the same rank: stable_sort preserves insertion
+        // order, so "second" folds after "first". Replace-across-layers is
+        // per-layer (a new layer's first occurrence clears the lower collection),
+        // so the later-inserted same-rank layer replaces, not appends.
+        auto first = xml_of("<cfg><nums>1</nums></cfg>");
+        auto second = xml_of("<cfg><nums>2</nums></cfg>");
+        nucleus::source_stack_options opts;
+        add_layer(opts, *first, 10, "first");
+        add_layer(opts, *second, 10, "second");
+
+        auto loaded = nucleus::load_configuration(space, opts);
+        REQUIRE(loaded);
+        auto typed = loaded.value().get_all_as<int32_t>("cfg/nums");
+        REQUIRE(typed);
+        REQUIRE(typed.value() == std::vector<int32_t>{2});
+    }
+
+    SECTION("a higher-rank layer replaces the lower layer's collection")
+    {
+        nucleus::configuration_space_builder engine;
+        engine.register_element(nucleus::element("cfg", anchor::root()));
+        engine.register_element(
+            nucleus::repeated_typed_element<int32_t>("nums", anchor::keyspace("cfg")));
+        nucleus::configuration_space space = engine.build();
+
+        auto base = xml_of("<cfg><nums>1</nums><nums>2</nums><nums>3</nums></cfg>");
+        auto derived = xml_of("<cfg><nums>10</nums><nums>20</nums></cfg>");
+        nucleus::source_stack_options opts;
+        add_layer(opts, *base, 10, "base");
+        add_layer(opts, *derived, 20, "derived");
+
+        auto loaded = nucleus::load_configuration(space, opts);
+        REQUIRE(loaded);
+        auto typed = loaded.value().get_all_as<int32_t>("cfg/nums");
+        REQUIRE(typed);
+        // Replace, not append-across-layers: the base collection is gone.
+        REQUIRE(typed.value() == std::vector<int32_t>{10, 20});
     }
 }

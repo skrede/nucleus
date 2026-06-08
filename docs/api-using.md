@@ -132,6 +132,29 @@ nor `repeated` and `unique` -- both combinations are rejected at registration.
 A source must declare the `duplicate_keys` capability to feed a repeated
 element; one that cannot fails loudly instead of silently collapsing values.
 
+### Repeated-key fold order
+
+The fold visits layers in ascending precedence rank. Equal-rank layers fold in
+the order they were pushed onto the stack — the fold uses a `std::stable_sort`,
+which preserves that insertion order. The order in which values land therefore
+follows two independent rules, one within a layer and one across layers:
+
+- **Within a single layer**, the first occurrence of a repeated path *replaces*
+  any collection a lower layer contributed (clearing it), and every subsequent
+  occurrence in that same layer *appends*. So one source's repeated entries
+  accumulate in document order.
+- **Across layers**, a later-folded layer *replaces* the collection wholesale,
+  then appends its own occurrences afresh. "Later-folded" means higher rank, or —
+  among equal ranks — later insertion order. A separate layer never appends onto
+  another layer's collection; it replaces. Two same-rank layers therefore resolve
+  to the later-inserted one's collection, not their concatenation.
+
+`get_all()` and `get_all_as<T>()` return values in exactly this fold order, and
+`collection_provenance_of()` returns one origin per element in the same order. A
+source that lacks the `duplicate_keys` capability may supply at most one value
+per repeated path per layer (a second is a loud error), so a flat source can only
+ever seed a single-element collection for a given path in one layer.
+
 ### `anchor` — where an element attaches
 
 An anchor is a typed, code-side-only position. It never appears in document text.
