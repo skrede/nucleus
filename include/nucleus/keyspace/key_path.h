@@ -1,7 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_KEYSPACE_KEY_PATH_H
 #define HPP_GUARD_NUCLEUS_KEYSPACE_KEY_PATH_H
 
-#include "nucleus/result.h"
+#include "nucleus/expected.h"
 
 #include <string>
 #include <vector>
@@ -39,10 +39,10 @@ public:
     // Parses a `/`-separated FQN string into segments. Leading/trailing
     // separators and empty (`a//b`) segments are rejected so a path always has a
     // canonical, round-trippable form.
-    [[nodiscard]] static result<key_path, std::string> parse(std::string_view text)
+    [[nodiscard]] static expected<key_path, std::string> parse(std::string_view text)
     {
         if(text.empty())
-            return fail(std::string("key path is empty"));
+            return unexpected(std::string("key path is empty"));
 
         std::vector<std::string> segments;
         std::size_t start = 0;
@@ -51,7 +51,7 @@ public:
             if(i == text.size() || text[i] == separator)
             {
                 if(i == start)
-                    return fail(std::string("key path '") + std::string(text)
+                    return unexpected(std::string("key path '") + std::string(text)
                                 + "' has an empty segment");
                 segments.emplace_back(text.substr(start, i - start));
                 start = i + 1;

@@ -1,7 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_SOURCE_SOURCE_H
 #define HPP_GUARD_NUCLEUS_SOURCE_SOURCE_H
 
-#include "nucleus/result.h"
+#include "nucleus/expected.h"
 #include "nucleus/capability.h"
 
 #include "nucleus/source/inherit_declaration.h"
@@ -66,7 +66,7 @@ struct source_batch
 using source_error = std::string;
 
 // The result of pulling from a source.
-using source_result = result<source_batch, source_error>;
+using source_result = expected<source_batch, source_error>;
 
 // The runtime-virtual source/provider seam -- THE boundary of the engine. A
 // source yields keyspace entries (path -> value + capability flags) from its

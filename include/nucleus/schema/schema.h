@@ -1,7 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_SCHEMA_SCHEMA_H
 #define HPP_GUARD_NUCLEUS_SCHEMA_SCHEMA_H
 
-#include "nucleus/result.h"
+#include "nucleus/expected.h"
 
 #include "nucleus/schema/anchor.h"
 
@@ -79,8 +79,8 @@ struct schema_element
     // value at the resolve boundary. Null (the default) means no conversion --
     // the element is untyped and its value is only available as a string via
     // get(). Set together with type_identity by the typed_element factory.
-    // Converters must not throw; return fail() for any conversion error.
-    std::function<result<std::any, std::string>(std::string_view)> converter;
+    // Converters must not throw; return unexpected() for any conversion error.
+    std::function<expected<std::any, std::string>(std::string_view)> converter;
 
     // The std::type_index of the type T that the converter produces. Present iff
     // converter is set; used by get_as<T> to enforce outright type equality.

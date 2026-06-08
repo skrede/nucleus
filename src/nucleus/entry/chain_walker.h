@@ -2,7 +2,7 @@
 #define HPP_GUARD_NUCLEUS_ENTRY_CHAIN_WALKER_H
 
 #include "nucleus/format.h"
-#include "nucleus/result.h"
+#include "nucleus/expected.h"
 
 #include "nucleus/schema/projection.h"
 
@@ -99,7 +99,7 @@ public:
     // the declaring source, so index 0 is the deepest ancestor and the last entry
     // is the requested file itself. The factory and projection are the same ones
     // used by the load() caller. Errors propagate immediately on the first failure.
-    [[nodiscard]] static result<std::vector<chain_entry>, std::string>
+    [[nodiscard]] static expected<std::vector<chain_entry>, std::string>
     expand(const std::vector<std::string> &requested_paths,
            const factory_fn &make,
            const schema_projection &projection,
@@ -111,7 +111,7 @@ public:
         {
             auto res = walker.expand_one(path, make, projection, policy, out);
             if(!res)
-                return fail(std::move(res).error());
+                return unexpected(std::move(res).error());
         }
         return out;
     }
@@ -122,10 +122,10 @@ private:
         , m_admissibility(policy.admissibility)
     {}
 
-    [[nodiscard]] result<depth_guard, std::string> push_depth()
+    [[nodiscard]] expected<depth_guard, std::string> push_depth()
     {
         if(m_depth >= m_cap)
-            return fail(nucleus::format(
+            return unexpected(nucleus::format(
                 "inheritance chain depth {} exceeded the configured limit of {}; "
                 "raise the depth cap if intentional",
                 m_depth, m_cap));
@@ -133,12 +133,12 @@ private:
         return depth_guard(this);
     }
 
-    [[nodiscard]] result<path_guard, std::string> push_path(
+    [[nodiscard]] expected<path_guard, std::string> push_path(
         const std::filesystem::path &absolute)
     {
         std::string key = absolute.generic_string();
         if(m_visited.count(key))
-            return fail(nucleus::format(
+            return unexpected(nucleus::format(
                 "inheritance cycle detected at '{}': this file was already visited "
                 "in the current chain",
                 key));
@@ -151,7 +151,7 @@ private:
     // is_parent is false for the top-level requested source and true for every
     // recursive call that follows an inherit= declaration; the admissibility
     // callback is invoked only when is_parent is true.
-    [[nodiscard]] result<std::monostate, std::string>
+    [[nodiscard]] expected<std::monostate, std::string>
     expand_one(const std::string &path,
                const factory_fn &make,
                const schema_projection &projection,
@@ -167,29 +167,29 @@ private:
         }
         catch(...)
         {
-            return fail(nucleus::format(
+            return unexpected(nucleus::format(
                 "inheritance chain: could not normalize path '{}'", path));
         }
 
         auto pg = push_path(std::filesystem::path(norm));
         if(!pg)
-            return fail(std::move(pg).error());
+            return unexpected(std::move(pg).error());
 
         auto dg = push_depth();
         if(!dg)
-            return fail(std::move(dg).error());
+            return unexpected(std::move(dg).error());
 
         // Build the source via the host factory.
         std::unique_ptr<source> src = make ? make(path) : nullptr;
         if(!src)
-            return fail(nucleus::format(
+            return unexpected(nucleus::format(
                 "inheritance chain: no source could be built for path '{}'", path));
 
         src->apply_projection(projection);
 
         source_result pulled = src->pull();
         if(!pulled)
-            return fail(nucleus::format(
+            return unexpected(nucleus::format(
                 "inheritance chain: source '{}': {}", path, pulled.error()));
 
         // Query the inheritance declaration AFTER pull() (arena is populated).
@@ -210,7 +210,7 @@ private:
             }
             catch(...)
             {
-                return fail(nucleus::format(
+                return unexpected(nucleus::format(
                     "inheritance chain: could not normalize parent path '{}' "
                     "declared by '{}'",
                     decl.path, path));
@@ -218,7 +218,7 @@ private:
 
             auto rec = expand_one(parent_path_str, make, projection, policy, out, true);
             if(!rec)
-                return fail(std::move(rec).error());
+                return unexpected(std::move(rec).error());
         }
         // kind::opt_out terminates the chain below this file (no recursion).
         // kind::inherit_default means "no parent declared" -- the chain terminates here.
@@ -230,7 +230,7 @@ private:
         {
             std::string reason = m_admissibility(*src);
             if(!reason.empty())
-                return fail(nucleus::format(
+                return unexpected(nucleus::format(
                     "chain admissibility check rejected parent '{}': {}", path, reason));
         }
 

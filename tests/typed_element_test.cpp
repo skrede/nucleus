@@ -45,22 +45,22 @@ struct point2
     }
 };
 
-std::function<nucleus::result<std::any, std::string>(std::string_view)>
+std::function<nucleus::expected<std::any, std::string>(std::string_view)>
 make_point2_converter()
 {
-    return [](std::string_view sv) -> nucleus::result<std::any, std::string> {
+    return [](std::string_view sv) -> nucleus::expected<std::any, std::string> {
         auto comma = sv.find(',');
         if(comma == std::string_view::npos)
-            return nucleus::fail(std::string("missing comma separator"));
+            return nucleus::unexpected(std::string("missing comma separator"));
         std::string_view xs = sv.substr(0, comma);
         std::string_view ys = sv.substr(comma + 1);
         int xv{}, yv{};
         auto [px, ecx] = std::from_chars(xs.data(), xs.data() + xs.size(), xv);
         if(ecx != std::errc{} || px != xs.data() + xs.size())
-            return nucleus::fail(std::string("bad x component"));
+            return nucleus::unexpected(std::string("bad x component"));
         auto [py, ecy] = std::from_chars(ys.data(), ys.data() + ys.size(), yv);
         if(ecy != std::errc{} || py != ys.data() + ys.size())
-            return nucleus::fail(std::string("bad y component"));
+            return nucleus::unexpected(std::string("bad y component"));
         return std::any(point2{xv, yv});
     };
 }

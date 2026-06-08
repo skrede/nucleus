@@ -56,7 +56,7 @@ public:
         registration_request request{kind, owner};
         policy_verdict verdict = m_policy->review(request);
         if(!verdict.accepted())
-            return fail(verdict.reason());
+            return unexpected(verdict.reason());
         return registration_ok();
     }
 
@@ -96,32 +96,32 @@ public:
     load_result run_resolve(const source_stack &stack)
     {
         if(phase != facade_phase::configurable)
-            return fail(std::string(
+            return unexpected(std::string(
                 "load/resolve is not allowed: the facade is already resolved"));
 
         resolution_context ctx(schema, tokenizer);
         if(auto folded = ctx.fold(stack); !folded)
-            return fail(std::move(folded).error());
+            return unexpected(std::move(folded).error());
 
         // Keyed-container instances collapse onto the unified hierarchy BEFORE
         // the schema gates content: a primary-key value is transient resolution
         // state and never reaches validation or the frozen configuration. An
         // ambiguous fold (several strains, no selection) fails loudly here.
         if(auto sliced = ctx.slice(m_selection, m_strain_scope); !sliced)
-            return fail(std::move(sliced).error());
+            return unexpected(std::move(sliced).error());
 
         // The schema is the authority over CONTENT: a non-empty schema gates the
         // folded keyspace before it is frozen, so undeclared keys and missing
         // required fields fail the resolve rather than silently shipping.
         if(auto checked = ctx.validate(); !checked)
-            return fail(std::move(checked).error());
+            return unexpected(std::move(checked).error());
 
         // Type conversion: for each schema element with a registered converter,
         // convert the resolved string value to T at the resolve boundary.
         // Runs after validate() so only the post-slice, schema-validated keyspace
         // is visited; a bad value fails the resolve loudly with path + reason + layer.
         if(auto converted = ctx.convert(); !converted)
-            return fail(std::move(converted).error());
+            return unexpected(std::move(converted).error());
 
         configuration result = ctx.freeze();
         // The context (and every retained source buffer) is dropped here; the
@@ -184,7 +184,7 @@ namespace {
 [[nodiscard]] registration_result reject_if_resolved(facade_phase phase, std::string_view what)
 {
     if(phase != facade_phase::configurable)
-        return fail(nucleus::format(
+        return unexpected(nucleus::format(
             "{} is not allowed after the facade has resolved", what));
     return registration_ok();
 }
@@ -221,7 +221,7 @@ registration_result configuration_space::register_element(schema_element element
     const std::string claimed = element.declared_path().str();
     // attach() enforces referential integrity; surface its rejection verbatim.
     if(auto attached = m_impl->schema.attach(std::move(element)); !attached)
-        return fail(std::move(attached).error());
+        return unexpected(std::move(attached).error());
     m_impl->note_claim(claimed, registration_kind::schema, owner);
     return registration_ok();
 }
@@ -330,7 +330,7 @@ load_result configuration_space::load(std::vector<std::string> paths, const docu
     const schema_projection projection = m_impl->schema.projection();
     auto expanded = chain_walker::expand(paths, make, projection, m_impl->m_inherit_policy);
     if(!expanded)
-        return fail(std::move(expanded).error());
+        return unexpected(std::move(expanded).error());
 
     // entries owns the sources; they must outlive run_resolve.
     std::vector<chain_walker::chain_entry> entries = std::move(expanded).value();
@@ -350,7 +350,7 @@ load_result configuration_space::load(std::vector<std::string> args,
     const schema_projection projection = m_impl->schema.projection();
     auto expanded = chain_walker::expand(paths, make, projection, m_impl->m_inherit_policy);
     if(!expanded)
-        return fail(std::move(expanded).error());
+        return unexpected(std::move(expanded).error());
 
     // entries owns the sources; they must outlive run_resolve.
     std::vector<chain_walker::chain_entry> entries = std::move(expanded).value();

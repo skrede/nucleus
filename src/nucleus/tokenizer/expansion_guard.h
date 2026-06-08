@@ -2,7 +2,7 @@
 #define HPP_GUARD_NUCLEUS_TOKENIZER_EXPANSION_GUARD_H
 
 #include "nucleus/format.h"
-#include "nucleus/result.h"
+#include "nucleus/expected.h"
 
 #include "nucleus/tokenizer/resolve_error.h"
 
@@ -79,7 +79,7 @@ public:
     // Pushes `label` onto the active chain. Fails with cyclic_reference when the
     // label is already live (naming the ordered cycle) or depth_exceeded when the
     // chain would grow past the cap. On success returns a popping guard.
-    [[nodiscard]] result<scope, resolve_error> enter(std::string label)
+    [[nodiscard]] expected<scope, resolve_error> enter(std::string label)
     {
         auto first = std::find(m_chain.begin(), m_chain.end(), label);
         if(first != m_chain.end())
@@ -88,11 +88,11 @@ public:
             for(auto it = first; it != m_chain.end(); ++it)
                 chain += *it + " -> ";
             chain += label;
-            return fail(resolve_error(resolve_errc::cyclic_reference,
+            return unexpected(resolve_error(resolve_errc::cyclic_reference,
                                       nucleus::format("cyclic reference: {}", chain)));
         }
         if(m_chain.size() >= m_cap)
-            return fail(resolve_error(resolve_errc::depth_exceeded,
+            return unexpected(resolve_error(resolve_errc::depth_exceeded,
                                       nucleus::format("token expansion depth {} exceeded", m_cap)));
         m_chain.push_back(std::move(label));
         return scope(this);

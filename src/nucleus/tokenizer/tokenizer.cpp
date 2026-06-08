@@ -11,7 +11,7 @@ token_result tokenizer::resolve_field(std::string_view name) const
             return field.resolve();
     if(m_wildcard)
         return m_wildcard(name);
-    return fail(resolve_error(resolve_errc::missing_field,
+    return unexpected(resolve_error(resolve_errc::missing_field,
                               nucleus::format("'{}' has no field '{}'", m_category, name)));
 }
 
@@ -21,7 +21,7 @@ token_result tokenizer::resolve_function(std::string_view name,
     for(const auto &fn : m_functions)
         if(fn.name == name)
             return fn.resolve(args);
-    return fail(resolve_error(resolve_errc::unknown_function,
+    return unexpected(resolve_error(resolve_errc::unknown_function,
                               nucleus::format("'{}' has no function '{}'", m_category, name)));
 }
 

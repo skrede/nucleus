@@ -2,7 +2,7 @@
 #define HPP_GUARD_NUCLEUS_SCHEMA_SCHEMA_REGISTRY_H
 
 #include "nucleus/format.h"
-#include "nucleus/result.h"
+#include "nucleus/expected.h"
 #include "nucleus/identity.h"
 
 #include "nucleus/schema/anchor.h"
@@ -33,7 +33,7 @@ struct schema_spec
 
 // The outcome of attaching a schema element: success, or a referential-integrity
 // rejection naming the undefined keyspace it tried to attach under.
-using schema_attach_result = result<std::monostate, std::string>;
+using schema_attach_result = expected<std::monostate, std::string>;
 
 // One of the three flat sibling registries -- and the SINGLE upstream authority.
 // It stores schema elements anchored into the keyspace. Because the CLI surface
@@ -87,7 +87,7 @@ public:
             const key_path &under = el.at.under();
             if(!is_defined_node(under))
             {
-                return fail(nucleus::format(
+                return unexpected(nucleus::format(
                     "schema element '{}' cannot attach under undefined keyspace '{}'",
                     el.name, under.str()));
             }
@@ -104,7 +104,7 @@ public:
                 m_elements, [](const schema_element &e) { return e.identity; });
             if(existing != m_elements.end())
             {
-                return fail(nucleus::format(
+                return unexpected(nucleus::format(
                     "schema element '{}' cannot be a primary key: '{}' is "
                     "already the configuration space's primary key, and a "
                     "space has exactly one",
@@ -113,13 +113,13 @@ public:
         }
 
         if(el.repeated && el.identity)
-            return fail(nucleus::format(
+            return unexpected(nucleus::format(
                 "schema element '{}' cannot be both repeated and a primary key: "
                 "a primary key must be a unique scalar, not a collection",
                 el.name));
 
         if(el.repeated && el.unique)
-            return fail(nucleus::format(
+            return unexpected(nucleus::format(
                 "schema element '{}' cannot be both repeated and unique: "
                 "uniqueness requires a single comparable value, not a collection",
                 el.name));

@@ -21,13 +21,19 @@ include(cmake/buildflags.cmake)
 # ---------------------------------------------------------------------------
 set(NUCLEUS_PUBLIC_HEADERS
     include/nucleus/version.h
-    include/nucleus/result.h
     include/nucleus/format.h
-    include/nucleus/configuration_space.h
+    include/nucleus/expected.h
     include/nucleus/identity.h
     include/nucleus/log_sink.h
     include/nucleus/capability.h
+    include/nucleus/configuration_space.h
     include/nucleus/registration_policy.h
+)
+
+# Detail headers: implementation seams exposed only through a public alias header
+# (e.g. expected.h -> detail/expected.h), installed under their subdirectory.
+set(NUCLEUS_DETAIL_HEADERS
+    include/nucleus/detail/expected.h
 )
 
 # Public source-seam and keyspace headers. These are header-only contracts; they
@@ -205,6 +211,8 @@ install(FILES ${NUCLEUS_COMPLETION_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/completion)
 install(FILES ${NUCLEUS_UTILITY_HEADERS}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/utility)
+install(FILES ${NUCLEUS_DETAIL_HEADERS}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/detail)
 
 # ---------------------------------------------------------------------------
 # XML source module

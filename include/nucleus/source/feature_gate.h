@@ -2,7 +2,7 @@
 #define HPP_GUARD_NUCLEUS_SOURCE_FEATURE_GATE_H
 
 #include "nucleus/format.h"
-#include "nucleus/result.h"
+#include "nucleus/expected.h"
 #include "nucleus/log_sink.h"
 #include "nucleus/capability.h"
 
@@ -58,7 +58,7 @@ struct gated_features
     std::vector<degradation> degraded;
 };
 
-using gate_result = result<gated_features, gate_error>;
+using gate_result = expected<gated_features, gate_error>;
 
 // Computes feature availability as the intersection of a consumer's requirements
 // with a source's capabilities, applying the loud-vs-quiet contract:
@@ -88,7 +88,7 @@ using gate_result = result<gated_features, gate_error>;
 
         if(req.strength == requirement_strength::required)
         {
-            return fail(nucleus::format(
+            return unexpected(nucleus::format(
                 "source '{}' cannot satisfy capability '{}' required by '{}'",
                 source_name, to_string(req.cap), consumer));
         }

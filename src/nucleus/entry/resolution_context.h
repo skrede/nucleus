@@ -2,7 +2,7 @@
 #define HPP_GUARD_NUCLEUS_ENTRY_RESOLUTION_CONTEXT_H
 
 #include "nucleus/format.h"
-#include "nucleus/result.h"
+#include "nucleus/expected.h"
 
 #include "nucleus/entry/precedence.h"
 #include "nucleus/entry/strain_scope.h"
@@ -84,7 +84,7 @@ public:
     // arrival) rank overwrites a lower one (last-writer-wins within rank). Every
     // batch's retained buffer is pinned in this context until freeze() copies the
     // values out, so no view dangles mid-fold.
-    [[nodiscard]] result<std::monostate, resolve_fold_error> fold(const source_stack &stack)
+    [[nodiscard]] expected<std::monostate, resolve_fold_error> fold(const source_stack &stack)
     {
         std::vector<const source_layer *> ordered;
         ordered.reserve(stack.layers().size());
@@ -117,7 +117,7 @@ public:
             layer->src->apply_projection(projection);
             source_result pulled = layer->src->pull();
             if(!pulled)
-                return fail(nucleus::format("source '{}': {}",
+                return unexpected(nucleus::format("source '{}': {}",
                                               layer->label, pulled.error()));
 
             source_batch &batch = pulled.value();
@@ -133,7 +133,7 @@ public:
                 // collection value is independently expanded before accumulation.
                 token_result expanded = resolve_tokens(entry.value.text(), m_tokenizer);
                 if(!expanded)
-                    return fail(nucleus::format(
+                    return unexpected(nucleus::format(
                         "source '{}': token resolution failed for key '{}': {}",
                         layer->label, entry.path, expanded.error().message));
 
@@ -156,7 +156,7 @@ public:
                     if(!entry.capabilities.supports(capability::duplicate_keys)
                        && seen_repeated_this_layer.count(entry.path) != 0)
                     {
-                        return fail(nucleus::format(
+                        return unexpected(nucleus::format(
                             "source '{}': repeated field '{}' received multiple "
                             "values from a source that does not support "
                             "duplicate_keys; a flat source can supply at most one "
@@ -241,7 +241,7 @@ public:
     //
     // The scope policy applies whenever a strain resolves -- explicitly selected
     // or auto-resolved -- so the two paths cannot diverge for the same strain.
-    [[nodiscard]] result<std::monostate, resolve_fold_error>
+    [[nodiscard]] expected<std::monostate, resolve_fold_error>
     slice(const std::optional<std::string> &selection = std::nullopt,
           strain_scope_policy policy = strain_scope_policy::space_open_container_closed)
     {
@@ -257,7 +257,7 @@ public:
                 if(any.identity) { has_identity = true; break; }
             }
             if(!has_identity)
-                return fail(nucleus::format(
+                return unexpected(nucleus::format(
                     "selection '{}' cannot be applied: the schema declares "
                     "no primary key",
                     selection.value()));
@@ -281,7 +281,7 @@ public:
                 if(m_schema.keyed_instance_path(container, path))
                     strains[path.segments()[container.size()]].push_back(path);
                 else if(m_schema.key_value_collision(container, path))
-                    return fail(nucleus::format(
+                    return unexpected(nucleus::format(
                         "primary-key value '{}' in container '{}' collides with "
                         "a declared element of the same name: a strain cannot "
                         "be keyed by a sibling element's name",
@@ -294,7 +294,7 @@ public:
                 // unsatisfiable and must fail loudly, never silently resolve to
                 // whatever template content exists.
                 if(selection.has_value())
-                    return fail(nucleus::format(
+                    return unexpected(nucleus::format(
                         "selection '{}' does not match any strain in container "
                         "'{}': the container holds no primary-keyed instances",
                         selection.value(), container.str()));
@@ -318,7 +318,7 @@ public:
                             available += ", ";
                         available += nucleus::format("'{}'", key_value);
                     }
-                    return fail(nucleus::format(
+                    return unexpected(nucleus::format(
                         "selection '{}' does not match any strain in container "
                         "'{}'; available: {}",
                         selection.value(), container.str(), available));
@@ -334,7 +334,7 @@ public:
                         keys += ", ";
                     keys += nucleus::format("'{}'", key_value);
                 }
-                return fail(nucleus::format(
+                return unexpected(nucleus::format(
                     "container '{}' holds {} primary-keyed instances ({}) and "
                     "no instance is selected: a configuration space resolves "
                     "exactly one",
@@ -361,7 +361,7 @@ public:
                     }
                 }
                 if(!found_any)
-                    return fail(nucleus::format(
+                    return unexpected(nucleus::format(
                         "strain '{}' in container '{}' has no recorded "
                         "provenance: resolve cannot bound its defining layer",
                         chosen, container.str()));
@@ -432,7 +432,7 @@ public:
                 const bool has_disposition = (disp_it != disp_index.end());
 
                 if(has_cross_layer && !has_disposition)
-                    return fail(nucleus::format(
+                    return unexpected(nucleus::format(
                         "primary-key value '{}' in container '{}' is introduced "
                         "at multiple layers without an extend disposition: "
                         "re-opening a named instance in a derived file requires "
@@ -440,7 +440,7 @@ public:
                         key_value, container.str()));
 
                 if(has_disposition && !has_cross_layer)
-                    return fail(nucleus::format(
+                    return unexpected(nucleus::format(
                         "extend disposition for '{}' in container '{}' has no "
                         "base: no layer below the extending layer provides "
                         "entries for this instance",
@@ -487,7 +487,7 @@ public:
                                 which += ", ";
                             which += nucleus::format("'{}'", strain_kv);
                         }
-                        return fail(nucleus::format(
+                        return unexpected(nucleus::format(
                             "unique field '{}' in container '{}' has duplicate "
                             "value '{}' across instances: {}",
                             uel.name, container.str(), val_text, which));
@@ -567,7 +567,7 @@ public:
     // content gate (an empty schema is not a claim that nothing is allowed). An
     // undeclared key is reported with its nearest declared neighbor so a typo is
     // actionable; missing required fields are reported by the enforcer.
-    [[nodiscard]] result<std::monostate, resolve_fold_error> validate()
+    [[nodiscard]] expected<std::monostate, resolve_fold_error> validate()
     {
         if(m_schema.surface().empty())
             return std::monostate{};
@@ -594,7 +594,7 @@ public:
                     report += nucleus::format(" (did you mean '{}'?)", near.front());
             }
         }
-        return fail(std::move(report));
+        return unexpected(std::move(report));
     }
 
     // Runs the typed conversion pass: for every schema element that has a
@@ -603,7 +603,7 @@ public:
     // to required-ness, which validate() enforces). A conversion failure fails
     // the resolve with the path, the converter's reason, and the winning layer
     // label from provenance. Must run after validate() and before freeze().
-    [[nodiscard]] result<std::monostate, resolve_fold_error> convert()
+    [[nodiscard]] expected<std::monostate, resolve_fold_error> convert()
     {
         for(const schema_element &el : m_schema.elements())
         {
@@ -634,7 +634,7 @@ public:
                             m_provenance.collection_origins_of(path_str);
                         if(co != nullptr && i < co->size())
                             layer_label = (*co)[i].layer;
-                        return fail(nucleus::format(
+                        return unexpected(nucleus::format(
                             "conversion failed for '{}' element [{}]: {} (layer: {})",
                             path_str, i, res.error(), layer_label));
                     }
@@ -655,7 +655,7 @@ public:
                     const origin *orig = m_provenance.of(path_str);
                     if(orig != nullptr)
                         layer_label = orig->layer;
-                    return fail(nucleus::format(
+                    return unexpected(nucleus::format(
                         "conversion failed for '{}': {} (layer: {})",
                         path_str, res.error(), layer_label));
                 }

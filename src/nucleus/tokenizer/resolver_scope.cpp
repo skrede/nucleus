@@ -134,13 +134,13 @@ token_result resolver_scope::lookup_frame_binding(std::string_view category,
         if(it != f.bindings.end())
             return it->second;
         if(want_param)
-            return fail(resolve_error(resolve_errc::missing_field,
+            return unexpected(resolve_error(resolve_errc::missing_field,
                                       nucleus::format("unknown argument 'args.{}'", name)));
     }
     if(want_param)
-        return fail(resolve_error(resolve_errc::out_of_scope_context,
+        return unexpected(resolve_error(resolve_errc::out_of_scope_context,
                                   "'args' referenced outside any function frame"));
-    return fail(resolve_error(resolve_errc::unknown_category,
+    return unexpected(resolve_error(resolve_errc::unknown_category,
                               nucleus::format("no frame or tokenizer for category '{}'", category)));
 }
 
@@ -159,7 +159,7 @@ token_result resolver_scope::dispatch_field(std::string_view category, std::stri
 
     if(const tokenizer *t = m_registry.find(category))
         return t->resolve_field(name);
-    return fail(resolve_error(resolve_errc::unknown_category,
+    return unexpected(resolve_error(resolve_errc::unknown_category,
                               nucleus::format("no frame or tokenizer for category '{}'", category)));
 }
 
@@ -168,7 +168,7 @@ token_result resolver_scope::dispatch_function(std::string_view category, std::s
 {
     if(const tokenizer *t = m_registry.find(category))
         return t->resolve_function(name, args);
-    return fail(resolve_error(resolve_errc::unknown_category,
+    return unexpected(resolve_error(resolve_errc::unknown_category,
                               nucleus::format("no tokenizer for function category '{}'", category)));
 }
 
@@ -179,7 +179,7 @@ token_result resolver_scope::resolve_one(std::string_view token)
     // label is still on the chain, so the cycle guard fires instead of recursing
     // forever -- this is what makes a self/cyclic reference a named error.
     auto guard = m_guard.enter(std::string(token));
-    if(!guard) return fail(std::move(guard).error());
+    if(!guard) return unexpected(std::move(guard).error());
 
     // Field-form nesting (${env.${var}}): a nested ${...} that sits OUTSIDE any
     // argument list is resolved into the head before lexing, so the lexer sees a
@@ -191,13 +191,13 @@ token_result resolver_scope::resolve_one(std::string_view token)
     if(auto head_inner = body_head_has_nested_token(token); head_inner)
     {
         auto expanded = resolve_all(*head_inner);
-        if(!expanded) return fail(std::move(expanded).error());
+        if(!expanded) return unexpected(std::move(expanded).error());
         flattened = "${" + std::move(expanded).value() + "}";
         to_lex = flattened;
     }
 
     auto lexed = lex_token(to_lex);
-    if(!lexed) return fail(std::move(lexed).error());
+    if(!lexed) return unexpected(std::move(lexed).error());
 
     token_result produced = lexed.value().is_function
                                 ? [&] {
@@ -206,7 +206,7 @@ token_result resolver_scope::resolve_one(std::string_view token)
                                       for(const auto &arg : lexed.value().args)
                                       {
                                           auto r = resolve_all(arg);
-                                          if(!r) return token_result(fail(std::move(r).error()));
+                                          if(!r) return token_result(unexpected(std::move(r).error()));
                                           resolved_args.push_back(std::move(r).value());
                                       }
                                       return dispatch_function(lexed.value().category,
@@ -242,7 +242,7 @@ token_result resolver_scope::resolve_all(std::string_view input)
 
         auto token = input.substr(span->start, span->end - span->start + 1);
         auto resolved = resolve_one(token);
-        if(!resolved) return fail(std::move(resolved).error());
+        if(!resolved) return unexpected(std::move(resolved).error());
         result.append(resolved.value());
         pos = span->end + 1;
     }

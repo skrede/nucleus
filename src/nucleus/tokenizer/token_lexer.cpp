@@ -8,15 +8,15 @@ namespace nucleus {
 
 namespace {
 
-failure<resolve_error> parse_failure(std::string text)
+unexpected<resolve_error> parse_failure(std::string text)
 {
-    return fail(resolve_error(resolve_errc::parse_error, std::move(text)));
+    return unexpected(resolve_error(resolve_errc::parse_error, std::move(text)));
 }
 
-result<std::string_view, resolve_error> strip_braces(std::string_view token)
+expected<std::string_view, resolve_error> strip_braces(std::string_view token)
 {
     if(token.size() < 3 || !token.starts_with("${") || !token.ends_with("}"))
-        return fail(resolve_error(resolve_errc::parse_error,
+        return unexpected(resolve_error(resolve_errc::parse_error,
                                   "token is not enclosed in ${...}"));
     return token.substr(2, token.size() - 3);
 }
@@ -48,11 +48,11 @@ struct head_parse
 // for field form). Rejects an empty category, an empty name, a name that still
 // carries a dot (a multi-dot head is malformed), and a dynamically-named function
 // (a nested ${...} in the function name -- an unsupported nesting shape).
-result<head_parse, resolve_error> parse_head(std::string_view body)
+expected<head_parse, resolve_error> parse_head(std::string_view body)
 {
     auto dot = body.find('.');
     if(dot == std::string_view::npos || dot == 0)
-        return fail(resolve_error(resolve_errc::parse_error,
+        return unexpected(resolve_error(resolve_errc::parse_error,
                                   "token body is missing a category.name head"));
 
     head_parse out;
@@ -64,13 +64,13 @@ result<head_parse, resolve_error> parse_head(std::string_view body)
     out.paren_pos = paren;
 
     if(out.name.empty() || out.name.find('.') != std::string_view::npos)
-        return fail(resolve_error(resolve_errc::parse_error,
+        return unexpected(resolve_error(resolve_errc::parse_error,
                                   "token name is empty or contains a dot"));
     // A nested ${...} surviving into the name means a dynamically-named function
     // (`${cat.${x}(args)}`): nesting in the head before a top-level '(' is not a
     // supported shape. Reject it loudly rather than dispatch an unresolved name.
     if(out.name.find("${") != std::string_view::npos)
-        return fail(resolve_error(resolve_errc::parse_error,
+        return unexpected(resolve_error(resolve_errc::parse_error,
                                   "dynamically-named functions are not supported: "
                                   "a nested ${...} may not form a function name"));
     return out;
@@ -87,7 +87,7 @@ void append_significant(std::string &current, std::size_t &significant_end, char
 // stays one literal argument), and quote state. A surrounding pair of matching
 // quotes on a whole argument is stripped. Leading/trailing whitespace around an
 // argument boundary is trimmed; interior whitespace survives.
-result<std::vector<std::string>, resolve_error> parse_args(std::string_view body, std::size_t open_paren)
+expected<std::vector<std::string>, resolve_error> parse_args(std::string_view body, std::size_t open_paren)
 {
     std::vector<std::string> args;
     std::string current;
@@ -172,13 +172,13 @@ result<std::vector<std::string>, resolve_error> parse_args(std::string_view body
 
 }
 
-result<lexed_token, resolve_error> lex_token(std::string_view token)
+expected<lexed_token, resolve_error> lex_token(std::string_view token)
 {
     auto body = strip_braces(token);
-    if(!body) return fail(std::move(body).error());
+    if(!body) return unexpected(std::move(body).error());
 
     auto head = parse_head(body.value());
-    if(!head) return fail(std::move(head).error());
+    if(!head) return unexpected(std::move(head).error());
 
     lexed_token out;
     out.category = std::string(head.value().category);
@@ -189,7 +189,7 @@ result<lexed_token, resolve_error> lex_token(std::string_view token)
 
     out.is_function = true;
     auto args = parse_args(body.value(), head.value().paren_pos);
-    if(!args) return fail(std::move(args).error());
+    if(!args) return unexpected(std::move(args).error());
     out.args = std::move(args).value();
     return out;
 }

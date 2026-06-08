@@ -2,7 +2,7 @@
 #define HPP_GUARD_NUCLEUS_SOURCE_ARGV_ARGV_SOURCE_H
 
 #include "nucleus/format.h"
-#include "nucleus/result.h"
+#include "nucleus/expected.h"
 #include "nucleus/log_sink.h"
 #include "nucleus/capability.h"
 
@@ -104,7 +104,7 @@ public:
         {
             auto mapped = normalize_arg(token);
             if(!mapped)
-                return fail(mapped.error());
+                return unexpected(mapped.error());
 
             const key_path &path = mapped.value().key;
 
@@ -113,7 +113,7 @@ public:
             {
                 if(m_policy == unknown_key_policy::strict)
                 {
-                    return fail(nucleus::format(
+                    return unexpected(nucleus::format(
                         "unknown CLI flag '{}' maps to undeclared key '{}'",
                         token, path.str()));
                 }

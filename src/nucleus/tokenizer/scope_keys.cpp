@@ -25,12 +25,12 @@ token_result resolve_scope_key(std::string_view key, std::span<const scope_frame
     const bool is_file_key = key == "file_name" || key == "file_directory"
                           || key == "file_path" || key == "file_stem";
     if(!is_file_key)
-        return fail(resolve_error(resolve_errc::missing_field,
+        return unexpected(resolve_error(resolve_errc::missing_field,
                                   nucleus::format("unknown scope key 'scope.{}'", key)));
 
     const scope_frame *file = innermost_file_frame(frames);
     if(!file)
-        return fail(resolve_error(resolve_errc::out_of_scope_context,
+        return unexpected(resolve_error(resolve_errc::out_of_scope_context,
                                   nucleus::format("'scope.{}' resolved outside any file frame", key)));
 
     if(key == "file_name") return path_to_text(file->file_path.filename());
@@ -49,7 +49,7 @@ token_result resolve_location_key(std::string_view category, std::string_view ke
 {
     const scope_frame *file = innermost_file_frame(frames);
     if(!file)
-        return fail(resolve_error(resolve_errc::out_of_scope_context,
+        return unexpected(resolve_error(resolve_errc::out_of_scope_context,
                                   nucleus::format("'{}.{}' resolved outside any file frame",
                                                   category, key)));
     const auto &path = file->file_path;
@@ -57,21 +57,21 @@ token_result resolve_location_key(std::string_view category, std::string_view ke
     if(category == "self")
     {
         if(key == "path") return path_to_text(path);
-        return fail(resolve_error(resolve_errc::missing_field,
+        return unexpected(resolve_error(resolve_errc::missing_field,
                                   nucleus::format("unknown key 'self.{}'", key)));
     }
     if(category == "dir")
     {
         if(key == "path") return path_to_text(path.parent_path());
         if(key == "name") return path_to_text(path.parent_path().filename());
-        return fail(resolve_error(resolve_errc::missing_field,
+        return unexpected(resolve_error(resolve_errc::missing_field,
                                   nucleus::format("unknown key 'dir.{}'", key)));
     }
     // category == "file"
     if(key == "name") return path_to_text(path.filename());
     if(key == "path") return path_to_text(path);
     if(key == "stem") return path_to_text(path.stem());
-    return fail(resolve_error(resolve_errc::missing_field,
+    return unexpected(resolve_error(resolve_errc::missing_field,
                               nucleus::format("unknown key 'file.{}'", key)));
 }
 

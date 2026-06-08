@@ -14,9 +14,9 @@ namespace nucleus {
 
 namespace {
 
-failure<resolve_error> arity_error(std::string_view fn, std::string_view want)
+unexpected<resolve_error> arity_error(std::string_view fn, std::string_view want)
 {
-    return fail(resolve_error(resolve_errc::arg_count_mismatch,
+    return unexpected(resolve_error(resolve_errc::arg_count_mismatch,
                               nucleus::format("string.{} expects {}", fn, want)));
 }
 
@@ -61,7 +61,7 @@ tokenizer make_env_tokenizer()
     builder.set_wildcard([](std::string_view name) -> token_result {
         if(const char *value = std::getenv(std::string(name).c_str()))
             return std::string(value);
-        return fail(resolve_error(resolve_errc::missing_field,
+        return unexpected(resolve_error(resolve_errc::missing_field,
                                   nucleus::format("environment variable '{}' is not set", name)));
     });
     return std::move(builder).build();
@@ -101,16 +101,16 @@ tokenizer make_string_tokenizer()
             return arity_error("substr", "2 or 3 arguments (string, pos[, count])");
         std::size_t pos = 0;
         try { pos = static_cast<std::size_t>(std::stoull(a[1])); }
-        catch(...) { return fail(resolve_error(resolve_errc::arg_count_mismatch,
+        catch(...) { return unexpected(resolve_error(resolve_errc::arg_count_mismatch,
                                                "string.substr pos is not a number")); }
         if(pos > a[0].size())
-            return fail(resolve_error(resolve_errc::arg_count_mismatch,
+            return unexpected(resolve_error(resolve_errc::arg_count_mismatch,
                                       "string.substr pos is past the end of the string"));
         if(a.size() == 2)
             return a[0].substr(pos);
         std::size_t count = 0;
         try { count = static_cast<std::size_t>(std::stoull(a[2])); }
-        catch(...) { return fail(resolve_error(resolve_errc::arg_count_mismatch,
+        catch(...) { return unexpected(resolve_error(resolve_errc::arg_count_mismatch,
                                                "string.substr count is not a number")); }
         return a[0].substr(pos, count);
     });

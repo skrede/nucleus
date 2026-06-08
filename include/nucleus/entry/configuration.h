@@ -1,7 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_ENTRY_CONFIGURATION_H
 #define HPP_GUARD_NUCLEUS_ENTRY_CONFIGURATION_H
 
-#include "nucleus/result.h"
+#include "nucleus/expected.h"
 
 #include "nucleus/keyspace/provenance.h"
 
@@ -127,20 +127,20 @@ public:
     //                          type_index equality; no widening or coercion)
     // Note: any_cast<T> produces a copy of the stored value.
     template<typename T>
-    [[nodiscard]] result<T, std::string> get_as(const std::string &key) const
+    [[nodiscard]] expected<T, std::string> get_as(const std::string &key) const
     {
         auto it = m_typed.find(key);
         if(it == m_typed.end())
         {
             if(m_typed_collections.find(key) != m_typed_collections.end())
-                return fail(std::string("path '") + key
+                return unexpected(std::string("path '") + key
                             + "' holds a typed collection; use get_all_as<T>()");
             if(contains(key))
-                return fail(std::string("path '") + key + "' declares no type converter");
-            return fail(std::string("path '") + key + "' is absent");
+                return unexpected(std::string("path '") + key + "' declares no type converter");
+            return unexpected(std::string("path '") + key + "' is absent");
         }
         if(it->second.type() != typeid(T))
-            return fail(std::string("type mismatch for path '") + key
+            return unexpected(std::string("type mismatch for path '") + key
                         + "': stored type does not match requested type");
         return std::any_cast<T>(it->second);
     }
@@ -148,24 +148,24 @@ public:
     // Returns all typed elements for a repeated path.
     // Same error distinctions as get_as<T>.
     template<typename T>
-    [[nodiscard]] result<std::vector<T>, std::string> get_all_as(const std::string &key) const
+    [[nodiscard]] expected<std::vector<T>, std::string> get_all_as(const std::string &key) const
     {
         auto it = m_typed_collections.find(key);
         if(it == m_typed_collections.end())
         {
             if(m_typed.find(key) != m_typed.end())
-                return fail(std::string("path '") + key
+                return unexpected(std::string("path '") + key
                             + "' holds a single typed value; use get_as<T>()");
             if(contains(key))
-                return fail(std::string("path '") + key + "' declares no type converter");
-            return fail(std::string("path '") + key + "' is absent");
+                return unexpected(std::string("path '") + key + "' declares no type converter");
+            return unexpected(std::string("path '") + key + "' is absent");
         }
         std::vector<T> out;
         out.reserve(it->second.size());
         for(const std::any &a : it->second)
         {
             if(a.type() != typeid(T))
-                return fail(std::string("type mismatch for path '") + key
+                return unexpected(std::string("type mismatch for path '") + key
                             + "': stored element type does not match requested type");
             out.push_back(std::any_cast<T>(a));
         }

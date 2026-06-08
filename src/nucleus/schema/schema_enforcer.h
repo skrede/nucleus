@@ -2,7 +2,7 @@
 #define HPP_GUARD_NUCLEUS_SCHEMA_SCHEMA_ENFORCER_H
 
 #include "nucleus/format.h"
-#include "nucleus/result.h"
+#include "nucleus/expected.h"
 
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/schema_registry.h"
@@ -32,7 +32,7 @@ struct schema_violation
     std::string reason;
 };
 
-using schema_validation = result<std::monostate, std::vector<schema_violation>>;
+using schema_validation = expected<std::monostate, std::vector<schema_violation>>;
 
 // Validates a resolved keyspace against the registered schema -- the step that
 // makes the schema authoritative over CONTENT, not just shape. Three independent
@@ -162,7 +162,7 @@ public:
         }
 
         if(!violations.empty())
-            return fail(std::move(violations));
+            return unexpected(std::move(violations));
         return std::monostate{};
     }
 };

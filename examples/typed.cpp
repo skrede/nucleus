@@ -27,11 +27,11 @@ struct vec3 { float x = 0.f; float y = 0.f; float z = 0.f; };
 // float parsing, so the parse stays locale-independent and portable across
 // toolchains (e.g. standard libraries whose <charconv> lacks floating-point
 // from_chars).
-std::function<nucleus::result<std::any, std::string>(std::string_view)>
+std::function<nucleus::expected<std::any, std::string>(std::string_view)>
 make_vec3_converter()
 {
     return [parse_float = nucleus::make_scalar_converter<float>()](
-               std::string_view sv) -> nucleus::result<std::any, std::string> {
+               std::string_view sv) -> nucleus::expected<std::any, std::string> {
         float components[3] = {};
         std::size_t count = 0;
         std::string_view rest = sv;
@@ -40,13 +40,13 @@ make_vec3_converter()
             std::string_view token = rest.substr(0, sep);
             auto component = parse_float(token);
             if(!component)
-                return nucleus::fail(std::string("bad component"));
+                return nucleus::unexpected(std::string("bad component"));
             components[count] = std::any_cast<float>(component.value());
             ++count;
             rest = (sep == std::string_view::npos) ? std::string_view{} : rest.substr(sep + 1);
         }
         if(count != 3 || !rest.empty())
-            return nucleus::fail(
+            return nucleus::unexpected(
                 std::string("expected x,y,z -- three comma-separated floats"));
         return std::any(vec3{components[0], components[1], components[2]});
     };

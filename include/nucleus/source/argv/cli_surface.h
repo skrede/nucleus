@@ -1,7 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_SOURCE_ARGV_CLI_SURFACE_H
 #define HPP_GUARD_NUCLEUS_SOURCE_ARGV_CLI_SURFACE_H
 
-#include "nucleus/result.h"
+#include "nucleus/expected.h"
 
 #include "nucleus/keyspace/key_path.h"
 
@@ -39,7 +39,7 @@ struct cli_assignment
     std::string value;
 };
 
-using cli_normalize_result = result<cli_assignment, std::string>;
+using cli_normalize_result = expected<cli_assignment, std::string>;
 
 // Normalizes a single argv token into a (key path -> value) assignment, applying
 // the rules above. Reports an error for tokens that are not `--` flags or that
@@ -47,12 +47,12 @@ using cli_normalize_result = result<cli_assignment, std::string>;
 [[nodiscard]] inline cli_normalize_result normalize_arg(std::string_view raw)
 {
     if(!raw.starts_with("--"))
-        return fail(std::string("CLI argument '") + std::string(raw)
+        return unexpected(std::string("CLI argument '") + std::string(raw)
                     + "' does not start with '--'");
 
     std::string_view body = raw.substr(2);
     if(body.empty())
-        return fail(std::string("CLI argument '--' has no flag body"));
+        return unexpected(std::string("CLI argument '--' has no flag body"));
 
     std::string_view lhs;
     std::string value;
@@ -68,7 +68,7 @@ using cli_normalize_result = result<cli_assignment, std::string>;
     }
 
     if(lhs.empty())
-        return fail(std::string("CLI argument '") + std::string(raw)
+        return unexpected(std::string("CLI argument '") + std::string(raw)
                     + "' has an empty flag name");
 
     // `-` -> path separator; everything else (including `_`) passes through.
@@ -79,7 +79,7 @@ using cli_normalize_result = result<cli_assignment, std::string>;
 
     auto path = key_path::parse(key_text);
     if(!path)
-        return fail(std::move(path).error());
+        return unexpected(std::move(path).error());
 
     return cli_assignment{std::move(path).value(), std::move(value)};
 }

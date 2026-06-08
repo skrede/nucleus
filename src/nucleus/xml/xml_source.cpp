@@ -86,7 +86,7 @@ std::string_view keyed_value(const pugi::xml_node &node, const std::string &key_
 // recursive calls.
 //
 // batch is shared so the keyed-instance branch can push extend dispositions.
-result<std::monostate, source_error>
+expected<std::monostate, source_error>
 walk(const pugi::xml_node &node, std::string_view path,
      const capability_descriptor &caps, const schema_projection &proj,
      source_batch &batch, std::string_view skip,
@@ -102,7 +102,7 @@ walk(const pugi::xml_node &node, std::string_view path,
         if(attr_name == "inherit")
         {
             if(!is_root)
-                return fail(source_error{nucleus::format(
+                return unexpected(source_error{nucleus::format(
                     "inherit attribute is not permitted on element '{}'; "
                     "it is only valid on the document root element",
                     node.name())});
@@ -118,7 +118,7 @@ walk(const pugi::xml_node &node, std::string_view path,
         if(attr_name == "extend")
         {
             if(skip.empty())
-                return fail(source_error{nucleus::format(
+                return unexpected(source_error{nucleus::format(
                     "extend attribute is not permitted on element '{}'; "
                     "it is only valid on a primary-keyed container instance",
                     node.name())});
@@ -159,7 +159,7 @@ walk(const pugi::xml_node &node, std::string_view path,
                 // the same key value in one document are an error.
                 auto &seen = seen_keys[child_path];
                 if(seen.count(std::string(key_val)))
-                    return fail(source_error{nucleus::format(
+                    return unexpected(source_error{nucleus::format(
                         "duplicate primary-key value '{}' in container '{}': "
                         "the same key value appears more than once in this document",
                         key_val, child_path)});
@@ -178,7 +178,7 @@ walk(const pugi::xml_node &node, std::string_view path,
                                                       std::string(key_val),
                                                       extend_strength::wide});
                     else
-                        return fail(source_error{nucleus::format(
+                        return unexpected(source_error{nucleus::format(
                             "unknown extend value '{}' on element '{}'; "
                             "expected \"narrow\" or \"wide\"",
                             ext_val, child.name())});
@@ -222,12 +222,12 @@ source_result xml_source::pull()
         const bool loaded = m_kind == kind::file ? m_arena->load_file(m_input)
                                                  : m_arena->load_string(m_input);
         if(!loaded)
-            return fail(std::string("xml source: failed to parse input"));
+            return unexpected(std::string("xml source: failed to parse input"));
     }
 
     pugi::xml_node root = m_arena->root();
     if(!root)
-        return fail(std::string("xml source: document has no root element"));
+        return unexpected(std::string("xml source: document has no root element"));
 
     source_batch batch;
     std::map<std::string, std::set<std::string>> seen_keys;
@@ -237,7 +237,7 @@ source_result xml_source::pull()
     // repeatable instances are distinguished.
     if(auto r = walk(root, std::string_view(root.name()), capabilities(), m_projection,
                      batch, {}, seen_keys, true); !r)
-        return fail(r.error());
+        return unexpected(r.error());
 
     // Pin the arena: the entries' views point into it and must stay valid until
     // resolution copies them out. m_arena is also kept alive as a member so

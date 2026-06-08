@@ -1,7 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_TOKENIZER_TOKENIZER_H
 #define HPP_GUARD_NUCLEUS_TOKENIZER_TOKENIZER_H
 
-#include "nucleus/result.h"
+#include "nucleus/expected.h"
 
 #include "nucleus/tokenizer/resolve_error.h"
 
@@ -18,7 +18,7 @@ namespace nucleus {
 // The result of resolving one field or function: a produced string or a
 // resolution error. Tokenizers traffic purely in strings -- a token always
 // expands to text spliced back into the surrounding value.
-using token_result = result<std::string, resolve_error>;
+using token_result = expected<std::string, resolve_error>;
 
 // A field resolver: ${category.name} with no argument list. The closure
 // receives nothing and produces a string-or-error.

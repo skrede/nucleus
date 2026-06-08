@@ -1,7 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SPACE_H
 #define HPP_GUARD_NUCLEUS_CONFIGURATION_SPACE_H
 
-#include "nucleus/result.h"
+#include "nucleus/expected.h"
 #include "nucleus/identity.h"
 #include "nucleus/log_sink.h"
 #include "nucleus/registration_policy.h"
@@ -42,7 +42,7 @@ enum class shell;
 
 // The outcome of a registration: success, or a host-supplied rejection reason
 // surfaced verbatim from the registration-policy seam.
-using registration_result = result<std::monostate, std::string>;
+using registration_result = expected<std::monostate, std::string>;
 
 [[nodiscard]] inline registration_result registration_ok()
 {
@@ -62,7 +62,7 @@ enum class facade_phase
 // The outcome of a resolve: the immutable configuration, or a reason it failed
 // (a source/token error, or an attempt to resolve a facade that is already
 // resolved -- the state machine enforced verbatim).
-using load_result = result<configuration, std::string>;
+using load_result = expected<configuration, std::string>;
 
 // The configurable facade. In this phase it owns the three flat sibling
 // registries (schema / tokenizer / source) as composition members and accepts

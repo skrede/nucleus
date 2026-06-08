@@ -1,7 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_TOKENIZER_RESOLVER_SCOPE_H
 #define HPP_GUARD_NUCLEUS_TOKENIZER_RESOLVER_SCOPE_H
 
-#include "nucleus/result.h"
+#include "nucleus/expected.h"
 
 #include "nucleus/tokenizer/tokenizer.h"
 #include "nucleus/tokenizer/scope_frame.h"

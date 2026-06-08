@@ -2,7 +2,7 @@
 #define HPP_GUARD_NUCLEUS_SOURCE_EXTENSION_REGISTRY_H
 
 #include "nucleus/format.h"
-#include "nucleus/result.h"
+#include "nucleus/expected.h"
 #include "nucleus/identity.h"
 
 #include "nucleus/source/source.h"
@@ -28,7 +28,7 @@ using parser_factory = std::function<std::unique_ptr<source>(const std::string &
 // The error a registration can produce.
 using extension_error = std::string;
 
-using extension_result = result<std::monostate, extension_error>;
+using extension_result = expected<std::monostate, extension_error>;
 
 // Maps each file extension to exactly one parser.
 //
@@ -59,7 +59,7 @@ public:
             if(auto it = m_parsers.find(key); it != m_parsers.end())
             {
                 const bool same_owner = it->second.owner == owner;
-                return fail(nucleus::format(
+                return unexpected(nucleus::format(
                     "extension '{}' is already claimed by {} parser",
                     key, same_owner ? "the same" : "another"));
             }
@@ -68,7 +68,7 @@ public:
             // would silently no-op the second emplace, so reject it here before
             // anything is committed (the registration stays atomic).
             if(std::find(normalized.begin(), normalized.end(), key) != normalized.end())
-                return fail(nucleus::format(
+                return unexpected(nucleus::format(
                     "extension '{}' is claimed twice in the same registration", key));
             normalized.push_back(std::move(key));
         }
