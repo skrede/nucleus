@@ -7,7 +7,7 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "support/capable_source.h"
+#include "nucleus/configuration_source/runtime/runtime_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -51,9 +51,9 @@ void add_layer(nucleus::source_stack_options &opts, nucleus::configuration_sourc
 //   rank=10: web/port=80 (web's defining layer; Ld=10)
 //   rank=20: web/protocol=tcp, app/name=core (derived layer above Ld; general entry)
 //   rank=30: db/port=5432 (competing strain first appears; Ls=30)
-nucleus::source_stack_options three_layer_opts(nucleus::testing::capable_source &L0,
-                                               nucleus::testing::capable_source &Lderived,
-                                               nucleus::testing::capable_source &Lcompeting)
+nucleus::source_stack_options three_layer_opts(nucleus::runtime_source &L0,
+                                               nucleus::runtime_source &Lderived,
+                                               nucleus::runtime_source &Lcompeting)
 {
     L0.set("cluster/server/web/name", "web")
       .set("cluster/server/web/port", "80");
@@ -75,7 +75,7 @@ TEST_CASE("default policy (space-open container-closed) excludes container entri
           "the defining layer but admits general entries",
           "[scope_policy][keyed]")
 {
-    nucleus::testing::capable_source L0, Lderived, Lcompeting;
+    nucleus::runtime_source L0, Lderived, Lcompeting;
     nucleus::source_stack_options opts = three_layer_opts(L0, Lderived, Lcompeting);
     opts.selection = "web";
     // No scope override -- default is space_open_container_closed.
@@ -106,7 +106,7 @@ TEST_CASE("file_level policy excludes container entries and general entries abov
           "defining layer",
           "[scope_policy][keyed]")
 {
-    nucleus::testing::capable_source L0, Lderived, Lcompeting;
+    nucleus::runtime_source L0, Lderived, Lcompeting;
     nucleus::source_stack_options opts = three_layer_opts(L0, Lderived, Lcompeting);
     opts.selection = "web";
     opts.scope = strain_scope_policy::file_level;
@@ -133,7 +133,7 @@ TEST_CASE("container_open_until_next_strain admits container entries below Ls an
           "entries",
           "[scope_policy][keyed]")
 {
-    nucleus::testing::capable_source L0, Lderived, Lcompeting;
+    nucleus::runtime_source L0, Lderived, Lcompeting;
     nucleus::source_stack_options opts = three_layer_opts(L0, Lderived, Lcompeting);
     opts.selection = "web";
     opts.scope = strain_scope_policy::container_open_until_next_strain;
@@ -165,7 +165,7 @@ TEST_CASE("container_open_until_next_strain with no competing strain is fully op
           "[scope_policy][keyed]")
 {
     // Only web strain at ranks 10 and 20; no competing strain at all.
-    nucleus::testing::capable_source L0, Lderived;
+    nucleus::runtime_source L0, Lderived;
     L0.set("cluster/server/web/name", "web")
       .set("cluster/server/web/port", "80");
     Lderived.set("cluster/server/web/protocol", "tcp");
@@ -196,7 +196,7 @@ TEST_CASE("a competing strain introduced below the defining layer never bounds t
     // db is introduced at rank=10, BELOW web's defining layer at rank=30: db is
     // not the "next" strain after web's file, so Ls stays unbounded and every
     // web entry survives under container_open_until_next_strain.
-    nucleus::testing::capable_source Learly, Lweb, Lderived;
+    nucleus::runtime_source Learly, Lweb, Lderived;
     Learly.set("cluster/server/db/name", "db")
           .set("cluster/server/db/port", "5432");
     Lweb.set("cluster/server/web/name", "web")
@@ -235,7 +235,7 @@ TEST_CASE("Ls is bound by the layer that INTRODUCES the competing strain, not th
     // web's container entry at rank=40 sits between: it must be EXCLUDED, since
     // the composable window ends at the layer that introduced db (Ls=30), not
     // at the overwriting layer (50).
-    nucleus::testing::capable_source L0, Lcompeting, Lbetween, Loverwrite;
+    nucleus::runtime_source L0, Lcompeting, Lbetween, Loverwrite;
     L0.set("cluster/server/web/name", "web")
       .set("cluster/server/web/port", "80");
     Lcompeting.set("cluster/server/db/name", "db")
@@ -272,7 +272,7 @@ TEST_CASE("scope policies apply when the single named strain auto-resolves",
 {
     // No selection: web is the only named strain and auto-resolves. The default
     // policy must behave exactly as it does under an explicit selection of "web".
-    nucleus::testing::capable_source L0, Lderived;
+    nucleus::runtime_source L0, Lderived;
     L0.set("cluster/server/web/name", "web")
       .set("cluster/server/web/port", "80");
     Lderived.set("cluster/server/web/protocol", "tcp")
@@ -300,7 +300,7 @@ TEST_CASE("file_level applies on auto-resolve and cuts general entries above the
           "defining layer",
           "[scope_policy][keyed]")
 {
-    nucleus::testing::capable_source L0, Lderived;
+    nucleus::runtime_source L0, Lderived;
     L0.set("cluster/server/web/name", "web")
       .set("cluster/server/web/port", "80");
     Lderived.set("app/name", "core");

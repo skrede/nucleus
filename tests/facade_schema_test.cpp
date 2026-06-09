@@ -7,7 +7,7 @@
 
 #include "nucleus/keyspace/key_path.h"
 
-#include "support/capable_source.h"
+#include "nucleus/configuration_source/runtime/runtime_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -31,9 +31,9 @@ nucleus::key_path path_of(const std::string &text)
 
 // A flat (path -> value) feeder that declares the structural capabilities, so the
 // auto-gate admits the nested schemas these schema-authority tests exercise.
-nucleus::testing::capable_source one(std::string path, std::string text)
+nucleus::runtime_source one(std::string path, std::string text)
 {
-    nucleus::testing::capable_source src;
+    nucleus::runtime_source src;
     src.set(std::move(path), std::move(text));
     return src;
 }
@@ -156,7 +156,7 @@ TEST_CASE("resolve admits a document that satisfies the schema", "[facade][schem
         nucleus::element("port", nucleus::anchor::keyspace(path_of("server")))));
     nucleus::configuration_space space = engine.build();
 
-    nucleus::testing::capable_source src;
+    nucleus::runtime_source src;
     src.set("server/host", "localhost").set("server/port", "8080");
     nucleus::source_stack_options opts = base_layer(src);
 

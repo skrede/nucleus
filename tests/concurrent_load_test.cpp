@@ -12,7 +12,7 @@
 #include "nucleus/entry/precedence.h"
 #include "nucleus/entry/configuration.h"
 
-#include "support/capable_source.h"
+#include "nucleus/configuration_source/runtime/runtime_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -46,7 +46,7 @@ TEST_CASE("N threads load one shared const space lock-free with identical result
             // Borrow the shared space by const reference -- NO mutex anywhere. Each
             // thread owns its source and options on its own stack so nothing mutable
             // is shared; the feeder declares nesting so the auto-gate admits it.
-            nucleus::testing::capable_source src;
+            nucleus::runtime_source src;
             src.set("server/host", "localhost").set("server/port", "8080");
             nucleus::source_stack_options opts;
             opts.custom_layers.push_back(nucleus::configuration_source_layer{

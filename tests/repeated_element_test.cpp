@@ -14,7 +14,7 @@
 
 #include "nucleus/configuration_source/env/env_source.h"
 
-#include "support/capable_source.h"
+#include "nucleus/configuration_source/runtime/runtime_source.h"
 
 #include "nucleus/xml/xml_source.h"
 
@@ -416,11 +416,11 @@ TEST_CASE("collection scope-policy exclusion and admission",
         declare_cluster_tags(engine);
         nucleus::configuration_space space = engine.build();
 
-        nucleus::testing::capable_source L0;
+        nucleus::runtime_source L0;
         L0.set("cluster/server/primary/name", "primary")
           .set("cluster/server/primary/tags", "base");
 
-        nucleus::testing::capable_source Lderived;
+        nucleus::runtime_source Lderived;
         Lderived.set("cluster/server/primary/tags", "derived");
 
         nucleus::source_stack_options opts;
@@ -443,11 +443,11 @@ TEST_CASE("collection scope-policy exclusion and admission",
         declare_cluster_tags(engine);
         nucleus::configuration_space space = engine.build();
 
-        nucleus::testing::capable_source L0;
+        nucleus::runtime_source L0;
         L0.set("cluster/server/primary/name", "primary")
           .set("cluster/server/primary/tags", "base");
 
-        nucleus::testing::capable_source Lderived;
+        nucleus::runtime_source Lderived;
         Lderived.set("cluster/server/primary/tags", "derived");
 
         nucleus::source_stack_options opts;
