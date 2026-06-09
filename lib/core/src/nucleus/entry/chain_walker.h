@@ -195,25 +195,17 @@ private:
         // Recurse into the parent BEFORE appending this source (root-first order).
         if(decl.which == inherit_declaration::kind::parent_path)
         {
-            // Resolve relative paths against the declaring file's directory.
+            // Resolve relative paths against the declaring file's directory, then
+            // record the lexically-normalized (filesystem-independent) form as the
+            // chain label. weakly_canonical is applied only as the cycle key inside
+            // expand_one, so the recorded provenance path stays portable and
+            // deterministic across platforms and working directories.
             std::filesystem::path raw(decl.path);
             if(raw.is_relative())
                 raw = std::filesystem::path(path).parent_path() / raw;
 
-            std::string parent_path_str;
-            try
-            {
-                parent_path_str = std::filesystem::weakly_canonical(raw).generic_string();
-            }
-            catch(...)
-            {
-                return unexpected(nucleus::format(
-                    "inheritance chain: could not normalize parent path '{}' "
-                    "declared by '{}'",
-                    decl.path, path));
-            }
-
-            auto rec = expand_one(parent_path_str, make, projection, policy, out, true);
+            auto rec = expand_one(raw.lexically_normal().generic_string(),
+                                  make, projection, policy, out, true);
             if(!rec)
                 return unexpected(std::move(rec).error());
         }
