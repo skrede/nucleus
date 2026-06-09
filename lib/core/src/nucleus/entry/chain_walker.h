@@ -6,6 +6,7 @@
 
 #include "nucleus/schema/projection.h"
 
+#include "nucleus/configuration_source/source_handle.h"
 #include "nucleus/configuration_source/configuration_source.h"
 #include "nucleus/configuration_source/inherit_declaration.h"
 
@@ -18,6 +19,19 @@
 #include <unordered_set>
 
 namespace nucleus {
+
+// Thin adapter satisfying source_satisfies that owns a unique_ptr<configuration_source>.
+// Lets the chain_walker erase a factory-produced source into a source_handle without
+// slicing the polymorphic object; the fold's consuming pull goes through this adapter.
+struct source_ptr_adapter
+{
+    std::unique_ptr<configuration_source> ptr;
+
+    [[nodiscard]] capability_descriptor capabilities() const { return ptr->capabilities(); }
+    void apply_projection(const schema_projection &p) { ptr->apply_projection(p); }
+    [[nodiscard]] inherit_declaration inheritance() const { return ptr->inheritance(); }
+    [[nodiscard]] configuration_source_result pull() { return ptr->pull(); }
+};
 
 // Transient walker that expands a flat list of requested paths into a
 // root-first ordered chain of pulled sources, following each source's
@@ -80,18 +94,19 @@ public:
     };
 
     // One entry in the expanded chain: the path the source was built from and the
-    // source itself. Owned by the caller. The walk pulls once to surface the
-    // inheritance declaration; the batch is discarded -- the fold performs the
-    // consuming pull.
+    // erased source handle. Owned by the caller. The walk pulls once to surface the
+    // inheritance declaration; the fold performs the consuming pull via the handle.
+    // The handle is move-only; the walker moves it here after the walk pull.
     struct chain_entry
     {
-        std::string path;
-        std::unique_ptr<configuration_source> src;
+        std::string   path;
+        source_handle src;
     };
 
     // Factory type: given a path string, return a non-null unique_ptr<configuration_source>
-    // or null (null is surfaced as a load error). This matches
-    // configuration_space::document_factory.
+    // or null (null is surfaced as a load error). Returns unique_ptr so admissibility
+    // callbacks (which take const configuration_source &) can inspect the source
+    // before it is erased into a source_handle and moved into chain_entry.
     using factory_fn = std::function<std::unique_ptr<configuration_source>(const std::string &)>;
 
     // Expands `requested_paths` into a root-first ordered chain. For each path
@@ -234,8 +249,10 @@ private:
                     "chain admissibility check rejected parent '{}': {}", path, reason));
         }
 
-        // Append this source AFTER its parent (root-first).
-        out.push_back(chain_entry{path, std::move(src)});
+        // Append this source AFTER its parent (root-first). Erase the unique_ptr into
+        // a source_handle via the thin adapter; the fold's consuming pull goes through
+        // the handle (the walk-pull above read only the inheritance declaration).
+        out.push_back(chain_entry{path, source_handle(source_ptr_adapter{std::move(src)})});
 
         // depth_guard and path_guard released here by RAII.
         return std::monostate{};

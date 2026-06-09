@@ -25,6 +25,7 @@
 #include "nucleus/tokenizer/tokenizer_registry.h"
 
 #include <map>
+#include <span>
 #include <memory>
 #include <string>
 #include <vector>
@@ -144,23 +145,40 @@ namespace {
     return registration_ok();
 }
 
-// The shared auto-gate: derives the schema's capability requirements and gates the
-// assembled stack with whole-stack union semantics. load_configuration and
-// check_capabilities both call this over the SAME stack shape, so the pre-flight and
-// the load can never disagree about fit.
-[[nodiscard]] gate_result gate_assembled_stack(const schema_registry &schema,
-                                               const configuration_source_stack &stack,
-                                               log_sink &log)
+// Gate for the handle-based fold path. Reads capabilities from each
+// layered_handle without pulling; consistent with the gate for the pointer-based path.
+[[nodiscard]] gate_result gate_assembled_handles(
+    const schema_registry &schema,
+    std::span<resolution_context::layered_handle> layers,
+    log_sink &log)
 {
     std::vector<std::pair<std::string, capability_descriptor>> descriptors;
-    descriptors.reserve(stack.layers().size());
-    for(const configuration_source_layer &layer : stack.layers())
-    {
-        if(layer.src != nullptr)
-            descriptors.emplace_back(layer.label, layer.src->capabilities());
-    }
+    descriptors.reserve(layers.size());
+    for(const resolution_context::layered_handle &lh : layers)
+        descriptors.emplace_back(lh.label, lh.handle->capabilities());
     return gate_stack("schema", descriptors, derive_capability_requirements(schema), log);
 }
+
+// Thin configuration_source subclass that owns a source_handle and forwards all
+// calls. Used to adapt a source_handle back into the chain_walker's factory_fn
+// contract (unique_ptr<configuration_source>) for document inheritance walking.
+class handle_as_source final : public configuration_source
+{
+public:
+    explicit handle_as_source(source_handle h) : m_handle(std::move(h)) {}
+
+    [[nodiscard]] capability_descriptor capabilities() const override
+    { return m_handle.capabilities(); }
+    void apply_projection(const schema_projection &p) override
+    { m_handle.apply_projection(p); }
+    [[nodiscard]] inherit_declaration inheritance() const override
+    { return m_handle.inheritance(); }
+    [[nodiscard]] configuration_source_result pull() override
+    { return m_handle.pull(); }
+
+private:
+    source_handle m_handle;
+};
 
 }
 
@@ -339,77 +357,70 @@ configuration_space_builder configuration_space::expand() const
     return builder;
 }
 
-// --- free load_configuration ------------------------------------------------
+// --- recognizer_of ----------------------------------------------------------
 
-load_result load_configuration(const configuration_space &space, const source_stack_options &options)
+key_recognizer recognizer_of(const configuration_space &space)
 {
-    // Borrow the sealed space's core by CONST reference; every mutable resolve
-    // buffer below lives on this function's own stack, so concurrent calls on one
-    // shared const space share nothing mutable.
+    // Captures the space's schema registry by pointer; the recognizer is valid
+    // for as long as the space outlives it.
+    const schema_registry *schema = &space.m_impl->schema;
+    return [schema](const key_path &path) { return schema->recognizes(path); };
+}
+
+// --- new load(space, source_stack, load_options) ----------------------------
+
+load_result load(const configuration_space &space,
+                 source_stack stack,
+                 const load_options &options)
+{
     const space_core &state = *space.m_impl;
 
-    // The local sources and chain entries must outlive the fold below.
-    configuration_source_stack stack;
-    std::optional<argv_source> argv_src;
-    std::optional<env_source> env_src;
+    // Chain entries own the folded document sources; they must outlive the fold.
     std::vector<chain_walker::chain_entry> entries;
 
-    if(options.env)
+    // Assign ascending ranks to the caller's source_stack handles (index = rank).
+    // Later-listed handles have higher rank and win key contests.
+    std::vector<resolution_context::layered_handle> handles;
     {
-        env_src.emplace(options.env->entries);
-        stack.add(*env_src, layer_rank::env, "env");
+        std::span<source_handle> layers = stack.layers();
+        handles.reserve(layers.size());
+        for(std::size_t i = 0; i < layers.size(); ++i)
+            handles.push_back({&layers[i], i, nucleus::format("stack[{}]", i), {}});
     }
 
-    if(!options.document_paths.empty())
+    if(!options.document_paths.empty() && options.make_document)
     {
+        // Adapt the source_handle-returning factory to the chain_walker's
+        // unique_ptr<configuration_source> factory via handle_as_source.
+        const auto &make_doc = options.make_document;
+        chain_walker::factory_fn adapted = [&make_doc](const std::string &p)
+            -> std::unique_ptr<configuration_source> {
+            return std::make_unique<handle_as_source>(make_doc(p));
+        };
         const schema_projection projection = state.schema.projection();
-        auto expanded = chain_walker::expand(options.document_paths, options.make_document,
+        auto expanded = chain_walker::expand(options.document_paths, adapted,
                                              projection, options.inherit);
         if(!expanded)
             return unexpected(std::move(expanded).error());
         entries = std::move(expanded).value();
-        // Root-first order: index 0 is the deepest ancestor, last is the requested
-        // file. document_rank clamps the band strictly below argv so the CLI wins.
+        // Document entries get document_rank(i) values -- in the 200-899 band,
+        // strictly above index-based stack ranks and strictly below argv rank (1000).
+        // Source_stack handles that represent argv-like sources should be placed AFTER
+        // documents in the stack so their index rank exceeds document_rank values; that
+        // ordering is the caller's responsibility when composing the source_stack.
+        const std::size_t doc_start = handles.size();
+        handles.reserve(doc_start + entries.size());
         for(std::size_t i = 0; i < entries.size(); ++i)
-            stack.add(*entries[i].src, document_rank(i),
-                      nucleus::format("path:{}", entries[i].path));
+            handles.push_back({&entries[i].src, document_rank(i),
+                               nucleus::format("path:{}", entries[i].path), {}});
     }
 
-    if(options.argv)
-    {
-        argv_src.emplace(options.argv->args);
-        argv_src->policy(options.argv->policy);
-        if(options.argv->log != nullptr)
-            argv_src->log_to(*options.argv->log);
-        if(options.argv->recognize_against_schema)
-        {
-            // The recognizer bridges to the schema surface; it captures the const
-            // schema registry by reference and lives only for this load call.
-            const schema_registry &schema = state.schema;
-            argv_src->recognize_with([&schema](const key_path &path) { return schema.recognizes(path); });
-        }
-        stack.add(*argv_src, layer_rank::argv, "argv");
-    }
-
-    // Borrowed custom layers at their explicit ranks, verbatim.
-    for(const configuration_source_layer &layer : options.custom_layers)
-    {
-        if(layer.src != nullptr)
-            stack.add(*layer.src, layer.rank, layer.label, layer.owner);
-    }
-
-    // Auto-gate the assembled stack BEFORE folding: a hard shortfall is a loud
-    // named error here, a soft one degrades through the log sink and the load
-    // proceeds. No host call is required -- gating is part of every load.
     log_sink default_log;
-    log_sink &log = (options.argv && options.argv->log) ? *options.argv->log : default_log;
-    if(auto gated = gate_assembled_stack(state.schema, stack, log); !gated)
+    if(auto gated = gate_assembled_handles(state.schema, handles, default_log); !gated)
         return unexpected(std::move(gated).error());
 
-    // Stack-local, const-borrowing context: fold -> slice -> validate -> convert ->
-    // freeze, surfacing each error verbatim. The space is never mutated.
     resolution_context ctx(state.schema, state.tokenizer, state.converters);
-    if(auto folded = ctx.fold(stack); !folded)
+    if(auto folded = ctx.fold(handles); !folded)
         return unexpected(std::move(folded).error());
     if(auto sliced = ctx.slice(options.selection, options.scope); !sliced)
         return unexpected(std::move(sliced).error());
@@ -420,26 +431,74 @@ load_result load_configuration(const configuration_space &space, const source_st
     return ctx.freeze();
 }
 
-// --- check_capabilities (auto-gate pre-flight) ------------------------------
+// --- new check_capabilities(space, source_stack, load_options) --------------
 
-gate_result check_capabilities(const configuration_space &space, const source_stack_options &options)
+gate_result check_capabilities(const configuration_space &space,
+                                source_stack stack,
+                                const load_options &options)
 {
-    // Borrow the sealed space's core by CONST reference and assemble the SAME stack
-    // shape a load would, reading each source's capabilities() and label only --
-    // no pull(), no fold. This is the load's auto-gate without the resolve.
     const space_core &state = *space.m_impl;
 
-    configuration_source_stack stack;
-    std::optional<argv_source> argv_src;
-    std::optional<env_source> env_src;
     std::vector<chain_walker::chain_entry> entries;
+    std::vector<resolution_context::layered_handle> handles;
+    {
+        std::span<source_handle> layers = stack.layers();
+        handles.reserve(layers.size());
+        for(std::size_t i = 0; i < layers.size(); ++i)
+            handles.push_back({&layers[i], i, nucleus::format("stack[{}]", i), {}});
+    }
 
+    if(!options.document_paths.empty() && options.make_document)
+    {
+        const auto &make_doc = options.make_document;
+        chain_walker::factory_fn adapted = [&make_doc](const std::string &p)
+            -> std::unique_ptr<configuration_source> {
+            return std::make_unique<handle_as_source>(make_doc(p));
+        };
+        const schema_projection projection = state.schema.projection();
+        auto expanded = chain_walker::expand(options.document_paths, adapted,
+                                             projection, options.inherit);
+        if(!expanded)
+            return unexpected(std::move(expanded).error());
+        entries = std::move(expanded).value();
+        handles.reserve(handles.size() + entries.size());
+        for(std::size_t i = 0; i < entries.size(); ++i)
+            handles.push_back({&entries[i].src, document_rank(i),
+                               nucleus::format("path:{}", entries[i].path), {}});
+    }
+
+    log_sink default_log;
+    return gate_assembled_handles(state.schema, handles, default_log);
+}
+
+// --- free load_configuration (thin adapter) ---------------------------------
+
+load_result load_configuration(const configuration_space &space, const source_stack_options &options)
+{
+    // Borrow the sealed space's core by CONST reference; every mutable resolve
+    // buffer below lives on this function's own stack, so concurrent calls on one
+    // shared const space share nothing mutable.
+    const space_core &state = *space.m_impl;
+
+    // Build the handle-based fold input directly, preserving the exact layer_rank
+    // values so stable_sort, doc_band_min, and slice() band checks are numerically
+    // identical to the pre-refactor behavior.
+    std::vector<resolution_context::layered_handle> handles;
+
+    // Env source: owned here, handle borrows it.
+    std::optional<env_source> env_src;
+    source_stack env_stack;
     if(options.env)
     {
         env_src.emplace(options.env->entries);
-        stack.add(*env_src, layer_rank::env, "env");
+        env_stack.push_back(source_handle(source_ptr_adapter{
+            std::make_unique<env_source>(options.env->entries)}));
+        handles.push_back({&env_stack.layers()[0],
+                           static_cast<std::size_t>(layer_rank::env), "env", {}});
     }
 
+    // Document sources via chain_walker: expanded first, ranked in document band.
+    std::vector<chain_walker::chain_entry> entries;
     if(!options.document_paths.empty())
     {
         const schema_projection projection = state.schema.projection();
@@ -449,28 +508,135 @@ gate_result check_capabilities(const configuration_space &space, const source_st
             return unexpected(std::move(expanded).error());
         entries = std::move(expanded).value();
         for(std::size_t i = 0; i < entries.size(); ++i)
-            stack.add(*entries[i].src, document_rank(i),
-                      nucleus::format("path:{}", entries[i].path));
+            handles.push_back({&entries[i].src, document_rank(i),
+                               nucleus::format("path:{}", entries[i].path), {}});
     }
 
+    // Argv source: owned here, handle borrows it.
+    source_stack argv_stack;
     if(options.argv)
     {
-        argv_src.emplace(options.argv->args);
+        auto argv_src = std::make_unique<argv_source>(options.argv->args);
         argv_src->policy(options.argv->policy);
         if(options.argv->log != nullptr)
             argv_src->log_to(*options.argv->log);
-        stack.add(*argv_src, layer_rank::argv, "argv");
+        if(options.argv->recognize_against_schema)
+        {
+            // The recognizer bridges to the schema surface; it captures the const
+            // schema registry by reference and lives only for this load call.
+            const schema_registry &schema = state.schema;
+            argv_src->recognize_with([&schema](const key_path &path) { return schema.recognizes(path); });
+        }
+        argv_stack.push_back(source_handle(source_ptr_adapter{std::move(argv_src)}));
+        handles.push_back({&argv_stack.layers()[0],
+                           static_cast<std::size_t>(layer_rank::argv), "argv", {}});
     }
 
+    // Custom layers: borrowed pointers wrapped via source_ptr_adapter.
+    std::vector<source_stack> custom_stacks;
+    custom_stacks.reserve(options.custom_layers.size());
     for(const configuration_source_layer &layer : options.custom_layers)
     {
-        if(layer.src != nullptr)
-            stack.add(*layer.src, layer.rank, layer.label, layer.owner);
+        if(layer.src == nullptr)
+            continue;
+        custom_stacks.emplace_back();
+        // Wrap the borrowed pointer; the underlying source is owned by the caller.
+        struct borrowed_adapter
+        {
+            configuration_source *ptr;
+            [[nodiscard]] capability_descriptor capabilities() const { return ptr->capabilities(); }
+            void apply_projection(const schema_projection &p) { ptr->apply_projection(p); }
+            [[nodiscard]] inherit_declaration inheritance() const { return ptr->inheritance(); }
+            [[nodiscard]] configuration_source_result pull() { return ptr->pull(); }
+        };
+        custom_stacks.back().push_back(source_handle(borrowed_adapter{layer.src}));
+        handles.push_back({&custom_stacks.back().layers()[0],
+                           layer.rank, layer.label, layer.owner});
     }
 
     log_sink default_log;
     log_sink &log = (options.argv && options.argv->log) ? *options.argv->log : default_log;
-    return gate_assembled_stack(state.schema, stack, log);
+    if(auto gated = gate_assembled_handles(state.schema, handles, log); !gated)
+        return unexpected(std::move(gated).error());
+
+    resolution_context ctx(state.schema, state.tokenizer, state.converters);
+    if(auto folded = ctx.fold(handles); !folded)
+        return unexpected(std::move(folded).error());
+    if(auto sliced = ctx.slice(options.selection, options.scope); !sliced)
+        return unexpected(std::move(sliced).error());
+    if(auto checked = ctx.validate(); !checked)
+        return unexpected(std::move(checked).error());
+    if(auto converted = ctx.convert(); !converted)
+        return unexpected(std::move(converted).error());
+    return ctx.freeze();
+}
+
+// --- check_capabilities (auto-gate pre-flight, legacy adapter) --------------
+
+gate_result check_capabilities(const configuration_space &space, const source_stack_options &options)
+{
+    const space_core &state = *space.m_impl;
+
+    std::vector<resolution_context::layered_handle> handles;
+
+    source_stack env_stack;
+    if(options.env)
+    {
+        env_stack.push_back(source_handle(source_ptr_adapter{
+            std::make_unique<env_source>(options.env->entries)}));
+        handles.push_back({&env_stack.layers()[0],
+                           static_cast<std::size_t>(layer_rank::env), "env", {}});
+    }
+
+    std::vector<chain_walker::chain_entry> entries;
+    if(!options.document_paths.empty())
+    {
+        const schema_projection projection = state.schema.projection();
+        auto expanded = chain_walker::expand(options.document_paths, options.make_document,
+                                             projection, options.inherit);
+        if(!expanded)
+            return unexpected(std::move(expanded).error());
+        entries = std::move(expanded).value();
+        for(std::size_t i = 0; i < entries.size(); ++i)
+            handles.push_back({&entries[i].src, document_rank(i),
+                               nucleus::format("path:{}", entries[i].path), {}});
+    }
+
+    source_stack argv_stack;
+    if(options.argv)
+    {
+        auto argv_src = std::make_unique<argv_source>(options.argv->args);
+        argv_src->policy(options.argv->policy);
+        if(options.argv->log != nullptr)
+            argv_src->log_to(*options.argv->log);
+        argv_stack.push_back(source_handle(source_ptr_adapter{std::move(argv_src)}));
+        handles.push_back({&argv_stack.layers()[0],
+                           static_cast<std::size_t>(layer_rank::argv), "argv", {}});
+    }
+
+    std::vector<source_stack> custom_stacks;
+    custom_stacks.reserve(options.custom_layers.size());
+    for(const configuration_source_layer &layer : options.custom_layers)
+    {
+        if(layer.src == nullptr)
+            continue;
+        custom_stacks.emplace_back();
+        struct borrowed_adapter
+        {
+            configuration_source *ptr;
+            [[nodiscard]] capability_descriptor capabilities() const { return ptr->capabilities(); }
+            void apply_projection(const schema_projection &p) { ptr->apply_projection(p); }
+            [[nodiscard]] inherit_declaration inheritance() const { return ptr->inheritance(); }
+            [[nodiscard]] configuration_source_result pull() { return ptr->pull(); }
+        };
+        custom_stacks.back().push_back(source_handle(borrowed_adapter{layer.src}));
+        handles.push_back({&custom_stacks.back().layers()[0],
+                           layer.rank, layer.label, layer.owner});
+    }
+
+    log_sink default_log;
+    log_sink &log = (options.argv && options.argv->log) ? *options.argv->log : default_log;
+    return gate_assembled_handles(state.schema, handles, log);
 }
 
 }

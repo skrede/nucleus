@@ -9,6 +9,7 @@
 #include "nucleus/schema/schema.h"
 
 #include "nucleus/configuration_source/feature_gate.h"
+#include "nucleus/configuration_source/source_stack.h"
 #include "nucleus/configuration_source/argv/argv_source.h"
 #include "nucleus/configuration_source/inherit_declaration.h"
 #include "nucleus/configuration_source/configuration_source.h"
@@ -93,6 +94,18 @@ struct source_stack_options
     std::optional<std::string>              selection;
     strain_scope_policy                     scope = strain_scope_policy::space_open_container_closed;
     inherit_policy                          inherit;
+};
+
+// Per-load resolution knobs for the new load(space, source_stack, load_options)
+// entry point. Carries document expansion (paths + host factory returning source_handle)
+// and the resolution parameters; the sources themselves live in the source_stack.
+struct load_options
+{
+    std::optional<std::string>                          selection;
+    strain_scope_policy                                 scope = strain_scope_policy::space_open_container_closed;
+    inherit_policy                                      inherit;
+    std::vector<std::string>                            document_paths;
+    std::function<source_handle(const std::string &)>   make_document;
 };
 
 // The mutable, free-standing builder: sole owner of the four flat sibling
@@ -216,6 +229,9 @@ private:
     friend class configuration_space_builder;
     friend load_result load_configuration(const configuration_space &, const source_stack_options &);
     friend gate_result check_capabilities(const configuration_space &, const source_stack_options &);
+    friend load_result   load(const configuration_space &, source_stack, const load_options &);
+    friend gate_result   check_capabilities(const configuration_space &, source_stack, const load_options &);
+    friend key_recognizer recognizer_of(const configuration_space &);
     class impl;
     explicit configuration_space(std::unique_ptr<impl> sealed);
     std::unique_ptr<impl> m_impl;
@@ -236,6 +252,25 @@ private:
 // on its own regardless of whether this was called first; the two never disagree.
 [[nodiscard]] gate_result check_capabilities(const configuration_space &space,
                                              const source_stack_options &options);
+
+// New load entry point: folds the explicitly-composed source_stack against the
+// sealed space using index-as-rank precedence, optionally expanding document_paths
+// from load_options through the inheritance chain walker. Concurrent-safe;
+// borrows the space by const reference and owns all mutable resolve state locally.
+[[nodiscard]] load_result load(const configuration_space &space,
+                               source_stack stack,
+                               const load_options &options = {});
+
+// New capability pre-flight for the source_stack-based API. Reads capabilities
+// only -- no pull, no fold. Consistent with load() over the same stack+options.
+[[nodiscard]] gate_result check_capabilities(const configuration_space &space,
+                                             source_stack stack,
+                                             const load_options &options = {});
+
+// Derives a key recognizer from the sealed space's schema surface. The returned
+// closure is valid for as long as the space outlives it; it captures the space by
+// reference. Used to wire argv_source schema-coupled recognition at compose time.
+[[nodiscard]] key_recognizer recognizer_of(const configuration_space &space);
 
 }
 

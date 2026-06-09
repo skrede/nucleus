@@ -16,6 +16,7 @@
 #include "nucleus/schema/converter_registry.h"
 
 #include "nucleus/configuration_source/inherit_declaration.h"
+#include "nucleus/configuration_source/source_handle.h"
 
 #include "nucleus/diagnostics/key_suggester.h"
 
@@ -25,6 +26,7 @@
 #include <any>
 #include <map>
 #include <set>
+#include <span>
 #include <limits>
 #include <string>
 #include <vector>
@@ -222,6 +224,126 @@ public:
 
             // Pin the batch's buffer so its (now copied-out) views stayed valid
             // through the expansion above; it is released only at context destruction.
+            m_buffers.push_back(std::move(batch.buffer));
+        }
+
+        return std::monostate{};
+    }
+
+    // One entry in the handle-based fold: the erased source, its ascending rank
+    // (index into the source_stack), and a human-readable label for provenance.
+    struct layered_handle
+    {
+        source_handle *handle;
+        std::size_t    rank;
+        std::string    label;
+        owner_token    owner;
+    };
+
+    // Fold overload that consumes a sequence of layered_handle descriptors.
+    // The caller assigns ascending ranks by index so the stable_sort and the
+    // doc_band_min slice checks work with the same numeric machinery as the
+    // legacy pointer-based fold. Each handle is pulled exactly once per load;
+    // the project->pull->inherit lifecycle contract holds unchanged.
+    [[nodiscard]] expected<std::monostate, resolve_fold_error>
+    fold(std::span<layered_handle> layers)
+    {
+        std::vector<layered_handle *> ordered;
+        ordered.reserve(layers.size());
+        for(layered_handle &lh : layers)
+            ordered.push_back(&lh);
+        std::stable_sort(ordered.begin(), ordered.end(),
+                         [](const layered_handle *a, const layered_handle *b) {
+                             return a->rank < b->rank;
+                         });
+
+        const schema_projection projection = m_schema.projection();
+
+        std::set<std::string> repeated_paths;
+        for(const schema_element &el : m_schema.elements())
+        {
+            if(el.repeated)
+                repeated_paths.insert(el.declared_path().str());
+        }
+
+        for(layered_handle *lh : ordered)
+        {
+            lh->handle->apply_projection(projection);
+            configuration_source_result pulled = lh->handle->pull();
+            if(!pulled)
+                return unexpected(nucleus::format("source '{}': {}",
+                                              lh->label, pulled.error()));
+
+            configuration_source_batch &batch = pulled.value();
+
+            std::set<std::string> seen_repeated_this_layer;
+
+            for(keyspace_entry &entry : batch.entries)
+            {
+                token_result expanded = resolve_tokens(entry.value.text(), m_tokenizer);
+                if(!expanded)
+                    return unexpected(nucleus::format(
+                        "source '{}': token resolution failed for key '{}': {}",
+                        lh->label, entry.path, expanded.error().message));
+
+                auto path = key_path::parse(entry.path);
+                if(!path)
+                    continue;
+
+                const std::string canonical_path = m_schema.canonical_text(path.value());
+                if(repeated_paths.count(canonical_path))
+                {
+                    if(!entry.capabilities.supports(capability::duplicate_keys)
+                       && seen_repeated_this_layer.count(entry.path) != 0)
+                    {
+                        return unexpected(nucleus::format(
+                            "source '{}': repeated field '{}' received multiple "
+                            "values from a source that does not support "
+                            "duplicate_keys; a flat source can supply at most one "
+                            "value per repeated field per layer",
+                            lh->label, entry.path));
+                    }
+
+                    const bool is_first_in_layer =
+                        (seen_repeated_this_layer.count(entry.path) == 0);
+                    seen_repeated_this_layer.insert(entry.path);
+
+                    if(is_first_in_layer)
+                    {
+                        std::vector<value> init;
+                        init.push_back(value::owned(std::move(expanded).value()));
+                        m_building.replace_collection(path.value(), std::move(init));
+                        std::vector<origin> col_origins;
+                        col_origins.push_back(
+                            origin{lh->rank, lh->label, lh->owner});
+                        m_provenance.record_collection(path.value().str(),
+                                                       std::move(col_origins));
+                    }
+                    else
+                    {
+                        m_building.append(path.value(),
+                                          value::owned(std::move(expanded).value()));
+                        const std::vector<origin> *existing =
+                            m_provenance.collection_origins_of(path.value().str());
+                        std::vector<origin> updated =
+                            existing ? *existing : std::vector<origin>{};
+                        updated.push_back(
+                            origin{lh->rank, lh->label, lh->owner});
+                        m_provenance.record_collection(path.value().str(),
+                                                       std::move(updated));
+                    }
+                }
+                else
+                {
+                    m_building.set(path.value(), value::owned(std::move(expanded).value()));
+                    m_provenance.record(entry.path,
+                                        origin{lh->rank, lh->label, lh->owner});
+                }
+            }
+
+            for(const extend_disposition &d : batch.dispositions)
+                m_dispositions.push_back(d);
+
             m_buffers.push_back(std::move(batch.buffer));
         }
 

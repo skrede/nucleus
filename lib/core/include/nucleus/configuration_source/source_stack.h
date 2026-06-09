@@ -21,6 +21,13 @@ public:
         (m_layers.emplace_back(source_handle(std::move(sources))), ...);
     }
 
+    // Appends a pre-erased handle to the stack; later-appended handles have higher precedence.
+    source_stack &push_back(source_handle h)
+    {
+        m_layers.push_back(std::move(h));
+        return *this;
+    }
+
     // Returns the ordered layers; index corresponds to precedence rank.
     [[nodiscard]] std::span<source_handle> layers() noexcept { return m_layers; }
 
