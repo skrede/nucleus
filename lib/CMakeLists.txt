@@ -79,6 +79,15 @@ nucleus_add_module(core
 
 set_target_properties(nucleus_core PROPERTIES VERSION ${PROJECT_VERSION})
 
+# runtime: a header-only source module. runtime_source builds a configuration
+# programmatically (.set(path, value)) with no document or parser dependency. Its
+# public adapter header lives under nucleus/sources/; the INTERFACE link to
+# nucleus::nucleus means a consumer of nucleus::runtime also gets core.
+nucleus_add_module(runtime
+    TYPE INTERFACE
+    ALIASES nucleus::runtime
+    LINK_PUBLIC nucleus::nucleus)
+
 # Diagnostic formatting backend: when the standard library lacks std::format the
 # format() seam falls back to {fmt} in a public header, so the link is PUBLIC. The
 # probe + fetch run in the root before add_subdirectory(lib); here we only wire the

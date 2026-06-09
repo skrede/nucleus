@@ -2,9 +2,11 @@
 #
 # The core must be domain-neutral and format-agnostic: no XML / pugixml coupling
 # and no host vocabulary leaking into it. Parser dependencies live only inside
-# their own per-target modules (e.g. lib/xml/), never in core. This script greps
-# the relocated core headers and implementation for forbidden symbols and fails
-# (nonzero exit) on any hit. Run as a CTest gate.
+# their own per-target modules (e.g. lib/xml/), never in core. The boundary is now
+# STRUCTURAL -- the source/format adapters live in separate include roots and
+# targets (lib/xml, lib/runtime) that core cannot reach -- and this gate additionally
+# lint-asserts it: any core file that includes a nucleus/sources/ adapter header, or
+# names a format, fails (nonzero exit). Run as a CTest gate.
 #
 # Invoke: cmake -DNUCLEUS_ROOT=<repo> -P scripts/core_purity_check.cmake
 
@@ -62,6 +64,14 @@ foreach(file ${core_files})
             list(APPEND violations "${file}: contains forbidden symbol '${symbol}'")
         endif()
     endforeach()
+
+    # Structural assertion: a source/format adapter lives under nucleus/sources/ in
+    # its own module; core must never include one. Either include spelling fails.
+    string(FIND "${lowered}" "#include <nucleus/sources/" angle_include)
+    string(FIND "${lowered}" "#include \"nucleus/sources/" quote_include)
+    if(NOT angle_include EQUAL -1 OR NOT quote_include EQUAL -1)
+        list(APPEND violations "${file}: includes a nucleus/sources/ adapter header")
+    endif()
 endforeach()
 
 list(LENGTH violations violation_count)

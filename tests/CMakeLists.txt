@@ -19,7 +19,7 @@ endif()
 # can construct the registries directly.
 function(nucleus_add_test name)
     add_executable(${name} ${name}.cpp)
-    target_link_libraries(${name} PRIVATE nucleus::nucleus Catch2::Catch2WithMain)
+    target_link_libraries(${name} PRIVATE nucleus::nucleus ${ARGN} Catch2::Catch2WithMain)
     nucleus_enable_coverage(${name})
     target_include_directories(${name} PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
@@ -34,7 +34,7 @@ nucleus_add_test(format_test)
 nucleus_add_test(identity_test)
 nucleus_add_test(log_sink_test)
 nucleus_add_test(facade_test)
-nucleus_add_test(facade_schema_test)
+nucleus_add_test(facade_schema_test nucleus::runtime)
 nucleus_add_test(registry_isolation_test)
 nucleus_add_test(source_seam_test)
 nucleus_add_test(capability_gating_test)
@@ -55,11 +55,11 @@ nucleus_add_test(diagnostics_test)
 nucleus_add_test(completion_test)
 nucleus_add_test(completion_smoke_test)
 nucleus_add_test(facade_completion_test)
-nucleus_add_test(strain_scope_policy_test)
+nucleus_add_test(strain_scope_policy_test nucleus::runtime)
 nucleus_add_test(converter_registry_test)
 nucleus_add_test(builder_lifecycle_test)
 nucleus_add_test(expand_independence_test)
-nucleus_add_test(concurrent_load_test)
+nucleus_add_test(concurrent_load_test nucleus::runtime)
 
 # The concurrent-load guarantee test spawns std::threads; link the platform's
 # threading library so the shared-const-read design is exercised under ASan.
@@ -173,7 +173,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(repeated_element_test repeated_element_test.cpp)
     nucleus_enable_coverage(repeated_element_test)
     target_link_libraries(repeated_element_test
-        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::runtime Catch2::Catch2WithMain)
     target_include_directories(repeated_element_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
