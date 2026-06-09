@@ -143,3 +143,39 @@ TEST_CASE("a value at an undeclared path is rejected", "[enforcer]")
     REQUIRE_FALSE(v);
     REQUIRE(violation_mentions(v.error(), "not declared by the schema"));
 }
+
+TEST_CASE("a repeated element rejects a collection value outside the allowed set", "[enforcer]")
+{
+    schema_registry reg;
+    reg.attach(nucleus::element("logging", anchor::root()));
+    auto level = nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
+                                       {"debug", "info", "warn", "error"});
+    level.repeated = true;
+    reg.attach(std::move(level));
+
+    keyspace ks;
+    ks.append(path_of("logging/level"), nucleus::value::owned("info"));
+    ks.append(path_of("logging/level"), nucleus::value::owned("warm"));
+
+    auto v = schema_enforcer::validate(reg, ks);
+    REQUIRE_FALSE(v);
+    REQUIRE(violation_mentions(v.error(),
+                               "collection value 'warm' is not one of the allowed values"));
+    REQUIRE(violation_mentions(v.error(), "did you mean 'warn'?"));
+}
+
+TEST_CASE("a repeated element accepts a collection of admissible values", "[enforcer]")
+{
+    schema_registry reg;
+    reg.attach(nucleus::element("logging", anchor::root()));
+    auto level = nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
+                                       {"debug", "info", "warn", "error"});
+    level.repeated = true;
+    reg.attach(std::move(level));
+
+    keyspace ks;
+    ks.append(path_of("logging/level"), nucleus::value::owned("info"));
+    ks.append(path_of("logging/level"), nucleus::value::owned("error"));
+
+    REQUIRE(schema_enforcer::validate(reg, ks));
+}

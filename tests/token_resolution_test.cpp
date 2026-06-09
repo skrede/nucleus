@@ -159,3 +159,46 @@ TEST_CASE("host-registered generic frame category resolves its bindings", "[reso
     auto miss = scope.resolve_all("${node.unknown}");
     REQUIRE_FALSE(miss.has_value());
 }
+
+TEST_CASE("an unknown scope key is a named missing_field error", "[resolve][scope]")
+{
+    auto reg = core_registry();
+    resolver_scope scope(reg);
+    auto frame = scope.push_file_frame("/etc/app/config.xml");
+
+    auto r = scope.resolve_all("${scope.bogus}");
+    REQUIRE_FALSE(r.has_value());
+    CHECK(r.error().code == resolve_errc::missing_field);
+}
+
+TEST_CASE("a location category with no file frame is out_of_scope_context", "[resolve][scope]")
+{
+    auto reg = core_registry();
+    resolver_scope scope(reg);
+
+    auto r = scope.resolve_all("${file.name}");
+    REQUIRE_FALSE(r.has_value());
+    CHECK(r.error().code == resolve_errc::out_of_scope_context);
+}
+
+TEST_CASE("unknown self/dir/file location keys are named errors", "[resolve][scope]")
+{
+    auto reg = core_registry();
+    resolver_scope scope(reg);
+    auto frame = scope.push_file_frame("/etc/app/config.xml");
+
+    for(const char *expr : {"${self.bogus}", "${dir.bogus}", "${file.bogus}"})
+    {
+        auto r = scope.resolve_all(expr);
+        REQUIRE_FALSE(r.has_value());
+        CHECK(r.error().code == resolve_errc::missing_field);
+    }
+}
+
+TEST_CASE("an unknown tokenizer function is a named error", "[resolve][string]")
+{
+    auto reg = core_registry();
+    auto r = resolve_tokens("${string.bogusfn(x)}", reg);
+    REQUIRE_FALSE(r.has_value());
+    CHECK(r.error().code == resolve_errc::unknown_function);
+}
