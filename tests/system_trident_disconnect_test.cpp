@@ -1,0 +1,163 @@
+#include "nucleus/configuration_space.h"
+#include "nucleus/entry/configuration.h"
+
+#include "nucleus/schema/anchor.h"
+#include "nucleus/schema/schema.h"
+
+#include "nucleus/sources/env_source.h"
+#include "nucleus/sources/xml_source.h"
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <memory>
+#include <string>
+#include <vector>
+#include <optional>
+
+// System-level extension of the buffer-drop invariant to the new explicit-stack
+// path with a richer stack (XML document with inheritance chain + env overlay).
+//
+// The configuration is moved out of an inner scope. The entire source_stack, the
+// space, and the XML arena are then destroyed. Every value is read back afterward.
+// Under AddressSanitizer this proves the configuration is self-owning on the new
+// path: the copy-out at the load boundary severed every view from its source.
+
+using namespace nucleus;
+
+namespace {
+
+std::string filename_of(const std::string &path)
+{
+    const auto pos = path.find_last_of("/\\");
+    return (pos == std::string::npos) ? path : path.substr(pos + 1);
+}
+
+source_handle xml_of(const std::string &text)
+{
+    return source_handle(
+        xml::xml_source::from(xml::xml_source_options::of_string(text)));
+}
+
+// Two-file inheritance chain: base defines host and mode; derived extends and
+// overrides mode, adds port.
+constexpr const char *kBase =
+    "<server>"
+    "<host>base-host</host>"
+    "<mode>secondary</mode>"
+    "</server>";
+
+constexpr const char *kDerived =
+    "<server inherit=\"base.xml\">"
+    "<mode>primary</mode>"
+    "<port>9000</port>"
+    "</server>";
+
+}
+
+TEST_CASE("configuration outlives dropped source_stack, space, and XML arena on new load path",
+          "[system][disconnect][lifetime]")
+{
+    std::optional<configuration> result;
+
+    {
+        // --- INNER SCOPE: build, load, then DROP everything ---
+
+        configuration_space_builder builder;
+        builder.register_element(element("server", anchor::root()));
+        builder.register_element(element("host", anchor::keyspace("server")));
+        builder.register_element(element("mode", anchor::keyspace("server")));
+        builder.register_element(element("port", anchor::keyspace("server")));
+        configuration_space space = builder.build();
+
+        // XML document source (views into the pugixml arena) + env overlay.
+        // The document chain forms the base; env is a stack source that ranks
+        // ABOVE the whole chain and overrides it where they contest a key.
+        env_source overlay;
+        overlay.set("server/port", "8888");
+
+        auto make_doc = [](const std::string &path) -> source_handle {
+            const std::string name = filename_of(path);
+            if(name == "base.xml")    return xml_of(kBase);
+            if(name == "derived.xml") return xml_of(kDerived);
+            return source_handle(env_source{});
+        };
+
+        load_options opts;
+        opts.document_paths = {"derived.xml"};
+        opts.make_document  = make_doc;
+
+        auto loaded = load(space, source_stack{std::move(overlay)}, opts);
+        REQUIRE(loaded);
+
+        result = std::move(loaded).value();
+
+        // space, source_stack, overlay, and the pugixml arena are all destroyed here.
+    }
+
+    // --- OUTER SCOPE: space + stack + arena are gone ---
+
+    REQUIRE(result.has_value());
+
+    // Read EVERY value back after all sources are dropped.
+    // Under ASan this is the proof the configuration is fully self-owning.
+    REQUIRE(result->get("server/host") == "base-host");
+    REQUIRE(result->get("server/mode") == "primary");
+    // The env overlay is a stack source ranked above the document base, so it
+    // wins the port contest: env set 8888, the document set 9000, env overrides.
+    REQUIRE(result->get("server/port") == "8888");
+
+    // Provenance also survived the drop.
+    const origin *host_origin = result->provenance_of("server/host");
+    REQUIRE(host_origin != nullptr);
+
+    const origin *mode_origin = result->provenance_of("server/mode");
+    REQUIRE(mode_origin != nullptr);
+
+    const origin *port_origin = result->provenance_of("server/port");
+    REQUIRE(port_origin != nullptr);
+}
+
+TEST_CASE("configuration outlives a drop of the simplest xml+env stack on the new path",
+          "[system][disconnect][lifetime]")
+{
+    // Minimal shape: one XML document source + one env overlay, no inheritance chain.
+    std::optional<configuration> result;
+
+    {
+        configuration_space space = configuration_space_builder{}.build();
+
+        constexpr const char *kDoc =
+            "<app>"
+            "<logging level=\"debug\" file=\"/var/log/app.log\"/>"
+            "<server host=\"127.0.0.1\" port=\"8080\"/>"
+            "</app>";
+
+        // Document source at stack[0]; env overlay at stack[1] overrides port.
+        auto doc = xml::xml_source::from(xml::xml_source_options::of_string(kDoc));
+        env_source overlay;
+        overlay.set("app/server/port", "9090");
+
+        auto loaded = load(space,
+                           source_stack{std::move(doc), std::move(overlay)},
+                           {});
+        REQUIRE(loaded);
+        result = std::move(loaded).value();
+        // Every source is destroyed here.
+    }
+
+    REQUIRE(result.has_value());
+
+    // All values readable after the entire source stack is gone.
+    REQUIRE(result->get("app/logging/level") == "debug");
+    REQUIRE(result->get("app/logging/file") == "/var/log/app.log");
+    REQUIRE(result->get("app/server/host") == "127.0.0.1");
+    REQUIRE(result->get("app/server/port") == "9090");  // overlay won
+
+    const origin *port_origin = result->provenance_of("app/server/port");
+    REQUIRE(port_origin != nullptr);
+    REQUIRE(port_origin->layer == "stack[1]");
+
+    const origin *host_origin = result->provenance_of("app/server/host");
+    REQUIRE(host_origin != nullptr);
+    REQUIRE(host_origin->layer == "stack[0]");
+}

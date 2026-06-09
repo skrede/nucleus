@@ -226,6 +226,59 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     target_compile_definitions(inheritance_golden_test PRIVATE
         NUCLEUS_GOLDEN_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/inheritance_golden/fixtures")
     add_test(NAME inheritance_golden_test COMMAND inheritance_golden_test)
+
+    # System tests: end-to-end coverage of the trident (space + stack + configuration).
+    # Each links the real shipped modules it exercises so the linker verifies the module
+    # boundaries are correct.
+
+    # Multi-source system load: env + XML inheritance chain + argv, asserting values,
+    # provenance (winning layer), cross-source last-listed-wins, and inheritance resolution.
+    add_executable(system_multi_source_test system_multi_source_test.cpp)
+    nucleus_enable_coverage(system_multi_source_test)
+    target_link_libraries(system_multi_source_test
+        PRIVATE nucleus::nucleus nucleus::env nucleus::args nucleus::source_xml nucleus::runtime
+                Catch2::Catch2WithMain)
+    target_include_directories(system_multi_source_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/lib/core/src
+    )
+    add_test(NAME system_multi_source_test COMMAND system_multi_source_test)
+
+    # Trident disconnection: inner-scope XML + env stack dropped; every value read back
+    # after the entire source_stack, space, and arena are destroyed. Passes under ASan.
+    add_executable(system_trident_disconnect_test system_trident_disconnect_test.cpp)
+    nucleus_enable_coverage(system_trident_disconnect_test)
+    target_link_libraries(system_trident_disconnect_test
+        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::env
+                Catch2::Catch2WithMain)
+    target_include_directories(system_trident_disconnect_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/lib/core/src
+    )
+    add_test(NAME system_trident_disconnect_test COMMAND system_trident_disconnect_test)
+
+    # One-space-many-stacks: one sealed space serves two different source stacks
+    # and yields two independent, simultaneously-valid configurations.
+    add_executable(system_one_space_many_stacks_test system_one_space_many_stacks_test.cpp)
+    nucleus_enable_coverage(system_one_space_many_stacks_test)
+    target_link_libraries(system_one_space_many_stacks_test
+        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::env nucleus::runtime
+                Catch2::Catch2WithMain)
+    target_include_directories(system_one_space_many_stacks_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/lib/core/src
+    )
+    add_test(NAME system_one_space_many_stacks_test COMMAND system_one_space_many_stacks_test)
+
+    # Round-trip: runtime_source + XML repeated field -> load -> emit -> reload;
+    # asserts C2 == C1 by value (key set, scalars, repeated-field multiplicity).
+    add_executable(system_round_trip_test system_round_trip_test.cpp)
+    nucleus_enable_coverage(system_round_trip_test)
+    target_link_libraries(system_round_trip_test
+        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::runtime nucleus::env
+                Catch2::Catch2WithMain)
+    target_include_directories(system_round_trip_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/lib/core/src
+    )
+    add_test(NAME system_round_trip_test COMMAND system_round_trip_test)
+
 endif()
 
 # ---------------------------------------------------------------------------
