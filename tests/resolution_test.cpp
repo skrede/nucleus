@@ -24,23 +24,9 @@
 #include <utility>
 #include <string_view>
 
-// The convergence: a sealed configuration_space, a per-load source_stack_options,
-// and the free load_configuration that folds a precedence stack with provenance and
+// The convergence: a sealed configuration_space, a per-load source_stack,
+// and the free load that folds a precedence stack with provenance and
 // freezes an immutable configuration via a stack-local, const-borrowing context.
-
-namespace {
-
-// Borrows one source at an explicit rank through the per-load options.
-nucleus::source_stack_options layer_at(nucleus::configuration_source &src,
-                                       nucleus::layer_rank rank, std::string label)
-{
-    nucleus::source_stack_options opts;
-    opts.custom_layers.push_back(nucleus::configuration_source_layer{
-        &src, static_cast<std::size_t>(rank), std::move(label), {}});
-    return opts;
-}
-
-} // namespace
 
 TEST_CASE("resolve folds a precedence stack and freezes an immutable result", "[resolution]")
 {
@@ -52,13 +38,10 @@ TEST_CASE("resolve folds a precedence stack and freezes an immutable result", "[
     nucleus::env_source env;
     env.set("server/port", "8080"); // overrides the default port
 
-    nucleus::source_stack_options opts;
-    opts.custom_layers.push_back(nucleus::configuration_source_layer{
-        &defaults, static_cast<std::size_t>(nucleus::layer_rank::defaults), "defaults", {}});
-    opts.custom_layers.push_back(nucleus::configuration_source_layer{
-        &env, static_cast<std::size_t>(nucleus::layer_rank::env), "env", {}});
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    // defaults at lower precedence (stack[0]), env at higher precedence (stack[1]).
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{std::move(defaults), std::move(env)},
+        {});
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -77,13 +60,10 @@ TEST_CASE("value and provenance are recorded in the same fold and cannot diverge
     nucleus::env_source over;
     over.set("a", "from-overlay");
 
-    nucleus::source_stack_options opts;
-    opts.custom_layers.push_back(nucleus::configuration_source_layer{
-        &base, static_cast<std::size_t>(nucleus::layer_rank::base), "base", {}});
-    opts.custom_layers.push_back(nucleus::configuration_source_layer{
-        &over, static_cast<std::size_t>(nucleus::layer_rank::overlay), "overlay", {}});
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    // base at lower precedence (stack[0]), over at higher precedence (stack[1]).
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{std::move(base), std::move(over)},
+        {});
     REQUIRE(loaded);
     const auto &config = loaded.value();
 
@@ -93,11 +73,11 @@ TEST_CASE("value and provenance are recorded in the same fold and cannot diverge
     // The winning value's provenance names the layer that actually set it.
     const nucleus::origin *a_origin = config.provenance_of("a");
     REQUIRE(a_origin != nullptr);
-    REQUIRE(a_origin->layer == "overlay");
+    REQUIRE(a_origin->layer == "stack[1]");
 
     const nucleus::origin *b_origin = config.provenance_of("b");
     REQUIRE(b_origin != nullptr);
-    REQUIRE(b_origin->layer == "base");
+    REQUIRE(b_origin->layer == "stack[0]");
 }
 
 TEST_CASE("explicit precedence is argv over overlay over base over env over defaults", "[resolution]")
@@ -110,23 +90,15 @@ TEST_CASE("explicit precedence is argv over overlay over base over env over defa
     nucleus::env_source overlay;   overlay.set("k", "overlay");
     nucleus::argv_source argv(std::vector<std::string>{"--k=argv"});
 
-    // Added out of rank order on purpose: the fold sorts by rank, not arrival.
-    nucleus::source_stack_options opts;
-    opts.custom_layers.push_back(nucleus::configuration_source_layer{
-        &overlay, static_cast<std::size_t>(nucleus::layer_rank::overlay), "overlay", {}});
-    opts.custom_layers.push_back(nucleus::configuration_source_layer{
-        &defaults, static_cast<std::size_t>(nucleus::layer_rank::defaults), "defaults", {}});
-    opts.custom_layers.push_back(nucleus::configuration_source_layer{
-        &argv, static_cast<std::size_t>(nucleus::layer_rank::argv), "argv", {}});
-    opts.custom_layers.push_back(nucleus::configuration_source_layer{
-        &env, static_cast<std::size_t>(nucleus::layer_rank::env), "env", {}});
-    opts.custom_layers.push_back(nucleus::configuration_source_layer{
-        &base, static_cast<std::size_t>(nucleus::layer_rank::base), "base", {}});
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    // Listed in ascending-precedence order: defaults(stack[0]) < env(stack[1])
+    // < base(stack[2]) < overlay(stack[3]) < argv(stack[4]).
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{std::move(defaults), std::move(env),
+                              std::move(base), std::move(overlay), std::move(argv)},
+        {});
     REQUIRE(loaded);
     REQUIRE(loaded.value().get("k") == "argv");
-    REQUIRE(loaded.value().provenance_of("k")->layer == "argv");
+    REQUIRE(loaded.value().provenance_of("k")->layer == "stack[4]");
 }
 
 TEST_CASE("a sealed space loads repeatedly and a built builder rejects registration",
@@ -136,13 +108,12 @@ TEST_CASE("a sealed space loads repeatedly and a built builder rejects registrat
     nucleus::configuration_space space = engine.build();
 
     nucleus::env_source one; one.set("k", "v");
-    nucleus::source_stack_options opts = layer_at(one, nucleus::layer_rank::base, "base");
 
     // Unlike the old one-shot facade, the sealed space serves repeated loads: it is
-    // immutable and load_configuration owns all mutable state on its own stack.
-    auto first = nucleus::load_configuration(space, opts);
+    // immutable and load owns all mutable state on its own stack.
+    auto first = nucleus::load(space, nucleus::source_stack{one}, {});
     REQUIRE(first);
-    auto second = nucleus::load_configuration(space, opts);
+    auto second = nucleus::load(space, nucleus::source_stack{one}, {});
     REQUIRE(second);
     REQUIRE(second.value().get("k") == "v");
 
@@ -242,11 +213,9 @@ TEST_CASE("an unresolvable token fails the fold loudly rather than passing throu
     // env/string), so the ${...} cannot resolve.
     env.set("greeting", "${nope.whatever}");
 
-    nucleus::source_stack_options opts = layer_at(env, nucleus::layer_rank::base, "base");
-
     // The fold reports the offending key instead of silently layering the
     // unexpanded text.
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(env)}, {});
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().find("greeting") != std::string::npos);
 }
@@ -261,9 +230,7 @@ TEST_CASE("the space resolves core builtin tokens with no extra registration", "
     env.set("greeting", "${string.upper(hi)}");
     env.set("token", "${string.concat(a,b,c)}");
 
-    nucleus::source_stack_options opts = layer_at(env, nucleus::layer_rank::base, "base");
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(env)}, {});
     REQUIRE(loaded);
     REQUIRE(loaded.value().get("greeting") == "HI");
     REQUIRE(loaded.value().get("token") == "abc");
@@ -284,9 +251,7 @@ TEST_CASE("install_tokenizer injects an additional tokenizer reachable at resolv
     nucleus::env_source env;
     env.set("msg", "${greet.world}");
 
-    nucleus::source_stack_options opts = layer_at(env, nucleus::layer_rank::base, "base");
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(env)}, {});
     REQUIRE(loaded);
     REQUIRE(loaded.value().get("msg") == "hello world");
 }
@@ -305,7 +270,7 @@ TEST_CASE("tokens are expanded per-source before layering (expand-then-layer)", 
     env.set("loud", "${string.upper(hi)}").set("plain", "kept");
 
     nucleus::configuration_source_stack stack;
-    stack.add(env, nucleus::layer_rank::base, "base");
+    stack.add(env, std::size_t{2}, "base");
 
     nucleus::resolution_context ctx(schema, tokenizer, converters);
     auto folded = ctx.fold(stack);

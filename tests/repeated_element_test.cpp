@@ -30,10 +30,9 @@ using nucleus::anchor;
 
 namespace {
 
-std::unique_ptr<nucleus::configuration_source> xml_of(const std::string &text)
+nucleus::xml::xml_source xml_of(const std::string &text)
 {
-    return std::make_unique<nucleus::xml::xml_source>(
-        nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(text)));
+    return nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(text));
 }
 
 // Registers a flat schema: a <config> root container with a repeated <tag> leaf.
@@ -53,14 +52,6 @@ void declare_cluster_tags(nucleus::configuration_space_builder &engine)
         nucleus::primary_key_element("name", anchor::keyspace("cluster/server")));
     engine.register_element(
         nucleus::repeated_element("tags", anchor::keyspace("cluster/server")));
-}
-
-// Borrows one source at an explicit numeric rank into the per-load options.
-void add_layer(nucleus::source_stack_options &opts, nucleus::configuration_source &src,
-               std::size_t rank, std::string label)
-{
-    opts.custom_layers.push_back(
-        nucleus::configuration_source_layer{&src, rank, std::move(label), {}});
 }
 
 // A minimal source that emits two entries for the same repeated path with
@@ -94,10 +85,9 @@ TEST_CASE("N values in one layer -- order preserved", "[repeated][ordering]")
     nucleus::configuration_space space = engine.build();
 
     auto src = xml_of("<config><tag>a</tag><tag>b</tag><tag>c</tag></config>");
-    nucleus::source_stack_options opts;
-    add_layer(opts, *src, 10, "doc");
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{std::move(src)},
+        {});
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -114,11 +104,10 @@ TEST_CASE("cross-layer replace -- higher rank replaces lower collection wholesal
     auto src1 = xml_of("<config><tag>x</tag><tag>y</tag></config>");
     auto src2 = xml_of("<config><tag>p</tag></config>");
 
-    nucleus::source_stack_options opts;
-    add_layer(opts, *src1, 10, "base");
-    add_layer(opts, *src2, 20, "overlay");
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    // src1 at lower precedence (stack[0]), src2 at higher precedence (stack[1]).
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{std::move(src1), std::move(src2)},
+        {});
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -133,10 +122,9 @@ TEST_CASE("get() on repeated path returns last value", "[repeated][accessor]")
     nucleus::configuration_space space = engine.build();
 
     auto src = xml_of("<config><tag>a</tag><tag>b</tag><tag>c</tag></config>");
-    nucleus::source_stack_options opts;
-    add_layer(opts, *src, 10, "doc");
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{std::move(src)},
+        {});
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -152,10 +140,9 @@ TEST_CASE("get_all() on single-value path returns one-element vector", "[repeate
     nucleus::configuration_space space = engine.build();
 
     auto src = xml_of("<config><key>v</key></config>");
-    nucleus::source_stack_options opts;
-    add_layer(opts, *src, 10, "doc");
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{std::move(src)},
+        {});
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -170,10 +157,9 @@ TEST_CASE("get_all() on absent path returns empty vector", "[repeated][accessor]
     nucleus::configuration_space space = engine.build();
 
     auto src = xml_of("<config><key>v</key></config>");
-    nucleus::source_stack_options opts;
-    add_layer(opts, *src, 10, "doc");
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{std::move(src)},
+        {});
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -189,10 +175,9 @@ TEST_CASE("keys() returns repeated path exactly once", "[repeated][accessor]")
     nucleus::configuration_space space = engine.build();
 
     auto src = xml_of("<config><other>x</other><tag>a</tag><tag>b</tag></config>");
-    nucleus::source_stack_options opts;
-    add_layer(opts, *src, 10, "doc");
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{std::move(src)},
+        {});
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -216,11 +201,11 @@ TEST_CASE("repeated path with required flag satisfies required check", "[repeate
     nucleus::configuration_space space = engine.build();
 
     auto src = xml_of("<config><tag>present</tag></config>");
-    nucleus::source_stack_options opts;
-    add_layer(opts, *src, 10, "doc");
 
     // One value satisfies the required check.
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{std::move(src)},
+        {});
     REQUIRE(loaded);
     REQUIRE(loaded.value().get_all("config/tag") == std::vector<std::string>{"present"});
 }
@@ -238,11 +223,9 @@ TEST_CASE("repeated leaf under keyed container with selection resolves to collec
         </cluster>)";
 
     auto src = xml_of(doc);
-    nucleus::source_stack_options opts;
-    add_layer(opts, *src, 10, "doc");
-    opts.selection = "primary";
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{std::move(src)},
+        nucleus::load_options{.selection = "primary"});
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -264,10 +247,9 @@ TEST_CASE("token expansion per value -- each value expanded independently",
         "<val>${string.upper(alpha)}_1</val>"
         "<val>${string.upper(beta)}_2</val>"
         "</config>");
-    nucleus::source_stack_options opts;
-    add_layer(opts, *src, 10, "doc");
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{std::move(src)},
+        {});
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
@@ -314,11 +296,10 @@ TEST_CASE("capability degradation -- non-duplicate_keys source into repeated fie
     engine.register_element(nucleus::repeated_element("tag", anchor::root()));
     nucleus::configuration_space space = engine.build();
 
-    auto fake = std::make_unique<dual_entry_source>("tag");
-    nucleus::source_stack_options opts;
-    add_layer(opts, *fake, 10, "fake");
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    dual_entry_source fake("tag");
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{std::move(fake)},
+        {});
     REQUIRE(!loaded);
     REQUIRE(loaded.error().find("duplicate_keys") != std::string::npos);
 }
@@ -334,10 +315,9 @@ TEST_CASE("ASan: freeze copies values out before buffer drop", "[repeated][lifet
         nucleus::configuration_space space = engine.build();
 
         auto src = xml_of("<config><tag>x</tag><tag>y</tag></config>");
-        nucleus::source_stack_options opts;
-        add_layer(opts, *src, 10, "doc");
-
-        auto result = nucleus::load_configuration(space, opts);
+        auto result = nucleus::load(space,
+            nucleus::source_stack{std::move(src)},
+            {});
         REQUIRE(result);
         return std::move(result).value();
     }(); // space, src, and all buffers destroyed here
@@ -362,16 +342,14 @@ TEST_CASE("relay_strain: higher-rank keyed collection wins over lower-rank flat 
         </cluster>)";
 
     auto src = xml_of(doc);
-    nucleus::source_stack_options opts;
-    add_layer(opts, flat, 5, "flat-low");
-    add_layer(opts, *src, 10, "xml-high");
-    opts.selection = "primary";
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    // flat at lower precedence (stack[0]), xml at higher precedence (stack[1]).
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{std::move(flat), std::move(src)},
+        nucleus::load_options{.selection = "primary"});
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
-    // Collection at rank 10 wins over flat scalar at rank 5.
+    // Collection at higher rank wins over flat scalar at lower rank.
     REQUIRE(config.get_all("cluster/server/tags")
             == std::vector<std::string>{"alpha", "beta"});
     REQUIRE_FALSE(config.get("cluster/server/tags") == "low");
@@ -393,16 +371,14 @@ TEST_CASE("relay_strain: higher-rank flat override wins over lower-rank keyed co
     flat.set("cluster/server/tags", "high");
 
     auto src = xml_of(doc);
-    nucleus::source_stack_options opts;
-    add_layer(opts, *src, 10, "xml-low");
-    add_layer(opts, flat, 20, "flat-high");
-    opts.selection = "primary";
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    // xml at lower precedence (stack[0]), flat at higher precedence (stack[1]).
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{std::move(src), std::move(flat)},
+        nucleus::load_options{.selection = "primary"});
     REQUIRE(loaded);
     const nucleus::configuration &config = loaded.value();
 
-    // Flat source at rank 20 wins; only "high" remains.
+    // Flat source at higher rank wins; only "high" remains.
     REQUIRE(config.get_all("cluster/server/tags") == std::vector<std::string>{"high"});
 }
 
@@ -422,13 +398,11 @@ TEST_CASE("collection scope-policy exclusion and admission",
         nucleus::runtime_source Lderived;
         Lderived.set("cluster/server/primary/tags", "derived");
 
-        nucleus::source_stack_options opts;
-        add_layer(opts, L0, 10, "L0");
-        add_layer(opts, Lderived, 20, "Lderived");
-        opts.selection = "primary";
+        // L0 at lower precedence (stack[0]), Lderived at higher precedence (stack[1]).
         // Default policy is space_open_container_closed.
-
-        auto loaded = nucleus::load_configuration(space, opts);
+        auto loaded = nucleus::load(space,
+            nucleus::source_stack{std::move(L0), std::move(Lderived)},
+            nucleus::load_options{.selection = "primary"});
         REQUIRE(loaded);
         const nucleus::configuration &config = loaded.value();
 
@@ -449,13 +423,12 @@ TEST_CASE("collection scope-policy exclusion and admission",
         nucleus::runtime_source Lderived;
         Lderived.set("cluster/server/primary/tags", "derived");
 
-        nucleus::source_stack_options opts;
-        add_layer(opts, L0, 10, "L0");
-        add_layer(opts, Lderived, 20, "Lderived");
-        opts.selection = "primary";
-        opts.scope = nucleus::strain_scope_policy::container_open_until_next_strain;
-
-        auto loaded = nucleus::load_configuration(space, opts);
+        // L0 at lower precedence (stack[0]), Lderived at higher precedence (stack[1]).
+        auto loaded = nucleus::load(space,
+            nucleus::source_stack{std::move(L0), std::move(Lderived)},
+            nucleus::load_options{
+                .selection = "primary",
+                .scope = nucleus::strain_scope_policy::container_open_until_next_strain});
         REQUIRE(loaded);
         const nucleus::configuration &config = loaded.value();
 

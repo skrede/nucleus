@@ -1,5 +1,5 @@
 // Concurrent loads on one shared const configuration_space need no synchronization:
-// load_configuration borrows the space's registries by const reference and owns all
+// load borrows the space's registries by const reference and owns all
 // mutable resolve state on its own stack. N threads call it on the SAME const space
 // with no mutex; all succeed with byte-identical results. Under ASan this exercises
 // the shared-const-read design with no data race.
@@ -9,7 +9,6 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/entry/precedence.h"
 #include "nucleus/entry/configuration.h"
 
 #include "nucleus/sources/runtime_source.h"
@@ -44,14 +43,13 @@ TEST_CASE("N threads load one shared const space lock-free with identical result
     {
         threads.emplace_back([&space, &results, &ok, i]() {
             // Borrow the shared space by const reference -- NO mutex anywhere. Each
-            // thread owns its source and options on its own stack so nothing mutable
+            // thread owns its source and stack on its own stack so nothing mutable
             // is shared; the feeder declares nesting so the auto-gate admits it.
             nucleus::runtime_source src;
             src.set("server/host", "localhost").set("server/port", "8080");
-            nucleus::source_stack_options opts;
-            opts.custom_layers.push_back(nucleus::configuration_source_layer{
-                &src, static_cast<std::size_t>(nucleus::layer_rank::env), "env", {}});
-            auto loaded = nucleus::load_configuration(space, opts);
+            auto loaded = nucleus::load(space,
+                nucleus::source_stack{std::move(src)},
+                {});
             if(!loaded)
                 return;
             std::map<std::string, std::string> snapshot;

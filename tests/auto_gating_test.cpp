@@ -6,8 +6,7 @@
 #include "nucleus/schema/converters.h"
 
 #include "nucleus/configuration_source/configuration_source.h"
-
-#include "nucleus/entry/precedence.h"
+#include "nucleus/configuration_source/env/env_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -56,16 +55,20 @@ TEST_CASE("load_configuration auto-gates: a flat env stack fails a nested schema
 {
     nucleus::configuration_space space = make_nested_typed_space();
 
-    nucleus::source_stack_options options;
-    options.env = nucleus::env_source_options{};
-
-    auto loaded = nucleus::load_configuration(space, options);
+    // An empty env source lacks nesting; it cannot satisfy the HARD nesting requirement.
+    nucleus::env_source empty_env;
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{std::move(empty_env)},
+        {});
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().find("nesting") != std::string::npos);
 
     // The standalone pre-flight gates the SAME stack and returns the SAME verdict,
     // so a host can validate fit before a load without the two ever disagreeing.
-    auto preflight = nucleus::check_capabilities(space, options);
+    nucleus::env_source empty_env2;
+    auto preflight = nucleus::check_capabilities(space,
+        nucleus::source_stack{std::move(empty_env2)},
+        {});
     REQUIRE_FALSE(preflight);
     REQUIRE(preflight.error() == loaded.error());
 }
@@ -74,15 +77,14 @@ TEST_CASE("a single capable layer satisfies the HARD nesting requirement by unio
 {
     nucleus::configuration_space space = make_nested_typed_space();
 
-    capable_source base;
-    nucleus::source_stack_options options;
-    options.env = nucleus::env_source_options{};
-    options.custom_layers.push_back(nucleus::configuration_source_layer{
-        &base, static_cast<std::size_t>(nucleus::layer_rank::base), "doc", {}});
-
-    // env lacks nesting, but the custom layer provides it: the whole-stack union
+    // env lacks nesting, but the capable_source provides it: the whole-stack union
     // satisfies the hard requirement, so the pre-flight gate accepts the stack.
-    auto preflight = nucleus::check_capabilities(space, options);
+    // env at lower precedence (stack[0]), capable base at higher precedence (stack[1]).
+    nucleus::env_source env;
+    capable_source base;
+    auto preflight = nucleus::check_capabilities(space,
+        nucleus::source_stack{std::move(env), std::move(base)},
+        {});
     REQUIRE(preflight);
     bool nesting_honored = false;
     for(nucleus::capability cap : preflight.value().honored)

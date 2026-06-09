@@ -4,7 +4,6 @@
 
 #include "nucleus/configuration_space.h"
 
-#include "nucleus/entry/precedence.h"
 #include "nucleus/entry/configuration.h"
 
 #include "nucleus/schema/anchor.h"
@@ -29,11 +28,9 @@ int main()
     nucleus::env_source values;
     values.set("server/port", "8080").set("server/name", "edge");
 
-    nucleus::source_stack_options opts;
-    opts.custom_layers.push_back(nucleus::configuration_source_layer{
-        &values, static_cast<std::size_t>(nucleus::layer_rank::base), "base", {}});
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{std::move(values)},
+        {});
     if(!loaded)
     {
         std::cerr << "resolve failed: " << loaded.error() << '\n';

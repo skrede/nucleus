@@ -32,10 +32,9 @@ using nucleus::strain_scope_policy;
 
 namespace {
 
-std::unique_ptr<nucleus::configuration_source> xml_of(const std::string &text)
+nucleus::xml::xml_source xml_of(const std::string &text)
 {
-    return std::make_unique<nucleus::xml::xml_source>(
-        nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(text)));
+    return nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(text));
 }
 
 std::string filename_of(const std::string &path)
@@ -54,13 +53,8 @@ void declare_server_typed(nucleus::configuration_space_builder &engine)
         nucleus::typed_element<int32_t>("port", anchor::keyspace("cluster/server")));
 }
 
-void add_layer(nucleus::source_stack_options &opts, nucleus::configuration_source &src,
-               std::size_t rank, std::string label)
-{
-    opts.custom_layers.push_back(
-        nucleus::configuration_source_layer{&src, rank, std::move(label), {}});
-}
-
+// Document-path chain loader: kept on the legacy load_configuration path since it uses
+// document_paths. Migration of the document-path API belongs to a later plan.
 nucleus::load_result load_chain(const nucleus::configuration_space &space,
                                 std::vector<std::string> paths,
                                 nucleus::document_factory factory,
@@ -98,9 +92,9 @@ TEST_CASE("typed x inheritance chain: derived value wins and converts",
     auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "base.xml")
-            return xml_of(base_doc);
+            return std::make_unique<nucleus::xml::xml_source>(xml_of(base_doc));
         if(name == "derived.xml")
-            return xml_of(derived_doc);
+            return std::make_unique<nucleus::xml::xml_source>(xml_of(derived_doc));
         return nullptr;
     };
 
@@ -139,9 +133,9 @@ TEST_CASE("typed x inheritance chain: bad value in winning layer fails resolve",
     auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "base.xml")
-            return xml_of(base_doc);
+            return std::make_unique<nucleus::xml::xml_source>(xml_of(base_doc));
         if(name == "derived.xml")
-            return xml_of(derived_doc);
+            return std::make_unique<nucleus::xml::xml_source>(xml_of(derived_doc));
         return nullptr;
     };
 
@@ -175,12 +169,9 @@ TEST_CASE("typed x pruned strain: selected strain resolves; bad value in pruned 
         declare_server_typed(engine);
         nucleus::configuration_space space = engine.build();
 
-        auto src = xml_of(doc);
-        nucleus::source_stack_options opts;
-        add_layer(opts, *src, 10, "doc");
-        opts.selection = "primary";
-
-        auto loaded = nucleus::load_configuration(space, opts);
+        auto loaded = nucleus::load(space,
+            nucleus::source_stack{xml_of(doc)},
+            nucleus::load_options{.selection = "primary"});
         REQUIRE(loaded);
 
         auto p = loaded.value().get_as<int32_t>("cluster/server/port");
@@ -194,12 +185,9 @@ TEST_CASE("typed x pruned strain: selected strain resolves; bad value in pruned 
         declare_server_typed(engine);
         nucleus::configuration_space space = engine.build();
 
-        auto src = xml_of(doc);
-        nucleus::source_stack_options opts;
-        add_layer(opts, *src, 10, "doc");
-        opts.selection = "secondary";
-
-        auto loaded = nucleus::load_configuration(space, opts);
+        auto loaded = nucleus::load(space,
+            nucleus::source_stack{xml_of(doc)},
+            nucleus::load_options{.selection = "secondary"});
         REQUIRE(!loaded);
         REQUIRE(loaded.error().find("invalid characters") != std::string::npos);
     }
@@ -225,11 +213,10 @@ TEST_CASE("typed x repeated across layers: winning layer collection replaces bas
         auto derived_src = xml_of(
             "<cfg><nums>10</nums><nums>20</nums></cfg>");
 
-        nucleus::source_stack_options opts;
-        add_layer(opts, *base_src, 10, "base");
-        add_layer(opts, *derived_src, 20, "derived");
-
-        auto loaded = nucleus::load_configuration(space, opts);
+        // base_src at lower precedence (stack[0]), derived_src at higher (stack[1]).
+        auto loaded = nucleus::load(space,
+            nucleus::source_stack{std::move(base_src), std::move(derived_src)},
+            {});
         REQUIRE(loaded);
 
         auto r = loaded.value().get_all_as<int32_t>("cfg/nums");
@@ -254,16 +241,14 @@ TEST_CASE("typed x repeated across layers: winning layer collection replaces bas
         auto derived_src = xml_of(
             "<cfg><nums>10</nums><nums>notanumber</nums></cfg>");
 
-        nucleus::source_stack_options opts;
-        add_layer(opts, *base_src, 10, "base");
-        add_layer(opts, *derived_src, 20, "derived");
-
-        auto loaded = nucleus::load_configuration(space, opts);
+        auto loaded = nucleus::load(space,
+            nucleus::source_stack{std::move(base_src), std::move(derived_src)},
+            {});
         REQUIRE(!loaded);
         INFO("error: " << loaded.error());
         REQUIRE(loaded.error().find("cfg/nums") != std::string::npos);
         REQUIRE(loaded.error().find("[1]") != std::string::npos);
-        REQUIRE(loaded.error().find("derived") != std::string::npos);
+        REQUIRE(loaded.error().find("stack[1]") != std::string::npos);
     }
 
     SECTION("bad element only in losing collection does not fail")
@@ -280,11 +265,9 @@ TEST_CASE("typed x repeated across layers: winning layer collection replaces bas
         auto derived_src = xml_of(
             "<cfg><nums>10</nums><nums>20</nums></cfg>");
 
-        nucleus::source_stack_options opts;
-        add_layer(opts, *base_src, 10, "base");
-        add_layer(opts, *derived_src, 20, "derived");
-
-        auto loaded = nucleus::load_configuration(space, opts);
+        auto loaded = nucleus::load(space,
+            nucleus::source_stack{std::move(base_src), std::move(derived_src)},
+            {});
         REQUIRE(loaded);
 
         auto r = loaded.value().get_all_as<int32_t>("cfg/nums");
@@ -323,9 +306,9 @@ TEST_CASE("typed x scope policy: excluded entry above Ld is not converted",
     auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
         const std::string name = filename_of(path);
         if(name == "base.xml")
-            return xml_of(base_doc);
+            return std::make_unique<nucleus::xml::xml_source>(xml_of(base_doc));
         if(name == "derived.xml")
-            return xml_of(derived_doc);
+            return std::make_unique<nucleus::xml::xml_source>(xml_of(derived_doc));
         return nullptr;
     };
 
@@ -355,11 +338,9 @@ TEST_CASE("typed access surface: get and get_as agree; type mismatch pinned",
             nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
         nucleus::configuration_space space = engine.build();
 
-        auto src = xml_of("<cfg><val>99</val></cfg>");
-        nucleus::source_stack_options opts;
-        add_layer(opts, *src, 10, "doc");
-
-        auto loaded = nucleus::load_configuration(space, opts);
+        auto loaded = nucleus::load(space,
+            nucleus::source_stack{xml_of("<cfg><val>99</val></cfg>")},
+            {});
         REQUIRE(loaded);
 
         REQUIRE(loaded.value().get("cfg/val").has_value());
@@ -378,11 +359,9 @@ TEST_CASE("typed access surface: get and get_as agree; type mismatch pinned",
             nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
         nucleus::configuration_space space = engine.build();
 
-        auto src = xml_of("<cfg><val>99</val></cfg>");
-        nucleus::source_stack_options opts;
-        add_layer(opts, *src, 10, "doc");
-
-        auto loaded = nucleus::load_configuration(space, opts);
+        auto loaded = nucleus::load(space,
+            nucleus::source_stack{xml_of("<cfg><val>99</val></cfg>")},
+            {});
         REQUIRE(loaded);
 
         // int32_t was stored; requesting double is a type mismatch.
@@ -434,11 +413,9 @@ TEST_CASE("repeated_typed_element<T> round-trips the full pipeline in fold order
         nucleus::repeated_typed_element<int32_t>("nums", anchor::keyspace("cfg")));
     nucleus::configuration_space space = engine.build();
 
-    auto src = xml_of("<cfg><nums>1</nums><nums>2</nums><nums>3</nums></cfg>");
-    nucleus::source_stack_options opts;
-    add_layer(opts, *src, 10, "doc");
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{xml_of("<cfg><nums>1</nums><nums>2</nums><nums>3</nums></cfg>")},
+        {});
     REQUIRE(loaded);
 
     // The typed collection arrives in document/fold order...
@@ -466,11 +443,9 @@ TEST_CASE("repeated_typed_element<T> convert pass fails on a mid-collection defe
     nucleus::configuration_space space = engine.build();
 
     // The winning layer's collection has a non-numeric element at index 1.
-    auto src = xml_of("<cfg><nums>10</nums><nums>notanumber</nums><nums>30</nums></cfg>");
-    nucleus::source_stack_options opts;
-    add_layer(opts, *src, 20, "winning-layer");
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{xml_of("<cfg><nums>10</nums><nums>notanumber</nums><nums>30</nums></cfg>")},
+        {});
     REQUIRE_FALSE(loaded);
     INFO("error: " << loaded.error());
     REQUIRE(loaded.error().find("conversion failed for") != std::string::npos);
@@ -479,7 +454,7 @@ TEST_CASE("repeated_typed_element<T> convert pass fails on a mid-collection defe
     REQUIRE(loaded.error().find("[1]") != std::string::npos);
     REQUIRE(loaded.error().find("invalid characters") != std::string::npos);
     // ...and the winning layer label.
-    REQUIRE(loaded.error().find("winning-layer") != std::string::npos);
+    REQUIRE(loaded.error().find("stack[0]") != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------
@@ -498,11 +473,9 @@ TEST_CASE("repeated_typed_element<T> appends within a layer and replaces across 
 
         // One layer carrying several occurrences: the first replaces any lower
         // collection, the rest append -- so all occurrences accumulate in order.
-        auto single = xml_of("<cfg><nums>1</nums><nums>2</nums></cfg>");
-        nucleus::source_stack_options opts;
-        add_layer(opts, *single, 10, "single");
-
-        auto loaded = nucleus::load_configuration(space, opts);
+        auto loaded = nucleus::load(space,
+            nucleus::source_stack{xml_of("<cfg><nums>1</nums><nums>2</nums></cfg>")},
+            {});
         REQUIRE(loaded);
         auto typed = loaded.value().get_all_as<int32_t>("cfg/nums");
         REQUIRE(typed);
@@ -517,17 +490,15 @@ TEST_CASE("repeated_typed_element<T> appends within a layer and replaces across 
             nucleus::repeated_typed_element<int32_t>("nums", anchor::keyspace("cfg")));
         nucleus::configuration_space space = engine.build();
 
-        // Two SEPARATE layers at the same rank: stable_sort preserves insertion
-        // order, so "second" folds after "first". Replace-across-layers is
+        // Two SEPARATE sources at adjacent stack positions: stable_sort preserves
+        // insertion order, so "second" folds after "first". Replace-across-layers is
         // per-layer (a new layer's first occurrence clears the lower collection),
         // so the later-inserted same-rank layer replaces, not appends.
-        auto first = xml_of("<cfg><nums>1</nums></cfg>");
-        auto second = xml_of("<cfg><nums>2</nums></cfg>");
-        nucleus::source_stack_options opts;
-        add_layer(opts, *first, 10, "first");
-        add_layer(opts, *second, 10, "second");
-
-        auto loaded = nucleus::load_configuration(space, opts);
+        auto loaded = nucleus::load(space,
+            nucleus::source_stack{
+                xml_of("<cfg><nums>1</nums></cfg>"),
+                xml_of("<cfg><nums>2</nums></cfg>")},
+            {});
         REQUIRE(loaded);
         auto typed = loaded.value().get_all_as<int32_t>("cfg/nums");
         REQUIRE(typed);
@@ -542,13 +513,12 @@ TEST_CASE("repeated_typed_element<T> appends within a layer and replaces across 
             nucleus::repeated_typed_element<int32_t>("nums", anchor::keyspace("cfg")));
         nucleus::configuration_space space = engine.build();
 
-        auto base = xml_of("<cfg><nums>1</nums><nums>2</nums><nums>3</nums></cfg>");
-        auto derived = xml_of("<cfg><nums>10</nums><nums>20</nums></cfg>");
-        nucleus::source_stack_options opts;
-        add_layer(opts, *base, 10, "base");
-        add_layer(opts, *derived, 20, "derived");
-
-        auto loaded = nucleus::load_configuration(space, opts);
+        // base at lower precedence (stack[0]), derived at higher (stack[1]).
+        auto loaded = nucleus::load(space,
+            nucleus::source_stack{
+                xml_of("<cfg><nums>1</nums><nums>2</nums><nums>3</nums></cfg>"),
+                xml_of("<cfg><nums>10</nums><nums>20</nums></cfg>")},
+            {});
         REQUIRE(loaded);
         auto typed = loaded.value().get_all_as<int32_t>("cfg/nums");
         REQUIRE(typed);

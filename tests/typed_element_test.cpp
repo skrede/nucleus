@@ -19,32 +19,31 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <any>
 #include <cmath>
 #include <memory>
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <optional>
+#include <string_view>
 
 using nucleus::anchor;
 
 namespace {
 
-std::unique_ptr<nucleus::configuration_source> xml_of(const std::string &text)
+nucleus::xml::xml_source xml_of(const std::string &text)
 {
-    return std::make_unique<nucleus::xml::xml_source>(
-        nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(text)));
+    return nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(text));
 }
 
-// Seals `engine` into a space and loads `src` as the sole document-band layer at
-// rank 10 -- the per-load shape replacing the old facade stack-load member.
-// `src` outlives the fold (load_configuration copies values out before returning).
-nucleus::load_result resolve_one(nucleus::configuration_space_builder &engine,
-                                 nucleus::configuration_source &src)
+// Seals `engine` into a space and loads `src` as the sole source.
+// The source is moved into the stack; values are copied out before returning.
+template<typename S>
+nucleus::load_result resolve_one(nucleus::configuration_space_builder &engine, S src)
 {
     nucleus::configuration_space space = engine.build();
-    nucleus::source_stack_options opts;
-    opts.custom_layers.push_back(nucleus::configuration_source_layer{&src, 10, "doc", {}});
-    return nucleus::load_configuration(space, opts);
+    return nucleus::load(space, nucleus::source_stack{std::move(src)}, {});
 }
 
 struct point2
@@ -92,7 +91,7 @@ TEST_CASE("built-in int32_t converter", "[typed][builtin][integer]")
             nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
 
         auto src = xml_of("<cfg><val>42</val></cfg>");
-        auto loaded = resolve_one(engine, *src);
+        auto loaded = resolve_one(engine, std::move(src));
         REQUIRE(loaded);
         auto r = loaded.value().get_as<int32_t>("cfg/val");
         REQUIRE(r);
@@ -107,7 +106,7 @@ TEST_CASE("built-in int32_t converter", "[typed][builtin][integer]")
             nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
 
         auto src = xml_of("<cfg><val>-1</val></cfg>");
-        auto loaded = resolve_one(engine, *src);
+        auto loaded = resolve_one(engine, std::move(src));
         REQUIRE(loaded);
         auto r = loaded.value().get_as<int32_t>("cfg/val");
         REQUIRE(r);
@@ -455,7 +454,7 @@ TEST_CASE("custom point2 converter round-trips through typed_element", "[typed][
                                            make_point2_converter()));
 
         auto src = xml_of("<cfg><pos>3,7</pos></cfg>");
-        auto loaded = resolve_one(engine, *src);
+        auto loaded = resolve_one(engine, std::move(src));
         REQUIRE(loaded);
         auto r = loaded.value().get_as<point2>("cfg/pos");
         REQUIRE(r);
@@ -471,7 +470,7 @@ TEST_CASE("custom point2 converter round-trips through typed_element", "[typed][
                                            make_point2_converter()));
 
         auto src = xml_of("<cfg><pos>3</pos></cfg>");
-        auto loaded = resolve_one(engine, *src);
+        auto loaded = resolve_one(engine, std::move(src));
         REQUIRE(!loaded);
     }
 
@@ -484,7 +483,7 @@ TEST_CASE("custom point2 converter round-trips through typed_element", "[typed][
                                            make_point2_converter()));
 
         auto src = xml_of("<cfg><pos>abc,7</pos></cfg>");
-        auto loaded = resolve_one(engine, *src);
+        auto loaded = resolve_one(engine, std::move(src));
         REQUIRE(!loaded);
     }
 }
@@ -499,7 +498,7 @@ TEST_CASE("conversion failure at resolve surfaces diagnostic", "[typed][failure]
         struct pair_t
         {
             nucleus::configuration_space_builder engine;
-            std::unique_ptr<nucleus::configuration_source> src;
+            std::optional<nucleus::xml::xml_source> src;
         };
         pair_t p;
         p.engine.register_element(nucleus::element("cfg", anchor::root()));
@@ -512,7 +511,7 @@ TEST_CASE("conversion failure at resolve surfaces diagnostic", "[typed][failure]
     SECTION("error contains the path")
     {
         auto p = make_engine_and_src("notanumber");
-        auto loaded = resolve_one(p.engine, *p.src);
+        auto loaded = resolve_one(p.engine, std::move(*p.src));
         REQUIRE(!loaded);
         INFO("error: " << loaded.error());
         REQUIRE(loaded.error().find("cfg/val") != std::string::npos);
@@ -521,17 +520,17 @@ TEST_CASE("conversion failure at resolve surfaces diagnostic", "[typed][failure]
     SECTION("error contains the layer label")
     {
         auto p = make_engine_and_src("notanumber");
-        auto loaded = resolve_one(p.engine, *p.src);
+        auto loaded = resolve_one(p.engine, std::move(*p.src));
         REQUIRE(!loaded);
         INFO("error: " << loaded.error());
-        // The convert() format is "conversion failed for '...': ... (layer: doc)"
-        REQUIRE(loaded.error().find("doc") != std::string::npos);
+        // The convert() format is "conversion failed for '...': ... (layer: stack[0])"
+        REQUIRE(loaded.error().find("stack[0]") != std::string::npos);
     }
 
     SECTION("error contains the converter reason substring")
     {
         auto p = make_engine_and_src("notanumber");
-        auto loaded = resolve_one(p.engine, *p.src);
+        auto loaded = resolve_one(p.engine, std::move(*p.src));
         REQUIRE(!loaded);
         INFO("error: " << loaded.error());
         // "notanumber" is pure alphabetic: the corrected converter returns
@@ -562,7 +561,7 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
         engine.register_element(nucleus::element("name", anchor::keyspace("cfg")));
 
         auto src = xml_of("<cfg><name>hello</name></cfg>");
-        auto loaded = resolve_one(engine, *src);
+        auto loaded = resolve_one(engine, std::move(src));
         REQUIRE(loaded);
 
         auto r = loaded.value().get_as<int32_t>("nonexistent");
@@ -579,7 +578,7 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
         engine.register_element(nucleus::element("name", anchor::keyspace("cfg")));
 
         auto src = xml_of("<cfg><name>hello</name></cfg>");
-        auto loaded = resolve_one(engine, *src);
+        auto loaded = resolve_one(engine, std::move(src));
         REQUIRE(loaded);
 
         auto r = loaded.value().get_as<int32_t>("cfg/name");
@@ -596,7 +595,7 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
             nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
 
         auto src = xml_of("<cfg><val>42</val></cfg>");
-        auto loaded = resolve_one(engine, *src);
+        auto loaded = resolve_one(engine, std::move(src));
         REQUIRE(loaded);
 
         // The converter stored int32_t; requesting float is a mismatch.
@@ -615,7 +614,7 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
         engine.register_element(el);
 
         auto src = xml_of("<cfg><nums>1</nums><nums>2</nums></cfg>");
-        auto loaded = resolve_one(engine, *src);
+        auto loaded = resolve_one(engine, std::move(src));
         REQUIRE(loaded);
 
         // The path carries a typed collection; get_as is the wrong accessor.
@@ -639,7 +638,7 @@ TEST_CASE("get_all_as error distinctions", "[typed][accessor][errors]")
             nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
 
         auto src = xml_of("<cfg><val>42</val></cfg>");
-        auto loaded = resolve_one(engine, *src);
+        auto loaded = resolve_one(engine, std::move(src));
         REQUIRE(loaded);
 
         // The path carries a scalar typed value; get_all_as is the wrong accessor.
@@ -666,7 +665,7 @@ TEST_CASE("repeated x typed: get_all_as", "[typed][repeated][typed]")
         engine.register_element(el);
 
         auto src = xml_of("<cfg><val>1</val><val>2</val><val>3</val></cfg>");
-        auto loaded = resolve_one(engine, *src);
+        auto loaded = resolve_one(engine, std::move(src));
         REQUIRE(loaded);
 
         auto r = loaded.value().get_all_as<int32_t>("cfg/val");
@@ -685,7 +684,7 @@ TEST_CASE("repeated x typed: get_all_as", "[typed][repeated][typed]")
 
         // Second element (index 1) is bad.
         auto src = xml_of("<cfg><val>1</val><val>bad</val><val>3</val></cfg>");
-        auto loaded = resolve_one(engine, *src);
+        auto loaded = resolve_one(engine, std::move(src));
         REQUIRE(!loaded);
         INFO("error: " << loaded.error());
         // The convert() format for repeated: "... element [1]: ..."
@@ -767,7 +766,7 @@ TEST_CASE("typed + identity: resolve interaction", "[typed][identity][resolve]")
             "  <id>42</id>"
             "  <score>100</score>"
             "</container>");
-        auto loaded = resolve_one(engine, *src);
+        auto loaded = resolve_one(engine, std::move(src));
         REQUIRE(loaded);
 
         // The typed non-key field converts normally.
@@ -812,7 +811,7 @@ TEST_CASE("typed + identity: resolve interaction", "[typed][identity][resolve]")
             "  <id>7</id>"
             "  <score>5</score>"
             "</container>");
-        auto loaded = resolve_one(engine, *src);
+        auto loaded = resolve_one(engine, std::move(src));
         REQUIRE(loaded);
         REQUIRE(!loaded.value().empty());
     }

@@ -2,7 +2,6 @@
 
 #include "nucleus/sources/xml_source.h"
 
-#include "nucleus/entry/precedence.h"
 #include "nucleus/entry/configuration.h"
 
 #include "nucleus/configuration_source/env/env_source.h"
@@ -11,7 +10,6 @@
 
 #include <memory>
 #include <string>
-#include <vector>
 #include <optional>
 
 // The convergence buffer-lifetime checkpoint -- the project's top use-after-free
@@ -45,13 +43,10 @@ TEST_CASE("resolved values survive dropping every source buffer", "[resolution][
         nucleus::env_source overlay;
         overlay.set("app/server/port", "9090");
 
-        nucleus::source_stack_options opts;
-        opts.custom_layers.push_back(nucleus::configuration_source_layer{
-            &doc, static_cast<std::size_t>(nucleus::layer_rank::base), "base-document", {}});
-        opts.custom_layers.push_back(nucleus::configuration_source_layer{
-            &overlay, static_cast<std::size_t>(nucleus::layer_rank::overlay), "overlay", {}});
-
-        auto loaded = nucleus::load_configuration(space, opts);
+        // base-document at lower precedence (stack[0]), overlay at higher precedence (stack[1]).
+        auto loaded = nucleus::load(space,
+            nucleus::source_stack{std::move(doc), std::move(overlay)},
+            {});
         REQUIRE(loaded);
         config = std::move(loaded).value();
 
@@ -71,9 +66,9 @@ TEST_CASE("resolved values survive dropping every source buffer", "[resolution][
     // Provenance survived the drop too, and points at the winning layer.
     const nucleus::origin *port_origin = config->provenance_of("app/server/port");
     REQUIRE(port_origin != nullptr);
-    REQUIRE(port_origin->layer == "overlay");
+    REQUIRE(port_origin->layer == "stack[1]");
 
     const nucleus::origin *host_origin = config->provenance_of("app/server/host");
     REQUIRE(host_origin != nullptr);
-    REQUIRE(host_origin->layer == "base-document");
+    REQUIRE(host_origin->layer == "stack[0]");
 }

@@ -3,8 +3,6 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/entry/precedence.h"
-
 #include "nucleus/keyspace/key_path.h"
 
 #include "nucleus/sources/runtime_source.h"
@@ -38,15 +36,6 @@ nucleus::runtime_source one(std::string path, std::string text)
     return src;
 }
 
-// A single borrowed source at the base rank, layered through the per-load options.
-nucleus::source_stack_options base_layer(nucleus::configuration_source &src)
-{
-    nucleus::source_stack_options opts;
-    opts.custom_layers.push_back(nucleus::configuration_source_layer{
-        &src, static_cast<std::size_t>(nucleus::layer_rank::base), "base", {}});
-    return opts;
-}
-
 } // namespace
 
 TEST_CASE("a typed schema element registers through the builder", "[facade][schema]")
@@ -73,9 +62,7 @@ TEST_CASE("resolve rejects an undeclared key and suggests the nearest declared o
     nucleus::configuration_space space = engine.build();
 
     auto src = one("logging/levle", "debug"); // typo'd key
-    nucleus::source_stack_options opts = base_layer(src);
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(src)}, {});
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().find("not declared") != std::string::npos);
     REQUIRE(loaded.error().find("did you mean") != std::string::npos);
@@ -94,9 +81,7 @@ TEST_CASE("resolve rejects a missing required field", "[facade][schema]")
 
     // Only the optional port is supplied; the required host is missing.
     auto src = one("server/port", "8080");
-    nucleus::source_stack_options opts = base_layer(src);
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(src)}, {});
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().find("required field 'server/host'") != std::string::npos);
 }
@@ -116,9 +101,7 @@ TEST_CASE("resolve admits an anonymous strain without the identity field",
     // it collapses into the configuration space. The primary key is a selector,
     // not a presence obligation.
     auto src = one("node/role", "primary");
-    nucleus::source_stack_options opts = base_layer(src);
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(src)}, {});
     REQUIRE(loaded);
     REQUIRE(loaded.value().get("node/role") == "primary");
 }
@@ -139,9 +122,7 @@ TEST_CASE("resolve rejects anonymous-only content when the identity is required"
     // Requiring the identity element is the host's knob for demanding a NAMED
     // strain; anonymous-only content now fails in required-field vocabulary.
     auto src = one("node/role", "primary");
-    nucleus::source_stack_options opts = base_layer(src);
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(src)}, {});
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().find("required field 'node/name'") != std::string::npos);
 }
@@ -158,9 +139,7 @@ TEST_CASE("resolve admits a document that satisfies the schema", "[facade][schem
 
     nucleus::runtime_source src;
     src.set("server/host", "localhost").set("server/port", "8080");
-    nucleus::source_stack_options opts = base_layer(src);
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(src)}, {});
     REQUIRE(loaded);
     REQUIRE(loaded.value().get("server/host") == "localhost");
     REQUIRE(loaded.value().get("server/port") == "8080");
