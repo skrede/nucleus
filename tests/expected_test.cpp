@@ -8,7 +8,6 @@
 #include <utility>
 
 using nucleus::expected;
-using nucleus::unexpected;
 using nucleus::unexpect;
 
 namespace {
@@ -16,7 +15,7 @@ namespace {
 expected<int, std::string> parse(bool ok)
 {
     if (ok) return 42;
-    return unexpected<std::string>("bad input");
+    return nucleus::unexpected<std::string>("bad input");
 }
 
 }
@@ -42,7 +41,7 @@ TEST_CASE("expected carries an error on failure", "[expected]")
 TEST_CASE("expected disambiguates same-typed value and error via unexpected", "[expected]")
 {
     expected<int, int> ok(5);
-    expected<int, int> err(unexpected(9));
+    expected<int, int> err(nucleus::unexpected(9));
     REQUIRE(ok.has_value());
     REQUIRE(ok.value() == 5);
     REQUIRE_FALSE(err.has_value());
@@ -51,7 +50,7 @@ TEST_CASE("expected disambiguates same-typed value and error via unexpected", "[
 
 TEST_CASE("expected converts the error on construction from unexpected", "[expected]")
 {
-    expected<int, std::string> e(unexpected("literal"));
+    expected<int, std::string> e(nucleus::unexpected("literal"));
     REQUIRE_FALSE(e.has_value());
     REQUIRE(e.error() == std::string("literal"));
 }
@@ -62,7 +61,7 @@ TEST_CASE("value_or returns the value or the fallback", "[expected]")
     REQUIRE(parse(false).value_or(7) == 7);
 
     const expected<int, std::string> ok(1);
-    const expected<int, std::string> err(unexpected<std::string>("e"));
+    const expected<int, std::string> err(nucleus::unexpected<std::string>("e"));
     REQUIRE(ok.value_or(99) == 1);
     REQUIRE(err.value_or(99) == 99);
 }
@@ -70,10 +69,10 @@ TEST_CASE("value_or returns the value or the fallback", "[expected]")
 TEST_CASE("error_or returns the error or the fallback", "[expected]")
 {
     const expected<int, std::string> ok(1);
-    const expected<int, std::string> err(unexpected<std::string>("boom"));
+    const expected<int, std::string> err(nucleus::unexpected<std::string>("boom"));
     REQUIRE(ok.error_or("none") == "none");
     REQUIRE(err.error_or("none") == "boom");
-    REQUIRE(expected<int, std::string>(unexpected<std::string>("rv")).error_or("none") == "rv");
+    REQUIRE(expected<int, std::string>(nucleus::unexpected<std::string>("rv")).error_or("none") == "rv");
 }
 
 TEST_CASE("and_then invokes on success and short-circuits on error", "[expected]")
@@ -152,9 +151,9 @@ TEST_CASE("value/error/and_then work across all four ref-qualifications", "[expe
     REQUIRE(clvalue.and_then(wrap).value() == 12);
     REQUIRE(expected<int, std::string>(20).and_then(wrap).value() == 21);
 
-    const expected<int, std::string> cerr(unexpected<std::string>("e"));
+    const expected<int, std::string> cerr(nucleus::unexpected<std::string>("e"));
     REQUIRE(cerr.error() == "e");
-    REQUIRE(expected<int, std::string>(unexpected<std::string>("rv")).error() == "rv");
+    REQUIRE(expected<int, std::string>(nucleus::unexpected<std::string>("rv")).error() == "rv");
 }
 
 TEST_CASE("a move-only value flows through the monadic chain without a copy", "[expected]")
@@ -177,7 +176,7 @@ TEST_CASE("expected<void, E> tracks success and error", "[expected]")
     REQUIRE(ok.has_value());
     REQUIRE(static_cast<bool>(ok));
 
-    expected<void, std::string> err(unexpected<std::string>("void-err"));
+    expected<void, std::string> err(nucleus::unexpected<std::string>("void-err"));
     REQUIRE_FALSE(err.has_value());
     REQUIRE(err.error() == "void-err");
 }
@@ -193,11 +192,11 @@ TEST_CASE("expected<void, E> chains with nullary and void-returning callables", 
     REQUIRE(ran);
     REQUIRE(chained.has_value());
 
-    auto recovered = expected<void, std::string>(unexpected<std::string>("x"))
+    auto recovered = expected<void, std::string>(nucleus::unexpected<std::string>("x"))
                          .or_else([](const std::string &) { return expected<void, std::string>(); });
     REQUIRE(recovered.has_value());
 
-    auto mapped_err = expected<void, std::string>(unexpected<std::string>("err"))
+    auto mapped_err = expected<void, std::string>(nucleus::unexpected<std::string>("err"))
                           .transform_error([](const std::string &e) { return e.size(); });
     REQUIRE_FALSE(mapped_err.has_value());
     REQUIRE(mapped_err.error() == std::size_t{3});
@@ -207,8 +206,8 @@ TEST_CASE("expected equality compares value and error states", "[expected]")
 {
     expected<int, std::string> a(1);
     expected<int, std::string> b(1);
-    expected<int, std::string> c(unexpected<std::string>("e"));
+    expected<int, std::string> c(nucleus::unexpected<std::string>("e"));
     REQUIRE(a == b);
     REQUIRE_FALSE(a == c);
-    REQUIRE(c == unexpected<std::string>("e"));
+    REQUIRE(c == nucleus::unexpected<std::string>("e"));
 }
