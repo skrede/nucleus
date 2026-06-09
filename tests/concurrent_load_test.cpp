@@ -35,7 +35,9 @@ TEST_CASE("N threads load one shared const space lock-free with identical result
 
     constexpr std::size_t thread_count = 8;
     std::vector<std::map<std::string, std::string>> results(thread_count);
-    std::vector<bool> ok(thread_count, false);
+    // char, not vector<bool>: the bit-packed specialization shares machine words
+    // across indices, so concurrent per-thread writes would race on the same word.
+    std::vector<char> ok(thread_count, 0);
 
     std::vector<std::thread> threads;
     threads.reserve(thread_count);
@@ -56,7 +58,7 @@ TEST_CASE("N threads load one shared const space lock-free with identical result
             for(const std::string &key : loaded.value().keys())
                 snapshot.emplace(key, loaded.value().get(key).value_or(std::string{}));
             results[i] = std::move(snapshot);
-            ok[i] = true;
+            ok[i] = 1;
         });
     }
     for(std::thread &t : threads)
