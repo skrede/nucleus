@@ -66,6 +66,7 @@ nucleus_add_test(expand_independence_test nucleus::env)
 nucleus_add_test(concurrent_load_test nucleus::runtime)
 nucleus_add_test(load_front_door_test nucleus::runtime)
 nucleus_add_test(recognizer_of_test nucleus::args)
+nucleus_add_test(converter_edge_cases_test)
 
 # The concurrent-load guarantee test spawns std::threads; link the platform's
 # threading library so the shared-const-read design is exercised under ASan.
