@@ -12,18 +12,18 @@
 #include "nucleus/schema/converters.h"
 
 #include "nucleus/configuration_source/configuration_source.h"
+#include "nucleus/configuration_source/env/env_source.h"
 
 #include "nucleus/sources/xml_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <any>
-#include <memory>
 #include <string>
 #include <vector>
 #include <cstdint>
-#include <utility>
 #include <optional>
+#include <functional>
 #include <typeindex>
 #include <string_view>
 
@@ -53,18 +53,17 @@ void declare_server_typed(nucleus::configuration_space_builder &engine)
         nucleus::typed_element<int32_t>("port", anchor::keyspace("cluster/server")));
 }
 
-// Document-path chain loader: kept on the legacy load_configuration path since it uses
-// document_paths. Migration of the document-path API belongs to a later plan.
+// Document-path chain loader against the explicit stack API.
 nucleus::load_result load_chain(const nucleus::configuration_space &space,
                                 std::vector<std::string> paths,
-                                nucleus::document_factory factory,
+                                std::function<nucleus::source_handle(const std::string &)> factory,
                                 std::optional<std::string> selection = std::nullopt)
 {
-    nucleus::source_stack_options opts;
+    nucleus::load_options opts;
     opts.document_paths = std::move(paths);
     opts.make_document = std::move(factory);
     opts.selection = std::move(selection);
-    return nucleus::load_configuration(space, opts);
+    return nucleus::load(space, nucleus::source_stack{}, opts);
 }
 
 }
@@ -89,13 +88,13 @@ TEST_CASE("typed x inheritance chain: derived value wins and converts",
     declare_server_typed(engine);
     nucleus::configuration_space space = engine.build();
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "base.xml")
-            return std::make_unique<nucleus::xml::xml_source>(xml_of(base_doc));
+            return nucleus::source_handle(xml_of(base_doc));
         if(name == "derived.xml")
-            return std::make_unique<nucleus::xml::xml_source>(xml_of(derived_doc));
-        return nullptr;
+            return nucleus::source_handle(xml_of(derived_doc));
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     auto loaded = load_chain(space, {"derived.xml"}, factory, "web");
@@ -130,13 +129,13 @@ TEST_CASE("typed x inheritance chain: bad value in winning layer fails resolve",
     declare_server_typed(engine);
     nucleus::configuration_space space = engine.build();
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "base.xml")
-            return std::make_unique<nucleus::xml::xml_source>(xml_of(base_doc));
+            return nucleus::source_handle(xml_of(base_doc));
         if(name == "derived.xml")
-            return std::make_unique<nucleus::xml::xml_source>(xml_of(derived_doc));
-        return nullptr;
+            return nucleus::source_handle(xml_of(derived_doc));
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     auto loaded = load_chain(space, {"derived.xml"}, factory, "web");
@@ -303,13 +302,13 @@ TEST_CASE("typed x scope policy: excluded entry above Ld is not converted",
         nucleus::typed_element<int32_t>("score", anchor::keyspace("cluster/server")));
     nucleus::configuration_space space = engine.build();
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "base.xml")
-            return std::make_unique<nucleus::xml::xml_source>(xml_of(base_doc));
+            return nucleus::source_handle(xml_of(base_doc));
         if(name == "derived.xml")
-            return std::make_unique<nucleus::xml::xml_source>(xml_of(derived_doc));
-        return nullptr;
+            return nucleus::source_handle(xml_of(derived_doc));
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     auto loaded = load_chain(space, {"derived.xml"}, factory, "web");

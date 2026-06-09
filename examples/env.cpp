@@ -6,8 +6,6 @@
 
 #include "nucleus/configuration_space.h"
 
-#include "nucleus/entry/precedence.h"
-
 #include "nucleus/configuration_source/env/env_source.h"
 
 #include <iostream>
@@ -16,15 +14,12 @@ int main()
 {
     nucleus::configuration_space space = nucleus::configuration_space_builder{}.build();
 
-    // env_source_options carries the host-mapped (path, value) entries by value;
-    // it is layered at the env rank by load_configuration.
-    nucleus::source_stack_options options;
-    options.env = nucleus::env_source_options{{
-        {"service/region", "eu-west"},
-        {"service/tier", "gold"},
-    }};
+    // An env_source carrying the host-mapped (path, value) entries by value.
+    nucleus::env_source values;
+    values.set("service/region", "eu-west")
+          .set("service/tier", "gold");
 
-    auto loaded = nucleus::load_configuration(space, options);
+    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(values)}, {});
     if(!loaded)
     {
         std::cerr << "resolve failed: " << loaded.error() << '\n';

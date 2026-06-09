@@ -25,22 +25,23 @@
 
 #include "nucleus/sources/xml_source.h"
 
+#include "nucleus/configuration_source/env/env_source.h"
+
 #include <catch2/catch_test_macros.hpp>
 
-#include <memory>
 #include <string>
 #include <vector>
-#include <utility>
 #include <optional>
+#include <functional>
 
 using nucleus::anchor;
 using nucleus::strain_scope_policy;
 
 namespace {
 
-std::unique_ptr<nucleus::configuration_source> xml_of(const std::string &text)
+nucleus::source_handle xml_of(const std::string &text)
 {
-    return std::make_unique<nucleus::xml::xml_source>(
+    return nucleus::source_handle(
         nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(text)));
 }
 
@@ -70,16 +71,16 @@ void declare_cluster_with_unique(nucleus::configuration_space_builder &engine)
 // Loads a document chain against `space` carrying per-load selection and scope.
 nucleus::load_result load_chain(const nucleus::configuration_space &space,
                                 std::vector<std::string> paths,
-                                nucleus::document_factory factory,
+                                std::function<nucleus::source_handle(const std::string &)> factory,
                                 std::optional<std::string> selection = std::nullopt,
                                 strain_scope_policy scope = strain_scope_policy::space_open_container_closed)
 {
-    nucleus::source_stack_options opts;
+    nucleus::load_options opts;
     opts.document_paths = std::move(paths);
     opts.make_document = std::move(factory);
     opts.selection = std::move(selection);
     opts.scope = scope;
-    return nucleus::load_configuration(space, opts);
+    return nucleus::load(space, nucleus::source_stack{}, opts);
 }
 
 // ---------------------------------------------------------------------------
@@ -105,7 +106,7 @@ const char *LEAF_DOC = R"(
 
 auto make_main_factory()
 {
-    return [](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    return [](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "root.xml")
             return xml_of(ROOT_DOC);
@@ -113,7 +114,7 @@ auto make_main_factory()
             return xml_of(MID_DOC);
         if(name == "leaf.xml")
             return xml_of(LEAF_DOC);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 }
 
@@ -138,7 +139,7 @@ const char *YANG_DOC_TC4 = R"(
 
 auto make_tc4_factory()
 {
-    return [](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    return [](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "root_tc4.xml")
             return xml_of(ROOT_DOC_TC4);
@@ -146,7 +147,7 @@ auto make_tc4_factory()
             return xml_of(MID_DOC_TC4);
         if(name == "yang_tc4.xml")
             return xml_of(YANG_DOC_TC4);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 }
 
@@ -196,13 +197,13 @@ TEST_CASE("integration: auto-resolve single named strain succeeds without select
         <cluster inherit="base2.xml">
         </cluster>)";
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "base2.xml")
             return xml_of(base_doc);
         if(name == "derived2.xml")
             return xml_of(derived_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     nucleus::configuration_space_builder engine;
@@ -233,13 +234,13 @@ TEST_CASE("integration: file_level scope policy excludes derived-layer entries",
             <server name="primary" extend="narrow"><protocol>tcp</protocol></server>
         </cluster>)";
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "root3.xml")
             return xml_of(root3_doc);
         if(name == "derived3.xml")
             return xml_of(derived3_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     nucleus::configuration_space_builder engine;
@@ -313,13 +314,13 @@ TEST_CASE("integration: opt-out terminates the chain by declaration",
         <cluster inherit="mid5.xml">
         </cluster>)";
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "mid5.xml")
             return xml_of(mid5_doc);
         if(name == "leaf5.xml")
             return xml_of(leaf5_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     nucleus::configuration_space_builder engine;
@@ -349,13 +350,13 @@ TEST_CASE("integration: multiple strains with no selection is a loud error",
             <server name="secondary"><port>22</port></server>
         </cluster>)";
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "base6.xml")
             return xml_of(base6_doc);
         if(name == "derived6.xml")
             return xml_of(derived6_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     nucleus::configuration_space_builder engine;
@@ -384,13 +385,13 @@ TEST_CASE("integration: select with unknown key value is a loud error",
             <server name="secondary"><port>22</port></server>
         </cluster>)";
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "base7.xml")
             return xml_of(base7_doc);
         if(name == "derived7.xml")
             return xml_of(derived7_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     nucleus::configuration_space_builder engine;

@@ -3,18 +3,17 @@
 // A runtime_source builds the scalar base in code via chained .set() -- no document,
 // no parser. A small XML overlay supplies the repeated tag values (a flat source can
 // carry at most one value per repeated field per layer, so the duplicate_keys-capable
-// XML source is what genuinely supplies a repeated field). load_configuration unifies
-// them, then the ONE resolved configuration is emitted as XML (nested), env
-// (KEY=value), and args (--KEY=value) into std::cout. Each emitter models the
-// format-agnostic config_emitter seam; the user owns the stream. The repeated tag
-// keeps all its values in every format.
+// XML source is what genuinely supplies a repeated field). load unifies them, then
+// the ONE resolved configuration is emitted as XML (nested), env (KEY=value), and
+// args (--KEY=value) into std::cout. Each emitter models the format-agnostic
+// config_emitter seam; the user owns the stream. The repeated tag keeps all its
+// values in every format.
 
 #include "nucleus/configuration_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/entry/precedence.h"
 #include "nucleus/entry/configuration.h"
 
 #include "nucleus/sources/xml_source.h"
@@ -24,7 +23,6 @@
 #include "nucleus/configuration_source/env/env_emitter.h"
 #include "nucleus/configuration_source/argv/argv_emitter.h"
 
-#include <memory>
 #include <string>
 #include <iostream>
 
@@ -49,18 +47,16 @@ int main()
 
     // The repeated tag values arrive from a document overlay.
     const char *document = "<server><tag>alpha</tag><tag>beta</tag></server>";
-    auto make = [document](const std::string &) -> std::unique_ptr<nucleus::configuration_source> {
-        return std::make_unique<nucleus::xml::xml_source>(
-            nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(document)));
+    auto make = [document](const std::string &) -> nucleus::source_handle {
+        return nucleus::source_handle(
+            nucleus::xml::xml_source::from(
+                nucleus::xml::xml_source_options::of_string(document)));
     };
 
-    nucleus::source_stack_options options;
-    options.custom_layers.push_back(nucleus::configuration_source_layer{
-        &base, static_cast<std::size_t>(nucleus::layer_rank::base), "runtime", {}});
-    options.document_paths = {"config.xml"};
-    options.make_document = make;
-
-    auto loaded = nucleus::load_configuration(space, options);
+    // runtime_source at lower precedence (stack[0]); document overlay at higher via load_options.
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{std::move(base)},
+        nucleus::load_options{.document_paths = {"config.xml"}, .make_document = make});
     if(!loaded)
     {
         std::cerr << "load failed: " << loaded.error() << '\n';

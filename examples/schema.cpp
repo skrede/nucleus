@@ -10,8 +10,6 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/entry/precedence.h"
-
 #include "nucleus/configuration_source/env/env_source.h"
 
 #include <iostream>
@@ -31,11 +29,7 @@ int main()
     nucleus::env_source values;
     values.set("server/mode", "http");
 
-    nucleus::source_stack_options options;
-    options.custom_layers.push_back(nucleus::configuration_source_layer{
-        &values, static_cast<std::size_t>(nucleus::layer_rank::base), "config", {}});
-
-    auto loaded = nucleus::load_configuration(space, options);
+    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(values)}, {});
     if(!loaded)
     {
         std::cout << "rejected as expected: " << loaded.error() << '\n';

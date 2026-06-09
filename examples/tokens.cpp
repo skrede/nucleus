@@ -6,8 +6,6 @@
 
 #include "nucleus/configuration_space.h"
 
-#include "nucleus/entry/precedence.h"
-
 #include "nucleus/configuration_source/env/env_source.h"
 
 #include <cstdlib>
@@ -36,11 +34,7 @@ int main()
 
     nucleus::configuration_space space = nucleus::configuration_space_builder{}.build();
 
-    nucleus::source_stack_options options;
-    options.custom_layers.push_back(nucleus::configuration_source_layer{
-        &values, static_cast<std::size_t>(nucleus::layer_rank::base), "config", {}});
-
-    auto loaded = nucleus::load_configuration(space, options);
+    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(values)}, {});
     if(!loaded)
     {
         std::cerr << "resolve failed: " << loaded.error() << '\n';

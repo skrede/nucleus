@@ -104,12 +104,12 @@ TEST_CASE("inheritance golden fixtures match nucleus-derived resolution", "[gold
             nucleus::golden::declare_schema(builder);
             const nucleus::configuration_space space = builder.build();
 
-            nucleus::source_stack_options opts;
+            nucleus::load_options opts;
             opts.document_paths = spec.inputs;
             opts.make_document = nucleus::golden::file_factory(dir.string());
             opts.selection = spec.selection;
 
-            nucleus::load_result loaded = nucleus::load_configuration(space, opts);
+            nucleus::load_result loaded = nucleus::load(space, nucleus::source_stack{}, opts);
             INFO("load error (if any): " << (loaded ? std::string("<none>") : loaded.error()));
             REQUIRE(loaded);
 

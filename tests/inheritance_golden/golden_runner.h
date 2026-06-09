@@ -65,12 +65,11 @@ inline std::string filename_of(const std::string &path)
 // A document factory that maps every requested path to an XML file read from the
 // given case directory. Dispatch is by filename so inherit= and multi-path stacks
 // both resolve against the same fixture directory.
-inline nucleus::document_factory file_factory(std::string case_dir)
+inline std::function<nucleus::source_handle(const std::string &)> file_factory(std::string case_dir)
 {
-    return [dir = std::move(case_dir)](const std::string &path)
-               -> std::unique_ptr<nucleus::configuration_source> {
+    return [dir = std::move(case_dir)](const std::string &path) -> nucleus::source_handle {
         const std::string full = dir + "/" + filename_of(path);
-        return std::make_unique<nucleus::xml::xml_source>(
+        return nucleus::source_handle(
             nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_file(full)));
     };
 }

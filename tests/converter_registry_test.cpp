@@ -10,6 +10,8 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/converters.h"
 
+#include "nucleus/configuration_source/env/env_source.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <any>
@@ -19,12 +21,12 @@ using nucleus::anchor;
 
 namespace {
 
-// The env layer carrying one (path, text) pair, by value.
-nucleus::source_stack_options env_with(std::string path, std::string text)
+// One env layer carrying a single (path, text) pair.
+nucleus::source_stack env_with(std::string path, std::string text)
 {
-    nucleus::source_stack_options opts;
-    opts.env = nucleus::env_source_options{{{std::move(path), std::move(text)}}};
-    return opts;
+    nucleus::env_source src;
+    src.set(std::move(path), std::move(text));
+    return nucleus::source_stack{std::move(src)};
 }
 
 } // namespace
@@ -36,8 +38,7 @@ TEST_CASE("registry supplies the converter for a deferred-converter element", "[
     builder.register_element(nucleus::registered_element<int>("port", anchor::root()));
     nucleus::configuration_space space = builder.build();
 
-    nucleus::source_stack_options opts = env_with("port", "8080");
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space, env_with("port", "8080"), {});
     REQUIRE(loaded);
 
     auto typed = loaded.value().get_as<int>("port");
@@ -59,8 +60,7 @@ TEST_CASE("a per-element converter overrides the registry converter", "[converte
         nucleus::typed_element<int>("port", anchor::root(), nucleus::make_scalar_converter<int>()));
     nucleus::configuration_space space = builder.build();
 
-    nucleus::source_stack_options opts = env_with("port", "8080");
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space, env_with("port", "8080"), {});
     REQUIRE(loaded);
 
     auto typed = loaded.value().get_as<int>("port");
@@ -76,8 +76,7 @@ TEST_CASE("a type with no registered converter is left unconverted", "[converter
     builder.register_element(nucleus::registered_element<int>("port", anchor::root()));
     nucleus::configuration_space space = builder.build();
 
-    nucleus::source_stack_options opts = env_with("port", "8080");
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space, env_with("port", "8080"), {});
     REQUIRE(loaded);
 
     REQUIRE(loaded.value().get("port") == std::string("8080"));

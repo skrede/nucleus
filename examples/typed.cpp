@@ -11,9 +11,7 @@
 #include "nucleus/sources/xml_source.h"
 
 #include <any>
-#include <memory>
 #include <string>
-#include <vector>
 #include <iostream>
 #include <functional>
 #include <string_view>
@@ -66,16 +64,14 @@ int main()
 
     // In-memory document -- no file on disk required.
     const char *document = R"(<body><pos>1.0,2.5,3.0</pos><mass>42</mass></body>)";
-    auto make = [document](const std::string &) -> std::unique_ptr<nucleus::configuration_source> {
-        return std::make_unique<nucleus::xml::xml_source>(
-            nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(document)));
+    auto make = [document](const std::string &) -> nucleus::source_handle {
+        return nucleus::source_handle(
+            nucleus::xml::xml_source::from(
+                nucleus::xml::xml_source_options::of_string(document)));
     };
 
-    nucleus::source_stack_options options;
-    options.document_paths = {"config.xml"};
-    options.make_document = make;
-
-    auto loaded = nucleus::load_configuration(space, options);
+    auto loaded = nucleus::load(space, nucleus::source_stack{},
+        nucleus::load_options{.document_paths = {"config.xml"}, .make_document = make});
     if(!loaded) {
         std::cerr << "load failed: " << loaded.error() << '\n';
         return 1;

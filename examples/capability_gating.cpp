@@ -1,4 +1,4 @@
-// capability_gating: load_configuration auto-gates with NO host gate call.
+// capability_gating: load auto-gates with NO host gate call.
 //
 // The schema is nested (a `server` container primary-keyed by `name`) and typed
 // (an int `port`), so it requires the `nesting` capability. A flat env source
@@ -10,6 +10,8 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/converters.h"
+
+#include "nucleus/configuration_source/env/env_source.h"
 
 #include <iostream>
 
@@ -24,13 +26,11 @@ int main()
     nucleus::configuration_space space = builder.build();
 
     // A flat env source -- no nesting, no typed scalars.
-    nucleus::source_stack_options options;
-    options.env = nucleus::env_source_options{{
-        {"server/name", "primary"},
-    }};
+    nucleus::env_source values;
+    values.set("server/name", "primary");
 
-    // No gate/check call anywhere: load_configuration auto-gates on its own.
-    auto loaded = nucleus::load_configuration(space, options);
+    // No gate/check call anywhere: load auto-gates on its own.
+    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(values)}, {});
     if(!loaded)
     {
         std::cout << "load auto-gated and refused: " << loaded.error() << '\n';

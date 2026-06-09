@@ -12,7 +12,8 @@
 
 #include "nucleus/sources/xml_source.h"
 
-#include <memory>
+#include "nucleus/configuration_source/argv/argv_source.h"
+
 #include <vector>
 #include <string>
 #include <iostream>
@@ -32,19 +33,20 @@ int main()
     // document factory builds the xml_source from an xml_source_options value --
     // the only seam through which the xml module reaches the core.
     const char *document = R"(<server host="127.0.0.1" mode="http"/>)";
-    auto make = [document](const std::string &) -> std::unique_ptr<nucleus::configuration_source> {
-        return std::make_unique<nucleus::xml::xml_source>(
-            nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(document)));
+    auto make = [document](const std::string &) -> nucleus::source_handle {
+        return nucleus::source_handle(
+            nucleus::xml::xml_source::from(
+                nucleus::xml::xml_source_options::of_string(document)));
     };
 
     // argv outranks the document band, so it overrides `mode`; the document's
     // `host` survives.
-    nucleus::source_stack_options options;
-    options.argv = nucleus::argv_source_options{{"--server-mode=https"}};
-    options.document_paths = {"config.xml"};
-    options.make_document = make;
+    nucleus::argv_source argv(std::vector<std::string>{"--server-mode=https"});
+    argv.recognize_with(nucleus::recognizer_of(space));
 
-    auto loaded = nucleus::load_configuration(space, options);
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{std::move(argv)},
+        nucleus::load_options{.document_paths = {"config.xml"}, .make_document = make});
     if(!loaded)
     {
         std::cerr << "load failed: " << loaded.error() << '\n';

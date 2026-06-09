@@ -8,9 +8,7 @@
 
 #include "nucleus/sources/xml_source.h"
 
-#include <memory>
 #include <string>
-#include <vector>
 #include <iostream>
 
 int main()
@@ -37,19 +35,18 @@ int main()
             <server name="secondary"><port>22</port></server>
         </cluster>)";
 
-    auto make = [document](const std::string &) -> std::unique_ptr<nucleus::configuration_source> {
-        return std::make_unique<nucleus::xml::xml_source>(
-            nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(document)));
+    auto make = [document](const std::string &) -> nucleus::source_handle {
+        return nucleus::source_handle(
+            nucleus::xml::xml_source::from(
+                nucleus::xml::xml_source_options::of_string(document)));
     };
 
-    // Select the "primary" strain for this load -- a per-load parameter now. Only one
-    // named instance survives the resolve.
-    nucleus::source_stack_options options;
-    options.document_paths = {"config.xml"};
-    options.make_document = make;
-    options.selection = "primary";
-
-    auto loaded = nucleus::load_configuration(space, options);
+    // Select the "primary" strain for this load -- a per-load parameter.
+    auto loaded = nucleus::load(space, nucleus::source_stack{},
+        nucleus::load_options{
+            .selection = "primary",
+            .document_paths = {"config.xml"},
+            .make_document = make});
     if(!loaded)
     {
         std::cerr << "load failed: " << loaded.error() << '\n';

@@ -15,7 +15,6 @@
 #include "nucleus/sources/xml_source.h"
 #include "nucleus/sources/xml_emitter.h"
 
-#include <memory>
 #include <string>
 #include <iostream>
 
@@ -30,16 +29,14 @@ int main()
 
     const char *document =
         "<server><host>localhost</host><tag>alpha</tag><tag>beta</tag></server>";
-    auto make = [document](const std::string &) -> std::unique_ptr<nucleus::configuration_source> {
-        return std::make_unique<nucleus::xml::xml_source>(
-            nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(document)));
+    auto make = [document](const std::string &) -> nucleus::source_handle {
+        return nucleus::source_handle(
+            nucleus::xml::xml_source::from(
+                nucleus::xml::xml_source_options::of_string(document)));
     };
 
-    nucleus::source_stack_options options;
-    options.document_paths = {"config.xml"};
-    options.make_document = make;
-
-    auto loaded = nucleus::load_configuration(space, options);
+    auto loaded = nucleus::load(space, nucleus::source_stack{},
+        nucleus::load_options{.document_paths = {"config.xml"}, .make_document = make});
     if(!loaded)
     {
         std::cerr << "load failed: " << loaded.error() << '\n';

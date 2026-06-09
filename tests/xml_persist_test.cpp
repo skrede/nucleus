@@ -11,7 +11,6 @@
 
 #include <string>
 #include <vector>
-#include <memory>
 #include <cstdio>
 #include <fstream>
 #include <sstream>
@@ -27,9 +26,9 @@ using nucleus::anchor;
 
 namespace {
 
-std::unique_ptr<nucleus::configuration_source> xml_of(const std::string &text)
+nucleus::source_handle xml_of(const std::string &text)
 {
-    return std::make_unique<nucleus::xml::xml_source>(
+    return nucleus::source_handle(
         nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(text)));
 }
 
@@ -40,9 +39,9 @@ void declare_server(nucleus::configuration_space_builder &engine)
     engine.register_element(nucleus::repeated_element("tag", anchor::keyspace("server")));
 }
 
-nucleus::source_stack_options document_options(const std::string &xml)
+nucleus::load_options document_options(const std::string &xml)
 {
-    nucleus::source_stack_options opts;
+    nucleus::load_options opts;
     opts.document_paths = {"doc.xml"};
     opts.make_document = [xml](const std::string &) { return xml_of(xml); };
     return opts;
@@ -63,14 +62,14 @@ TEST_CASE("a resolved configuration round-trips through XML persistence", "[pers
     declare_server(engine);
     nucleus::configuration_space space = engine.build();
 
-    auto first = nucleus::load_configuration(space, document_options(kDocument));
+    auto first = nucleus::load(space, nucleus::source_stack{}, document_options(kDocument));
     REQUIRE(first);
     const nucleus::configuration &original = first.value();
 
     std::ostringstream serialized;
     nucleus::xml::emit_document(original, serialized);
 
-    auto second = nucleus::load_configuration(space, document_options(serialized.str()));
+    auto second = nucleus::load(space, nucleus::source_stack{}, document_options(serialized.str()));
     REQUIRE(second);
     const nucleus::configuration &reloaded = second.value();
 
@@ -90,7 +89,7 @@ TEST_CASE("emit_document to a file persists a configuration that re-reads identi
     declare_server(engine);
     nucleus::configuration_space space = engine.build();
 
-    auto first = nucleus::load_configuration(space, document_options(kDocument));
+    auto first = nucleus::load(space, nucleus::source_stack{}, document_options(kDocument));
     REQUIRE(first);
 
     // The test owns persistence: emit into a file stream it opens, then re-read it.
@@ -107,7 +106,7 @@ TEST_CASE("emit_document to a file persists a configuration that re-reads identi
     in.close();
     std::filesystem::remove(path);
 
-    auto second = nucleus::load_configuration(space, document_options(buffer.str()));
+    auto second = nucleus::load(space, nucleus::source_stack{}, document_options(buffer.str()));
     REQUIRE(second);
     REQUIRE(second.value().keys() == first.value().keys());
     REQUIRE(second.value().get_all("server/tag")

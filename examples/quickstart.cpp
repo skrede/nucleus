@@ -8,6 +8,8 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
+#include "nucleus/configuration_source/argv/argv_source.h"
+
 #include <vector>
 #include <iostream>
 
@@ -19,9 +21,10 @@ int main()
         nucleus::element("port", nucleus::anchor::keyspace("server")));
     nucleus::configuration_space space = builder.build();
 
-    nucleus::source_stack_options options;
-    options.argv = nucleus::argv_source_options{{"--server-port=8080"}};
-    auto loaded = nucleus::load_configuration(space, options);
+    nucleus::argv_source argv(std::vector<std::string>{"--server-port=8080"});
+    argv.recognize_with(nucleus::recognizer_of(space));
+
+    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(argv)}, {});
     if(!loaded)
     {
         std::cerr << "load failed: " << loaded.error() << '\n';

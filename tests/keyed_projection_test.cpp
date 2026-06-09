@@ -9,7 +9,6 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <memory>
 #include <string>
 #include <vector>
 #include <optional>
@@ -27,9 +26,9 @@ using nucleus::anchor;
 
 namespace {
 
-std::unique_ptr<nucleus::configuration_source> xml_of(const std::string &text)
+nucleus::source_handle xml_of(const std::string &text)
 {
-    return std::make_unique<nucleus::xml::xml_source>(
+    return nucleus::source_handle(
         nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(text)));
 }
 
@@ -47,15 +46,15 @@ void declare_cluster(nucleus::configuration_space_builder &engine)
 }
 
 // Loads `doc` as the sole document layer against `space`, with an optional strain
-// selection -- the per-load shape replacing the old paths-and-factory load.
+// selection.
 nucleus::load_result load_doc(const nucleus::configuration_space &space, const char *doc,
                               std::optional<std::string> selection = std::nullopt)
 {
-    nucleus::source_stack_options opts;
+    nucleus::load_options opts;
     opts.document_paths = {"doc.xml"};
     opts.make_document = [doc](const std::string &) { return xml_of(doc); };
     opts.selection = std::move(selection);
-    return nucleus::load_configuration(space, opts);
+    return nucleus::load(space, nucleus::source_stack{}, opts);
 }
 
 }

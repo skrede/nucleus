@@ -7,26 +7,27 @@
 
 #include "nucleus/sources/xml_source.h"
 
+#include "nucleus/configuration_source/env/env_source.h"
+
 #include <catch2/catch_test_macros.hpp>
 
-#include <memory>
 #include <string>
 #include <vector>
-#include <utility>
 #include <optional>
+#include <functional>
 
 // Inheritance chain walk, composition, extend dispositions, and duplicate
 // detection tests. All tests use the factory-lambda in-memory pattern: no
 // filesystem access, no host vocabulary; all shapes are generic (cluster/server).
-// Selection and inherit policy are per-load parameters on source_stack_options.
+// Selection and inherit policy are per-load parameters on load_options.
 
 using nucleus::anchor;
 
 namespace {
 
-std::unique_ptr<nucleus::configuration_source> xml_of(const std::string &text)
+nucleus::source_handle xml_of(const std::string &text)
 {
-    return std::make_unique<nucleus::xml::xml_source>(
+    return nucleus::source_handle(
         nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(text)));
 }
 
@@ -60,20 +61,19 @@ std::string filename_of(const std::string &path)
 }
 
 // Loads a document chain against `space`, carrying the per-load selection and
-// inherit policy as options -- the shape replacing the old per-load selection and
-// inherit-policy setters plus the old paths-and-factory load.
+// inherit policy as options.
 nucleus::load_result load_chain(const nucleus::configuration_space &space,
                                 std::vector<std::string> paths,
-                                nucleus::document_factory factory,
+                                std::function<nucleus::source_handle(const std::string &)> factory,
                                 std::optional<std::string> selection = std::nullopt,
                                 nucleus::inherit_policy policy = {})
 {
-    nucleus::source_stack_options opts;
+    nucleus::load_options opts;
     opts.document_paths = std::move(paths);
     opts.make_document = std::move(factory);
     opts.selection = std::move(selection);
     opts.inherit = std::move(policy);
-    return nucleus::load_configuration(space, opts);
+    return nucleus::load(space, nucleus::source_stack{}, opts);
 }
 
 }
@@ -118,13 +118,13 @@ TEST_CASE("two-file chain assembles root-first, derived overrides root", "[chain
     declare_cluster(engine);
     nucleus::configuration_space space = engine.build();
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
         if(name == "derived.xml")
             return xml_of(derived_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     auto loaded = load_chain(space, {"derived.xml"}, factory, "web");
@@ -158,13 +158,13 @@ TEST_CASE("anonymous instances compose across chain in document order", "[chain]
         nucleus::element("protocol", anchor::keyspace("cluster/server")));
     nucleus::configuration_space space = engine.build();
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
         if(name == "derived.xml")
             return xml_of(derived_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     auto loaded = load_chain(space, {"derived.xml"}, factory);
@@ -194,13 +194,13 @@ TEST_CASE("named strain in derived composes on template from root", "[chain]")
     nucleus::configuration_space space = engine.build();
     // Single named strain auto-resolves; no selection needed.
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
         if(name == "derived.xml")
             return xml_of(derived_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     auto loaded = load_chain(space, {"derived.xml"}, factory);
@@ -236,7 +236,7 @@ TEST_CASE("opt-out truncates chain below declaring file", "[chain]")
     declare_cluster(engine);
     nucleus::configuration_space space = engine.build();
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "grandparent.xml")
         {
@@ -247,7 +247,7 @@ TEST_CASE("opt-out truncates chain below declaring file", "[chain]")
             return xml_of(base_doc);
         if(name == "derived.xml")
             return xml_of(derived_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     auto loaded = load_chain(space, {"derived.xml"}, factory, "web");
@@ -273,7 +273,7 @@ TEST_CASE("depth cap exceeded returns loud error naming the limit", "[chain]")
     nucleus::inherit_policy policy;
     policy.depth_cap = 2;
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "a.xml")
             return xml_of(a_doc);
@@ -281,7 +281,7 @@ TEST_CASE("depth cap exceeded returns loud error naming the limit", "[chain]")
             return xml_of(b_doc);
         if(name == "c.xml")
             return xml_of(c_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     auto loaded = load_chain(space, {"a.xml"}, factory, std::nullopt, std::move(policy));
@@ -302,13 +302,13 @@ TEST_CASE("cycle in inheritance chain fails loudly naming the path", "[chain]")
     declare_cluster(engine);
     nucleus::configuration_space space = engine.build();
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "a.xml")
             return xml_of(a_doc);
         if(name == "b.xml")
             return xml_of(b_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     auto loaded = load_chain(space, {"a.xml"}, factory);
@@ -340,13 +340,13 @@ TEST_CASE("admissibility callback rejection fails naming the parent", "[chain]")
         return "not allowed in test";
     };
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
         if(name == "derived.xml")
             return xml_of(derived_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     auto loaded = load_chain(space, {"derived.xml"}, factory, "web", std::move(policy));
@@ -411,13 +411,13 @@ TEST_CASE("admissibility reject-all fails naming the parent in a two-file chain"
         return "reject everything";
     };
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
         if(name == "derived.xml")
             return xml_of(derived_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     auto loaded = load_chain(space, {"derived.xml"}, factory, "web", std::move(policy));
@@ -446,13 +446,13 @@ TEST_CASE("default admit-all policy allows all parents", "[chain]")
     nucleus::configuration_space space = engine.build();
     // No inherit policy -- default admits all parents.
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
         if(name == "derived.xml")
             return xml_of(derived_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     auto loaded = load_chain(space, {"derived.xml"}, factory, "web");
@@ -479,13 +479,13 @@ TEST_CASE("extend-narrow obeys default scope policy", "[chain]")
     declare_cluster(engine);
     nucleus::configuration_space space = engine.build();
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
         if(name == "derived.xml")
             return xml_of(derived_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     auto loaded = load_chain(space, {"derived.xml"}, factory, "web");
@@ -515,13 +515,13 @@ TEST_CASE("extend-wide bypasses scope policy", "[chain]")
     declare_cluster(engine);
     nucleus::configuration_space space = engine.build();
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
         if(name == "derived.xml")
             return xml_of(derived_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     auto loaded = load_chain(space, {"derived.xml"}, factory, "web");
@@ -551,13 +551,13 @@ TEST_CASE("extend-without-base fails loudly", "[chain]")
     declare_cluster(engine);
     nucleus::configuration_space space = engine.build();
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
         if(name == "derived.xml")
             return xml_of(derived_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     // Select "web" so the "multiple strains, no selection" guard does not fire
@@ -589,13 +589,13 @@ TEST_CASE("re-open without extend disposition fails loudly", "[chain]")
     declare_cluster(engine);
     nucleus::configuration_space space = engine.build();
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
         if(name == "derived.xml")
             return xml_of(derived_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     auto loaded = load_chain(space, {"derived.xml"}, factory);
@@ -648,13 +648,13 @@ TEST_CASE("duplicate primary-key across chain layers without extend fails", "[ch
     declare_cluster(engine);
     nucleus::configuration_space space = engine.build();
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
         if(name == "derived.xml")
             return xml_of(derived_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     auto loaded = load_chain(space, {"derived.xml"}, factory);
@@ -709,13 +709,13 @@ TEST_CASE("duplicate unique-field value across chain files fails", "[chain]")
     declare_cluster_with_unique(engine);
     nucleus::configuration_space space = engine.build();
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "base.xml")
             return xml_of(base_doc);
         if(name == "derived.xml")
             return xml_of(derived_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     // Select "web" so unique enforcement runs before the "multiple strains, no
@@ -799,12 +799,12 @@ TEST_CASE("depth-cap boundary: exactly at the cap loads, one beyond fails", "[ch
     declare_anon_cluster(engine);
     nucleus::configuration_space space = engine.build();
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "a.xml") return xml_of(a_doc);
         if(name == "b.xml") return xml_of(b_doc);
         if(name == "c.xml") return xml_of(c_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     SECTION("exactly at the cap loads")
@@ -841,12 +841,12 @@ TEST_CASE("three-file cycle fails loudly naming a path on the cycle", "[chain]")
     declare_anon_cluster(engine);
     nucleus::configuration_space space = engine.build();
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "a.xml") return xml_of(a_doc);
         if(name == "b.xml") return xml_of(b_doc);
         if(name == "c.xml") return xml_of(c_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     auto loaded = load_chain(space, {"a.xml"}, factory);
@@ -873,11 +873,11 @@ TEST_CASE("duplicate-canonical path reached two ways resolves deterministically"
     declare_anon_cluster(engine);
     nucleus::configuration_space space = engine.build();
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "base.xml") return xml_of(base_doc);
         if(name == "derived.xml") return xml_of(derived_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     // Request base directly AND derived (which inherits base): base is canonically
@@ -904,11 +904,11 @@ TEST_CASE("independent second requested path is not falsely flagged as a cycle",
     declare_anon_cluster(engine);
     nucleus::configuration_space space = engine.build();
 
-    auto factory = [&](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
         if(name == "first.xml") return xml_of(first_doc);
         if(name == "second.xml") return xml_of(second_doc);
-        return nullptr;
+        return nucleus::source_handle(nucleus::env_source{});
     };
 
     // Two independent top-level walks in one expand(): the first walk's visited

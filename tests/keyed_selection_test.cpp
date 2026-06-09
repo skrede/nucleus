@@ -9,12 +9,11 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <memory>
 #include <string>
 #include <vector>
 #include <optional>
 
-// Selection-path tests: the per-load source_stack_options.selection designates a
+// Selection-path tests: the per-load load_options.selection designates a
 // single named strain by primary-key value; resolve prunes non-matching strains
 // and strips the transient key segment. Unknown selections and missing primary
 // keys both fail loudly. The shapes here are generic (a cluster of servers) -- no
@@ -24,9 +23,9 @@ using nucleus::anchor;
 
 namespace {
 
-std::unique_ptr<nucleus::configuration_source> xml_of(const std::string &text)
+nucleus::source_handle xml_of(const std::string &text)
 {
-    return std::make_unique<nucleus::xml::xml_source>(
+    return nucleus::source_handle(
         nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(text)));
 }
 
@@ -46,11 +45,11 @@ void declare_cluster(nucleus::configuration_space_builder &engine)
 nucleus::load_result load_doc(const nucleus::configuration_space &space, const char *doc,
                               std::optional<std::string> selection = std::nullopt)
 {
-    nucleus::source_stack_options opts;
+    nucleus::load_options opts;
     opts.document_paths = {"doc.xml"};
     opts.make_document = [doc](const std::string &) { return xml_of(doc); };
     opts.selection = std::move(selection);
-    return nucleus::load_configuration(space, opts);
+    return nucleus::load(space, nucleus::source_stack{}, opts);
 }
 
 }

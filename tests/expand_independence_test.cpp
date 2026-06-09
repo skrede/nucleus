@@ -22,11 +22,11 @@ using nucleus::anchor;
 namespace {
 
 // One env layer carrying a single (path, value) pair.
-nucleus::source_stack_options env_with(std::string path, std::string text)
+nucleus::source_stack env_with(std::string path, std::string text)
 {
-    nucleus::source_stack_options opts;
-    opts.env = nucleus::env_source_options{{{std::move(path), std::move(text)}}};
-    return opts;
+    nucleus::env_source src;
+    src.set(std::move(path), std::move(text));
+    return nucleus::source_stack{std::move(src)};
 }
 
 }
@@ -66,7 +66,7 @@ TEST_CASE("deriving does not perturb a later load on the base", "[expand][indepe
     nucleus::configuration_space base = base_builder.build();
 
     // A load on the base BEFORE deriving.
-    auto before = nucleus::load_configuration(base, env_with("port", "8080"));
+    auto before = nucleus::load(base, env_with("port", "8080"), {});
     REQUIRE(before);
     REQUIRE(before.value().get_as<int>("port"));
     REQUIRE(before.value().get_as<int>("port").value() == 8080);
@@ -79,14 +79,14 @@ TEST_CASE("deriving does not perturb a later load on the base", "[expand][indepe
 
     // A load on the base AFTER deriving behaves identically -- the derivation did
     // not mutate the base's registries (no shared base pointer).
-    auto after = nucleus::load_configuration(base, env_with("port", "8080"));
+    auto after = nucleus::load(base, env_with("port", "8080"), {});
     REQUIRE(after);
     REQUIRE(after.value().get_as<int>("port"));
     REQUIRE(after.value().get_as<int>("port").value() == 8080);
 
     // The base still rejects "host" -- the derived builder's extra element never
     // leaked back into the base.
-    auto rejects = nucleus::load_configuration(base, env_with("host", "x"));
+    auto rejects = nucleus::load(base, env_with("host", "x"), {});
     REQUIRE_FALSE(rejects);
 }
 

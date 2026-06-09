@@ -6,7 +6,6 @@
 
 #include "nucleus/configuration_space.h"
 
-#include "nucleus/entry/precedence.h"
 #include "nucleus/keyspace/provenance.h"
 
 #include "nucleus/configuration_source/env/env_source.h"
@@ -24,14 +23,10 @@ int main()
 
     nucleus::configuration_space space = nucleus::configuration_space_builder{}.build();
 
-    // Borrowed custom layers at explicit ranks; higher ranks win.
-    nucleus::source_stack_options options;
-    options.custom_layers.push_back(nucleus::configuration_source_layer{
-        &env, static_cast<std::size_t>(nucleus::layer_rank::env), "env", {}});
-    options.custom_layers.push_back(nucleus::configuration_source_layer{
-        &argv, static_cast<std::size_t>(nucleus::layer_rank::argv), "argv", {}});
-
-    auto loaded = nucleus::load_configuration(space, options);
+    // env at lower precedence (stack[0]), argv at higher precedence (stack[1]).
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{std::move(env), std::move(argv)},
+        {});
     if(!loaded)
     {
         std::cerr << "resolve failed: " << loaded.error() << '\n';

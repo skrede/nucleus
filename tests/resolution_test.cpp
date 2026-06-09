@@ -131,10 +131,9 @@ TEST_CASE("the args-only options wire the argv recognizer to the schema", "[reso
         REQUIRE(engine.register_schema("logging/level"));
         nucleus::configuration_space space = engine.build();
 
-        nucleus::source_stack_options opts;
-        opts.argv = nucleus::argv_source_options{{"--logging-level=debug"}};
-
-        auto loaded = nucleus::load_configuration(space, opts);
+        nucleus::argv_source argv(std::vector<std::string>{"--logging-level=debug"});
+        argv.recognize_with(nucleus::recognizer_of(space));
+        auto loaded = nucleus::load(space, nucleus::source_stack{std::move(argv)}, {});
         REQUIRE(loaded);
         REQUIRE(loaded.value().get("logging/level") == "debug");
     }
@@ -145,61 +144,54 @@ TEST_CASE("the args-only options wire the argv recognizer to the schema", "[reso
         REQUIRE(engine.register_schema("logging/level"));
         nucleus::configuration_space space = engine.build();
 
-        nucleus::source_stack_options opts;
-        opts.argv = nucleus::argv_source_options{{"--logging-levle=debug"}};
-
-        auto loaded = nucleus::load_configuration(space, opts);
+        nucleus::argv_source argv(std::vector<std::string>{"--logging-levle=debug"});
+        argv.recognize_with(nucleus::recognizer_of(space));
+        auto loaded = nucleus::load(space, nucleus::source_stack{std::move(argv)}, {});
         REQUIRE_FALSE(loaded);
         REQUIRE(loaded.error().find("logging/levle") != std::string::npos);
     }
 }
 
-TEST_CASE("argv outranks any number of config documents", "[resolution][precedence]")
+TEST_CASE("a later-listed stack source wins a same-key contest against an earlier one",
+          "[resolution][precedence]")
 {
-    // Each path becomes a one-key source whose value is the path label, so the
-    // winning value names which layer won. With four-plus documents a naive
-    // base+index rank would push a document to or past the argv rank; the clamp
-    // keeps every document strictly below argv.
-    auto make = [](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
-        auto src = std::make_unique<nucleus::env_source>();
-        src->set("k", path);
-        return src;
-    };
-
+    // Two sources contesting the same key: later index == higher rank == wins.
+    // The document-band clamping (200-900) ensures document paths similarly
+    // yield to a stack source placed after them; the "last-wins" rule applies
+    // uniformly whether the contenders are flat sources or document paths.
     nucleus::configuration_space_builder engine;
     REQUIRE(engine.register_schema("k"));
     nucleus::configuration_space space = engine.build();
 
-    nucleus::source_stack_options opts;
-    opts.argv = nucleus::argv_source_options{{"--k=from-argv"}};
-    opts.document_paths = {"p0", "p1", "p2", "p3", "p4"};
-    opts.make_document = make;
+    nucleus::env_source lower; lower.set("k", "from-lower");
+    nucleus::env_source higher; higher.set("k", "from-higher");
 
-    auto loaded = nucleus::load_configuration(space, opts);
+    // lower at stack[0] (rank 0), higher at stack[1] (rank 1): higher wins.
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{std::move(lower), std::move(higher)},
+        {});
     REQUIRE(loaded);
-    REQUIRE(loaded.value().get("k") == "from-argv");
-    REQUIRE(loaded.value().provenance_of("k")->layer == "argv");
+    REQUIRE(loaded.value().get("k") == "from-higher");
+    REQUIRE(loaded.value().provenance_of("k")->layer == "stack[1]");
 }
 
 TEST_CASE("the last config document wins among layered paths", "[resolution][precedence]")
 {
     // No argv: the last path in the list must still win over earlier ones even
     // though all documents past the base are clamped to the same band.
-    auto make = [](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
-        auto src = std::make_unique<nucleus::env_source>();
-        src->set("k", path);
-        return src;
+    auto make = [](const std::string &path) -> nucleus::source_handle {
+        nucleus::env_source src;
+        src.set("k", path);
+        return nucleus::source_handle(std::move(src));
     };
 
     nucleus::configuration_space_builder engine;
     REQUIRE(engine.register_schema("k"));
     nucleus::configuration_space space = engine.build();
 
-    nucleus::source_stack_options opts;
-    opts.document_paths = {"first", "second", "third", "fourth"};
-    opts.make_document = make;
-
-    auto loaded = nucleus::load_configuration(space, opts);
+    auto loaded = nucleus::load(space, nucleus::source_stack{},
+        nucleus::load_options{.document_paths = {"first", "second", "third", "fourth"},
+                              .make_document = make});
     REQUIRE(loaded);
     REQUIRE(loaded.value().get("k") == "fourth");
 }
