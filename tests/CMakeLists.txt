@@ -38,6 +38,8 @@ nucleus_add_test(facade_schema_test nucleus::runtime)
 nucleus_add_test(registry_isolation_test)
 nucleus_add_test(source_seam_test)
 nucleus_add_test(source_handle_test)
+nucleus_add_test(source_concept_test)
+nucleus_add_test(source_stack_test)
 nucleus_add_test(capability_gating_test)
 nucleus_add_test(capability_requirements_test)
 nucleus_add_test(auto_gating_test)
@@ -258,6 +260,20 @@ add_executable(entangling_ctor_fixture EXCLUDE_FROM_ALL
     isolation/entangling_ctor_fixture.cpp)
 target_link_libraries(entangling_ctor_fixture PRIVATE nucleus::nucleus)
 target_include_directories(entangling_ctor_fixture PRIVATE
+    ${CMAKE_SOURCE_DIR}/lib/core/src
+)
+
+add_test(
+    NAME source_concept_unsatisfied_compile
+    COMMAND ${CMAKE_COMMAND} --build . --target source_concept_unsatisfied_fixture --config $<CONFIG>
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+set_tests_properties(source_concept_unsatisfied_compile PROPERTIES WILL_FAIL TRUE)
+
+add_executable(source_concept_unsatisfied_fixture EXCLUDE_FROM_ALL
+    isolation/source_concept_unsatisfied_fixture.cpp)
+target_link_libraries(source_concept_unsatisfied_fixture PRIVATE nucleus::nucleus)
+target_include_directories(source_concept_unsatisfied_fixture PRIVATE
     ${CMAKE_SOURCE_DIR}/lib/core/src
 )
 
