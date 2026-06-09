@@ -1,3 +1,4 @@
+#include "nucleus/configuration_source/source_handle.h"
 #include "nucleus/configuration_source/configuration_source.h"
 
 #include "nucleus/keyspace/entry.h"
@@ -27,7 +28,7 @@ constexpr const char *kDocument = R"(<app>
 
 // Copies every entry's value out into an owned map, severing the dependency on
 // the document arena. This is the copy-out resolution performs at its boundary.
-std::map<std::string, std::string> copy_out(nucleus::configuration_source &src)
+std::map<std::string, std::string> copy_out(nucleus::source_handle &src)
 {
     auto pulled = src.pull();
     REQUIRE(pulled);
@@ -54,7 +55,8 @@ TEST_CASE("xml source values survive dropping the document arena", "[xml][lifeti
 {
     std::map<std::string, std::string> values;
     {
-        auto src = nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(kDocument));
+        nucleus::source_handle src{
+            nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(kDocument))};
         values = copy_out(src);
         // src and the pulled batch are destroyed at the end of this scope; the
         // pugixml document arena is freed here.
@@ -90,11 +92,11 @@ TEST_CASE("the xml source reports a parse failure rather than dangling", "[xml]"
 
 TEST_CASE("a document source reaches the engine only as a source", "[xml]")
 {
-    // The xml source is driven purely through the virtual source interface --
-    // the same path env and the fake parser use. The arena lives inside the
-    // batch's retained_buffer, invisible to this call site.
-    auto src = nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string("<root key=\"v\"/>"));
-    nucleus::configuration_source &as_source = src;
+    // The xml source is driven purely through the erased source_handle --
+    // the same path env and any other plain struct source uses. The arena lives
+    // inside the batch's retained_buffer, invisible to this call site.
+    nucleus::source_handle as_source{
+        nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string("<root key=\"v\"/>"))};
 
     auto pulled = as_source.pull();
     REQUIRE(pulled);

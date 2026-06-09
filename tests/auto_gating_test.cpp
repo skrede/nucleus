@@ -18,17 +18,17 @@ namespace {
 // A stub source declaring a capable descriptor (nesting/duplicate_keys/typed),
 // used as a custom base layer to prove a single capable layer satisfies a HARD
 // requirement that the always-present flat layers cannot (whole-stack union).
-class capable_source final : public nucleus::configuration_source
+// Plain struct satisfying the source concept by duck typing.
+struct capable_source
 {
-public:
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const override
+    [[nodiscard]] nucleus::capability_descriptor capabilities() const
     {
         return nucleus::capability_descriptor{nucleus::capability::nesting,
                                               nucleus::capability::duplicate_keys,
                                               nucleus::capability::typed_scalars};
     }
 
-    [[nodiscard]] nucleus::configuration_source_result pull() override
+    [[nodiscard]] nucleus::configuration_source_result pull()
     {
         return nucleus::configuration_source_batch{};
     }

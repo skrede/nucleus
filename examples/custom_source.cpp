@@ -1,13 +1,15 @@
-// custom_source: implement the `source` seam by subclassing it.
+// custom_source: implement the source seam with a plain struct -- no inheritance.
 //
-// A source declares its capabilities() and yields entries from pull(). This one
-// emits owned values, so it pins no buffer (retained_buffer::none()). Any source
-// -- argv, env, XML, or this -- reaches the engine through this one interface.
+// A source declares its capabilities() and yields entries from pull(). Any struct
+// satisfying those two members is a source: it flows through source_handle and into
+// the engine the same way argv, env, or xml does. This one emits owned values, so
+// it pins no buffer (retained_buffer::none()).
 
 #include "nucleus/configuration_space.h"
 
 #include "nucleus/capability.h"
 
+#include "nucleus/configuration_source/source_handle.h"
 #include "nucleus/configuration_source/configuration_source.h"
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
@@ -16,17 +18,17 @@
 
 namespace {
 
-// A source backed by an in-memory table. It owns its values, so views never
-// outlive a backing buffer and no retained_buffer is needed.
-class table_source final : public nucleus::configuration_source
+// A source backed by an in-memory table. No base class, no virtuals -- just the
+// two members the concept requires. It owns its values, so views never outlive a
+// backing buffer and no retained_buffer is needed.
+struct table_source
 {
-public:
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const override
+    [[nodiscard]] nucleus::capability_descriptor capabilities() const
     {
         return {nucleus::capability::nesting};
     }
 
-    [[nodiscard]] nucleus::configuration_source_result pull() override
+    [[nodiscard]] nucleus::configuration_source_result pull()
     {
         nucleus::configuration_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(

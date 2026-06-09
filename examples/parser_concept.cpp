@@ -1,19 +1,18 @@
-// parser_concept: satisfy the Parser concept with a plain struct -- no inheritance.
+// parser_concept: satisfy the source concept with a plain struct -- no inheritance.
 //
-// A type with capabilities() and pull() satisfies nucleus::Parser. adapt_parser
-// type-erases it into a `source`, so a value-type parser reaches the engine
-// through the SAME virtual path a hand-written subclass does.
+// Any struct with capabilities() and pull() satisfies nucleus::source_satisfies.
+// source_handle type-erases it into the engine so a plain-struct source reaches
+// the fold through the same erasure path any other source does.
 
 #include "nucleus/capability.h"
 
-#include "nucleus/configuration_source/parser.h"
+#include "nucleus/configuration_source/source_concept.h"
+#include "nucleus/configuration_source/source_handle.h"
 #include "nucleus/configuration_source/configuration_source.h"
-#include "nucleus/configuration_source/parser_adapter.h"
 
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
 
-#include <memory>
 #include <iostream>
 
 namespace {
@@ -26,7 +25,7 @@ struct table_parser
         return {nucleus::capability::ordering};
     }
 
-    [[nodiscard]] nucleus::configuration_source_result pull() const
+    [[nodiscard]] nucleus::configuration_source_result pull()
     {
         nucleus::configuration_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(
@@ -35,16 +34,16 @@ struct table_parser
     }
 };
 
-static_assert(nucleus::Parser<table_parser>,
-              "table_parser must satisfy the Parser concept");
+static_assert(nucleus::source_satisfies<table_parser>,
+              "table_parser must satisfy the source concept");
 
 }
 
 int main()
 {
-    std::unique_ptr<nucleus::configuration_source> source = nucleus::adapt_parser(table_parser{});
+    nucleus::source_handle source{table_parser{}};
 
-    auto pulled = source->pull();
+    auto pulled = source.pull();
     if(!pulled)
     {
         std::cerr << "pull failed: " << pulled.error() << '\n';

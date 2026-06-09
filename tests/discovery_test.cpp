@@ -1,5 +1,8 @@
 #include "nucleus/capability.h"
 
+#include "nucleus/configuration_source/parser.h"
+#include "nucleus/configuration_source/parser_adapter.h"
+#include "nucleus/configuration_source/source_concept.h"
 #include "nucleus/configuration_source/configuration_source.h"
 #include "nucleus/configuration_source/discovery.h"
 #include "nucleus/configuration_source/extension_registry.h"
@@ -21,17 +24,17 @@ namespace {
 
 // A trivial source that reports which file it was built from, so a test can
 // assert discovery wired the right factory to the right path.
-class labelled_source final : public nucleus::configuration_source
+// Plain struct satisfying the source concept by duck typing.
+struct labelled_source
 {
-public:
     explicit labelled_source(std::string label) : m_label(std::move(label)) {}
 
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const override
+    [[nodiscard]] nucleus::capability_descriptor capabilities() const
     {
         return {};
     }
 
-    [[nodiscard]] nucleus::configuration_source_result pull() override
+    [[nodiscard]] nucleus::configuration_source_result pull()
     {
         nucleus::configuration_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(
@@ -39,16 +42,18 @@ public:
         return batch;
     }
 
-private:
     std::string m_label;
 };
+
+static_assert(nucleus::source_satisfies<labelled_source>,
+              "labelled_source must satisfy the source concept");
 
 // A factory that tags the source it builds with the format name, so the test can
 // see which parser claimed the discovered file.
 nucleus::parser_factory tagging_factory(std::string format)
 {
     return [format](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
-        return std::make_unique<labelled_source>(format + ":" + path);
+        return nucleus::adapt_parser(labelled_source(format + ":" + path));
     };
 }
 

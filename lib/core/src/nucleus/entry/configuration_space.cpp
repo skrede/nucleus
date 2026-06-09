@@ -485,14 +485,11 @@ load_result load_configuration(const configuration_space &space, const source_st
     // identical to the pre-refactor behavior.
     std::vector<resolution_context::layered_handle> handles;
 
-    // Env source: owned here, handle borrows it.
-    std::optional<env_source> env_src;
+    // Env source: owned here, wrapped directly into source_handle.
     source_stack env_stack;
     if(options.env)
     {
-        env_src.emplace(options.env->entries);
-        env_stack.push_back(source_handle(source_ptr_adapter{
-            std::make_unique<env_source>(options.env->entries)}));
+        env_stack.push_back(source_handle(env_source{options.env->entries}));
         handles.push_back({&env_stack.layers()[0],
                            static_cast<std::size_t>(layer_rank::env), "env", {}});
     }
@@ -512,22 +509,22 @@ load_result load_configuration(const configuration_space &space, const source_st
                                nucleus::format("path:{}", entries[i].path), {}});
     }
 
-    // Argv source: owned here, handle borrows it.
+    // Argv source: built as a value, configured in place, then moved into a handle.
     source_stack argv_stack;
     if(options.argv)
     {
-        auto argv_src = std::make_unique<argv_source>(options.argv->args);
-        argv_src->policy(options.argv->policy);
+        argv_source argv_src(options.argv->args);
+        argv_src.policy(options.argv->policy);
         if(options.argv->log != nullptr)
-            argv_src->log_to(*options.argv->log);
+            argv_src.log_to(*options.argv->log);
         if(options.argv->recognize_against_schema)
         {
             // The recognizer bridges to the schema surface; it captures the const
             // schema registry by reference and lives only for this load call.
             const schema_registry &schema = state.schema;
-            argv_src->recognize_with([&schema](const key_path &path) { return schema.recognizes(path); });
+            argv_src.recognize_with([&schema](const key_path &path) { return schema.recognizes(path); });
         }
-        argv_stack.push_back(source_handle(source_ptr_adapter{std::move(argv_src)}));
+        argv_stack.push_back(source_handle(std::move(argv_src)));
         handles.push_back({&argv_stack.layers()[0],
                            static_cast<std::size_t>(layer_rank::argv), "argv", {}});
     }
@@ -582,8 +579,7 @@ gate_result check_capabilities(const configuration_space &space, const source_st
     source_stack env_stack;
     if(options.env)
     {
-        env_stack.push_back(source_handle(source_ptr_adapter{
-            std::make_unique<env_source>(options.env->entries)}));
+        env_stack.push_back(source_handle(env_source{options.env->entries}));
         handles.push_back({&env_stack.layers()[0],
                            static_cast<std::size_t>(layer_rank::env), "env", {}});
     }
@@ -605,11 +601,11 @@ gate_result check_capabilities(const configuration_space &space, const source_st
     source_stack argv_stack;
     if(options.argv)
     {
-        auto argv_src = std::make_unique<argv_source>(options.argv->args);
-        argv_src->policy(options.argv->policy);
+        argv_source argv_src(options.argv->args);
+        argv_src.policy(options.argv->policy);
         if(options.argv->log != nullptr)
-            argv_src->log_to(*options.argv->log);
-        argv_stack.push_back(source_handle(source_ptr_adapter{std::move(argv_src)}));
+            argv_src.log_to(*options.argv->log);
+        argv_stack.push_back(source_handle(std::move(argv_src)));
         handles.push_back({&argv_stack.layers()[0],
                            static_cast<std::size_t>(layer_rank::argv), "argv", {}});
     }

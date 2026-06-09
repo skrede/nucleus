@@ -250,25 +250,17 @@ TEST_CASE("install_tokenizer injects an additional tokenizer reachable at resolv
 
 TEST_CASE("tokens are expanded per-source before layering (expand-then-layer)", "[resolution][tokens]")
 {
-    // Driven at the keystone directly so a real tokenizer registry is in scope:
-    // the borrowed registries are built independently and meet only through the
-    // transient borrowing context.
-    nucleus::schema_registry schema;
-    nucleus::tokenizer_registry tokenizer;
-    tokenizer.add(nucleus::make_string_tokenizer(), nucleus::owner_token{});
-    nucleus::converter_registry converters;
+    // A single env source carrying one token and one plain value: the token must
+    // be expanded at fold time so the frozen configuration holds the resolved form.
+    nucleus::configuration_space space = nucleus::configuration_space_builder{}.build();
 
     nucleus::env_source env;
     env.set("loud", "${string.upper(hi)}").set("plain", "kept");
 
-    nucleus::configuration_source_stack stack;
-    stack.add(env, std::size_t{2}, "base");
+    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(env)}, {});
+    REQUIRE(loaded);
 
-    nucleus::resolution_context ctx(schema, tokenizer, converters);
-    auto folded = ctx.fold(stack);
-    REQUIRE(folded);
-
-    nucleus::configuration config = ctx.freeze();
+    const nucleus::configuration &config = loaded.value();
     // The token expanded at read time; the layered value is already resolved.
     REQUIRE(config.get("loud") == "HI");
     REQUIRE(config.get("plain") == "kept");

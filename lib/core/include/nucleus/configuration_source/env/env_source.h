@@ -30,7 +30,9 @@ namespace nucleus {
 // pairs. The host decides which environment variables map to which key paths and
 // how names are translated -- the core never reads the process environment on
 // its own or imposes a naming convention.
-class env_source final : public configuration_source
+//
+// Plain struct satisfying the source concept by duck typing.
+class env_source final
 {
 public:
     env_source() = default;
@@ -53,12 +55,12 @@ public:
         return capability_descriptor{};
     }
 
-    [[nodiscard]] capability_descriptor capabilities() const override
+    [[nodiscard]] capability_descriptor capabilities() const
     {
         return descriptor();
     }
 
-    [[nodiscard]] configuration_source_result pull() override
+    [[nodiscard]] configuration_source_result pull()
     {
         configuration_source_batch batch;
         batch.entries.reserve(m_entries.size());

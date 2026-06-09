@@ -22,7 +22,9 @@ namespace nucleus {
 // and typed data. The per-entry values carry no capability flags, so the fold result
 // is identical to env's; only the gate-visible source descriptor differs, which lets
 // the auto-gate admit a nested/repeated schema fed programmatically.
-class runtime_source final : public configuration_source
+//
+// Plain struct satisfying the source concept by duck typing.
+class runtime_source final
 {
 public:
     runtime_source() = default;
@@ -38,14 +40,14 @@ public:
         return *this;
     }
 
-    [[nodiscard]] capability_descriptor capabilities() const override
+    [[nodiscard]] capability_descriptor capabilities() const
     {
         return capability_descriptor{capability::nesting,
                                      capability::duplicate_keys,
                                      capability::typed_scalars};
     }
 
-    [[nodiscard]] configuration_source_result pull() override
+    [[nodiscard]] configuration_source_result pull()
     {
         configuration_source_batch batch;
         batch.entries.reserve(m_entries.size());

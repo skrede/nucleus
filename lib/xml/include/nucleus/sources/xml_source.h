@@ -1,7 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_SOURCES_XML_SOURCE_H
 #define HPP_GUARD_NUCLEUS_SOURCES_XML_SOURCE_H
 
-#include "nucleus/configuration_source/document_source.h"
+#include "nucleus/configuration_source/configuration_source.h"
 #include "nucleus/configuration_source/inherit_declaration.h"
 
 #include "nucleus/schema/projection.h"
@@ -47,14 +47,16 @@ struct xml_source_options
 // A document source backed by pugixml. It walks the parsed tree into keyspace
 // entries: nested elements become `/`-separated key paths, and an element's
 // attributes and pure-text leaf children become values. Every value is a VIEW
-// into the document arena (the pugixml pool), and the returned batch pins that
-// arena in its retained_buffer so the views stay valid until resolution copies
-// them out.
+// into the document arena (the pugixml pool), and the batch returned by pull()
+// MUST carry, in its retained_buffer, ownership of the arena its view-values
+// point into. Resolution copies values out and only then drops the batch; until
+// then the arena is pinned. A document source that returned views without pinning
+// the arena would dangle the instant the batch outlived the parser.
 //
-// This is the ONLY place pugixml is reachable. The class is a normal
-// document_source; nothing of pugixml appears in its interface, so the core never
-// sees it.
-class xml_source final : public document_source
+// This is the ONLY place pugixml is reachable; nothing of pugixml appears in the
+// interface, so the core never sees it. Plain struct satisfying the source concept
+// by duck typing (source_satisfies + projects_source + inheriting_source).
+class xml_source final
 {
 public:
     // Builds an xml_source from a value-semantics options struct: parse from an
@@ -66,14 +68,14 @@ public:
         return xml_source(k, std::move(options.data));
     }
 
-    [[nodiscard]] capability_descriptor capabilities() const override;
+    [[nodiscard]] capability_descriptor capabilities() const;
 
-    [[nodiscard]] configuration_source_result pull() override;
+    [[nodiscard]] configuration_source_result pull();
 
     // Retains the schema-derived projection the resolve fold hands over before
     // pull(), so the walk can render repeatable keyed containers (one instance
     // per primary-key value) instead of collapsing repeated siblings last-wins.
-    void apply_projection(const schema_projection &projection) override
+    void apply_projection(const schema_projection &projection)
     {
         m_projection = projection;
     }
@@ -81,7 +83,7 @@ public:
     // Returns the inheritance declaration read from the document root's inherit=
     // attribute. Callable after pull(); returns inherit_default when pull() has
     // not been called yet or the document root has no inherit= attribute.
-    [[nodiscard]] inherit_declaration inheritance() const override;
+    [[nodiscard]] inherit_declaration inheritance() const;
 
 private:
     enum class kind

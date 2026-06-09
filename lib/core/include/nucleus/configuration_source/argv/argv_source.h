@@ -39,8 +39,8 @@ enum class unknown_key_policy
 using key_recognizer = std::function<bool(const key_path &)>;
 
 // The argv source: maps `--a-b-c=v` flags onto the SAME keyspace every other
-// source feeds, GOING THROUGH the runtime-virtual `source` seam (it is a
-// non-document source emitting entries directly -- not a bespoke parallel path).
+// source feeds (it is a non-document source emitting entries directly -- not a
+// bespoke parallel path).
 //
 // Pull does two things in order, mirroring the locked design:
 //   1. Syntactic mapping  -- normalize_arg turns each token into a (path, value)
@@ -54,7 +54,9 @@ using key_recognizer = std::function<bool(const key_path &)>;
 // nesting structure of its own -- the hierarchy comes from the path), carries no
 // typed scalars, comments, or ordering guarantees. Like env, that makes it a real
 // exerciser of feature degradation rather than a source that claims everything.
-class argv_source final : public configuration_source
+//
+// Plain struct satisfying the source concept by duck typing.
+class argv_source final
 {
 public:
     argv_source() = default;
@@ -90,12 +92,12 @@ public:
         return capability_descriptor{};
     }
 
-    [[nodiscard]] capability_descriptor capabilities() const override
+    [[nodiscard]] capability_descriptor capabilities() const
     {
         return descriptor();
     }
 
-    [[nodiscard]] configuration_source_result pull() override
+    [[nodiscard]] configuration_source_result pull()
     {
         configuration_source_batch batch;
         batch.entries.reserve(m_args.size());
