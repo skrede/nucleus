@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_NUCLEUS_XML_XML_SOURCE_H
-#define HPP_GUARD_NUCLEUS_XML_XML_SOURCE_H
+#ifndef HPP_GUARD_NUCLEUS_SOURCES_XML_SOURCE_H
+#define HPP_GUARD_NUCLEUS_SOURCES_XML_SOURCE_H
 
 #include "nucleus/configuration_source/document_source.h"
 #include "nucleus/configuration_source/inherit_declaration.h"

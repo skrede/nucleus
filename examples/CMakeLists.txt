@@ -30,45 +30,39 @@ nucleus_add_example(registration_policy)
 nucleus_add_example(capability_gating)
 
 # The XML example layers an XML document under the command line, so it links the
-# XML source module. That module's header lives under the internal src/ tree (the
-# one place pugixml is reachable), so the example adds src/ to its include path --
-# the same way the buffer-lifetime test reaches it. Built only when the XML
-# module is.
+# xml module (nucleus::xml). Its public adapter headers under nucleus/sources/
+# arrive via that link; pugixml stays private inside lib/xml. Built only when the
+# XML module is.
 if(NUCLEUS_BUILD_SOURCE_XML)
-    # Template emission lives in the xml module (nucleus::xml::emit_template), so the
-    # example links it and reaches its header under the internal src/ tree.
+    # Template emission lives in the xml module (nucleus::xml::emit_template); the
+    # example links it and its header arrives via the nucleus::xml link.
     add_executable(emit_template emit_template.cpp)
     target_link_libraries(emit_template PRIVATE nucleus::nucleus nucleus::source_xml)
     target_include_directories(emit_template PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
-        ${CMAKE_SOURCE_DIR}/src
     )
 
     add_executable(xml xml.cpp)
     target_link_libraries(xml PRIVATE nucleus::nucleus nucleus::source_xml)
     target_include_directories(xml PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
-        ${CMAKE_SOURCE_DIR}/src
     )
 
     add_executable(strains strains.cpp)
     target_link_libraries(strains PRIVATE nucleus::nucleus nucleus::source_xml)
     target_include_directories(strains PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
-        ${CMAKE_SOURCE_DIR}/src
     )
 
     add_executable(typed typed.cpp)
     target_link_libraries(typed PRIVATE nucleus::nucleus nucleus::source_xml)
     target_include_directories(typed PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
-        ${CMAKE_SOURCE_DIR}/src
     )
 
     add_executable(xml_persist xml_persist.cpp)
     target_link_libraries(xml_persist PRIVATE nucleus::nucleus nucleus::source_xml)
     target_include_directories(xml_persist PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
-        ${CMAKE_SOURCE_DIR}/src
     )
 endif()

@@ -59,88 +59,32 @@ if(NOT NUCLEUS_HAVE_STD_FORMAT)
     set(NUCLEUS_FMT_REQUIRED TRUE)
 endif()
 
+# Whether the XML module (and thus its pugixml dependency) is built and installed.
+# The module lives in lib/xml and flips this via PARENT_SCOPE when built; the
+# package config consumes it to decide whether to find_dependency(pugixml).
+option(NUCLEUS_BUILD_SOURCE_XML "Build the XML source module (fetches pugixml)" ON)
+set(NUCLEUS_XML_INSTALLED FALSE)
+
 # ---------------------------------------------------------------------------
 # Per-target library tree
 #
-# lib/ stands up each module (core first; xml/env/args/runtime follow) behind one
+# lib/ stands up each module (core, then the format modules) behind one
 # nucleus_add_module() helper. core's EXPORT_NAME is nucleus, so the installed
-# export keeps defining nucleus::nucleus for existing consumers.
+# export keeps defining nucleus::nucleus for existing consumers. The format
+# modules (xml today; env/args/runtime next) link core but core cannot see them.
 # ---------------------------------------------------------------------------
 add_subdirectory(lib)
 
 # ---------------------------------------------------------------------------
 # Install / export
 # ---------------------------------------------------------------------------
-# Whether the XML module (and thus its pugixml dependency) is part of this
-# install. Defaults off; set TRUE when the module is built+installed below. The
-# package config consumes it to decide whether to find_dependency(pugixml).
-set(NUCLEUS_XML_INSTALLED FALSE)
-
 # The single export set; each module joined it via nucleus_add_module(). Generated
-# once here so it sees every installed target (core + any format modules below).
+# once here so it sees every installed target (core + any format modules).
 install(EXPORT nucleus-targets
     FILE nucleus-targets.cmake
     NAMESPACE nucleus::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/nucleus
 )
-
-# ---------------------------------------------------------------------------
-# XML source module
-#
-# A separate target that wraps pugixml. pugixml is PRIVATE-linked here and is
-# reachable from nowhere else: the core library has zero parser dependencies, so
-# adopters who never use XML never pull pugixml. The module is built only when
-# requested (default ON for the test build; adopters opt in). It links the core
-# PUBLICly because its public header is a core document_source, and pugixml
-# PRIVATELY so the dependency never leaks through the link interface.
-# ---------------------------------------------------------------------------
-option(NUCLEUS_BUILD_SOURCE_XML "Build the XML source module (fetches pugixml)" ON)
-
-if(NUCLEUS_BUILD_SOURCE_XML)
-    include(FetchContent)
-    FetchContent_Declare(
-        pugixml
-        GIT_REPOSITORY https://github.com/zeux/pugixml.git
-        GIT_TAG v1.15
-        FIND_PACKAGE_ARGS NAMES pugixml
-    )
-    FetchContent_MakeAvailable(pugixml)
-
-    add_library(nucleus_source_xml
-        src/nucleus/xml/xml_source.cpp
-        src/nucleus/xml/xml_emitter.cpp
-    )
-    add_library(nucleus::source_xml ALIAS nucleus_source_xml)
-    nucleus_enable_coverage(nucleus_source_xml)
-
-    target_compile_features(nucleus_source_xml PUBLIC cxx_std_20)
-    target_include_directories(nucleus_source_xml
-        PUBLIC
-            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-        PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/src
-    )
-    target_link_libraries(nucleus_source_xml
-        PUBLIC nucleus::nucleus
-        PRIVATE pugixml::pugixml
-    )
-
-    # Match the imported target name to the in-tree alias (nucleus::source_xml).
-    # Without this the NAMESPACE-prefixed export yields nucleus::nucleus_source_xml.
-    set_target_properties(nucleus_source_xml PROPERTIES EXPORT_NAME source_xml)
-
-    install(TARGETS nucleus_source_xml
-        EXPORT nucleus-targets
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    )
-
-    # The installed export carries $<LINK_ONLY:pugixml::pugixml> from this
-    # static module, so the package config must require pugixml. Recorded here
-    # and consumed by the config template below.
-    set(NUCLEUS_XML_INSTALLED TRUE)
-endif()
 
 # ---------------------------------------------------------------------------
 # Package config

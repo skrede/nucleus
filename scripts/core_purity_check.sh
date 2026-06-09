@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Core-purity grep for CI. The core must be domain-neutral and format-agnostic:
 # no XML / pugixml coupling and no host vocabulary leaking into it. Parser
-# dependencies live only inside their own source modules (e.g. a future
-# src/nucleus/xml/), never in core. This script greps the public headers and
-# core implementation for forbidden symbols and exits nonzero on any hit.
+# dependencies live only inside their own per-target modules (e.g. lib/xml/),
+# never in core. This script greps the relocated core headers and implementation
+# for forbidden symbols and exits nonzero on any hit.
 #
 # A CMake-script equivalent (scripts/core_purity_check.cmake) is wired as a
 # CTest gate; this shell wrapper is for CI pipelines that grep directly.
@@ -18,9 +18,9 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 pattern='xml|pugi|<vagus>|<node>|\bvagus\b'
 
 # The quarantined module that is ALLOWED to mention parser/host vocabulary
-# because it IS the wrapper (does not exist yet; excluded so the gate stays
-# correct once the xml source module lands).
-quarantine='src/nucleus/xml/'
+# because it IS the wrapper: the xml format module (lib/xml/). It lives outside
+# lib/core, so it is not even scanned here; this exclusion is belt-and-suspenders.
+quarantine='lib/xml/'
 
 hits="$(grep -rinE "$pattern" \
         "$root/lib/core/include/nucleus" "$root/lib/core/src/nucleus" 2>/dev/null \

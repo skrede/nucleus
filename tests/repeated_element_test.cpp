@@ -16,7 +16,7 @@
 
 #include "nucleus/configuration_source/runtime/runtime_source.h"
 
-#include "nucleus/xml/xml_source.h"
+#include "nucleus/sources/xml_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 

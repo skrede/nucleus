@@ -1,5 +1,5 @@
 #include "xml_reader.h"
-#include "xml_source.h"
+#include "nucleus/sources/xml_source.h"
 
 #include "nucleus/format.h"
 #include "nucleus/capability.h"

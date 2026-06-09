@@ -10,7 +10,7 @@
 #include "nucleus/configuration_source/env/env_emitter.h"
 #include "nucleus/configuration_source/argv/argv_emitter.h"
 
-#include "nucleus/xml/xml_emitter.h"
+#include "nucleus/sources/xml_emitter.h"
 
 #include <catch2/catch_test_macros.hpp>
 

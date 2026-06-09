@@ -86,3 +86,31 @@ set_target_properties(nucleus_core PROPERTIES VERSION ${PROJECT_VERSION})
 if(NOT NUCLEUS_HAVE_STD_FORMAT)
     target_link_libraries(nucleus_core PUBLIC fmt::fmt)
 endif()
+
+# xml: a format module that wraps pugixml. pugixml is PRIVATE-linked and reachable
+# only inside lib/xml/src, so core (which cannot even see this target) never pulls
+# it. Public adapter headers live under nucleus/sources/. nucleus::source_xml is a
+# back-compat alias for the in-tree consumers. Built on demand.
+if(NUCLEUS_BUILD_SOURCE_XML)
+    include(FetchContent)
+    FetchContent_Declare(
+        pugixml
+        GIT_REPOSITORY https://github.com/zeux/pugixml.git
+        GIT_TAG v1.15
+        FIND_PACKAGE_ARGS NAMES pugixml
+    )
+    FetchContent_MakeAvailable(pugixml)
+
+    nucleus_add_module(xml
+        TYPE STATIC
+        EXPORT_NAME xml
+        ALIASES nucleus::xml nucleus::source_xml
+        SOURCES
+            xml/src/nucleus/xml/xml_source.cpp
+            xml/src/nucleus/xml/xml_emitter.cpp
+        LINK_PUBLIC nucleus::nucleus
+        LINK_PRIVATE pugixml::pugixml)
+
+    # The package config (root scope) requires pugixml when the module is installed.
+    set(NUCLEUS_XML_INSTALLED TRUE PARENT_SCOPE)
+endif()

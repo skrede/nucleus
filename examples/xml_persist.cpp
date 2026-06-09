@@ -12,8 +12,8 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/xml/xml_source.h"
-#include "nucleus/xml/xml_emitter.h"
+#include "nucleus/sources/xml_source.h"
+#include "nucleus/sources/xml_emitter.h"
 
 #include <memory>
 #include <string>

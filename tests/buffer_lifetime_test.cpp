@@ -3,7 +3,7 @@
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
 
-#include "nucleus/xml/xml_source.h"
+#include "nucleus/sources/xml_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 

@@ -2,9 +2,9 @@
 #
 # The core must be domain-neutral and format-agnostic: no XML / pugixml coupling
 # and no host vocabulary leaking into it. Parser dependencies live only inside
-# their own source modules (e.g. a future src/nucleus/xml/), never in core. This
-# script greps the public headers and core implementation for forbidden symbols
-# and fails (nonzero exit) on any hit. Run as a CTest gate.
+# their own per-target modules (e.g. lib/xml/), never in core. This script greps
+# the relocated core headers and implementation for forbidden symbols and fails
+# (nonzero exit) on any hit. Run as a CTest gate.
 #
 # Invoke: cmake -DNUCLEUS_ROOT=<repo> -P scripts/core_purity_check.cmake
 
@@ -21,13 +21,13 @@ endif()
 set(forbidden "xml" "pugi" "vagus" "<vagus>" "<node>")
 
 # Directories that are allowed to mention parser/host vocabulary because they ARE
-# the quarantined module: the xml source module (src/nucleus/xml/) now exists and
-# wraps pugixml privately. It is excluded so the gate stays correct while the rest
-# of core remains format/host-neutral. Paths are normalized to absolute real
-# paths so the exclusion holds however NUCLEUS_ROOT was passed (absolute, ".",
-# or with embedded "/./" segments).
+# the quarantined module: the xml format module (lib/xml/) wraps pugixml privately.
+# It lives outside lib/core entirely, so it is not even scanned here; this exclusion
+# is belt-and-suspenders. Paths are normalized to absolute real paths so the
+# exclusion holds however NUCLEUS_ROOT was passed (absolute, ".", or with embedded
+# "/./" segments).
 get_filename_component(quarantined_xml_dir
-    "${NUCLEUS_ROOT}/src/nucleus/xml" REALPATH)
+    "${NUCLEUS_ROOT}/lib/xml" REALPATH)
 set(quarantined_dirs "${quarantined_xml_dir}")
 
 file(GLOB_RECURSE core_files

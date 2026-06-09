@@ -8,7 +8,7 @@
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/converters.h"
 
-#include "nucleus/xml/xml_source.h"
+#include "nucleus/sources/xml_source.h"
 
 #include <any>
 #include <memory>

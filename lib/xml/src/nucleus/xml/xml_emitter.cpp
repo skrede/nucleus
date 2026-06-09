@@ -1,4 +1,4 @@
-#include "xml_emitter.h"
+#include "nucleus/sources/xml_emitter.h"
 
 #include "nucleus/config_emitter.h"
 #include "nucleus/configuration_space.h"

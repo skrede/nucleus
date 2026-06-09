@@ -10,7 +10,7 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/xml/xml_source.h"
+#include "nucleus/sources/xml_source.h"
 
 #include <memory>
 #include <vector>

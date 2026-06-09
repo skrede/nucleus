@@ -1,6 +1,6 @@
 #include "nucleus/configuration_space.h"
 
-#include "nucleus/xml/xml_source.h"
+#include "nucleus/sources/xml_source.h"
 
 #include "nucleus/entry/precedence.h"
 #include "nucleus/entry/configuration.h"
