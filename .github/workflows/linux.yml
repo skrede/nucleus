@@ -7,12 +7,14 @@ on:
       - "**.md"
       - "docs/**"
       - ".planning/**"
+      - ".gitignore"
   pull_request:
     branches: [ master ]
     paths-ignore:
       - "**.md"
       - "docs/**"
       - ".planning/**"
+      - ".gitignore"
   workflow_dispatch:
 
 jobs:
