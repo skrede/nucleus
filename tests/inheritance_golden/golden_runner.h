@@ -125,18 +125,23 @@ inline std::optional<std::string> diff(const std::string &expected, const std::s
     auto split = [](const std::string &text) {
         std::vector<std::string> lines;
         std::string current;
+        // Tolerate CRLF: strip a trailing '\r' so a golden file checked out with
+        // Windows line endings still compares equal to the LF-serialized actual.
+        const auto flush = [&] {
+            if(!current.empty() && current.back() == '\r')
+                current.pop_back();
+            lines.push_back(current);
+            current.clear();
+        };
         for(const char c : text)
         {
             if(c == '\n')
-            {
-                lines.push_back(current);
-                current.clear();
-            }
+                flush();
             else
                 current.push_back(c);
         }
         if(!current.empty())
-            lines.push_back(current);
+            flush();
         return lines;
     };
 

@@ -1,0 +1,5 @@
+# Golden inheritance fixtures must check out with LF on every platform so the
+# resolved-keyspace diff is byte-identical; Windows CRLF would otherwise append a
+# trailing carriage return to each expected line and break the line-by-line compare.
+tests/inheritance_golden/**/expected.txt text eol=lf
+tests/inheritance_golden/**/*.xml        text eol=lf
