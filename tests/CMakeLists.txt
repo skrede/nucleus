@@ -87,6 +87,18 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     )
     add_test(NAME xml_template_test COMMAND xml_template_test)
 
+    # The emit-seam proof builds all three emitters (env, args, xml) from one space,
+    # so it links the xml module and reaches its header under the internal src/.
+    add_executable(emit_seam_test emit_seam_test.cpp)
+    nucleus_enable_coverage(emit_seam_test)
+    target_link_libraries(emit_seam_test
+        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+    target_include_directories(emit_seam_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+    )
+    add_test(NAME emit_seam_test COMMAND emit_seam_test)
+
     add_executable(buffer_lifetime_test buffer_lifetime_test.cpp)
     nucleus_enable_coverage(buffer_lifetime_test)
     target_link_libraries(buffer_lifetime_test
