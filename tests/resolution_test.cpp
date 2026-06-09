@@ -1,15 +1,7 @@
 #include "nucleus/configuration_space.h"
 #include "nucleus/identity.h"
 
-#include "nucleus/entry/precedence.h"
-#include "nucleus/entry/resolution_context.h"
-
 #include "nucleus/configuration_source/env/env_source.h"
-
-#include "nucleus/schema/schema_registry.h"
-
-#include "nucleus/configuration_source/configuration_source_registry.h"
-
 #include "nucleus/configuration_source/argv/argv_source.h"
 
 #include "nucleus/tokenizer/tokenizer_builder.h"

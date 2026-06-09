@@ -33,7 +33,7 @@ struct handwritten_source
     }
 };
 
-static_assert(nucleus::source_satisfies<handwritten_source>,
+static_assert(nucleus::configuration_source<handwritten_source>,
               "handwritten_source must satisfy the source concept");
 
 // A second plain struct source: a different author, different capabilities and
@@ -55,7 +55,7 @@ struct ordering_source
     }
 };
 
-static_assert(nucleus::source_satisfies<ordering_source>,
+static_assert(nucleus::configuration_source<ordering_source>,
               "ordering_source must satisfy the source concept");
 
 // Drives any erased source through source_handle -- it cannot see whether the

@@ -163,33 +163,32 @@ parser holding an arena. The shipped XML source does -- see
 
 ---
 
-<a id="parser"></a>
-## `Parser` — the compile-time parser concept
+<a id="configuration_source_concept"></a>
+## `configuration_source` — the compile-time source concept
 
-`#include "nucleus/source/parser.h"`
+`#include "nucleus/configuration_source/source_concept.h"`
 
-The format-neutral authoring path that needs no inheritance. Any type with the
-two members satisfies the concept and can be type-erased into a `source` via
-[`adapt_parser`](api-implementations.md#parser_adapter).
+Any plain struct with the two required members satisfies the concept and can be
+type-erased into a `source_handle` via the `source_handle` constructor.
 
 ```cpp
-template <typename T>
-concept Parser = requires(T parser) {
-    { parser.capabilities() } -> std::convertible_to<capability_descriptor>;
-    { parser.pull() }         -> std::convertible_to<source_result>;
+template <typename S>
+concept configuration_source = requires(S s) {
+    { s.capabilities() } -> std::convertible_to<capability_descriptor>;
+    { s.pull() }         -> std::convertible_to<configuration_source_result>;
 };
 ```
 
 ```cpp
-struct table_parser {
+struct table_source {
     capability_descriptor capabilities() const { return {capability::ordering}; }
-    source_result pull() const { /* ... */ }
+    configuration_source_result pull() { /* ... */ }
 };
-static_assert(nucleus::Parser<table_parser>);
+static_assert(nucleus::configuration_source<table_source>);
 ```
 
-Two authoring paths, one runtime seam: a hand-written `source` subclass and a
-concept-satisfying struct both reach the engine as `source&`. See
+A plain struct is type-erased into a `source_handle` and reaches the engine through
+the same fold path as any other source. See
 [`examples/parser_concept.cpp`](../examples/parser_concept.cpp).
 
 ---
@@ -276,7 +275,7 @@ gate_result gate_features(std::string_view consumer, std::string_view source_nam
                           log_sink &log);
 ```
 
-`load_configuration` runs this gate automatically: it derives the schema's
+`load` runs this gate automatically: it derives the schema's
 capability requirements from element shape and gates the assembled source stack
 (whole-stack union -- a hard capability is satisfied when ANY layer provides it)
 before folding, so a hard shortfall is a loud named error and a soft one degrades
@@ -388,15 +387,16 @@ The host-injectable policy installed via
 
 ```cpp
 struct inherit_policy {
-    std::function<std::string(const source &)> admissibility;
+    std::function<std::string(capability_descriptor)> admissibility;
     std::size_t depth_cap = 16;
 };
 ```
 
 - `admissibility` -- invoked for each candidate parent source after it is pulled
-  (not for the top-level requested source). A non-empty return value rejects that
-  parent and fails the load with the returned string as the error. An empty return
-  admits the source. A null admissibility callback (the default) admits all sources.
+  (not for the top-level requested source). The callback receives the candidate's
+  `capability_descriptor`. A non-empty return value rejects that parent and fails the
+  load with the returned string as the error. An empty return admits the source.
+  A null admissibility callback (the default) admits all sources.
 - `depth_cap` -- the maximum inheritance chain depth before the walker fails with
   a loud error. Default is 16.
 

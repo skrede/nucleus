@@ -6,8 +6,6 @@
 
 #include "nucleus/registry/flat_registry.h"
 
-#include "nucleus/configuration_source/configuration_source_registry.h"
-
 #include "nucleus/tokenizer/tokenizer_registry.h"
 
 namespace {

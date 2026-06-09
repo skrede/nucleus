@@ -23,7 +23,7 @@
 
 namespace {
 
-// A host policy that records every reviewed registration and rejects sources
+// A host policy that records every reviewed registration and rejects tokenizers
 // whose review it is configured to refuse -- proving the seam can intercept.
 class recording_policy final : public nucleus::registration_policy
 {
@@ -31,18 +31,18 @@ public:
     nucleus::policy_verdict review(const nucleus::registration_request &request) override
     {
         seen.push_back(request.kind);
-        if(request.kind == nucleus::registration_kind::configuration_source && reject_sources)
-            return nucleus::policy_verdict::reject("sources are reserved by the host");
+        if(request.kind == nucleus::registration_kind::tokenizer && reject_tokenizers)
+            return nucleus::policy_verdict::reject("tokenizers are reserved by the host");
         return nucleus::policy_verdict::accept();
     }
 
     std::vector<nucleus::registration_kind> seen;
-    bool reject_sources = false;
+    bool reject_tokenizers = false;
 };
 
 }
 
-TEST_CASE("the facade accepts registrations on all three surfaces", "[facade]")
+TEST_CASE("the facade accepts registrations on all surfaces", "[facade]")
 {
     nucleus::configuration_space_builder engine;
 
@@ -53,11 +53,9 @@ TEST_CASE("the facade accepts registrations on all three surfaces", "[facade]")
 
     REQUIRE(engine.register_schema("logging/level"));
     REQUIRE(engine.register_tokenizer("custom"));
-    REQUIRE(engine.register_source("argv"));
 
     REQUIRE(engine.schema_count() == 1);
     REQUIRE(engine.tokenizer_count() == builtin_tokenizers + 1);
-    REQUIRE(engine.source_count() == 1);
 }
 
 TEST_CASE("each registration carries an opaque owner token", "[facade]")
@@ -67,32 +65,31 @@ TEST_CASE("each registration carries an opaque owner token", "[facade]")
     nucleus::owner_token host_b(42);
 
     REQUIRE(engine.register_schema("a/b", host_a));
-    REQUIRE(engine.register_source("env", host_b));
+    REQUIRE(engine.register_tokenizer("env-extra", host_b));
     REQUIRE(engine.schema_count() == 1);
-    REQUIRE(engine.source_count() == 1);
+    REQUIRE(engine.tokenizer_count() >= 3); // 2 builtins + 1 registered
 }
 
 TEST_CASE("the registration-policy seam can intercept a registration", "[facade]")
 {
     auto policy = std::make_shared<recording_policy>();
-    policy->reject_sources = true;
+    policy->reject_tokenizers = true;
 
     nucleus::configuration_space_builder engine;
     engine.set_registration_policy(policy);
 
     REQUIRE(engine.register_schema("a"));
-    auto rejected = engine.register_source("argv");
+    auto rejected = engine.register_tokenizer("custom");
     REQUIRE_FALSE(rejected);
-    REQUIRE(rejected.error() == "sources are reserved by the host");
+    REQUIRE(rejected.error() == "tokenizers are reserved by the host");
 
-    // The schema registration committed; the source registration did not.
+    // The schema registration committed; the tokenizer registration did not.
     REQUIRE(engine.schema_count() == 1);
-    REQUIRE(engine.source_count() == 0);
 
     // The policy saw both reviews before either committed.
     REQUIRE(policy->seen.size() == 2);
     REQUIRE(policy->seen[0] == nucleus::registration_kind::schema);
-    REQUIRE(policy->seen[1] == nucleus::registration_kind::configuration_source);
+    REQUIRE(policy->seen[1] == nucleus::registration_kind::tokenizer);
 }
 
 TEST_CASE("two registrations claiming the same key path surface a non-adjudicating conflict",
@@ -178,13 +175,14 @@ TEST_CASE("the per-source capability gate applies the loud/quiet contract", "[fa
 TEST_CASE("clearing the policy restores accept-all behavior", "[facade]")
 {
     auto policy = std::make_shared<recording_policy>();
-    policy->reject_sources = true;
+    policy->reject_tokenizers = true;
 
     nucleus::configuration_space_builder engine;
     engine.set_registration_policy(policy);
-    REQUIRE_FALSE(engine.register_source("argv"));
+    const std::size_t builtin_count = engine.tokenizer_count();
+    REQUIRE_FALSE(engine.register_tokenizer("custom"));
 
     engine.set_registration_policy(nullptr);
-    REQUIRE(engine.register_source("argv"));
-    REQUIRE(engine.source_count() == 1);
+    REQUIRE(engine.register_tokenizer("custom"));
+    REQUIRE(engine.tokenizer_count() == builtin_count + 1);
 }

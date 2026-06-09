@@ -14,7 +14,7 @@ class source_stack
 {
 public:
     // Constructs a stack from any pack of concept-satisfying sources.
-    template <source_satisfies... Ss>
+    template <configuration_source... Ss>
     explicit source_stack(Ss... sources)
     {
         m_layers.reserve(sizeof...(Ss));

@@ -336,7 +336,7 @@ TEST_CASE("admissibility callback rejection fails naming the parent", "[chain]")
     nucleus::configuration_space space = engine.build();
 
     nucleus::inherit_policy policy;
-    policy.admissibility = [](const nucleus::configuration_source &) -> std::string {
+    policy.admissibility = [](nucleus::capability_descriptor) -> std::string {
         return "not allowed in test";
     };
 
@@ -373,7 +373,7 @@ TEST_CASE("admissibility reject-all does not block a single-file load", "[chain]
     nucleus::configuration_space space = engine.build();
 
     nucleus::inherit_policy policy;
-    policy.admissibility = [](const nucleus::configuration_source &) -> std::string {
+    policy.admissibility = [](nucleus::capability_descriptor) -> std::string {
         return "reject everything";
     };
 
@@ -407,7 +407,7 @@ TEST_CASE("admissibility reject-all fails naming the parent in a two-file chain"
     nucleus::configuration_space space = engine.build();
 
     nucleus::inherit_policy policy;
-    policy.admissibility = [](const nucleus::configuration_source &) -> std::string {
+    policy.admissibility = [](nucleus::capability_descriptor) -> std::string {
         return "reject everything";
     };
 

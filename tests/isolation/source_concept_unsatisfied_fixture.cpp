@@ -1,6 +1,6 @@
 // Negative compile fixture. This file MUST fail to compile -- CTest asserts the
 // failure via WILL_FAIL. It demonstrates that the source concept is an executable
-// invariant: a struct missing pull() cannot satisfy source_satisfies and cannot
+// invariant: a struct missing pull() cannot satisfy configuration_source and cannot
 // be placed inside a source_stack.
 
 #include "nucleus/configuration_source/source_concept.h"
@@ -15,8 +15,8 @@ struct missing_pull
 };
 
 // This static_assert is FALSE for missing_pull, triggering a compile error.
-static_assert(nucleus::source_satisfies<missing_pull>,
-              "a struct missing pull() must not satisfy source_satisfies");
+static_assert(nucleus::configuration_source<missing_pull>,
+              "a struct missing pull() must not satisfy configuration_source");
 
 }
 

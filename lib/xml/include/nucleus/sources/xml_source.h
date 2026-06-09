@@ -55,7 +55,7 @@ struct xml_source_options
 //
 // This is the ONLY place pugixml is reachable; nothing of pugixml appears in the
 // interface, so the core never sees it. Plain struct satisfying the source concept
-// by duck typing (source_satisfies + projects_source + inheriting_source).
+// by duck typing (configuration_source + projects_source + inheriting_source).
 class xml_source final
 {
 public:

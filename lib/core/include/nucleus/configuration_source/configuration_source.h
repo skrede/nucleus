@@ -61,32 +61,6 @@ using configuration_source_error = std::string;
 // The result of pulling from a source.
 using configuration_source_result = expected<configuration_source_batch, configuration_source_error>;
 
-// The runtime-virtual source/provider seam -- THE boundary of the engine. It yields
-// keyspace entries (path -> value + capability flags) and a capability descriptor.
-// Deliberately not a "document parser": env and argv are sources too; a document
-// source is just the subcategory sharing a view-node model. A compile-time author
-// writes a Parser-concept struct injected through parser_adapter<T>.
-class configuration_source
-{
-public:
-    virtual ~configuration_source() = default;
-
-    // The affordances this source can represent. Drives feature gating.
-    [[nodiscard]] virtual capability_descriptor capabilities() const = 0;
-
-    // Offers a schema-derived projection just before pull() so a document source can
-    // project repeatable keyed containers faithfully. Default no-op (flat sources
-    // ignore it). Called by the load fold for every source it folds.
-    virtual void apply_projection(const schema_projection &) {}
-
-    // Returns the declared parent, if any. Called after pull(). No-op for flat sources.
-    [[nodiscard]] virtual inherit_declaration inheritance() const { return {}; }
-
-    // Produces this source's entries. On success the batch carries any retained buffer
-    // the views depend on; on failure a configuration_source_error explains why.
-    [[nodiscard]] virtual configuration_source_result pull() = 0;
-};
-
 }
 
 #endif

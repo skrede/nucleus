@@ -8,7 +8,7 @@
 
 #include "nucleus/registry/flat_registry.h"
 
-#include "nucleus/configuration_source/configuration_source_registry.h"
+#include "nucleus/schema/schema_registry.h"
 
 #include "nucleus/tokenizer/tokenizer_registry.h"
 
@@ -34,7 +34,7 @@ static_assert(nucleus::flat_registry<entangling_registry>,
 static_assert(nucleus::independently_constructible<
                   entangling_registry,
                   nucleus::tokenizer_registry,
-                  nucleus::configuration_source_registry>::value,
+                  nucleus::schema_registry>::value,
               "a registry constructible from a sibling violates flat ownership");
 
 }

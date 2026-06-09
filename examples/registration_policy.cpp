@@ -12,15 +12,15 @@
 
 namespace {
 
-// A policy that reserves the source surface for the host: it accepts schema and
-// tokenizer registrations but refuses any source registration.
-class reserve_sources final : public nucleus::registration_policy
+// A policy that reserves the tokenizer surface for the host: it accepts schema
+// registrations but refuses any tokenizer registration.
+class reserve_tokenizers final : public nucleus::registration_policy
 {
 public:
     nucleus::policy_verdict review(const nucleus::registration_request &request) override
     {
-        if(request.kind == nucleus::registration_kind::configuration_source)
-            return nucleus::policy_verdict::reject("sources are reserved by the host");
+        if(request.kind == nucleus::registration_kind::tokenizer)
+            return nucleus::policy_verdict::reject("tokenizers are reserved by the host");
         return nucleus::policy_verdict::accept();
     }
 };
@@ -30,14 +30,14 @@ public:
 int main()
 {
     nucleus::configuration_space_builder builder;
-    builder.set_registration_policy(std::make_shared<reserve_sources>());
+    builder.set_registration_policy(std::make_shared<reserve_tokenizers>());
 
     auto schema = builder.register_schema("logging/level");
     std::cout << "schema registration accepted: " << std::boolalpha
               << static_cast<bool>(schema) << '\n';
 
-    auto source = builder.register_source("argv");
-    if(!source)
-        std::cout << "source registration rejected: " << source.error() << '\n';
+    auto tokenizer = builder.register_tokenizer("custom");
+    if(!tokenizer)
+        std::cout << "tokenizer registration rejected: " << tokenizer.error() << '\n';
     return 0;
 }

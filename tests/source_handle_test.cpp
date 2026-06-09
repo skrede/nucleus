@@ -60,9 +60,9 @@ struct full_source
 };
 
 // Concept satisfaction checks.
-static_assert(nucleus::source_satisfies<flat_source>,
+static_assert(nucleus::configuration_source<flat_source>,
               "flat_source must satisfy the required source concept");
-static_assert(nucleus::source_satisfies<full_source>,
+static_assert(nucleus::configuration_source<full_source>,
               "full_source must satisfy the required source concept");
 
 static_assert(!nucleus::projects_source<flat_source>,

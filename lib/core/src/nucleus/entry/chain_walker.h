@@ -7,7 +7,6 @@
 #include "nucleus/schema/projection.h"
 
 #include "nucleus/configuration_source/source_handle.h"
-#include "nucleus/configuration_source/configuration_source.h"
 #include "nucleus/configuration_source/inherit_declaration.h"
 
 #include <memory>
@@ -19,19 +18,6 @@
 #include <unordered_set>
 
 namespace nucleus {
-
-// Thin adapter satisfying source_satisfies that owns a unique_ptr<configuration_source>.
-// Lets the chain_walker erase a factory-produced source into a source_handle without
-// slicing the polymorphic object; the fold's consuming pull goes through this adapter.
-struct source_ptr_adapter
-{
-    std::unique_ptr<configuration_source> ptr;
-
-    [[nodiscard]] capability_descriptor capabilities() const { return ptr->capabilities(); }
-    void apply_projection(const schema_projection &p) { ptr->apply_projection(p); }
-    [[nodiscard]] inherit_declaration inheritance() const { return ptr->inheritance(); }
-    [[nodiscard]] configuration_source_result pull() { return ptr->pull(); }
-};
 
 // Transient walker that expands a flat list of requested paths into a
 // root-first ordered chain of pulled sources, following each source's
@@ -103,11 +89,8 @@ public:
         source_handle src;
     };
 
-    // Factory type: given a path string, return a non-null unique_ptr<configuration_source>
-    // or null (null is surfaced as a load error). Returns unique_ptr so admissibility
-    // callbacks (which take const configuration_source &) can inspect the source
-    // before it is erased into a source_handle and moved into chain_entry.
-    using factory_fn = std::function<std::unique_ptr<configuration_source>(const std::string &)>;
+        // Factory type: given a path string, return a source_handle ready to fold.
+    using factory_fn = std::function<source_handle(const std::string &)>;
 
     // Expands `requested_paths` into a root-first ordered chain. For each path
     // the walker follows the inheritance declaration recursively before appending
@@ -194,21 +177,20 @@ private:
         if(!dg)
             return unexpected(std::move(dg).error());
 
-        // Build the source via the host factory.
-        std::unique_ptr<configuration_source> src = make ? make(path) : nullptr;
-        if(!src)
-            return unexpected(nucleus::format(
-                "inheritance chain: no source could be built for path '{}'", path));
+        // Build the source handle via the host factory.
+        source_handle handle = make(path);
 
-        src->apply_projection(projection);
+        // Pull once to read the inheritance declaration; the fold will pull again
+        // via the handle stored in chain_entry.
+        handle.apply_projection(projection);
 
-        configuration_source_result pulled = src->pull();
+        configuration_source_result pulled = handle.pull();
         if(!pulled)
             return unexpected(nucleus::format(
                 "inheritance chain: source '{}': {}", path, pulled.error()));
 
         // Query the inheritance declaration AFTER pull() (arena is populated).
-        inherit_declaration decl = src->inheritance();
+        inherit_declaration decl = handle.inheritance();
 
         // Recurse into the parent BEFORE appending this source (root-first order).
         if(decl.which == inherit_declaration::kind::parent_path)
@@ -238,21 +220,21 @@ private:
         // kind::opt_out terminates the chain below this file (no recursion).
         // kind::inherit_default means "no parent declared" -- the chain terminates here.
 
-        // Admissibility check runs after pull() but before appending to output.
-        // Invoked only for candidate parent sources (is_parent=true); the initially
-        // requested source is never subject to the admissibility policy.
+        // Admissibility check: invoked only for candidate parent sources; the
+        // initially requested source is never subject to the admissibility policy.
         if(is_parent && m_admissibility)
         {
-            std::string reason = m_admissibility(*src);
+            // Pull capabilities for the admissibility check via the handle.
+            std::string reason = m_admissibility(handle.capabilities());
             if(!reason.empty())
                 return unexpected(nucleus::format(
                     "chain admissibility check rejected parent '{}': {}", path, reason));
         }
 
-        // Append this source AFTER its parent (root-first). Erase the unique_ptr into
-        // a source_handle via the thin adapter; the fold's consuming pull goes through
-        // the handle (the walk-pull above read only the inheritance declaration).
-        out.push_back(chain_entry{path, source_handle(source_ptr_adapter{std::move(src)})});
+        // Append this source AFTER its parent (root-first). The handle is move-only;
+        // the walk-pull above read only the inheritance declaration, the fold will
+        // perform its own pull via the stored handle.
+        out.push_back(chain_entry{path, std::move(handle)});
 
         // depth_guard and path_guard released here by RAII.
         return std::monostate{};
@@ -261,7 +243,7 @@ private:
     std::size_t m_depth = 0;
     std::size_t m_cap;
     std::unordered_set<std::string> m_visited;
-    std::function<std::string(const configuration_source &)> m_admissibility;
+    std::function<std::string(capability_descriptor)> m_admissibility;
 };
 
 }

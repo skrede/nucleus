@@ -56,12 +56,12 @@ void declare_cluster_tags(nucleus::configuration_space_builder &engine)
 
 // A minimal source that emits two entries for the same repeated path with
 // no duplicate_keys capability -- used to verify the capability gate fires.
-struct dual_entry_source : nucleus::configuration_source
+struct dual_entry_source
 {
     std::string path;
     explicit dual_entry_source(std::string p) : path(std::move(p)) {}
 
-    nucleus::configuration_source_result pull() override
+    [[nodiscard]] nucleus::configuration_source_result pull()
     {
         nucleus::configuration_source_batch batch;
         nucleus::capability_descriptor no_caps{};
@@ -70,7 +70,7 @@ struct dual_entry_source : nucleus::configuration_source
         return batch;
     }
 
-    nucleus::capability_descriptor capabilities() const override
+    [[nodiscard]] nucleus::capability_descriptor capabilities() const
     {
         return {};
     }

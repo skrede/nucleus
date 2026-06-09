@@ -51,7 +51,7 @@ struct capable_source
 
 }
 
-TEST_CASE("load_configuration auto-gates: a flat env stack fails a nested schema loudly", "[auto-gate]")
+TEST_CASE("load auto-gates: a flat env stack fails a nested schema loudly", "[auto-gate]")
 {
     nucleus::configuration_space space = make_nested_typed_space();
 

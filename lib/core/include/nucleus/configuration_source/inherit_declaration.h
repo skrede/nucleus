@@ -1,17 +1,13 @@
 #ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_INHERIT_DECLARATION_H
 #define HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_INHERIT_DECLARATION_H
 
+#include "nucleus/capability.h"
+
 #include <string>
 #include <cstddef>
 #include <functional>
 
 namespace nucleus {
-
-// Forward declaration: the source seam (defined in nucleus/configuration_source/configuration_source.h).
-// inherit_policy accepts a reference to a source as the admissibility argument,
-// so a forward declaration is sufficient -- inherit_declaration.h does not pull
-// the full source header.
-class configuration_source;
 
 // The strength of a re-open disposition: narrow obeys the active scope policy;
 // wide composes regardless of scope policy.
@@ -50,7 +46,9 @@ struct inherit_policy
 {
     // Returns a non-empty rejection reason if the candidate source is not
     // admissible as a chain parent; empty string = admitted. Default admits all.
-    std::function<std::string(const configuration_source &)> admissibility;
+    // The callback receives the candidate's capability descriptor, which describes
+    // the source's declared affordances (nesting, ordering, typed_scalars, etc.).
+    std::function<std::string(capability_descriptor)> admissibility;
     std::size_t depth_cap = 16;
 };
 

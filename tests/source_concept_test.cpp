@@ -82,16 +82,16 @@ struct full_stub
     }
 };
 
-// ----- source_satisfies: positive proofs -----
+// ----- configuration_source: positive proofs -----
 
-static_assert(nucleus::source_satisfies<minimal_source>,
-              "a struct with only capabilities()+pull() must satisfy source_satisfies");
-static_assert(nucleus::source_satisfies<flat_stub>,
-              "flat_stub must satisfy source_satisfies");
-static_assert(nucleus::source_satisfies<projecting_stub>,
-              "projecting_stub must satisfy source_satisfies");
-static_assert(nucleus::source_satisfies<full_stub>,
-              "full_stub must satisfy source_satisfies");
+static_assert(nucleus::configuration_source<minimal_source>,
+              "a struct with only capabilities()+pull() must satisfy configuration_source");
+static_assert(nucleus::configuration_source<flat_stub>,
+              "flat_stub must satisfy configuration_source");
+static_assert(nucleus::configuration_source<projecting_stub>,
+              "projecting_stub must satisfy configuration_source");
+static_assert(nucleus::configuration_source<full_stub>,
+              "full_stub must satisfy configuration_source");
 
 // ----- projects_source: present only when apply_projection() is declared -----
 

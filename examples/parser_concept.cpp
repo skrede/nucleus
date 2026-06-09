@@ -1,6 +1,6 @@
-// parser_concept: satisfy the source concept with a plain struct -- no inheritance.
+// source_concept: satisfy the source concept with a plain struct -- no inheritance.
 //
-// Any struct with capabilities() and pull() satisfies nucleus::source_satisfies.
+// Any struct with capabilities() and pull() satisfies nucleus::configuration_source.
 // source_handle type-erases it into the engine so a plain-struct source reaches
 // the fold through the same erasure path any other source does.
 
@@ -34,7 +34,7 @@ struct table_parser
     }
 };
 
-static_assert(nucleus::source_satisfies<table_parser>,
+static_assert(nucleus::configuration_source<table_parser>,
               "table_parser must satisfy the source concept");
 
 }

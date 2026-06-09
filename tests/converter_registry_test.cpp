@@ -1,5 +1,5 @@
 // Behavior of the type_index-keyed converter registry as the fourth flat sibling,
-// exercised end-to-end through the builder/space + free load_configuration so the
+// exercised end-to-end through the builder/space + free load so the
 // borrowed-registry convert pass is the real path under test:
 //   - a registry converter supplies the conversion for a deferred-converter element;
 //   - a per-element converter overrides the registry converter for the same element;

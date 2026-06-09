@@ -4,7 +4,6 @@
 #include "nucleus/format.h"
 #include "nucleus/expected.h"
 
-#include "nucleus/entry/precedence.h"
 #include "nucleus/entry/strain_scope.h"
 #include "nucleus/entry/configuration.h"
 
@@ -82,153 +81,6 @@ public:
 
     [[nodiscard]] keyspace &building() noexcept { return m_building; }
     [[nodiscard]] provenance &origins() noexcept { return m_provenance; }
-
-    // The single fold: layer the stack into the building keyspace by precedence,
-    // recording each winning value's provenance in the SAME step so the two can
-    // never diverge. Expand-then-layer: every value's ${...} tokens are resolved
-    // per-source at read time (against the borrowed tokenizer registry) BEFORE it
-    // is layered, so layering operates on already-resolved strings.
-    //
-    // Layers are visited lowest rank first; a key set by a higher (or equal, by
-    // arrival) rank overwrites a lower one (last-writer-wins within rank). Every
-    // batch's retained buffer is pinned in this context until freeze() copies the
-    // values out, so no view dangles mid-fold.
-    [[nodiscard]] expected<std::monostate, resolve_fold_error> fold(const configuration_source_stack &stack)
-    {
-        std::vector<const configuration_source_layer *> ordered;
-        ordered.reserve(stack.layers().size());
-        for(const configuration_source_layer &layer : stack.layers())
-            ordered.push_back(&layer);
-        std::stable_sort(ordered.begin(), ordered.end(),
-                         [](const configuration_source_layer *a, const configuration_source_layer *b) {
-                             return a->rank < b->rank;
-                         });
-
-        // The schema-derived projection every source is offered before it pulls,
-        // so a document source renders repeatable keyed containers faithfully.
-        // Built once from the borrowed schema; flat sources ignore it.
-        const schema_projection projection = m_schema.projection();
-
-        // Build a set of repeated-path strings from the schema once, so the
-        // inner entry loop classifies each path in O(log n) without rescanning.
-        std::set<std::string> repeated_paths;
-        for(const schema_element &el : m_schema.elements())
-        {
-            if(el.repeated)
-                repeated_paths.insert(el.declared_path().str());
-        }
-
-        for(const configuration_source_layer *layer : ordered)
-        {
-            if(layer->src == nullptr)
-                continue;
-
-            layer->src->apply_projection(projection);
-            configuration_source_result pulled = layer->src->pull();
-            if(!pulled)
-                return unexpected(nucleus::format("source '{}': {}",
-                                              layer->label, pulled.error()));
-
-            configuration_source_batch &batch = pulled.value();
-
-            // Tracks which repeated paths have already received their first entry
-            // from this layer (triggering replace). Reset per layer so a new layer
-            // always starts fresh with a replace before appending.
-            std::set<std::string> seen_repeated_this_layer;
-
-            for(keyspace_entry &entry : batch.entries)
-            {
-                // Expand tokens FIRST, before the repeated-path branch, so each
-                // collection value is independently expanded before accumulation.
-                token_result expanded = resolve_tokens(entry.value.text(), m_tokenizer);
-                if(!expanded)
-                    return unexpected(nucleus::format(
-                        "source '{}': token resolution failed for key '{}': {}",
-                        layer->label, entry.path, expanded.error().message));
-
-                auto path = key_path::parse(entry.path);
-                if(!path)
-                    continue;
-
-                // Use the canonical (key-stripped) path to classify the entry as
-                // repeated. A repeated leaf under a keyed container arrives from
-                // a document source with a transient instance segment inserted
-                // (e.g. cluster/server/primary/tags rather than cluster/server/tags);
-                // the canonical form matches the declared repeated path.
-                const std::string canonical_path = m_schema.canonical_text(path.value());
-                if(repeated_paths.count(canonical_path))
-                {
-                    // Capability gate: a source without duplicate_keys cannot
-                    // legally produce more than one entry for the same repeated
-                    // path per layer. If it somehow does, that is a source-level
-                    // bug -- fail loudly.
-                    if(!entry.capabilities.supports(capability::duplicate_keys)
-                       && seen_repeated_this_layer.count(entry.path) != 0)
-                    {
-                        return unexpected(nucleus::format(
-                            "source '{}': repeated field '{}' received multiple "
-                            "values from a source that does not support "
-                            "duplicate_keys; a flat source can supply at most one "
-                            "value per repeated field per layer",
-                            layer->label, entry.path));
-                    }
-
-                    const bool is_first_in_layer =
-                        (seen_repeated_this_layer.count(entry.path) == 0);
-                    seen_repeated_this_layer.insert(entry.path);
-
-                    if(is_first_in_layer)
-                    {
-                        // First entry from this layer: REPLACE (clears any
-                        // lower-layer collection).
-                        std::vector<value> init;
-                        init.push_back(value::owned(std::move(expanded).value()));
-                        m_building.replace_collection(path.value(), std::move(init));
-                        // Provenance: start a fresh per-element origins vector.
-                        std::vector<origin> col_origins;
-                        col_origins.push_back(
-                            origin{layer->rank, layer->label, layer->owner});
-                        m_provenance.record_collection(path.value().str(),
-                                                       std::move(col_origins));
-                    }
-                    else
-                    {
-                        // Subsequent entry from the same layer: APPEND.
-                        m_building.append(path.value(),
-                                          value::owned(std::move(expanded).value()));
-                        // Append this element's origin to the existing vector.
-                        const std::vector<origin> *existing =
-                            m_provenance.collection_origins_of(path.value().str());
-                        std::vector<origin> updated =
-                            existing ? *existing : std::vector<origin>{};
-                        updated.push_back(
-                            origin{layer->rank, layer->label, layer->owner});
-                        m_provenance.record_collection(path.value().str(),
-                                                       std::move(updated));
-                    }
-                }
-                else
-                {
-                    // Single-value path: unchanged last-write-wins behavior.
-                    // Value and provenance written together; they cannot diverge.
-                    m_building.set(path.value(), value::owned(std::move(expanded).value()));
-                    m_provenance.record(entry.path,
-                                        origin{layer->rank, layer->label, layer->owner});
-                }
-            }
-
-            // Extract extend dispositions declared by this batch (empty for flat
-            // sources; populated by document sources that parse extend= attributes).
-            for(const extend_disposition &d : batch.dispositions)
-                m_dispositions.push_back(d);
-
-            // Pin the batch's buffer so its (now copied-out) views stayed valid
-            // through the expansion above; it is released only at context destruction.
-            m_buffers.push_back(std::move(batch.buffer));
-        }
-
-        return std::monostate{};
-    }
 
     // One entry in the handle-based fold: the erased source, its ascending rank
     // (index into the source_stack), and a human-readable label for provenance.
@@ -533,8 +385,10 @@ public:
             // document-band layer without an extend disposition is a re-open error.
             // A strain with an extend disposition but entries at only one document-
             // band layer has no base (extend without base).
-            static constexpr std::size_t doc_band_min =
-                static_cast<std::size_t>(layer_rank::base);
+            // 200: the base of the document precedence band (see document_rank() in
+            // configuration_space.cpp). Document sources occupy [200, 900); flat
+            // sources assigned by stack index always fall below this band.
+            static constexpr std::size_t doc_band_min = 200;
             for(const auto &[key_value, keyed_paths] : strains)
             {
                 std::set<std::size_t> intro_ranks;

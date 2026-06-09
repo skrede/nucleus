@@ -5,7 +5,7 @@
 #include "nucleus/expected.h"
 #include "nucleus/identity.h"
 
-#include "nucleus/configuration_source/configuration_source.h"
+#include "nucleus/configuration_source/source_handle.h"
 
 #include <map>
 #include <memory>
@@ -13,6 +13,7 @@
 #include <vector>
 #include <utility>
 #include <variant>
+#include <optional>
 #include <algorithm>
 #include <functional>
 #include <string_view>
@@ -20,10 +21,10 @@
 
 namespace nucleus {
 
-// Builds a source for a concrete file path. A parser registration carries one of
-// these; discovery invokes it to turn a found path into a live source. The core
-// stays format-neutral: it never names a parser, only stores the host's factory.
-using parser_factory = std::function<std::unique_ptr<configuration_source>(const std::string &path)>;
+// Builds a source handle for a concrete file path. A parser registration carries
+// one of these; discovery invokes it to turn a found path into a live source.
+// The core stays format-neutral: it never names a parser, only stores the host's factory.
+using parser_factory = std::function<source_handle(const std::string &path)>;
 
 // The error a registration can produce.
 using extension_error = std::string;
@@ -83,13 +84,13 @@ public:
         return m_parsers.find(normalize(extension)) != m_parsers.end();
     }
 
-    // Builds a source for `path` if its extension is claimed; nullptr otherwise.
+    // Builds a source handle for `path` if its extension is claimed; nullopt otherwise.
     // The extension is the final dot-suffix of the path's last segment.
-    [[nodiscard]] std::unique_ptr<configuration_source> open(const std::string &path) const
+    [[nodiscard]] std::optional<source_handle> open(const std::string &path) const
     {
         auto it = m_parsers.find(extension_of(path));
         if(it == m_parsers.end())
-            return nullptr;
+            return std::nullopt;
         return it->second.factory(path);
     }
 

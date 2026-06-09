@@ -210,7 +210,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_test(NAME typed_shape_test COMMAND typed_shape_test)
 
     # Inheritance golden harness: drives real fixture documents through the public
-    # load_configuration() surface and diffs the serialized resolved keyspace against
+    # load() surface and diffs the serialized resolved keyspace against
     # pre-committed goldens derived from nucleus's own semantics. Cases are discovered
     # by directory scan under the fixture dir, so new topology fixtures are added as
     # data files with no source/CMake edit. Runs in the default ctest set (this

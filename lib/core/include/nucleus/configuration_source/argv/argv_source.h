@@ -13,6 +13,7 @@
 #include "nucleus/keyspace/key_path.h"
 
 #include "nucleus/configuration_source/argv/cli_surface.h"
+#include "nucleus/configuration_source/argv/key_recognizer.h"
 
 #include <string>
 #include <vector>
@@ -30,13 +31,6 @@ enum class unknown_key_policy
     strict,
     lenient,
 };
-
-// Tests whether a mapped key path is a declared target. The argv source asks this
-// AFTER syntactic mapping -- the schema-authoritative validation is a separate,
-// later step from segmentation. Supplied by the host (it bridges to the schema
-// registry's surface) so the seam header stays free of any registry dependency,
-// preserving the flat topology.
-using key_recognizer = std::function<bool(const key_path &)>;
 
 // The argv source: maps `--a-b-c=v` flags onto the SAME keyspace every other
 // source feeds (it is a non-document source emitting entries directly -- not a

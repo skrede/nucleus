@@ -15,7 +15,7 @@ class source_handle
 {
 public:
     // Constructs a handle owning a moved-in source. Constrained to concept-satisfying types.
-    template <source_satisfies S>
+    template <configuration_source S>
     explicit source_handle(S s)
         : m_self(std::make_unique<model<S>>(std::move(s)))
     {

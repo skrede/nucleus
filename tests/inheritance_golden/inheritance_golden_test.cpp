@@ -13,7 +13,7 @@
 #include <filesystem>
 
 // Data-driven golden harness: discovers every fixture case directory under the
-// compile-time fixture root, drives its document stack through load_configuration,
+// compile-time fixture root, drives its document stack through load,
 // and asserts the serialized resolved keyspace matches the pre-committed golden
 // exactly. One fixture is a deliberate divergence whose case.txt sets
 // expect_divergence=true; for it the harness asserts the diff routine REPORTS a

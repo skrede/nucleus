@@ -21,7 +21,7 @@
 #include <algorithm>
 
 // A thin, format-aware adapter that drives real fixture documents through the
-// public load_configuration() surface and renders the resolved keyspace to a
+// public load() surface and renders the resolved keyspace to a
 // canonical text form an exact golden diff can gate on. It owns no host
 // vocabulary: the shape it declares is a generic hierarchical document model, and
 // the only third-party touch is the already-wrapped XML source.

@@ -27,15 +27,14 @@ TEST_CASE("build() is infallible and seals counts into the space", "[builder][li
     // schema_count() counts path-tagged schema registrations (register_schema).
     REQUIRE(builder.register_schema("server"));
     REQUIRE(builder.register_schema("server/port"));
-    REQUIRE(builder.register_source("argv"));
+    REQUIRE(builder.register_tokenizer("custom"));
     REQUIRE(builder.register_converter<int>(nucleus::make_scalar_converter<int>()));
 
     nucleus::configuration_space space = builder.build();
 
     // The sealed space carries exactly what was registered.
     REQUIRE(space.schema_count() == 2);
-    REQUIRE(space.tokenizer_count() == builtin_tokenizers);
-    REQUIRE(space.source_count() == 1);
+    REQUIRE(space.tokenizer_count() == builtin_tokenizers + 1);
     REQUIRE(space.converter_count() == 1);
 }
 
@@ -59,7 +58,6 @@ TEST_CASE("registering on an already-built builder is a loud state-machine error
     check(builder.register_schema("late"), "register_schema");
     check(builder.register_element(nucleus::element("late", anchor::root())), "register_element");
     check(builder.register_tokenizer("late"), "register_tokenizer");
-    check(builder.register_source("late"), "register_source");
     check(builder.register_converter<std::int64_t>(
               nucleus::make_scalar_converter<std::int64_t>()), "register_converter");
     check(builder.install_tokenizer(nucleus::tokenizer_builder("late").build()),

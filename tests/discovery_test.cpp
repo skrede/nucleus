@@ -1,8 +1,7 @@
 #include "nucleus/capability.h"
 
-#include "nucleus/configuration_source/parser.h"
-#include "nucleus/configuration_source/parser_adapter.h"
 #include "nucleus/configuration_source/source_concept.h"
+#include "nucleus/configuration_source/source_handle.h"
 #include "nucleus/configuration_source/configuration_source.h"
 #include "nucleus/configuration_source/discovery.h"
 #include "nucleus/configuration_source/extension_registry.h"
@@ -45,15 +44,15 @@ struct labelled_source
     std::string m_label;
 };
 
-static_assert(nucleus::source_satisfies<labelled_source>,
+static_assert(nucleus::configuration_source<labelled_source>,
               "labelled_source must satisfy the source concept");
 
 // A factory that tags the source it builds with the format name, so the test can
 // see which parser claimed the discovered file.
 nucleus::parser_factory tagging_factory(std::string format)
 {
-    return [format](const std::string &path) -> std::unique_ptr<nucleus::configuration_source> {
-        return nucleus::adapt_parser(labelled_source(format + ":" + path));
+    return [format](const std::string &path) -> nucleus::source_handle {
+        return nucleus::source_handle(labelled_source(format + ":" + path));
     };
 }
 
@@ -90,7 +89,7 @@ TEST_CASE("each extension resolves to exactly one parser", "[extension]")
     // The clash committed nothing: the original parser still owns the extension.
     REQUIRE(registry.size() == 1);
     auto built = registry.open("config.xml");
-    REQUIRE(built != nullptr);
+    REQUIRE(built.has_value());
     auto pulled = built->pull();
     REQUIRE(pulled);
     REQUIRE(pulled.value().entries.at(0).value.text() == "xml:config.xml");
@@ -187,7 +186,7 @@ TEST_CASE("discovery finds host-supplied base name across host-supplied paths", 
     auto sources = nucleus::discovery::open_all(base, search_paths, registry);
     REQUIRE(sources.size() == 2);
     for(auto &src : sources)
-        REQUIRE(src->pull());
+        REQUIRE(src.pull());
 
     fs::remove_all(root);
 }
