@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-label="nucleus — a C++20 configuration library">
+  <defs>
+    <radialGradient id="core" cx="50%" cy="45%" r="60%">
+      <stop offset="0%" stop-color="#5B7BF0"/>
+      <stop offset="60%" stop-color="#2F5BE0"/>
+      <stop offset="100%" stop-color="#1E3FB0"/>
+    </radialGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="7" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- canvas -->
+  <rect width="1200" height="300" fill="#FFFFFF"/>
+
+  <!-- nucleus glyph: layered shells + input nodes resolving inward to the core -->
+  <g transform="translate(176,150)">
+    <!-- shells -->
+    <circle r="84" fill="none" stroke="#2F5BE0" stroke-opacity="0.12" stroke-width="1.5"/>
+    <circle r="58" fill="none" stroke="#2F5BE0" stroke-opacity="0.20" stroke-width="1.5"/>
+    <circle r="32" fill="none" stroke="#2F5BE0" stroke-opacity="0.32" stroke-width="1.5"/>
+
+    <!-- connectors: sources converging into the nucleus -->
+    <g stroke="#2F5BE0" stroke-opacity="0.35" stroke-width="1.5">
+      <line x1="-72.7" y1="-42" x2="0" y2="0"/>
+      <line x1="50.2" y1="29" x2="0" y2="0"/>
+      <line x1="0" y1="32" x2="0" y2="0"/>
+    </g>
+
+    <!-- input nodes on the shells -->
+    <circle cx="-72.7" cy="-42" r="5.5" fill="#7C93F2"/>
+    <circle cx="50.2" cy="29" r="5.5" fill="#7C93F2"/>
+    <circle cx="0" cy="32" r="5.5" fill="#7C93F2"/>
+
+    <!-- resolved core -->
+    <circle r="15" fill="url(#core)" filter="url(#glow)"/>
+  </g>
+
+  <!-- wordmark -->
+  <text x="300" y="148" font-family="'Inter','Segoe UI',Helvetica,Arial,sans-serif" font-size="82" font-weight="700" letter-spacing="-2" fill="#16181F">nucleus</text>
+
+  <!-- tagline -->
+  <text x="303" y="190" font-family="'Inter','Segoe UI',Helvetica,Arial,sans-serif" font-size="24" font-weight="500" fill="#5B6473">A C++20 configuration library</text>
+</svg>

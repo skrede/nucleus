@@ -1,3 +1,4 @@
+![Nucleus banner](./docs/banner.svg)
 [![Linux](https://github.com/skrede/nucleus/actions/workflows/linux.yml/badge.svg?branch=master)](https://github.com/skrede/nucleus/actions/workflows/linux.yml)
 [![macOS](https://github.com/skrede/nucleus/actions/workflows/macos.yml/badge.svg?branch=master)](https://github.com/skrede/nucleus/actions/workflows/macos.yml)
 [![Windows](https://github.com/skrede/nucleus/actions/workflows/windows.yml/badge.svg?branch=master)](https://github.com/skrede/nucleus/actions/workflows/windows.yml)
