@@ -1,6 +1,6 @@
 // Consumer smoke test against an installed nucleus package: registers a small
-// schema (including a typed element), resolves an env-backed stack, and reads
-// values back as text and as the declared type. Exit code is the verdict.
+// nested schema (including a typed element), resolves a runtime-backed stack, and
+// reads values back as text and as the declared type. Exit code is the verdict.
 
 #include "nucleus/configuration_space.h"
 
@@ -10,7 +10,7 @@
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/converters.h"
 
-#include "nucleus/sources/env_source.h"
+#include "nucleus/sources/runtime_source.h"
 
 #include <cstdint>
 #include <iostream>
@@ -25,7 +25,7 @@ int main()
         nucleus::element("name", nucleus::anchor::keyspace("server")));
     nucleus::configuration_space space = engine.build();
 
-    nucleus::env_source values;
+    nucleus::runtime_source values;
     values.set("server/port", "8080").set("server/name", "edge");
 
     auto loaded = nucleus::load(space,
