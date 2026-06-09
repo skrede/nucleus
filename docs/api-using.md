@@ -16,6 +16,7 @@ back. None of these requires subclassing. For the seams a host extends, see
 - [Provenance: `origin`, `provenance`](#provenance)
 - [Precedence: `source_stack`, `layer_rank`](#precedence)
 - [Built-in sources: `env_source`, `argv_source`](#sources)
+- [Emitting: the output seam (`config_emitter`)](#emit)
 - [`result<T, E>` — fallible returns](#result)
 - [`owner_token` — opaque identity](#owner_token)
 - [Diagnostics: `suggest_keys`, `conflict_report`](#diagnostics)
@@ -536,6 +537,59 @@ argv_source &log_to(log_sink &sink);
 In `strict` mode an unrecognized flag fails the pull; in `lenient` mode it is
 stored as a string and warned through the sink. See
 [`examples/argv.cpp`](../examples/argv.cpp).
+
+---
+
+<a id="emit"></a>
+## Emitting: the output seam (`config_emitter`)
+
+`#include "nucleus/config_emitter.h"` (the concept)
+
+Output is the inverse of a source: the configuration you resolved can be rendered
+back into any shipped format. `config_emitter` is the format-agnostic contract --
+a stateless type with two operations, both writing into a caller-owned
+`std::ostream`:
+
+```cpp
+template<typename Emitter>
+concept config_emitter = requires(const Emitter e, const configuration_space &space,
+                                  const configuration &config, std::ostream &out) {
+    { e.emit_template(space, out) } -> std::same_as<void>;
+    { e.emit_document(config, out) } -> std::same_as<void>;
+};
+```
+
+`emit_template` projects a sealed space's **declared schema** into a blank document
+template; `emit_document` projects a **resolved configuration** into a populated
+one. A repeated field keeps all of its values. Each shipped format exposes the
+pair as free functions in its own namespace:
+
+| Format | Header | Free functions | Link |
+|--------|--------|----------------|------|
+| XML  | `"nucleus/sources/xml_emitter.h"`                     | `nucleus::xml::emit_template` / `emit_document`  | `nucleus::xml` |
+| env  | `"nucleus/configuration_source/env/env_emitter.h"`   | `nucleus::env::emit_template` / `emit_document`  | core |
+| args | `"nucleus/configuration_source/argv/argv_emitter.h"` | `nucleus::args::emit_template` / `emit_document` | core |
+
+```cpp
+nucleus::xml::emit_document(config, std::cout);     // nested
+nucleus::env::emit_document(config, std::cout);     // KEY=value
+nucleus::args::emit_document(config, std::cout);    // --KEY=value
+```
+
+The seam is **stream-based, and you own persistence** -- there is no `*_to_file`
+helper. Compose with the standard library: write to a file with a `std::ofstream`,
+capture into a string with a `std::ostringstream`.
+
+```cpp
+std::ofstream file("config.xml");
+nucleus::xml::emit_document(config, file);          // to a file
+
+std::ostringstream text;
+nucleus::env::emit_document(config, text);          // to a std::string
+```
+
+See [`examples/round_trip.cpp`](../examples/round_trip.cpp), which resolves one
+configuration and emits it as XML, env, and args.
 
 ---
 

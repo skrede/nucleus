@@ -65,4 +65,14 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     target_include_directories(xml_persist PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
+
+    # round_trip renders one resolved configuration through xml/env/args, so it links
+    # the xml module (its emitter) and the runtime module (the programmatic source);
+    # the env/args emitters ship in core and arrive via nucleus::nucleus.
+    add_executable(round_trip round_trip.cpp)
+    target_link_libraries(round_trip
+        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::runtime)
+    target_include_directories(round_trip PRIVATE
+        ${CMAKE_SOURCE_DIR}/lib/core/src
+    )
 endif()

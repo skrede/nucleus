@@ -18,6 +18,7 @@ that satisfy these seams, see [Shipped implementations](api-implementations.md).
 - [Inheritance: `inherit_declaration`, `inherit_policy`, `extend_disposition`](#inheritance)
 - [Discovery: `extension_registry`, `discovery`](#discovery)
 - [`path_text`, `cli_surface` — shared transforms](#transforms)
+- [Adding a format module: `config_emitter`, `nucleus_add_module`](#format-module)
 
 ---
 
@@ -531,3 +532,45 @@ std::string flag_of(const key_path &path);                  // inverse: a/b/c ->
 
 `-` is always the separator; the split is on the first `=` only; a bare flag
 becomes the value `"true"`.
+
+---
+
+<a id="format-module"></a>
+## Adding a format module: `config_emitter`, `nucleus_add_module`
+
+A new output format (or a new parser-backed source) ships as its own per-target
+module so the core never links it. The shipped `xml` module is the worked example.
+
+**Layout.** Create `lib/<fmt>/` with a public include root `lib/<fmt>/include`, and
+put the public adapter and emitter headers under `nucleus/sources/` -- every
+consumer then includes them as `"nucleus/sources/<fmt>_source.h"` and
+`"nucleus/sources/<fmt>_emitter.h"`. A compiled module keeps its implementation
+(and any third-party parser) under `lib/<fmt>/src`, reachable only from inside the
+module.
+
+**Model the output contract.** Provide `emit_template(const configuration_space&,
+std::ostream&)` and `emit_document(const configuration&, std::ostream&)` as free
+functions in a `nucleus::<fmt>` namespace, plus a stateless `struct emitter` whose
+members forward to them so the type satisfies
+[`config_emitter`](api-using.md#emit). No third-party type appears in the public
+header; it lives only in the `.cpp`.
+
+**Register the target** via `nucleus_add_module()` in `lib/CMakeLists.txt`:
+
+```cmake
+# Header-only (no parser dependency), like env / args / runtime:
+nucleus_add_module(<fmt> TYPE INTERFACE
+    ALIASES nucleus::<fmt> LINK_PUBLIC nucleus::nucleus)
+
+# Compiled (wraps a library, like xml over pugixml -- keep the library PRIVATE):
+nucleus_add_module(<fmt> TYPE STATIC
+    ALIASES nucleus::<fmt>
+    SOURCES <fmt>/src/nucleus/<fmt>/<fmt>_emitter.cpp
+    LINK_PUBLIC nucleus::nucleus LINK_PRIVATE <thirdparty>::<thirdparty>)
+```
+
+The `INTERFACE`/`PUBLIC` link to `nucleus::nucleus` means a consumer of
+`nucleus::<fmt>` also gets core. **Core never links a format module**, and the
+boundary is enforced: a core file that includes a `nucleus/sources/` header (or
+names a format) fails the core-purity gate
+(`scripts/core_purity_check.{cmake,sh}`).
