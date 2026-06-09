@@ -22,6 +22,11 @@ nucleus_add_example(layering nucleus::env nucleus::args)
 nucleus_add_example(custom_source)
 nucleus_add_example(parser_concept)
 
+# New surface: explicit source_stack composition, reusable space, and argv recognizer.
+nucleus_add_example(source_stack nucleus::env nucleus::args nucleus::runtime)
+nucleus_add_example(reusable_space nucleus::runtime)
+nucleus_add_example(argv_recognizer nucleus::args)
+
 # Tokens, logging, completion, diagnostics, and the registration-policy seam.
 nucleus_add_example(tokens nucleus::env)
 nucleus_add_example(logging nucleus::args)
