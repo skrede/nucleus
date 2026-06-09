@@ -83,20 +83,23 @@ public:
     [[nodiscard]] provenance &origins() noexcept { return m_provenance; }
 
     // One entry in the handle-based fold: the erased source, its ascending rank
-    // (index into the source_stack), and a human-readable label for provenance.
+    // (cross-source precedence), a human-readable label for provenance, and an
+    // optional inheritance-chain layer ordinal. The layer is present only for
+    // inheritance-chain entries (base lowest); flat sources leave it absent and
+    // are treated as a single flat layer exempt from the slice re-open rules.
     struct layered_handle
     {
         source_handle *handle;
         std::size_t    rank;
         std::string    label;
         owner_token    owner;
+        std::optional<std::size_t> inheritance_layer;
     };
 
     // Fold overload that consumes a sequence of layered_handle descriptors.
-    // The caller assigns ascending ranks by index so the stable_sort and the
-    // doc_band_min slice checks work with the same numeric machinery as the
-    // legacy pointer-based fold. Each handle is pulled exactly once per load;
-    // the project->pull->inherit lifecycle contract holds unchanged.
+    // The caller assigns ascending ranks for cross-source precedence; the
+    // stable_sort folds low rank first. Each handle is pulled exactly once per
+    // load; the project->pull->inherit lifecycle contract holds unchanged.
     [[nodiscard]] expected<std::monostate, resolve_fold_error>
     fold(std::span<layered_handle> layers)
     {
@@ -167,7 +170,7 @@ public:
                         m_building.replace_collection(path.value(), std::move(init));
                         std::vector<origin> col_origins;
                         col_origins.push_back(
-                            origin{lh->rank, lh->label, lh->owner});
+                            origin{lh->rank, lh->label, lh->owner, lh->inheritance_layer});
                         m_provenance.record_collection(path.value().str(),
                                                        std::move(col_origins));
                     }
@@ -180,7 +183,7 @@ public:
                         std::vector<origin> updated =
                             existing ? *existing : std::vector<origin>{};
                         updated.push_back(
-                            origin{lh->rank, lh->label, lh->owner});
+                            origin{lh->rank, lh->label, lh->owner, lh->inheritance_layer});
                         m_provenance.record_collection(path.value().str(),
                                                        std::move(updated));
                     }
@@ -189,7 +192,8 @@ public:
                 {
                     m_building.set(path.value(), value::owned(std::move(expanded).value()));
                     m_provenance.record(entry.path,
-                                        origin{lh->rank, lh->label, lh->owner});
+                                        origin{lh->rank, lh->label, lh->owner,
+                                               lh->inheritance_layer});
                 }
             }
 
@@ -372,45 +376,43 @@ public:
                 disp_index[{d.container_path, d.key_value}] = d.strength;
 
             // Cross-layer re-open and extend-without-base checks.
-            // These checks apply only to document-band sources (rank >= base, i.e.
-            // inheritance chain layers). Flat source layering (env, argv, defaults)
-            // contributes to strains by design and is never a re-open error.
-            // For each named strain: compute the set of distinct document-band ranks
-            // at which entries were laid down, combining first-introduction ranks
-            // with winning ranks. An entry overwritten by a higher-rank layer has its
-            // first-introduction rank (the base layer) AND its winning rank (the
-            // deriving layer) both recorded -- so a chain re-open via overwrite is
-            // correctly detected as multi-layer even when the overwrite collapses the
-            // building keyspace to a single path. A strain present at more than one
-            // document-band layer without an extend disposition is a re-open error.
-            // A strain with an extend disposition but entries at only one document-
-            // band layer has no base (extend without base).
-            // 200: the base of the document precedence band (see document_rank() in
-            // configuration_space.cpp). Document sources occupy [200, 900); flat
-            // sources assigned by stack index always fall below this band.
-            static constexpr std::size_t doc_band_min = 200;
+            // These checks apply only to inheritance-chain entries, identified by
+            // the explicit inheritance-layer channel on each origin. Flat source
+            // layering (env, argv, defaults) carries no inheritance layer, forms a
+            // single flat layer by design, and is never a re-open error.
+            // For each named strain: compute the set of distinct inheritance-chain
+            // layer ordinals at which entries were laid down, combining
+            // first-introduction layers with winning layers. An entry overwritten by
+            // a higher chain layer has its first-introduction layer (the base) AND
+            // its winning layer (the deriving file) both recorded -- so a chain
+            // re-open via overwrite is detected as multi-layer even when the
+            // overwrite collapses the building keyspace to a single path. A strain
+            // present at more than one inheritance layer without an extend
+            // disposition is a re-open error. A strain with an extend disposition but
+            // entries at only one inheritance layer has no base (extend without base).
             for(const auto &[key_value, keyed_paths] : strains)
             {
-                std::set<std::size_t> intro_ranks;
+                std::set<std::size_t> intro_layers;
                 for(const key_path &kp : keyed_paths)
                 {
-                    const std::size_t *first = m_provenance.first_rank_of(kp.str());
-                    if(first != nullptr && *first >= doc_band_min)
-                        intro_ranks.insert(*first);
-                    // Also include the winning rank: an overwrite by a higher-rank
-                    // layer means the winner and the first-introducer differ, and
-                    // both layers must be counted as contributing to this strain.
+                    const std::size_t *first =
+                        m_provenance.first_inheritance_layer_of(kp.str());
+                    if(first != nullptr)
+                        intro_layers.insert(*first);
+                    // Also include the winning layer: an overwrite by a higher chain
+                    // layer means the winner and the first-introducer differ, and both
+                    // inheritance layers must be counted as contributing to this strain.
                     const origin *win = m_provenance.of(kp.str());
-                    if(win != nullptr && win->rank >= doc_band_min)
-                        intro_ranks.insert(win->rank);
+                    if(win != nullptr && win->inheritance_layer.has_value())
+                        intro_layers.insert(win->inheritance_layer.value());
                 }
 
-                // No document-band entries for this strain: flat-source only,
+                // No inheritance-chain entries for this strain: flat-source only,
                 // skip the inheritance chain checks.
-                if(intro_ranks.empty())
+                if(intro_layers.empty())
                     continue;
 
-                const bool has_cross_layer = (intro_ranks.size() > 1);
+                const bool has_cross_layer = (intro_layers.size() > 1);
                 auto disp_it = disp_index.find({container.str(), key_value});
                 const bool has_disposition = (disp_it != disp_index.end());
 

@@ -148,9 +148,10 @@ TEST_CASE("a later-listed stack source wins a same-key contest against an earlie
           "[resolution][precedence]")
 {
     // Two sources contesting the same key: later index == higher rank == wins.
-    // The document-band clamping (200-900) ensures document paths similarly
-    // yield to a stack source placed after them; the "last-wins" rule applies
-    // uniformly whether the contenders are flat sources or document paths.
+    // Cross-source precedence is uniform stack position: a document brought in
+    // via document_paths sits at the base, below every stack source, so the
+    // "last-wins" rule applies uniformly whether the contenders are flat sources
+    // or document paths.
     nucleus::configuration_space_builder engine;
     REQUIRE(engine.register_schema("k"));
     nucleus::configuration_space space = engine.build();
@@ -169,8 +170,9 @@ TEST_CASE("a later-listed stack source wins a same-key contest against an earlie
 
 TEST_CASE("the last config document wins among layered paths", "[resolution][precedence]")
 {
-    // No argv: the last path in the list must still win over earlier ones even
-    // though all documents past the base are clamped to the same band.
+    // No argv: the last path in the list must still win over earlier ones --
+    // the within-chain order is preserved (base lowest, each later path above the
+    // previous), so the last document wins this contest.
     auto make = [](const std::string &path) -> nucleus::source_handle {
         nucleus::env_source src;
         src.set("k", path);

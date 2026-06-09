@@ -116,20 +116,6 @@ public:
 
 namespace {
 
-// Maps a document's position in a path list onto a precedence rank that is always
-// STRICTLY BELOW argv. The first path is the base; each later path overlays the
-// previous one, but the whole band is clamped to the overlay rank so that no
-// document -- however many were supplied -- can ever tie or outrank argv.
-[[nodiscard]] std::size_t document_rank(std::size_t index)
-{
-    // Document band: [200, 900). 200 = base anchor; 900 = overlay anchor.
-    // Stack-index-based sources assigned rank = index always fall below 200.
-    constexpr std::size_t base    = 200;
-    constexpr std::size_t overlay = 900;
-    const std::size_t raw = base + index;
-    return raw < overlay ? raw : overlay;
-}
-
 // The state-machine guard: mutating the builder is only legal until build() seals
 // it. An attempt after build() is rejected with a reason naming the operation that
 // was actually attempted -- the lifecycle enforced, not merely documented.
@@ -139,6 +125,55 @@ namespace {
         return unexpected(nucleus::format(
             "{} is not allowed: the builder has already been built", what));
     return registration_ok();
+}
+
+// Assembles the fold handles under the unified precedence scheme: the
+// inheritance chain (if any) sits at the BASE, occupying the lowest ranks
+// [0, m) base-first so the within-chain order (base below, derived above) is
+// preserved; every source_stack handle then sits ABOVE the whole chain at rank
+// m + index, so any stack source (env, argv, runtime, a document in the stack) overrides
+// the document base. Cross-source precedence is carried entirely by rank; the
+// within-chain layering is carried by the explicit inheritance_layer ordinal
+// (equal to the chain index), which the slice step keys its re-open rules on.
+// `entries` is an out-parameter the caller owns: the chain sources must outlive
+// the fold. Returns the assembled handles or a chain-expansion error.
+[[nodiscard]] expected<std::vector<resolution_context::layered_handle>, std::string>
+assemble_handles(const space_core &state,
+                 source_stack &stack,
+                 const load_options &options,
+                 std::vector<chain_walker::chain_entry> &entries)
+{
+    // Expand the inheritance chain first so the stack handles can be ranked
+    // above it. expand() returns entries base-first (index 0 = deepest ancestor).
+    if(!options.document_paths.empty() && options.make_document)
+    {
+        const schema_projection projection = state.schema.projection();
+        auto expanded = chain_walker::expand(options.document_paths, options.make_document,
+                                             projection, options.inherit);
+        if(!expanded)
+            return unexpected(std::move(expanded).error());
+        entries = std::move(expanded).value();
+    }
+
+    std::span<source_handle> layers = stack.layers();
+
+    std::vector<resolution_context::layered_handle> handles;
+    handles.reserve(entries.size() + layers.size());
+
+    // The chain occupies the base ranks [0, m), base-first; each entry carries
+    // its inheritance-chain layer ordinal equal to its chain index.
+    for(std::size_t i = 0; i < entries.size(); ++i)
+        handles.push_back({&entries[i].src, i,
+                           nucleus::format("path:{}", entries[i].path), {}, i});
+
+    // Stack handles sit ABOVE the whole chain: rank = chain size + stack index.
+    // Their label keeps the bare stack index so provenance reads stack[N].
+    const std::size_t base_offset = entries.size();
+    for(std::size_t i = 0; i < layers.size(); ++i)
+        handles.push_back({&layers[i], base_offset + i,
+                           nucleus::format("stack[{}]", i), {}, std::nullopt});
+
+    return handles;
 }
 
 // Gate for the handle-based fold path. Reads capabilities from each
@@ -338,36 +373,10 @@ load_result load(const configuration_space &space,
 
     // Chain entries own the folded document sources; they must outlive the fold.
     std::vector<chain_walker::chain_entry> entries;
-
-    // Assign ascending ranks to the caller's source_stack handles (index = rank).
-    // Later-listed handles have higher rank and win key contests.
-    std::vector<resolution_context::layered_handle> handles;
-    {
-        std::span<source_handle> layers = stack.layers();
-        handles.reserve(layers.size());
-        for(std::size_t i = 0; i < layers.size(); ++i)
-            handles.push_back({&layers[i], i, nucleus::format("stack[{}]", i), {}});
-    }
-
-    if(!options.document_paths.empty() && options.make_document)
-    {
-        const schema_projection projection = state.schema.projection();
-        auto expanded = chain_walker::expand(options.document_paths, options.make_document,
-                                             projection, options.inherit);
-        if(!expanded)
-            return unexpected(std::move(expanded).error());
-        entries = std::move(expanded).value();
-        // Document entries get document_rank(i) values -- in the 200-899 band,
-        // strictly above index-based stack ranks and strictly below 900.
-        // Source_stack handles that represent argv-like sources should be placed AFTER
-        // documents in the stack so their index rank exceeds document_rank values; that
-        // ordering is the caller's responsibility when composing the source_stack.
-        const std::size_t doc_start = handles.size();
-        handles.reserve(doc_start + entries.size());
-        for(std::size_t i = 0; i < entries.size(); ++i)
-            handles.push_back({&entries[i].src, document_rank(i),
-                               nucleus::format("path:{}", entries[i].path), {}});
-    }
+    auto assembled = assemble_handles(state, stack, options, entries);
+    if(!assembled)
+        return unexpected(std::move(assembled).error());
+    std::vector<resolution_context::layered_handle> handles = std::move(assembled).value();
 
     log_sink default_log;
     if(auto gated = gate_assembled_handles(state.schema, handles, default_log); !gated)
@@ -393,28 +402,12 @@ gate_result check_capabilities(const configuration_space &space,
 {
     const space_core &state = *space.m_impl;
 
+    // Mirror load()'s assembly exactly so the gate sees the same handle scheme.
     std::vector<chain_walker::chain_entry> entries;
-    std::vector<resolution_context::layered_handle> handles;
-    {
-        std::span<source_handle> layers = stack.layers();
-        handles.reserve(layers.size());
-        for(std::size_t i = 0; i < layers.size(); ++i)
-            handles.push_back({&layers[i], i, nucleus::format("stack[{}]", i), {}});
-    }
-
-    if(!options.document_paths.empty() && options.make_document)
-    {
-        const schema_projection projection = state.schema.projection();
-        auto expanded = chain_walker::expand(options.document_paths, options.make_document,
-                                             projection, options.inherit);
-        if(!expanded)
-            return unexpected(std::move(expanded).error());
-        entries = std::move(expanded).value();
-        handles.reserve(handles.size() + entries.size());
-        for(std::size_t i = 0; i < entries.size(); ++i)
-            handles.push_back({&entries[i].src, document_rank(i),
-                               nucleus::format("path:{}", entries[i].path), {}});
-    }
+    auto assembled = assemble_handles(state, stack, options, entries);
+    if(!assembled)
+        return unexpected(std::move(assembled).error());
+    std::vector<resolution_context::layered_handle> handles = std::move(assembled).value();
 
     log_sink default_log;
     return gate_assembled_handles(state.schema, handles, default_log);

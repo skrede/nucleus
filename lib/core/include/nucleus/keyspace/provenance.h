@@ -8,6 +8,7 @@
 #include <vector>
 #include <cstddef>
 #include <utility>
+#include <optional>
 
 namespace nucleus {
 
@@ -24,6 +25,12 @@ struct origin
     std::string layer;
     // The opaque owner token of the winning source.
     owner_token owner;
+    // The within-inheritance-chain layer ordinal, set only for entries that
+    // came from an inheritance chain (base lowest, derived higher). Absent for
+    // flat sources, which form a single flat layer exempt from re-open checks.
+    // This channel is independent of `rank`: rank is cross-source precedence,
+    // this is the inheritance position the slice step keys its re-open rules on.
+    std::optional<std::size_t> inheritance_layer;
 };
 
 // The provenance map: key path -> winning origin, written in the SAME fold step that
@@ -41,6 +48,8 @@ public:
     void record(const std::string &key, origin where)
     {
         m_first_ranks.try_emplace(key, where.rank);
+        if(where.inheritance_layer.has_value())
+            m_first_inheritance_layers.try_emplace(key, where.inheritance_layer.value());
         m_origins.insert_or_assign(key, std::move(where));
     }
 
@@ -51,6 +60,7 @@ public:
     {
         m_origins.erase(key);
         m_first_ranks.erase(key);
+        m_first_inheritance_layers.erase(key);
         m_collection_origins.erase(key);
     }
 
@@ -68,16 +78,31 @@ public:
         return it == m_first_ranks.end() ? nullptr : &it->second;
     }
 
+    // The inheritance-chain layer ordinal that FIRST set `key`, or nullptr when
+    // the key was never recorded by an inheritance-chain entry. Flat sources
+    // never populate this, so a flat-only key returns nullptr -- the signal the
+    // slice step uses to exempt flat content from the inheritance re-open checks.
+    [[nodiscard]] const std::size_t *first_inheritance_layer_of(const std::string &key) const
+    {
+        auto it = m_first_inheritance_layers.find(key);
+        return it == m_first_inheritance_layers.end() ? nullptr : &it->second;
+    }
+
     // Records per-element origins for a repeated-path collection, replacing any
     // previously stored collection origins for this key. The first-introduction
     // rank for the path is also maintained (used by slice's Ld computation).
     void record_collection(const std::string &key, std::vector<origin> element_origins)
     {
-        // Capture first rank BEFORE the move to avoid use-after-move.
+        // Capture first rank and inheritance layer BEFORE the move.
         const std::size_t first_rank =
             element_origins.empty() ? 0 : element_origins.front().rank;
+        const std::optional<std::size_t> first_layer =
+            element_origins.empty() ? std::nullopt
+                                    : element_origins.front().inheritance_layer;
         m_collection_origins[key] = std::move(element_origins);
         m_first_ranks.try_emplace(key, first_rank);
+        if(first_layer.has_value())
+            m_first_inheritance_layers.try_emplace(key, first_layer.value());
     }
 
     // The per-element origins for a repeated-path collection, or nullptr when
@@ -105,6 +130,10 @@ private:
     // First-introduction ranks, kept apart from the winning origins so an
     // overwrite never erases the answer to "which layer introduced this key?".
     std::map<std::string, std::size_t> m_first_ranks;
+    // First-introduction inheritance-chain layer ordinals, present only for
+    // keys an inheritance-chain entry introduced. Drives the slice step's
+    // re-open detection independently of cross-source precedence rank.
+    std::map<std::string, std::size_t> m_first_inheritance_layers;
     // Per-element origins for repeated-path collections. A path appears here
     // instead of m_origins when its values are collected, not last-won.
     std::map<std::string, std::vector<origin>> m_collection_origins;
