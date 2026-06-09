@@ -20,6 +20,7 @@
 #include "nucleus/diagnostics/conflict_report.h"
 
 #include <any>
+#include <span>
 #include <memory>
 #include <string>
 #include <vector>
@@ -201,11 +202,9 @@ public:
     // and bound to `prog`. A pure read of the schema.
     [[nodiscard]] std::string generate_completion(shell which, std::string_view prog) const;
 
-    // Projects the sealed schema into a well-formed XML TEMPLATE string: one element
-    // per declared field, nested by anchor path, with constrained fields annotated by
-    // their allowed values. Hand-built in core with no XML library (template only --
-    // no default values).
-    [[nodiscard]] std::string emit_xml_template() const;
+    // The declared schema elements, the neutral data a format emitter projects into
+    // a template. A pure read of the sealed schema; the registry stays encapsulated.
+    [[nodiscard]] std::span<const schema_element> schema_elements() const;
 
     // Returns a NEW builder pre-populated with a DEEP COPY of this sealed space's
     // four registries + policy + claim/conflict ledger. Base and derived are fully

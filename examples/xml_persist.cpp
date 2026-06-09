@@ -1,9 +1,10 @@
 // xml_persist: load a configuration from XML, then persist it back to XML.
 //
-// nucleus::xml::write_document takes a resolved configuration and serializes it to
-// a well-formed XML document via the pugixml write API -- entirely inside the xml
-// module, so no pugixml type crosses into core. A repeated leaf persists all its
-// values. This is the resolved-config -> XML direction (the inverse of reading).
+// nucleus::xml::emit_document takes a resolved configuration and writes a well-formed
+// XML document into the caller's stream via the pugixml write API -- entirely inside
+// the xml module, so no pugixml type crosses into core. A repeated leaf persists all
+// its values. This is the resolved-config -> XML direction (the inverse of reading);
+// the user owns persistence (here, std::cout).
 
 #include "nucleus/configuration_space.h"
 #include "nucleus/entry/configuration.h"
@@ -12,7 +13,7 @@
 #include "nucleus/schema/schema.h"
 
 #include "nucleus/xml/xml_source.h"
-#include "nucleus/xml/xml_writer.h"
+#include "nucleus/xml/xml_emitter.h"
 
 #include <memory>
 #include <string>
@@ -45,13 +46,6 @@ int main()
         return 1;
     }
 
-    auto serialized = nucleus::xml::write_document(loaded.value());
-    if(!serialized)
-    {
-        std::cerr << "persist failed: " << serialized.error() << '\n';
-        return 1;
-    }
-
-    std::cout << serialized.value();
+    nucleus::xml::emit_document(loaded.value(), std::cout);
     return 0;
 }

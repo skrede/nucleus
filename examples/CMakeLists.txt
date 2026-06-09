@@ -29,7 +29,6 @@ nucleus_add_example(completion)
 nucleus_add_example(diagnostics)
 nucleus_add_example(registration_policy)
 nucleus_add_example(capability_gating)
-nucleus_add_example(emit_template)
 
 # The XML example layers an XML document under the command line, so it links the
 # XML source module. That module's header lives under the internal src/ tree (the
@@ -37,6 +36,15 @@ nucleus_add_example(emit_template)
 # the same way the buffer-lifetime test reaches it. Built only when the XML
 # module is.
 if(NUCLEUS_BUILD_SOURCE_XML)
+    # Template emission lives in the xml module (nucleus::xml::emit_template), so the
+    # example links it and reaches its header under the internal src/ tree.
+    add_executable(emit_template emit_template.cpp)
+    target_link_libraries(emit_template PRIVATE nucleus::nucleus nucleus::source_xml)
+    target_include_directories(emit_template PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+    )
+
     add_executable(xml xml.cpp)
     target_link_libraries(xml PRIVATE nucleus::nucleus nucleus::source_xml)
     target_include_directories(xml PRIVATE

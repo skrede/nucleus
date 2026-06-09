@@ -1,15 +1,18 @@
-// emit_template: project a schema into an XML template string.
+// emit_template: project a schema into an XML template, written to a stream.
 //
-// emit_xml_template() turns the declared schema into a well-formed XML template:
-// one element per field, nested by anchor path, with constrained fields annotated
-// by their allowed values. It is hand-built in core (no XML library), so this
-// example links ONLY nucleus::nucleus -- the optional XML source module is not
-// needed to emit a template.
+// The output seam is format-agnostic: core exposes the declared schema, and each
+// format module supplies an emitter. nucleus::xml::emit_template turns the schema
+// into a well-formed XML template -- one element per field, nested by anchor path,
+// with constrained fields annotated by their allowed values -- and writes it into
+// the caller's stream. This example links the xml module and reaches its header
+// under the internal src/ tree (the one place pugixml is private).
 
 #include "nucleus/configuration_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
+
+#include "nucleus/xml/xml_emitter.h"
 
 #include <vector>
 #include <iostream>
@@ -30,6 +33,6 @@ int main()
         std::vector<std::string>{"primary", "secondary"}));
 
     nucleus::configuration_space space = builder.build();
-    std::cout << space.emit_xml_template();
+    nucleus::xml::emit_template(space, std::cout);
     return 0;
 }

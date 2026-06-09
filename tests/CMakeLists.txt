@@ -41,7 +41,6 @@ nucleus_add_test(source_seam_test)
 nucleus_add_test(capability_gating_test)
 nucleus_add_test(capability_requirements_test)
 nucleus_add_test(auto_gating_test)
-nucleus_add_test(xml_template_test)
 nucleus_add_test(discovery_test)
 nucleus_add_test(key_path_test)
 nucleus_add_test(keyspace_test)
@@ -76,6 +75,18 @@ target_link_libraries(concurrent_load_test PRIVATE Threads::Threads)
 # use-after-free guard real.
 # ---------------------------------------------------------------------------
 if(NUCLEUS_BUILD_SOURCE_XML)
+    # Template emission lives in the xml module now (nucleus::xml::emit_template),
+    # so this test links the module and reaches its header under the internal src/.
+    add_executable(xml_template_test xml_template_test.cpp)
+    nucleus_enable_coverage(xml_template_test)
+    target_link_libraries(xml_template_test
+        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+    target_include_directories(xml_template_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+    )
+    add_test(NAME xml_template_test COMMAND xml_template_test)
+
     add_executable(buffer_lifetime_test buffer_lifetime_test.cpp)
     nucleus_enable_coverage(buffer_lifetime_test)
     target_link_libraries(buffer_lifetime_test

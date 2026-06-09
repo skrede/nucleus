@@ -26,6 +26,7 @@ set(NUCLEUS_PUBLIC_HEADERS
     include/nucleus/identity.h
     include/nucleus/log_sink.h
     include/nucleus/capability.h
+    include/nucleus/config_emitter.h
     include/nucleus/configuration_space.h
     include/nucleus/registration_policy.h
 )
@@ -238,7 +239,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
 
     add_library(nucleus_source_xml
         src/nucleus/xml/xml_source.cpp
-        src/nucleus/xml/xml_writer.cpp
+        src/nucleus/xml/xml_emitter.cpp
     )
     add_library(nucleus::source_xml ALIAS nucleus_source_xml)
     nucleus_enable_coverage(nucleus_source_xml)

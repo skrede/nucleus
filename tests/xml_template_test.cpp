@@ -3,15 +3,29 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
+#include "nucleus/xml/xml_emitter.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
 #include <vector>
+#include <sstream>
 
-// emit_xml_template projects a sealed schema into a well-formed XML TEMPLATE:
-// one element per declared field, nested by anchor path, with constrained fields
-// annotated by their allowed values. Assertions are on structure/substrings, not
-// byte-exact output, to stay robust to indentation.
+// nucleus::xml::emit_template projects a sealed schema into a well-formed XML
+// TEMPLATE: one element per declared field, nested by anchor path, with constrained
+// fields annotated by their allowed values. Assertions are on structure/substrings,
+// not byte-exact output, to stay robust to indentation.
+
+namespace {
+
+[[nodiscard]] std::string template_of(const nucleus::configuration_space &space)
+{
+    std::ostringstream oss;
+    nucleus::xml::emit_template(space, oss);
+    return oss.str();
+}
+
+}
 
 namespace {
 
@@ -31,10 +45,10 @@ namespace {
 
 }
 
-TEST_CASE("emit_xml_template nests declared fields under their anchor element", "[template]")
+TEST_CASE("emit_template nests declared fields under their anchor element", "[template]")
 {
     nucleus::configuration_space space = make_server_space();
-    const std::string xml = space.emit_xml_template();
+    const std::string xml = template_of(space);
 
     // The container element is present and closed (well-formed nesting).
     const std::size_t server_open = xml.find("<server>");
@@ -49,10 +63,10 @@ TEST_CASE("emit_xml_template nests declared fields under their anchor element", 
     REQUIRE(host < server_close);
 }
 
-TEST_CASE("emit_xml_template annotates a constrained field with its allowed values", "[template]")
+TEST_CASE("emit_template annotates a constrained field with its allowed values", "[template]")
 {
     nucleus::configuration_space space = make_server_space();
-    const std::string xml = space.emit_xml_template();
+    const std::string xml = template_of(space);
 
     // The constrained field carries its allowed-value annotation.
     const std::size_t mode = xml.find("<mode");
@@ -62,7 +76,7 @@ TEST_CASE("emit_xml_template annotates a constrained field with its allowed valu
     REQUIRE(xml.find("secondary") != std::string::npos);
 }
 
-TEST_CASE("emit_xml_template leaves an unconstrained field unannotated", "[template]")
+TEST_CASE("emit_template leaves an unconstrained field unannotated", "[template]")
 {
     nucleus::configuration_space_builder builder;
     builder.register_element(nucleus::element("server", nucleus::anchor::root()));
@@ -70,6 +84,6 @@ TEST_CASE("emit_xml_template leaves an unconstrained field unannotated", "[templ
         nucleus::element("host", nucleus::anchor::keyspace("server")));
     nucleus::configuration_space space = builder.build();
 
-    const std::string xml = space.emit_xml_template();
+    const std::string xml = template_of(space);
     REQUIRE(xml.find("allowed=") == std::string::npos);
 }

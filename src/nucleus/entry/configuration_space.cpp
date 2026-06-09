@@ -4,7 +4,6 @@
 
 #include "nucleus/completion/completion.h"
 
-#include "nucleus/schema/xml_template.h"
 #include "nucleus/schema/schema_enforcer.h"
 #include "nucleus/schema/schema_registry.h"
 #include "nucleus/schema/converter_registry.h"
@@ -321,12 +320,11 @@ std::string configuration_space::generate_completion(shell which, std::string_vi
     return nucleus::generate_completion(which, m_impl->schema, prog);
 }
 
-std::string configuration_space::emit_xml_template() const
+std::span<const schema_element> configuration_space::schema_elements() const
 {
-    // Mirror generate_completion: project the sealed schema through the free
-    // generator. Only the template string crosses the boundary; the registry stays
-    // encapsulated and no XML library enters core.
-    return nucleus::emit_xml_template(m_impl->schema);
+    // Project the sealed schema's declared elements as a read-only view; the
+    // registry stays encapsulated and no format knowledge enters core.
+    return m_impl->schema.elements();
 }
 
 configuration_space_builder configuration_space::expand() const

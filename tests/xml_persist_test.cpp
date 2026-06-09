@@ -5,7 +5,7 @@
 #include "nucleus/schema/schema.h"
 
 #include "nucleus/xml/xml_source.h"
-#include "nucleus/xml/xml_writer.h"
+#include "nucleus/xml/xml_emitter.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -17,10 +17,11 @@
 #include <sstream>
 #include <filesystem>
 
-// Round-trip proof: a configuration loaded from XML, persisted via the pugixml
-// write API inside the xml module, and re-loaded yields the same keys and values --
-// including repeated collections (no last-wins loss). A nested, primary-key-free
-// schema keeps the resolved keyspace stable across the round-trip.
+// Round-trip proof: a configuration loaded from XML, persisted via the stream-based
+// emit_document inside the xml module, and re-loaded yields the same keys and values
+// -- including repeated collections (no last-wins loss). A nested, primary-key-free
+// schema keeps the resolved keyspace stable across the round-trip. The test owns
+// persistence: it supplies the ostream (an ostringstream, then a file).
 
 using nucleus::anchor;
 
@@ -66,10 +67,10 @@ TEST_CASE("a resolved configuration round-trips through XML persistence", "[pers
     REQUIRE(first);
     const nucleus::configuration &original = first.value();
 
-    auto serialized = nucleus::xml::write_document(original);
-    REQUIRE(serialized);
+    std::ostringstream serialized;
+    nucleus::xml::emit_document(original, serialized);
 
-    auto second = nucleus::load_configuration(space, document_options(serialized.value()));
+    auto second = nucleus::load_configuration(space, document_options(serialized.str()));
     REQUIRE(second);
     const nucleus::configuration &reloaded = second.value();
 
@@ -83,7 +84,7 @@ TEST_CASE("a resolved configuration round-trips through XML persistence", "[pers
     REQUIRE(reloaded.get_all("server/tag") == std::vector<std::string>{"alpha", "beta"});
 }
 
-TEST_CASE("write_document_to_file persists a configuration that re-reads identically", "[persist]")
+TEST_CASE("emit_document to a file persists a configuration that re-reads identically", "[persist]")
 {
     nucleus::configuration_space_builder engine;
     declare_server(engine);
@@ -92,10 +93,13 @@ TEST_CASE("write_document_to_file persists a configuration that re-reads identic
     auto first = nucleus::load_configuration(space, document_options(kDocument));
     REQUIRE(first);
 
+    // The test owns persistence: emit into a file stream it opens, then re-read it.
     const std::filesystem::path path =
         std::filesystem::temp_directory_path() / "nucleus_xml_persist_test.xml";
-    auto written = nucleus::xml::write_document_to_file(first.value(), path.string());
-    REQUIRE(written);
+    {
+        std::ofstream out(path);
+        nucleus::xml::emit_document(first.value(), out);
+    }
 
     std::ifstream in(path);
     std::stringstream buffer;
