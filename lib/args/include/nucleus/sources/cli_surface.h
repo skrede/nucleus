@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_ARGV_CLI_SURFACE_H
-#define HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_ARGV_CLI_SURFACE_H
+#ifndef HPP_GUARD_NUCLEUS_SOURCES_CLI_SURFACE_H
+#define HPP_GUARD_NUCLEUS_SOURCES_CLI_SURFACE_H
 
 #include "nucleus/expected.h"
 
@@ -82,23 +82,6 @@ using cli_normalize_result = expected<cli_assignment, std::string>;
         return unexpected(std::move(path).error());
 
     return cli_assignment{std::move(path).value(), std::move(value)};
-}
-
-// The inverse projection: a keyspace path back to its canonical CLI flag. Because
-// segments never contain hyphens, this is a total, lossless inverse of the
-// segmentation -- the bijection made explicit (and the basis for the schema-
-// projected flag surface and, later, tab completion).
-[[nodiscard]] inline std::string flag_of(const key_path &path)
-{
-    std::string flag = "--";
-    const auto &segments = path.segments();
-    for(std::size_t i = 0; i < segments.size(); ++i)
-    {
-        if(i != 0)
-            flag.push_back('-');
-        flag.append(segments[i]);
-    }
-    return flag;
 }
 
 }

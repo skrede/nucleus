@@ -88,6 +88,24 @@ nucleus_add_module(runtime
     ALIASES nucleus::runtime
     LINK_PUBLIC nucleus::nucleus)
 
+# env: a header-only flat-source module. env_source carries host-mapped (path, value)
+# pairs and claims no structural capabilities (no nesting, no repeated keys, no typed
+# scalars). Built unconditionally: header-only modules have zero link cost for targets
+# that do not use them; they compile away when not included.
+nucleus_add_module(env
+    TYPE INTERFACE
+    ALIASES nucleus::env
+    LINK_PUBLIC nucleus::nucleus)
+
+# args: a header-only CLI-argument source module. argv_source parses `--flag=value`
+# tokens via the `-` <-> `/` bijection (cli_surface.h) and emits flat keyspace entries.
+# Also header-only, so no link cost for non-users. LINK_PUBLIC nucleus::nucleus brings
+# the core include root (key_path, capability, configuration_source seam) in transitively.
+nucleus_add_module(args
+    TYPE INTERFACE
+    ALIASES nucleus::args
+    LINK_PUBLIC nucleus::nucleus)
+
 # Diagnostic formatting backend: when the standard library lacks std::format the
 # format() seam falls back to {fmt} in a public header, so the link is PUBLIC. The
 # probe + fetch run in the root before add_subdirectory(lib); here we only wire the

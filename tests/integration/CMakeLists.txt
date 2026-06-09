@@ -11,4 +11,4 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(nucleus REQUIRED CONFIG)
 
 add_executable(integration_test integration_test.cpp)
-target_link_libraries(integration_test PRIVATE nucleus::nucleus)
+target_link_libraries(integration_test PRIVATE nucleus::nucleus nucleus::env)

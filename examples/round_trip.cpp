@@ -20,8 +20,8 @@
 #include "nucleus/sources/xml_emitter.h"
 #include "nucleus/sources/runtime_source.h"
 
-#include "nucleus/configuration_source/env/env_emitter.h"
-#include "nucleus/configuration_source/argv/argv_emitter.h"
+#include "nucleus/sources/env_emitter.h"
+#include "nucleus/sources/argv_emitter.h"
 
 #include <string>
 #include <iostream>

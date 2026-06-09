@@ -12,7 +12,7 @@
 
 #include "nucleus/sources/xml_source.h"
 
-#include "nucleus/configuration_source/argv/argv_source.h"
+#include "nucleus/sources/argv_source.h"
 
 #include <vector>
 #include <string>

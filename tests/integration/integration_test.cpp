@@ -10,7 +10,7 @@
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/converters.h"
 
-#include "nucleus/configuration_source/env/env_source.h"
+#include "nucleus/sources/env_source.h"
 
 #include <cstdint>
 #include <iostream>

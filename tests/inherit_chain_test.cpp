@@ -7,7 +7,7 @@
 
 #include "nucleus/sources/xml_source.h"
 
-#include "nucleus/configuration_source/env/env_source.h"
+#include "nucleus/sources/env_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 

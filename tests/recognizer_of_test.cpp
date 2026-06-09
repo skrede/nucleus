@@ -6,7 +6,7 @@
 #include "nucleus/keyspace/key_path.h"
 
 #include "nucleus/configuration_source/source_stack.h"
-#include "nucleus/configuration_source/argv/argv_source.h"
+#include "nucleus/sources/argv_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 

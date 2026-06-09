@@ -8,8 +8,8 @@
 
 #include "nucleus/keyspace/provenance.h"
 
-#include "nucleus/configuration_source/env/env_source.h"
-#include "nucleus/configuration_source/argv/argv_source.h"
+#include "nucleus/sources/env_source.h"
+#include "nucleus/sources/argv_source.h"
 
 #include <vector>
 #include <iostream>

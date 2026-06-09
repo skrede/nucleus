@@ -7,8 +7,8 @@
 
 #include "nucleus/keyspace/provenance.h"
 
-#include "nucleus/configuration_source/env/env_emitter.h"
-#include "nucleus/configuration_source/argv/argv_emitter.h"
+#include "nucleus/sources/env_emitter.h"
+#include "nucleus/sources/argv_emitter.h"
 
 #include "nucleus/sources/xml_emitter.h"
 

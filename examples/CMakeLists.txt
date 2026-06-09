@@ -4,30 +4,31 @@
 # modules). They are demonstrations, not tests, so they are not registered with
 # CTest.
 
-# Registers an example executable linked against the core library.
+# Registers an example executable linked against the core library. Additional
+# link targets (e.g. nucleus::env, nucleus::args) are passed as extra arguments.
 function(nucleus_add_example name)
     add_executable(${name} ${name}.cpp)
-    target_link_libraries(${name} PRIVATE nucleus::nucleus)
+    target_link_libraries(${name} PRIVATE nucleus::nucleus ${ARGN})
 endfunction()
 
 # Getting started.
-nucleus_add_example(quickstart)
-nucleus_add_example(schema)
+nucleus_add_example(quickstart nucleus::args)
+nucleus_add_example(schema nucleus::env)
 
 # Sources: the built-in flat sources and the seam a host extends.
-nucleus_add_example(argv)
-nucleus_add_example(env)
-nucleus_add_example(layering)
+nucleus_add_example(argv nucleus::args)
+nucleus_add_example(env nucleus::env)
+nucleus_add_example(layering nucleus::env nucleus::args)
 nucleus_add_example(custom_source)
 nucleus_add_example(parser_concept)
 
 # Tokens, logging, completion, diagnostics, and the registration-policy seam.
-nucleus_add_example(tokens)
-nucleus_add_example(logging)
+nucleus_add_example(tokens nucleus::env)
+nucleus_add_example(logging nucleus::args)
 nucleus_add_example(completion)
 nucleus_add_example(diagnostics)
 nucleus_add_example(registration_policy)
-nucleus_add_example(capability_gating)
+nucleus_add_example(capability_gating nucleus::env)
 
 # The XML example layers an XML document under the command line, so it links the
 # xml module (nucleus::xml). Its public adapter headers under nucleus/sources/
@@ -43,7 +44,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     )
 
     add_executable(xml xml.cpp)
-    target_link_libraries(xml PRIVATE nucleus::nucleus nucleus::source_xml)
+    target_link_libraries(xml PRIVATE nucleus::nucleus nucleus::source_xml nucleus::args)
     target_include_directories(xml PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
@@ -67,11 +68,11 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     )
 
     # round_trip renders one resolved configuration through xml/env/args, so it links
-    # the xml module (its emitter) and the runtime module (the programmatic source);
-    # the env/args emitters ship in core and arrive via nucleus::nucleus.
+    # the xml, env, and args modules (all three emitters); the runtime module supplies
+    # the programmatic source. Headers arrive via the respective links.
     add_executable(round_trip round_trip.cpp)
     target_link_libraries(round_trip
-        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::runtime)
+        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::runtime nucleus::env nucleus::args)
     target_include_directories(round_trip PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )

@@ -5,8 +5,10 @@
 
 #include "nucleus/keyspace/key_path.h"
 
-#include "nucleus/configuration_source/argv/argv_source.h"
-#include "nucleus/configuration_source/argv/cli_surface.h"
+#include "nucleus/schema/cli_flag.h"
+
+#include "nucleus/sources/argv_source.h"
+#include "nucleus/sources/cli_surface.h"
 
 #include <catch2/catch_test_macros.hpp>
 

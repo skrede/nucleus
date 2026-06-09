@@ -33,38 +33,38 @@ nucleus_add_test(type_info_test)
 nucleus_add_test(format_test)
 nucleus_add_test(identity_test)
 nucleus_add_test(log_sink_test)
-nucleus_add_test(facade_test)
+nucleus_add_test(facade_test nucleus::env)
 nucleus_add_test(facade_schema_test nucleus::runtime)
 nucleus_add_test(registry_isolation_test)
 nucleus_add_test(source_seam_test)
 nucleus_add_test(source_handle_test)
 nucleus_add_test(source_concept_test)
 nucleus_add_test(source_stack_test)
-nucleus_add_test(capability_gating_test)
+nucleus_add_test(capability_gating_test nucleus::env)
 nucleus_add_test(capability_requirements_test)
-nucleus_add_test(auto_gating_test)
+nucleus_add_test(auto_gating_test nucleus::env)
 nucleus_add_test(discovery_test)
 nucleus_add_test(key_path_test)
 nucleus_add_test(keyspace_test)
 nucleus_add_test(schema_registry_test)
 nucleus_add_test(schema_enforcer_test)
-nucleus_add_test(argv_source_test)
-nucleus_add_test(schema_cli_bijection_test)
+nucleus_add_test(argv_source_test nucleus::args)
+nucleus_add_test(schema_cli_bijection_test nucleus::args)
 nucleus_add_test(token_lexer_test)
 nucleus_add_test(token_resolution_test)
 nucleus_add_test(token_cycle_test)
-nucleus_add_test(resolution_test)
+nucleus_add_test(resolution_test nucleus::env nucleus::args)
 nucleus_add_test(diagnostics_test)
 nucleus_add_test(completion_test)
 nucleus_add_test(completion_smoke_test)
 nucleus_add_test(facade_completion_test)
 nucleus_add_test(strain_scope_policy_test nucleus::runtime)
-nucleus_add_test(converter_registry_test)
+nucleus_add_test(converter_registry_test nucleus::env)
 nucleus_add_test(builder_lifecycle_test)
-nucleus_add_test(expand_independence_test)
+nucleus_add_test(expand_independence_test nucleus::env)
 nucleus_add_test(concurrent_load_test nucleus::runtime)
 nucleus_add_test(load_front_door_test nucleus::runtime)
-nucleus_add_test(recognizer_of_test)
+nucleus_add_test(recognizer_of_test nucleus::args)
 
 # The concurrent-load guarantee test spawns std::threads; link the platform's
 # threading library so the shared-const-read design is exercised under ASan.
@@ -91,11 +91,11 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_test(NAME xml_template_test COMMAND xml_template_test)
 
     # The emit-seam proof builds all three emitters (env, args, xml) from one space,
-    # so it links the xml module; its header arrives via the nucleus::xml link.
+    # so it links all three modules; headers arrive via the respective links.
     add_executable(emit_seam_test emit_seam_test.cpp)
     nucleus_enable_coverage(emit_seam_test)
     target_link_libraries(emit_seam_test
-        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::env nucleus::args Catch2::Catch2WithMain)
     target_include_directories(emit_seam_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
@@ -116,7 +116,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(resolve_buffer_drop_test resolve_buffer_drop_test.cpp)
     nucleus_enable_coverage(resolve_buffer_drop_test)
     target_link_libraries(resolve_buffer_drop_test
-        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::env Catch2::Catch2WithMain)
     target_include_directories(resolve_buffer_drop_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
@@ -146,7 +146,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(inherit_chain_test inherit_chain_test.cpp)
     nucleus_enable_coverage(inherit_chain_test)
     target_link_libraries(inherit_chain_test
-        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::env Catch2::Catch2WithMain)
     target_include_directories(inherit_chain_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
@@ -167,7 +167,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(integration_shape_test integration_shape_test.cpp)
     nucleus_enable_coverage(integration_shape_test)
     target_link_libraries(integration_shape_test
-        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::env Catch2::Catch2WithMain)
     target_include_directories(integration_shape_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
@@ -178,7 +178,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(repeated_element_test repeated_element_test.cpp)
     nucleus_enable_coverage(repeated_element_test)
     target_link_libraries(repeated_element_test
-        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::runtime Catch2::Catch2WithMain)
+        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::runtime nucleus::env Catch2::Catch2WithMain)
     target_include_directories(repeated_element_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
@@ -203,7 +203,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(typed_shape_test typed_shape_test.cpp)
     nucleus_enable_coverage(typed_shape_test)
     target_link_libraries(typed_shape_test
-        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::env Catch2::Catch2WithMain)
     target_include_directories(typed_shape_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )

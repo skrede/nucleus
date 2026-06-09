@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_ENV_ENV_SOURCE_H
-#define HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_ENV_ENV_SOURCE_H
+#ifndef HPP_GUARD_NUCLEUS_SOURCES_ENV_SOURCE_H
+#define HPP_GUARD_NUCLEUS_SOURCES_ENV_SOURCE_H
 
 #include "nucleus/capability.h"
 
@@ -74,6 +74,6 @@ private:
     std::vector<std::pair<std::string, std::string>> m_entries;
 };
 
-} // namespace nucleus
+}
 
 #endif
