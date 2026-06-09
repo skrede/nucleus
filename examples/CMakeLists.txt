@@ -8,7 +8,6 @@
 function(nucleus_add_example name)
     add_executable(${name} ${name}.cpp)
     target_link_libraries(${name} PRIVATE nucleus::nucleus)
-    target_include_directories(${name} PRIVATE ${CMAKE_SOURCE_DIR}/include)
 endfunction()
 
 # Getting started.
@@ -41,35 +40,35 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(emit_template emit_template.cpp)
     target_link_libraries(emit_template PRIVATE nucleus::nucleus nucleus::source_xml)
     target_include_directories(emit_template PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/lib/core/src
         ${CMAKE_SOURCE_DIR}/src
     )
 
     add_executable(xml xml.cpp)
     target_link_libraries(xml PRIVATE nucleus::nucleus nucleus::source_xml)
     target_include_directories(xml PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/lib/core/src
         ${CMAKE_SOURCE_DIR}/src
     )
 
     add_executable(strains strains.cpp)
     target_link_libraries(strains PRIVATE nucleus::nucleus nucleus::source_xml)
     target_include_directories(strains PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/lib/core/src
         ${CMAKE_SOURCE_DIR}/src
     )
 
     add_executable(typed typed.cpp)
     target_link_libraries(typed PRIVATE nucleus::nucleus nucleus::source_xml)
     target_include_directories(typed PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/lib/core/src
         ${CMAKE_SOURCE_DIR}/src
     )
 
     add_executable(xml_persist xml_persist.cpp)
     target_link_libraries(xml_persist PRIVATE nucleus::nucleus nucleus::source_xml)
     target_include_directories(xml_persist PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/lib/core/src
         ${CMAKE_SOURCE_DIR}/src
     )
 endif()

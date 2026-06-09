@@ -31,9 +31,9 @@ get_filename_component(quarantined_xml_dir
 set(quarantined_dirs "${quarantined_xml_dir}")
 
 file(GLOB_RECURSE core_files
-    "${NUCLEUS_ROOT}/include/nucleus/*.h"
-    "${NUCLEUS_ROOT}/src/nucleus/*.h"
-    "${NUCLEUS_ROOT}/src/nucleus/*.cpp"
+    "${NUCLEUS_ROOT}/lib/core/include/nucleus/*.h"
+    "${NUCLEUS_ROOT}/lib/core/src/nucleus/*.h"
+    "${NUCLEUS_ROOT}/lib/core/src/nucleus/*.cpp"
 )
 
 set(violations "")

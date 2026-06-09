@@ -13,120 +13,14 @@ option(NUCLEUS_FETCH_TEST_DEPS "Fetch test dependencies (Catch2) via FetchConten
 include(cmake/buildflags.cmake)
 
 # ---------------------------------------------------------------------------
-# nucleus core library
-#
-# The public headers below are the stable, installed surface of the engine; the
-# subdirectory header sets that follow carry the source-seam, keyspace, schema,
-# and diagnostics contracts.
-# ---------------------------------------------------------------------------
-set(NUCLEUS_PUBLIC_HEADERS
-    include/nucleus/version.h
-    include/nucleus/format.h
-    include/nucleus/expected.h
-    include/nucleus/identity.h
-    include/nucleus/log_sink.h
-    include/nucleus/capability.h
-    include/nucleus/config_emitter.h
-    include/nucleus/configuration_space.h
-    include/nucleus/registration_policy.h
-)
-
-# Detail headers: implementation seams exposed only through a public alias header
-# (e.g. expected.h -> detail/expected.h), installed under their subdirectory.
-set(NUCLEUS_DETAIL_HEADERS
-    include/nucleus/detail/expected.h
-)
-
-# Public source-seam and keyspace headers. These are header-only contracts; they
-# install under their subdirectory so the include paths stay stable for adopters.
-set(NUCLEUS_SOURCE_HEADERS
-    include/nucleus/configuration_source/configuration_source.h
-    include/nucleus/configuration_source/parser.h
-    include/nucleus/configuration_source/discovery.h
-    include/nucleus/configuration_source/path_text.h
-    include/nucleus/configuration_source/feature_gate.h
-    include/nucleus/configuration_source/parser_adapter.h
-    include/nucleus/configuration_source/document_source.h
-    include/nucleus/configuration_source/extension_registry.h
-    include/nucleus/configuration_source/inherit_declaration.h
-)
-
-set(NUCLEUS_SOURCE_ENV_HEADERS
-    include/nucleus/configuration_source/env/env_source.h
-)
-
-set(NUCLEUS_KEYSPACE_HEADERS
-    include/nucleus/keyspace/value.h
-    include/nucleus/keyspace/entry.h
-    include/nucleus/keyspace/key_path.h
-    include/nucleus/keyspace/keyspace.h
-    include/nucleus/keyspace/provenance.h
-)
-
-set(NUCLEUS_ENTRY_HEADERS
-    include/nucleus/entry/precedence.h
-    include/nucleus/entry/strain_scope.h
-    include/nucleus/entry/configuration.h
-)
-
-set(NUCLEUS_DIAGNOSTICS_HEADERS
-    include/nucleus/diagnostics/key_suggester.h
-    include/nucleus/diagnostics/conflict_report.h
-)
-
-set(NUCLEUS_SCHEMA_HEADERS
-    include/nucleus/schema/anchor.h
-    include/nucleus/schema/schema.h
-    include/nucleus/schema/converters.h
-)
-
-set(NUCLEUS_SOURCE_ARGV_HEADERS
-    include/nucleus/configuration_source/argv/cli_surface.h
-    include/nucleus/configuration_source/argv/argv_source.h
-)
-
-set(NUCLEUS_COMPLETION_HEADERS
-    include/nucleus/completion/completion.h
-    include/nucleus/completion/completion_model.h
-    include/nucleus/completion/shell_emitter.h
-    include/nucleus/completion/bash_emitter.h
-    include/nucleus/completion/zsh_emitter.h
-)
-
-set(NUCLEUS_UTILITY_HEADERS
-    include/nucleus/utility/type_info.h
-)
-
-set(NUCLEUS_SOURCES
-    src/nucleus/version.cpp
-    src/nucleus/entry/configuration_space.cpp
-    src/nucleus/tokenizer/tokenizer.cpp
-    src/nucleus/tokenizer/token_lexer.cpp
-    src/nucleus/tokenizer/scope_keys.cpp
-    src/nucleus/tokenizer/resolver_scope.cpp
-    src/nucleus/tokenizer/builtin_tokenizers.cpp
-    src/nucleus/completion/completion.cpp
-)
-
-add_library(nucleus ${NUCLEUS_SOURCES})
-add_library(nucleus::nucleus ALIAS nucleus)
-nucleus_enable_coverage(nucleus)
-
-target_compile_features(nucleus PUBLIC cxx_std_20)
-
-target_include_directories(nucleus PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-)
-target_include_directories(nucleus PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-
-# ---------------------------------------------------------------------------
 # Diagnostic formatting backend
 #
 # std::format is the interface vocabulary, but libc++/Apple Clang historically
 # lagged on it. Detect __cpp_lib_format; if the standard library lacks it, pull
 # {fmt} (the reference implementation) so the format() seam stays buildable. The
-# dependency is PUBLIC because the fallback appears in a public header.
+# probe runs here, before add_subdirectory(lib), so its result and the recorded
+# NUCLEUS_FMT_REQUIRED stay in this scope for the package config below; the fmt
+# link itself is wired onto nucleus_core inside lib/CMakeLists.txt.
 # ---------------------------------------------------------------------------
 include(CheckCXXSourceCompiles)
 # Drive the probe with the compiler's own standard selection rather than a
@@ -162,14 +56,17 @@ if(NOT NUCLEUS_HAVE_STD_FORMAT)
         FIND_PACKAGE_ARGS NAMES fmt
     )
     FetchContent_MakeAvailable(fmt)
-    target_link_libraries(nucleus PUBLIC fmt::fmt)
     set(NUCLEUS_FMT_REQUIRED TRUE)
 endif()
 
-set_target_properties(nucleus PROPERTIES
-    PUBLIC_HEADER "${NUCLEUS_PUBLIC_HEADERS}"
-    VERSION ${PROJECT_VERSION}
-)
+# ---------------------------------------------------------------------------
+# Per-target library tree
+#
+# lib/ stands up each module (core first; xml/env/args/runtime follow) behind one
+# nucleus_add_module() helper. core's EXPORT_NAME is nucleus, so the installed
+# export keeps defining nucleus::nucleus for existing consumers.
+# ---------------------------------------------------------------------------
+add_subdirectory(lib)
 
 # ---------------------------------------------------------------------------
 # Install / export
@@ -179,41 +76,13 @@ set_target_properties(nucleus PROPERTIES
 # package config consumes it to decide whether to find_dependency(pugixml).
 set(NUCLEUS_XML_INSTALLED FALSE)
 
-install(TARGETS nucleus
-    EXPORT nucleus-targets
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus
-)
+# The single export set; each module joined it via nucleus_add_module(). Generated
+# once here so it sees every installed target (core + any format modules below).
 install(EXPORT nucleus-targets
     FILE nucleus-targets.cmake
     NAMESPACE nucleus::
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/nucleus
 )
-
-# Subdirectory headers preserve their relative path under the include root
-# (PUBLIC_HEADER flattens, which would collide source/ and keyspace/ names).
-install(FILES ${NUCLEUS_SOURCE_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/configuration_source)
-install(FILES ${NUCLEUS_SOURCE_ENV_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/configuration_source/env)
-install(FILES ${NUCLEUS_KEYSPACE_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/keyspace)
-install(FILES ${NUCLEUS_ENTRY_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/entry)
-install(FILES ${NUCLEUS_DIAGNOSTICS_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/diagnostics)
-install(FILES ${NUCLEUS_SCHEMA_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/schema)
-install(FILES ${NUCLEUS_SOURCE_ARGV_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/configuration_source/argv)
-install(FILES ${NUCLEUS_COMPLETION_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/completion)
-install(FILES ${NUCLEUS_UTILITY_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/utility)
-install(FILES ${NUCLEUS_DETAIL_HEADERS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/detail)
 
 # ---------------------------------------------------------------------------
 # XML source module
@@ -247,7 +116,6 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     target_compile_features(nucleus_source_xml PUBLIC cxx_std_20)
     target_include_directories(nucleus_source_xml
         PUBLIC
-            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
             $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src

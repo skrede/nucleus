@@ -22,7 +22,7 @@ function(nucleus_add_test name)
     target_link_libraries(${name} PRIVATE nucleus::nucleus Catch2::Catch2WithMain)
     nucleus_enable_coverage(${name})
     target_include_directories(${name} PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/lib/core/src
         ${CMAKE_SOURCE_DIR}/src
     )
     add_test(NAME ${name} COMMAND ${name})
@@ -82,7 +82,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     target_link_libraries(xml_template_test
         PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
     target_include_directories(xml_template_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/lib/core/src
         ${CMAKE_SOURCE_DIR}/src
     )
     add_test(NAME xml_template_test COMMAND xml_template_test)
@@ -94,7 +94,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     target_link_libraries(emit_seam_test
         PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
     target_include_directories(emit_seam_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/lib/core/src
         ${CMAKE_SOURCE_DIR}/src
     )
     add_test(NAME emit_seam_test COMMAND emit_seam_test)
@@ -104,7 +104,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     target_link_libraries(buffer_lifetime_test
         PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
     target_include_directories(buffer_lifetime_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/lib/core/src
         ${CMAKE_SOURCE_DIR}/src
     )
     add_test(NAME buffer_lifetime_test COMMAND buffer_lifetime_test)
@@ -117,7 +117,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     target_link_libraries(resolve_buffer_drop_test
         PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
     target_include_directories(resolve_buffer_drop_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/lib/core/src
         ${CMAKE_SOURCE_DIR}/src
     )
     add_test(NAME resolve_buffer_drop_test COMMAND resolve_buffer_drop_test)
@@ -130,7 +130,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     target_link_libraries(keyed_projection_test
         PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
     target_include_directories(keyed_projection_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/lib/core/src
         ${CMAKE_SOURCE_DIR}/src
     )
     add_test(NAME keyed_projection_test COMMAND keyed_projection_test)
@@ -140,7 +140,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     target_link_libraries(keyed_selection_test
         PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
     target_include_directories(keyed_selection_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/lib/core/src
         ${CMAKE_SOURCE_DIR}/src
     )
     add_test(NAME keyed_selection_test COMMAND keyed_selection_test)
@@ -150,7 +150,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     target_link_libraries(inherit_chain_test
         PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
     target_include_directories(inherit_chain_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/lib/core/src
         ${CMAKE_SOURCE_DIR}/src
     )
     add_test(NAME inherit_chain_test COMMAND inherit_chain_test)
@@ -163,7 +163,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     target_link_libraries(xml_persist_test
         PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
     target_include_directories(xml_persist_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/lib/core/src
         ${CMAKE_SOURCE_DIR}/src
     )
     add_test(NAME xml_persist_test COMMAND xml_persist_test)
@@ -173,7 +173,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     target_link_libraries(integration_shape_test
         PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
     target_include_directories(integration_shape_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/lib/core/src
         ${CMAKE_SOURCE_DIR}/src
     )
     add_test(NAME integration_shape_test COMMAND integration_shape_test)
@@ -185,7 +185,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     target_link_libraries(repeated_element_test
         PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
     target_include_directories(repeated_element_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/lib/core/src
         ${CMAKE_SOURCE_DIR}/src
     )
     add_test(NAME repeated_element_test COMMAND repeated_element_test)
@@ -198,7 +198,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     target_link_libraries(typed_element_test
         PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
     target_include_directories(typed_element_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/lib/core/src
         ${CMAKE_SOURCE_DIR}/src
     )
     add_test(NAME typed_element_test COMMAND typed_element_test)
@@ -212,7 +212,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     target_link_libraries(typed_shape_test
         PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
     target_include_directories(typed_shape_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/lib/core/src
         ${CMAKE_SOURCE_DIR}/src
     )
     add_test(NAME typed_shape_test COMMAND typed_shape_test)
@@ -228,7 +228,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     target_link_libraries(inheritance_golden_test
         PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
     target_include_directories(inheritance_golden_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/lib/core/src
         ${CMAKE_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/inheritance_golden
     )
@@ -257,7 +257,7 @@ add_executable(sibling_member_fixture EXCLUDE_FROM_ALL
     isolation/sibling_member_fixture.cpp)
 target_link_libraries(sibling_member_fixture PRIVATE nucleus::nucleus)
 target_include_directories(sibling_member_fixture PRIVATE
-    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/lib/core/src
     ${CMAKE_SOURCE_DIR}/src
 )
 
@@ -272,7 +272,7 @@ add_executable(entangling_ctor_fixture EXCLUDE_FROM_ALL
     isolation/entangling_ctor_fixture.cpp)
 target_link_libraries(entangling_ctor_fixture PRIVATE nucleus::nucleus)
 target_include_directories(entangling_ctor_fixture PRIVATE
-    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/lib/core/src
     ${CMAKE_SOURCE_DIR}/src
 )
 

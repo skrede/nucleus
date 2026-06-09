@@ -23,7 +23,7 @@ pattern='xml|pugi|<vagus>|<node>|\bvagus\b'
 quarantine='src/nucleus/xml/'
 
 hits="$(grep -rinE "$pattern" \
-        "$root/include/nucleus" "$root/src/nucleus" 2>/dev/null \
+        "$root/lib/core/include/nucleus" "$root/lib/core/src/nucleus" 2>/dev/null \
         | grep -v "$quarantine" || true)"
 
 if [[ -n "$hits" ]]; then
