@@ -193,7 +193,8 @@ argv.delimit_with(delim);
 
 Its capability descriptor is empty: a flag stream is flat and untyped, like
 env. See [`examples/argv.cpp`](../examples/argv.cpp),
-[`examples/argv_recognizer.cpp`](../examples/argv_recognizer.cpp), and
+[`examples/argv_recognizer.cpp`](../examples/argv_recognizer.cpp),
+[`examples/argv_delimiter.cpp`](../examples/argv_delimiter.cpp), and
 [`examples/logging.cpp`](../examples/logging.cpp).
 
 ---

@@ -1,8 +1,9 @@
 // argv: how command-line flags map onto the keyspace, and unknown-flag policy.
 //
-// `--a-b-c=v` maps to the key path `a/b/c`; `-` is always the separator. A
-// recognizer ties the source to the set of admissible keys. In lenient mode an
-// unrecognized flag is stored with a warning; in strict mode it fails the pull.
+// `--a-b-c=v` maps to the key path `a/b/c`; the delimiter is `-` by default and
+// host-selectable (see argv_delimiter.cpp). A recognizer ties the source to the
+// set of admissible keys. In lenient mode an unrecognized flag is stored with a
+// warning; in strict mode it fails the pull.
 
 #include "nucleus/argv/argv_source.h"
 

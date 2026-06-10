@@ -715,4 +715,5 @@ A host that re-delimits its CLI (`argv_source::delimit_with`) passes the same
 An `enum_element`'s value set becomes that flag's completion candidates. A pure
 read of the sealed schema. nucleus is a library, not a CLI — it returns the
 script as a string and the host decides how to surface it. See
-[`examples/completion.cpp`](../examples/completion.cpp).
+[`examples/completion.cpp`](../examples/completion.cpp) and
+[`examples/argv_delimiter.cpp`](../examples/argv_delimiter.cpp).

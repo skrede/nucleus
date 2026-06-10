@@ -27,6 +27,7 @@ nucleus_add_example(parser_concept)
 nucleus_add_example(source_stack nucleus::env nucleus::argv nucleus::runtime)
 nucleus_add_example(reusable_space nucleus::runtime)
 nucleus_add_example(argv_recognizer nucleus::argv)
+nucleus_add_example(argv_delimiter nucleus::argv)
 
 # Tokens, logging, completion, diagnostics, and the registration-policy seam.
 nucleus_add_example(tokens nucleus::env)
