@@ -28,7 +28,7 @@ enum class log_level : std::uint8_t
         case log_level::warn:  return "warn";
         case log_level::error: return "error";
     }
-    return "info";
+    return "unknown";
 }
 
 // The logging seam: a minimal level + message contract with a no-op default and

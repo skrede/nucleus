@@ -39,7 +39,7 @@ enum class capability : std::uint8_t
         case capability::comments:       return "comments";
         case capability::ordering:       return "ordering";
     }
-    return "nesting";
+    return "unknown";
 }
 
 // A source's declared affordances. It is a small fixed-size bit set keyed by the
