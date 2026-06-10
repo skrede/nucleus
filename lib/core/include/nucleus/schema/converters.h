@@ -34,6 +34,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <charconv>
+#include <concepts>
 #include <optional>
 #include <algorithm>
 #include <typeindex>
@@ -125,356 +126,111 @@ template<typename Float>
 
 }
 
-// Returns a converter lambda for the built-in scalar type T. Only instantiable
-// for the types listed in the toolchain floor comment above. Exposed so a host
-// can compose it (e.g. wrap it with extra validation) without re-implementing
-// the low-level parsing.
+// Maps a from_chars-shaped outcome onto the converter error vocabulary shared
+// by every numeric width:
+//   success but ptr short of the end  -> "trailing characters after value"
+//   errc::result_out_of_range         -> "value out of range for type"
+//   errc::invalid_argument, zero characters consumed:
+//        leading '-'                  -> "value out of range for type"
+//                                        (only reachable for unsigned targets: a
+//                                        signed out-of-range negative is already
+//                                        result_out_of_range)
+//        anything else (incl. '+')    -> "invalid characters in value"
+//                                        (from_chars never accepts a leading '+';
+//                                        that is syntax, not range)
+//   errc::invalid_argument, partial consume -> "trailing characters after value"
+namespace detail {
+
+template<typename T>
+[[nodiscard]] inline expected<std::any, std::string>
+classify_numeric_parse(std::string_view sv, const char *ptr, std::errc ec, T out)
+{
+    if(ec == std::errc{})
+    {
+        if(ptr != sv.data() + sv.size())
+            return unexpected(std::string("trailing characters after value"));
+        return std::any(out);
+    }
+    if(ec == std::errc::result_out_of_range)
+        return unexpected(std::string("value out of range for type"));
+    // errc::invalid_argument
+    if(ptr == sv.data())
+    {
+        if(sv.front() == '-')
+            return unexpected(std::string("value out of range for type"));
+        return unexpected(std::string("invalid characters in value"));
+    }
+    return unexpected(std::string("trailing characters after value"));
+}
+
+}
+
+// Returns a converter lambda for the built-in scalar type T (the set in the
+// header comment above; anything else is a loud compile error). Exposed so a
+// host can compose it (e.g. wrap it with extra validation) without
+// re-implementing the low-level parsing. bool and char are carved out before
+// the std::integral branch because both satisfy the concept yet have their own
+// vocabularies (true/false/1/0; exactly one byte).
 template<typename T>
 [[nodiscard]] std::function<expected<std::any, std::string>(std::string_view)>
 make_scalar_converter()
 {
-    // Intentionally not defined for arbitrary T -- only explicit specializations
-    // below are valid instantiations.
-    static_assert(sizeof(T) == 0, "make_scalar_converter<T> has no specialization for this type");
-    return {};
-}
-
-// Integer and float helpers -- dispatch follows the plan exactly:
-//   1. sv.empty()           -> "empty input"
-//   2. from_chars succeeds but ptr != sv.data()+sv.size()
-//                           -> "trailing characters after value"
-//   3. errc::result_out_of_range -> "value out of range for type"
-//   4. errc::invalid_argument on non-empty input:
-//        ptr == sv.data()   -> zero characters consumed; split on leading char:
-//                              '-' or '+' -> "value out of range for type"
-//                              (a sign into an unsigned type is a range-adjacent
-//                              case; a negative into a signed type that is still
-//                              out of representable range is already caught by
-//                              case 3, so this only fires for '+' on signed types)
-//                              anything else -> "invalid characters in value"
-//                              (pure non-numeric input such as "abc")
-//        ptr  > sv.data()   -> "trailing characters after value"
-
-template<>
-[[nodiscard]] inline std::function<expected<std::any, std::string>(std::string_view)>
-make_scalar_converter<int8_t>()
-{
-    return [](std::string_view sv) -> expected<std::any, std::string> {
-        if(sv.empty())
-            return unexpected(std::string("empty input"));
-        int8_t out{};
-        auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), out);
-        if(ec == std::errc{})
-        {
-            if(ptr != sv.data() + sv.size())
-                return unexpected(std::string("trailing characters after value"));
-            return std::any(out);
-        }
-        if(ec == std::errc::result_out_of_range)
-            return unexpected(std::string("value out of range for type"));
-        // errc::invalid_argument
-        if(ptr == sv.data())
-        {
-            if(!sv.empty() && (sv[0] == '-' || sv[0] == '+'))
-                return unexpected(std::string("value out of range for type"));
-            return unexpected(std::string("invalid characters in value"));
-        }
-        return unexpected(std::string("trailing characters after value"));
-    };
-}
-
-template<>
-[[nodiscard]] inline std::function<expected<std::any, std::string>(std::string_view)>
-make_scalar_converter<int16_t>()
-{
-    return [](std::string_view sv) -> expected<std::any, std::string> {
-        if(sv.empty())
-            return unexpected(std::string("empty input"));
-        int16_t out{};
-        auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), out);
-        if(ec == std::errc{})
-        {
-            if(ptr != sv.data() + sv.size())
-                return unexpected(std::string("trailing characters after value"));
-            return std::any(out);
-        }
-        if(ec == std::errc::result_out_of_range)
-            return unexpected(std::string("value out of range for type"));
-        // errc::invalid_argument
-        if(ptr == sv.data())
-        {
-            if(!sv.empty() && (sv[0] == '-' || sv[0] == '+'))
-                return unexpected(std::string("value out of range for type"));
-            return unexpected(std::string("invalid characters in value"));
-        }
-        return unexpected(std::string("trailing characters after value"));
-    };
-}
-
-template<>
-[[nodiscard]] inline std::function<expected<std::any, std::string>(std::string_view)>
-make_scalar_converter<int32_t>()
-{
-    return [](std::string_view sv) -> expected<std::any, std::string> {
-        if(sv.empty())
-            return unexpected(std::string("empty input"));
-        int32_t out{};
-        auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), out);
-        if(ec == std::errc{})
-        {
-            if(ptr != sv.data() + sv.size())
-                return unexpected(std::string("trailing characters after value"));
-            return std::any(out);
-        }
-        if(ec == std::errc::result_out_of_range)
-            return unexpected(std::string("value out of range for type"));
-        // errc::invalid_argument
-        if(ptr == sv.data())
-        {
-            if(!sv.empty() && (sv[0] == '-' || sv[0] == '+'))
-                return unexpected(std::string("value out of range for type"));
-            return unexpected(std::string("invalid characters in value"));
-        }
-        return unexpected(std::string("trailing characters after value"));
-    };
-}
-
-template<>
-[[nodiscard]] inline std::function<expected<std::any, std::string>(std::string_view)>
-make_scalar_converter<int64_t>()
-{
-    return [](std::string_view sv) -> expected<std::any, std::string> {
-        if(sv.empty())
-            return unexpected(std::string("empty input"));
-        int64_t out{};
-        auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), out);
-        if(ec == std::errc{})
-        {
-            if(ptr != sv.data() + sv.size())
-                return unexpected(std::string("trailing characters after value"));
-            return std::any(out);
-        }
-        if(ec == std::errc::result_out_of_range)
-            return unexpected(std::string("value out of range for type"));
-        // errc::invalid_argument
-        if(ptr == sv.data())
-        {
-            if(!sv.empty() && (sv[0] == '-' || sv[0] == '+'))
-                return unexpected(std::string("value out of range for type"));
-            return unexpected(std::string("invalid characters in value"));
-        }
-        return unexpected(std::string("trailing characters after value"));
-    };
-}
-
-template<>
-[[nodiscard]] inline std::function<expected<std::any, std::string>(std::string_view)>
-make_scalar_converter<uint8_t>()
-{
-    return [](std::string_view sv) -> expected<std::any, std::string> {
-        if(sv.empty())
-            return unexpected(std::string("empty input"));
-        uint8_t out{};
-        auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), out);
-        if(ec == std::errc{})
-        {
-            if(ptr != sv.data() + sv.size())
-                return unexpected(std::string("trailing characters after value"));
-            return std::any(out);
-        }
-        if(ec == std::errc::result_out_of_range)
-            return unexpected(std::string("value out of range for type"));
-        // errc::invalid_argument
-        if(ptr == sv.data())
-        {
-            if(!sv.empty() && (sv[0] == '-' || sv[0] == '+'))
-                return unexpected(std::string("value out of range for type"));
-            return unexpected(std::string("invalid characters in value"));
-        }
-        return unexpected(std::string("trailing characters after value"));
-    };
-}
-
-template<>
-[[nodiscard]] inline std::function<expected<std::any, std::string>(std::string_view)>
-make_scalar_converter<uint16_t>()
-{
-    return [](std::string_view sv) -> expected<std::any, std::string> {
-        if(sv.empty())
-            return unexpected(std::string("empty input"));
-        uint16_t out{};
-        auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), out);
-        if(ec == std::errc{})
-        {
-            if(ptr != sv.data() + sv.size())
-                return unexpected(std::string("trailing characters after value"));
-            return std::any(out);
-        }
-        if(ec == std::errc::result_out_of_range)
-            return unexpected(std::string("value out of range for type"));
-        // errc::invalid_argument
-        if(ptr == sv.data())
-        {
-            if(!sv.empty() && (sv[0] == '-' || sv[0] == '+'))
-                return unexpected(std::string("value out of range for type"));
-            return unexpected(std::string("invalid characters in value"));
-        }
-        return unexpected(std::string("trailing characters after value"));
-    };
-}
-
-template<>
-[[nodiscard]] inline std::function<expected<std::any, std::string>(std::string_view)>
-make_scalar_converter<uint32_t>()
-{
-    return [](std::string_view sv) -> expected<std::any, std::string> {
-        if(sv.empty())
-            return unexpected(std::string("empty input"));
-        uint32_t out{};
-        auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), out);
-        if(ec == std::errc{})
-        {
-            if(ptr != sv.data() + sv.size())
-                return unexpected(std::string("trailing characters after value"));
-            return std::any(out);
-        }
-        if(ec == std::errc::result_out_of_range)
-            return unexpected(std::string("value out of range for type"));
-        // errc::invalid_argument
-        if(ptr == sv.data())
-        {
-            if(!sv.empty() && (sv[0] == '-' || sv[0] == '+'))
-                return unexpected(std::string("value out of range for type"));
-            return unexpected(std::string("invalid characters in value"));
-        }
-        return unexpected(std::string("trailing characters after value"));
-    };
-}
-
-template<>
-[[nodiscard]] inline std::function<expected<std::any, std::string>(std::string_view)>
-make_scalar_converter<uint64_t>()
-{
-    return [](std::string_view sv) -> expected<std::any, std::string> {
-        if(sv.empty())
-            return unexpected(std::string("empty input"));
-        uint64_t out{};
-        auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), out);
-        if(ec == std::errc{})
-        {
-            if(ptr != sv.data() + sv.size())
-                return unexpected(std::string("trailing characters after value"));
-            return std::any(out);
-        }
-        if(ec == std::errc::result_out_of_range)
-            return unexpected(std::string("value out of range for type"));
-        // errc::invalid_argument
-        if(ptr == sv.data())
-        {
-            if(!sv.empty() && (sv[0] == '-' || sv[0] == '+'))
-                return unexpected(std::string("value out of range for type"));
-            return unexpected(std::string("invalid characters in value"));
-        }
-        return unexpected(std::string("trailing characters after value"));
-    };
-}
-
-template<>
-[[nodiscard]] inline std::function<expected<std::any, std::string>(std::string_view)>
-make_scalar_converter<float>()
-{
-    return [](std::string_view sv) -> expected<std::any, std::string> {
-        if(sv.empty())
-            return unexpected(std::string("empty input"));
-        float out{};
-        auto [ptr, ec] = detail::fp_from_chars(sv, out);
-        if(ec == std::errc{})
-        {
-            if(ptr != sv.data() + sv.size())
-                return unexpected(std::string("trailing characters after value"));
-            return std::any(out);
-        }
-        if(ec == std::errc::result_out_of_range)
-            return unexpected(std::string("value out of range for type"));
-        // errc::invalid_argument
-        if(ptr == sv.data())
-        {
-            if(!sv.empty() && (sv[0] == '-' || sv[0] == '+'))
-                return unexpected(std::string("value out of range for type"));
-            return unexpected(std::string("invalid characters in value"));
-        }
-        return unexpected(std::string("trailing characters after value"));
-    };
-}
-
-template<>
-[[nodiscard]] inline std::function<expected<std::any, std::string>(std::string_view)>
-make_scalar_converter<double>()
-{
-    return [](std::string_view sv) -> expected<std::any, std::string> {
-        if(sv.empty())
-            return unexpected(std::string("empty input"));
-        double out{};
-        auto [ptr, ec] = detail::fp_from_chars(sv, out);
-        if(ec == std::errc{})
-        {
-            if(ptr != sv.data() + sv.size())
-                return unexpected(std::string("trailing characters after value"));
-            return std::any(out);
-        }
-        if(ec == std::errc::result_out_of_range)
-            return unexpected(std::string("value out of range for type"));
-        // errc::invalid_argument
-        if(ptr == sv.data())
-        {
-            if(!sv.empty() && (sv[0] == '-' || sv[0] == '+'))
-                return unexpected(std::string("value out of range for type"));
-            return unexpected(std::string("invalid characters in value"));
-        }
-        return unexpected(std::string("trailing characters after value"));
-    };
-}
-
-// bool: accepts (case-insensitive) "true", "false", "1", "0".
-// All other input is an error: "expected true/false/1/0".
-template<>
-[[nodiscard]] inline std::function<expected<std::any, std::string>(std::string_view)>
-make_scalar_converter<bool>()
-{
-    return [](std::string_view sv) -> expected<std::any, std::string> {
-        if(sv.empty())
-            return unexpected(std::string("empty input"));
-        std::string lower(sv);
-        std::transform(lower.begin(), lower.end(), lower.begin(),
-                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        if(lower == "true" || lower == "1")
-            return std::any(true);
-        if(lower == "false" || lower == "0")
-            return std::any(false);
-        return unexpected(std::string("expected true/false/1/0"));
-    };
-}
-
-// char: exactly one byte -- longer or empty input is an error.
-template<>
-[[nodiscard]] inline std::function<expected<std::any, std::string>(std::string_view)>
-make_scalar_converter<char>()
-{
-    return [](std::string_view sv) -> expected<std::any, std::string> {
-        if(sv.size() != 1)
-            return unexpected(std::string("expected exactly one character"));
-        return std::any(static_cast<char>(sv[0]));
-    };
-}
-
-// std::string: passthrough -- always succeeds.
-template<>
-[[nodiscard]] inline std::function<expected<std::any, std::string>(std::string_view)>
-make_scalar_converter<std::string>()
-{
-    return [](std::string_view sv) -> expected<std::any, std::string> {
-        return std::any(std::string(sv));
-    };
+    if constexpr(std::is_same_v<T, bool>)
+    {
+        // Accepts (case-insensitive) "true", "false", "1", "0"; everything else errors.
+        return [](std::string_view sv) -> expected<std::any, std::string> {
+            if(sv.empty())
+                return unexpected(std::string("empty input"));
+            std::string lower(sv);
+            std::transform(lower.begin(), lower.end(), lower.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            if(lower == "true" || lower == "1")
+                return std::any(true);
+            if(lower == "false" || lower == "0")
+                return std::any(false);
+            return unexpected(std::string("expected true/false/1/0"));
+        };
+    }
+    else if constexpr(std::is_same_v<T, char>)
+    {
+        return [](std::string_view sv) -> expected<std::any, std::string> {
+            if(sv.size() != 1)
+                return unexpected(std::string("expected exactly one character"));
+            return std::any(static_cast<char>(sv[0]));
+        };
+    }
+    else if constexpr(std::is_same_v<T, std::string>)
+    {
+        return [](std::string_view sv) -> expected<std::any, std::string> {
+            return std::any(std::string(sv));
+        };
+    }
+    else if constexpr(std::integral<T>)
+    {
+        return [](std::string_view sv) -> expected<std::any, std::string> {
+            if(sv.empty())
+                return unexpected(std::string("empty input"));
+            T out{};
+            auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), out);
+            return detail::classify_numeric_parse(sv, ptr, ec, out);
+        };
+    }
+    else if constexpr(std::floating_point<T>)
+    {
+        return [](std::string_view sv) -> expected<std::any, std::string> {
+            if(sv.empty())
+                return unexpected(std::string("empty input"));
+            T out{};
+            auto [ptr, ec] = detail::fp_from_chars(sv, out);
+            return detail::classify_numeric_parse(sv, ptr, ec, out);
+        };
+    }
+    else
+    {
+        static_assert(std::is_same_v<T, void>,
+                      "make_scalar_converter<T>: T is not a built-in scalar "
+                      "(see the supported-type list in this header)");
+    }
 }
 
 // typed_element<T>(name, at, conv) -- attaches a converter and type identity to

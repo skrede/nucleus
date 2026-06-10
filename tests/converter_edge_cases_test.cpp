@@ -52,7 +52,7 @@ void exercise_signed_integral(std::string_view valid_text, Signed valid_value,
     fails_with<Signed>("", "empty");
     fails_with<Signed>(std::string(valid_text) + "xyz", "trailing");
     fails_with<Signed>(overflow_text, "out of range");
-    fails_with<Signed>("+5", "out of range");
+    fails_with<Signed>("+5", "invalid characters");
     fails_with<Signed>("abc", "invalid characters");
 }
 
@@ -96,7 +96,7 @@ TEST_CASE("float converter covers the full error matrix", "[typed][builtin][floa
     fails_with<float>("", "empty");
     fails_with<float>("3.5xyz", "trailing");
     fails_with<float>("1e999", "out of range");
-    fails_with<float>("+3.5", "out of range");
+    fails_with<float>("+3.5", "invalid characters");
     fails_with<float>("abc", "invalid characters");
 }
 
@@ -106,6 +106,6 @@ TEST_CASE("double converter covers the full error matrix", "[typed][builtin][flo
     fails_with<double>("", "empty");
     fails_with<double>("2.5xyz", "trailing");
     fails_with<double>("1e999", "out of range");
-    fails_with<double>("+2.5", "out of range");
+    fails_with<double>("+2.5", "invalid characters");
     fails_with<double>("abc", "invalid characters");
 }
