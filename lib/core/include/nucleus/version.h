@@ -4,7 +4,7 @@
 #include <string_view>
 
 #define NUCLEUS_VERSION_MAJOR 0
-#define NUCLEUS_VERSION_MINOR 0
+#define NUCLEUS_VERSION_MINOR 2
 #define NUCLEUS_VERSION_PATCH 0
 
 namespace nucleus {

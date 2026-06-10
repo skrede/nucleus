@@ -4,7 +4,7 @@ namespace nucleus {
 
 std::string_view version() noexcept
 {
-    return "0.0.0";
+    return "0.2.0";
 }
 
 }

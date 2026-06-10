@@ -28,6 +28,8 @@ function(nucleus_add_test name)
 endfunction()
 
 nucleus_add_test(version_test)
+target_compile_definitions(version_test PRIVATE
+    NUCLEUS_CMAKE_PROJECT_VERSION="${nucleus_VERSION}")
 nucleus_add_test(expected_test)
 nucleus_add_test(type_info_test)
 nucleus_add_test(format_test)

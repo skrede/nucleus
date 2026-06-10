@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(nucleus VERSION 0.0.0 LANGUAGES CXX)
+project(nucleus VERSION 0.2.0 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
@@ -104,7 +104,7 @@ configure_package_config_file(
 write_basic_package_version_file(
     ${CMAKE_CURRENT_BINARY_DIR}/nucleus-config-version.cmake
     VERSION ${PROJECT_VERSION}
-    COMPATIBILITY SameMajorVersion
+    COMPATIBILITY SameMinorVersion
 )
 install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/nucleus-config.cmake
