@@ -2,7 +2,9 @@ name: Linux
 
 on:
   push:
-    branches: [ master ]
+    branches:
+      - develop
+      - milestone/**
     paths-ignore:
       - "**.md"
       - "docs/**"
@@ -16,6 +18,13 @@ on:
       - ".planning/**"
       - ".gitignore"
   workflow_dispatch:
+
+# One run per branch per workflow: a push to develop and an open develop->master
+# PR share a concurrency group (head_ref for PRs, ref_name for pushes), so the
+# newer run supersedes the older instead of burning a duplicate job.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -74,17 +83,27 @@ jobs:
 
       # NUCLEUS_COVERAGE scopes instrumentation to first-party targets, so the
       # fetched dependencies emit no gcov data; the exclude below is
-      # belt-and-braces against any future directory-global flag.
+      # belt-and-braces against any future directory-global flag. gcovr filters
+      # are anchored at --root, so they must carry the lib/ prefix of the
+      # per-target layout. The negative-hits tolerance works around gcov
+      # emitting negative counters on some inlined paths (GCC bug 68080).
+      # The lines-valid guard fails the job if the filters ever rot back to
+      # matching nothing -- an empty report must never upload as green.
       - name: Generate coverage
         if: matrix.coverage
         run: |
           gcovr build \
             --root . \
             --gcov-executable "${{ matrix.gcov_executable }}" \
-            --filter 'include/nucleus/' \
-            --filter 'src/nucleus/' \
+            --filter 'lib/.*/include/nucleus/' \
+            --filter 'lib/.*/src/nucleus/' \
+            --gcov-ignore-parse-errors=negative_hits.warn_once_per_file \
             --gcov-exclude-directories '.*/_deps/.*' \
             --xml coverage.xml
+          if grep -q 'lines-valid="0"' coverage.xml; then
+            echo "coverage.xml contains no first-party lines; gcovr filters are broken" >&2
+            exit 1
+          fi
 
       - name: Upload to Codecov
         if: matrix.coverage

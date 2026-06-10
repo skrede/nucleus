@@ -2,7 +2,9 @@ name: Windows
 
 on:
   push:
-    branches: [ master ]
+    branches:
+      - develop
+      - milestone/**
     paths-ignore:
       - "**.md"
       - "docs/**"
@@ -16,6 +18,13 @@ on:
       - ".planning/**"
       - ".gitignore"
   workflow_dispatch:
+
+# One run per branch per workflow: a push to develop and an open develop->master
+# PR share a concurrency group (head_ref for PRs, ref_name for pushes), so the
+# newer run supersedes the older instead of burning a duplicate job.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   build:
