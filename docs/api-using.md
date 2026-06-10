@@ -1,84 +1,88 @@
 # Types you use
 
-The user-facing vocabulary: the types a host instantiates, passes in, and reads
+The host-side vocabulary: the types a program instantiates, passes in, and reads
 back. None of these requires subclassing. For the seams a host extends, see
 [Seams you extend](api-extending.md).
 
 ## Contents
 
-- [`configuration_space` — the facade](#configuration_space)
+- [The lifecycle at a glance](#lifecycle)
+- [`configuration_space_builder` — registration](#builder)
 - [Declaring a schema: `schema_element`, `anchor`, free factories](#schema)
+- [Typed fields: `typed_element<T>`, `register_converter`](#typed)
 - [Keying model: primary key, uniqueness, strains](#keying)
-- [Strain selection: `select()`, `set_strain_scope()`](#selection)
-- [`key_path` — addressing the keyspace](#key_path)
+- [`configuration_space` — the sealed space](#space)
+- [Composing sources: `source_stack`](#stack)
+- [`load()` and `load_options`](#load)
+- [Capability pre-flight: `check_capabilities`](#preflight)
 - [`configuration` — the resolved result](#configuration)
-- [Typed fields: `typed_element<T>`](#typed)
-- [Provenance: `origin`, `provenance`](#provenance)
-- [Precedence: `source_stack`, `layer_rank`](#precedence)
-- [Built-in sources: `env_source`, `argv_source`](#sources)
-- [Emitting: the output seam (`config_emitter`)](#emit)
-- [`result<T, E>` — fallible returns](#result)
+- [Provenance: `origin`](#provenance)
+- [`key_path` — addressing the keyspace](#key_path)
+- [Emitting: templates and documents](#emit)
+- [`expected<T, E>` — fallible returns](#expected)
 - [`owner_token` — opaque identity](#owner_token)
 - [Diagnostics: `suggest_keys`, `conflict_report`](#diagnostics)
 - [Completion: `generate_completion`, `shell`](#completion)
 
 ---
 
-<a id="configuration_space"></a>
-## `configuration_space` — the facade
+<a id="lifecycle"></a>
+## The lifecycle at a glance
+
+```
+configuration_space_builder  --register_* / install_tokenizer-->  build()
+        |
+        v
+configuration_space (sealed, immutable, reusable)
+        |
+        v
+nucleus::load(space, source_stack, load_options)  -->  expected<configuration, std::string>
+```
+
+A builder accepts registrations and `build()` seals it into an immutable
+`configuration_space`. The free function `nucleus::load` folds an explicitly
+composed `source_stack` against the sealed space and yields an immutable
+`configuration`. The space is never modified by a load, so one space serves many
+loads — even concurrently (see [`examples/reusable_space.cpp`](../examples/reusable_space.cpp)).
+
+---
+
+<a id="builder"></a>
+## `configuration_space_builder` — registration
 
 `#include "nucleus/configuration_space.h"`
 
-The entry point. In the configurable phase it owns the schema, tokenizer, and
-source registries and accepts registrations; `load()`/`resolve()` transitions it
-to the resolved phase and produces a `configuration`. Move-only.
+The mutable front end. It owns the schema, tokenizer, and converter registries
+plus the host registration policy and the claim/conflict ledger. Move-only.
 
 ```cpp
-configuration_space engine;
+configuration_space_builder builder;
 
-// Registration (configurable phase only).
 registration_result register_element(schema_element element, owner_token owner = {});
 registration_result register_schema(std::string key_path, owner_token owner = {});
 registration_result register_tokenizer(std::string name, owner_token owner = {});
-registration_result register_source(std::string name, owner_token owner = {});
 registration_result install_tokenizer(tokenizer tok, owner_token owner = {});
-void set_registration_policy(std::shared_ptr<registration_policy> policy);
+registration_result register_converter(std::type_index id,
+    std::function<expected<std::any, std::string>(std::string_view)> conv,
+    owner_token owner = {});
+template<typename T>
+registration_result register_converter(/* conv */, owner_token owner = {});  // keyed by typeid(T)
+registration_result set_registration_policy(std::shared_ptr<registration_policy> policy);
 
-// Strain selection and scope (configurable phase only; must be called before load/resolve).
-registration_result select(std::string key_value);
-registration_result set_strain_scope(strain_scope_policy policy);
-registration_result set_inherit_policy(inherit_policy policy);
-
-// Resolve (transitions to the resolved phase).
-load_result resolve(const source_stack &stack);
-load_result load(const source_stack &stack);                       // alias for resolve
-load_result load(std::vector<std::string> args);                   // argv only, schema-wired
-load_result load(std::vector<std::string> paths, const document_factory &make);
-load_result load(std::vector<std::string> args,
-                 std::vector<std::string> paths, const document_factory &make);
-
-// Reads (either phase).
-facade_phase phase() const noexcept;
 std::size_t schema_count() const noexcept;
-std::size_t tokenizer_count() const noexcept;   // includes the auto-installed core tokenizers
-std::size_t source_count() const noexcept;
+std::size_t tokenizer_count() const noexcept;
+std::size_t converter_count() const noexcept;
 std::vector<conflict_report> conflicts() const;
-std::string generate_completion(shell which, std::string_view prog) const;
 
-// Free function (auto-gate pre-flight) -- load_configuration auto-gates anyway:
-gate_result check_capabilities(const configuration_space &, const source_stack_options &);
+configuration_space build();   // seals; the builder is spent afterwards
 ```
 
-- `registration_result` is `result<std::monostate, std::string>`: truthy on
+- `registration_result` is `expected<std::monostate, std::string>`: truthy on
   success, carrying the registration policy's rejection reason on failure.
-- `load_result` is `result<configuration, std::string>`.
-- `document_factory` is `std::function<std::unique_ptr<source>(const std::string &)>`
-  -- the host's "path → source" decision; returning `nullptr` fails the load.
-- The single-argument `load(args)` overload wires the argv source's unknown-key
-  recognizer to the schema, so an undeclared flag is rejected by the schema
-  authority.
-
-Calling `resolve()`/`load()` a second time is an error (`"... already resolved"`).
+- Every registration carries an opaque `owner_token` and is first offered to the
+  [registration policy](api-extending.md#registration_policy).
+- After `build()`, every `register_*` / `install_*` call is a loud state-machine
+  error, never a silent no-op.
 
 See [`examples/quickstart.cpp`](../examples/quickstart.cpp).
 
@@ -90,98 +94,119 @@ See [`examples/quickstart.cpp`](../examples/quickstart.cpp).
 `#include "nucleus/schema/schema.h"` and `"nucleus/schema/anchor.h"`
 
 The schema is the authority over what keys may exist. A `schema_element` is one
-declared node; free factory functions build the four kinds fluently.
+declared node; free factory functions build the kinds fluently:
 
 ```cpp
-struct schema_element {
-    std::string name;                       // the leaf segment
-    anchor at = anchor::root();             // where it attaches
-    bool required = false;                   // must carry a value at resolve
-    bool identity = false;                   // this node's selector / primary key
-    bool unique = false;                     // value must be distinct across sibling instances
-    bool repeated = false;                   // keeps ALL N same-named values as a collection
-    std::vector<std::string> allowed_values; // closed set; empty = unconstrained
-    key_path declared_path() const;          // anchor path + name
-    key_path container() const;              // the parent path (the repeatable container)
-    bool enforces_uniqueness() const noexcept; // true if identity || unique
-};
-
 schema_element element(std::string name, anchor at);
 schema_element required_element(std::string name, anchor at);
 schema_element identity_element(std::string name, anchor at);
-schema_element primary_key_element(std::string name, anchor at);  // alias for identity_element
+schema_element primary_key_element(std::string name, anchor at);   // alias for identity_element
 schema_element unique_element(std::string name, anchor at);
 schema_element repeated_element(std::string name, anchor at);
 schema_element enum_element(std::string name, anchor at, std::vector<std::string> values);
-template<typename T>
-schema_element typed_element(std::string name, anchor at,
-    std::function<result<std::any, std::string>(std::string_view)> conv);
-template<typename T>
-schema_element typed_element(std::string name, anchor at);  // built-in scalar converter
+
+// In "nucleus/schema/converters.h":
+template<typename T> schema_element typed_element(std::string name, anchor at);  // built-in scalar converter
+template<typename T> schema_element typed_element(std::string name, anchor at,
+    std::function<expected<std::any, std::string>(std::string_view)> conv);
+template<typename T> schema_element repeated_typed_element(std::string name, anchor at /*, conv */);
+template<typename T> schema_element registered_element(std::string name, anchor at);  // converter from the registry
 ```
 
-A primary-key field selects one instance from a repeatable container and is
-implicitly unique; a `unique_element` constrains values to be distinct across
-sibling instances without taking on the selector role. Both are checked at resolve;
-violations are loud errors.
+The underlying struct exposes the independent axes the factories set:
 
-A `repeated_element` is a leaf field that keeps ALL N occurrences of a
-same-named entry as one ordered collection -- the third repetition kind,
-distinct from keyed containers (instances distinguished by the primary key) and
-template merging (anonymous instances composing). Within one source layer
-occurrences accumulate in document order; a higher-precedence layer replaces
-the collection wholesale. An element cannot be both `repeated` and `identity`,
-nor `repeated` and `unique` -- both combinations are rejected at registration.
-A source must declare the `duplicate_keys` capability to feed a repeated
-element; one that cannot fails loudly instead of silently collapsing values.
-
-### Repeated-key fold order
-
-The fold visits layers in ascending precedence rank. Equal-rank layers fold in
-the order they were pushed onto the stack — the fold uses a `std::stable_sort`,
-which preserves that insertion order. The order in which values land therefore
-follows two independent rules, one within a layer and one across layers:
-
-- **Within a single layer**, the first occurrence of a repeated path *replaces*
-  any collection a lower layer contributed (clearing it), and every subsequent
-  occurrence in that same layer *appends*. So one source's repeated entries
-  accumulate in document order.
-- **Across layers**, a later-folded layer *replaces* the collection wholesale,
-  then appends its own occurrences afresh. "Later-folded" means higher rank, or —
-  among equal ranks — later insertion order. A separate layer never appends onto
-  another layer's collection; it replaces. Two same-rank layers therefore resolve
-  to the later-inserted one's collection, not their concatenation.
-
-`get_all()` and `get_all_as<T>()` return values in exactly this fold order, and
-`collection_provenance_of()` returns one origin per element in the same order. A
-source that lacks the `duplicate_keys` capability may supply at most one value
-per repeated path per layer (a second is a loud error), so a flat source can only
-ever seed a single-element collection for a given path in one layer.
+```cpp
+struct schema_element {
+    std::string name;                        // the leaf segment
+    anchor at = anchor::root();              // where it attaches
+    bool required = false;                   // must carry a value at load
+    bool identity = false;                   // the parent container's primary key / slice selector
+    bool unique = false;                     // value distinct across sibling instances
+    bool repeated = false;                   // keeps ALL N same-named values as a collection
+    std::vector<std::string> allowed_values; // closed set; empty = unconstrained
+    // plus the typed seam: converter, type_identity (set by typed_element<T>)
+    key_path declared_path() const;          // anchor path + name
+    key_path container() const;              // the parent path
+    bool enforces_uniqueness() const noexcept;  // identity || unique
+};
+```
 
 ### `anchor` — where an element attaches
 
-An anchor is a typed, code-side-only position. It never appears in document text.
+`anchor::root()` introduces a top-level node; `anchor::keyspace(path)` attaches
+under an already-declared node. Referential integrity is enforced at attach
+time. At load, the schema rejects undeclared keys (with a nearest-key
+suggestion), missing `required` fields, and values outside an `enum_element`'s
+`allowed_values`. A space whose schema declares no elements applies no content
+gate — an empty schema is not a claim that nothing is allowed.
 
 ```cpp
-static anchor anchor::root();                       // introduce a top-level node
-static anchor anchor::keyspace(key_path under);     // attach under an existing node
-static anchor anchor::keyspace(const std::string &under);  // convenience; parses, collapses to root() if malformed
-bool is_root() const noexcept;
-const key_path &under() const noexcept;
-```
-
-Referential integrity is enforced at attach time: a `keyspace`-anchored element
-may only attach under an already-declared node. At resolve, the schema rejects
-undeclared keys (with a nearest-key suggestion), missing `required`/`identity`
-fields, and values outside an `enum_element`'s `allowed_values`.
-
-```cpp
-engine.register_element(nucleus::element("server", nucleus::anchor::root()));
-engine.register_element(nucleus::required_element("host", nucleus::anchor::keyspace("server")));
-engine.register_element(nucleus::enum_element("mode", nucleus::anchor::keyspace("server"), {"http", "https"}));
+builder.register_element(nucleus::element("server", nucleus::anchor::root()));
+builder.register_element(nucleus::required_element("host", nucleus::anchor::keyspace("server")));
+builder.register_element(nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
+                                               {"http", "https"}));
 ```
 
 See [`examples/schema.cpp`](../examples/schema.cpp).
+
+### Repeated elements
+
+A `repeated_element` is a leaf field that keeps ALL N occurrences of a
+same-named entry as one ordered collection — distinct from keyed containers
+(instances distinguished by the primary key) and template merging (anonymous
+instances composing). An element cannot be both `repeated` and `identity`, nor
+`repeated` and `unique`. Feeding a repeated element requires a source layer with
+the `duplicate_keys` capability (XML or the runtime source); within one source
+layer occurrences accumulate in document order, and a higher-precedence layer
+replaces the collection wholesale. `get_all()` / `get_all_as<T>()` return values
+in fold order, and `collection_provenance_of()` returns one origin per element
+in the same order. See [`examples/round_trip.cpp`](../examples/round_trip.cpp).
+
+---
+
+<a id="typed"></a>
+## Typed fields: `typed_element<T>`, `register_converter`
+
+`#include "nucleus/schema/converters.h"`
+
+`typed_element<T>` attaches a converter and a type identity to a
+`schema_element`; the element is otherwise identical to `element()`.
+
+- `typed_element<T>(name, at)` uses the built-in scalar converter for `T`. Built-in
+  converters exist for exactly: `int8_t`, `int16_t`, `int32_t`, `int64_t`,
+  `uint8_t`, `uint16_t`, `uint32_t`, `uint64_t`, `float`, `double`, `bool`,
+  `char`, `std::string`. Any other type is a compile-time error.
+- `typed_element<T>(name, at, conv)` accepts a host converter of type
+  `std::function<expected<std::any, std::string>(std::string_view)>`. The
+  converter must not throw; return `unexpected(reason)` for any conversion
+  error, and wrap exactly a `T` in the returned `std::any`.
+- `registered_element<T>(name, at)` declares only the type identity; the
+  converter is looked up at load in the builder's converter registry, populated
+  via `configuration_space_builder::register_converter<T>(conv)`. A per-element
+  converter overrides the registry's.
+- `make_scalar_converter<T>()` is public so a host can compose the built-in
+  parsing with extra validation.
+
+Declaring a type is a content contract: every declared path that survives
+slicing is converted at the load boundary, and a conversion failure fails the
+load loudly, naming the path, the converter's reason, and the winning layer's
+label. Absent paths are skipped (absence is `required`'s concern, not the
+converter's).
+
+```cpp
+builder.register_element(
+    nucleus::typed_element<vec3>("pos", nucleus::anchor::keyspace("body"), make_vec3_converter()));
+builder.register_element(
+    nucleus::typed_element<int32_t>("mass", nucleus::anchor::keyspace("body")));
+// ... load ...
+auto pos  = config.get_as<vec3>("body/pos");
+auto mass = config.get_as<int32_t>("body/mass");
+```
+
+The stored type must equal the type requested from `get_as<T>` outright —
+`type_index` equality, no widening, no coercion. Storing `int32_t` and reading
+`int64_t` is a type mismatch. A complete custom-converter registration and typed
+read-back is in [`examples/typed.cpp`](../examples/typed.cpp).
 
 ---
 
@@ -189,77 +214,268 @@ See [`examples/schema.cpp`](../examples/schema.cpp).
 ## Keying model: primary key, uniqueness, strains
 
 Marking an element with `identity` (via `primary_key_element`) makes its parent
-container repeatable: multiple instances can coexist in one fileset, each
-distinguished by a distinct primary-key value. Exactly one primary-key element is
-allowed per configuration space; it is the single slice selector for the whole
-schema hierarchy.
+container repeatable: multiple instances ("strains") can coexist in one
+document, each distinguished by a distinct primary-key value. Exactly one
+primary-key element is allowed per configuration space.
 
-`unique_element` constrains sibling values to be distinct without enabling the
-selector role. Many unique fields may coexist per container; a primary key is
-implicitly unique whether or not `unique` is also set.
+`unique_element` constrains sibling values to be distinct without taking on the
+selector role; many unique fields may coexist per container. A primary key is
+implicitly unique.
 
-Anonymous instances (instances with no primary-key value) are templates: they
-compose in document order and are inherited by all named instances. Named
-instances compose on top of the template.
+Anonymous instances (no primary-key value) are templates: they compose in
+document order and are inherited by all named instances.
 
 Resolution always strips the transient key segment: the resolved keyspace
-contains `cluster/server/port`, never `cluster/server/primary/port`. The primary-key
-value names which instance was selected, not a permanent path segment.
+contains `cluster/server/port`, never `cluster/server/primary/port`. The
+primary-key value names which instance was selected, not a permanent path
+segment.
 
-Duplicate primary-key values within one parse stack are a loud error. Duplicate
-`unique` values across sibling instances are a loud error.
+Selection is a per-load parameter (`load_options::selection`, below). Rules:
 
-Re-opening a named instance across an inheritance layer requires explicit consent:
-a derived document that wants to extend a base document's named instance must mark
-that instance with an `extend` disposition. Re-declaring a named instance in a
-derived layer without `extend` is rejected as a duplicate. This is deliberate — a
-plain overlay that silently re-opened a named instance across layers would let an
-unrelated downstream document mutate an upstream instance by name collision alone.
-The narrow/wide strengths are covered under [strain scope](#selection).
+- No selection and exactly one named strain present: auto-resolves to it.
+- No selection and multiple named strains: loud load error listing the
+  available strain names.
+- Unknown selection value: loud error.
 
-```cpp
-engine.register_element(nucleus::element("server", anchor::keyspace("cluster")));
-engine.register_element(nucleus::primary_key_element("name", anchor::keyspace("cluster/server")));
-engine.register_element(nucleus::unique_element("serial", anchor::keyspace("cluster/server")));
-```
-
----
-
-<a id="selection"></a>
-## Strain selection: select(), set_strain_scope()
-
-Select a specific strain before resolve:
-
-```cpp
-engine.select("primary");  // keep only the instance whose name == "primary"
-```
-
-Rules:
-
-- No selection and exactly one named strain present: auto-resolves to that strain.
-- No selection and multiple named strains: loud resolve error listing the available
-  strain names.
-- Unknown selection key value: loud error.
-
-Scope policy governs which entries survive after the slice step. Set it before
-load/resolve:
-
-```cpp
-engine.set_strain_scope(nucleus::strain_scope_policy::container_open_until_next_strain);
-```
-
-The three values and their effects:
+Scope policy (`load_options::scope`, a `strain_scope_policy` from
+`"nucleus/strain_scope.h"`) governs which entries survive after the slice step,
+in terms of Ld (the layer that defined the resolved strain) and Ls (the first
+layer introducing a competing strain above Ld):
 
 | Policy | Effect |
 |--------|--------|
-| `file_level` | The entire keyspace is frozen at the strain's defining layer. Every entry whose winning rank exceeds Ld is discarded, keyed and general alike. |
-| `space_open_container_closed` | General keyspace entries compose freely from all layers. The strain's keyed entries are frozen at Ld: entries with a winning rank above Ld are excluded. This is the default. |
-| `container_open_until_next_strain` | The strain's keyed entries compose from Ld up to but excluding Ls (the first layer that introduces a competing strain). If no competing strain exists above Ld, Ls is unbounded. General entries are unconstrained. |
+| `file_level` | The entire keyspace freezes at Ld; every entry whose winning rank exceeds Ld is discarded, keyed and general alike. |
+| `space_open_container_closed` | General entries compose freely from all layers; the strain's keyed entries freeze at Ld. **The default.** |
+| `container_open_until_next_strain` | The strain's keyed entries compose over [Ld, Ls); general entries are unconstrained. |
 
-Both `select()` and `set_strain_scope()` must be called before `load()`/`resolve()`;
-calling after resolve is a state-machine error.
+Re-opening a named instance across an inheritance layer requires explicit
+consent: the derived document marks the instance with an `extend` disposition
+(see [Seams you extend](api-extending.md#inheritance)); re-declaring it without
+`extend` is rejected as a duplicate.
+
+```cpp
+builder.register_element(nucleus::element("server", nucleus::anchor::keyspace("cluster")));
+builder.register_element(nucleus::primary_key_element("name", nucleus::anchor::keyspace("cluster/server")));
+builder.register_element(nucleus::unique_element("serial", nucleus::anchor::keyspace("cluster/server")));
+```
 
 See [`examples/strains.cpp`](../examples/strains.cpp).
+
+---
+
+<a id="space"></a>
+## `configuration_space` — the sealed space
+
+`#include "nucleus/configuration_space.h"`
+
+The immutable product of `build()`. Its surface is read-only — registration on a
+sealed space is impossible by construction. It is copyable (a deep copy; no
+shared state links two spaces) and freely thread-readable: `load()` borrows it
+by const reference.
+
+```cpp
+std::size_t schema_count() const noexcept;
+std::size_t tokenizer_count() const noexcept;   // includes the auto-installed core tokenizers
+std::size_t converter_count() const noexcept;
+std::vector<conflict_report> conflicts() const;
+std::string generate_completion(shell which, std::string_view prog) const;
+std::span<const schema_element> schema_elements() const;  // the declared schema, for emitters/derivation
+configuration_space_builder expand() const;  // a NEW builder seeded with a deep copy of this space
+```
+
+Two free functions derive from a sealed space:
+
+```cpp
+key_recognizer recognizer_of(const configuration_space &space);
+```
+
+returns the schema-surface predicate an `argv_source` uses to reject undeclared
+flags (the closure borrows the space; keep the space alive). See
+[`examples/argv_recognizer.cpp`](../examples/argv_recognizer.cpp).
+
+---
+
+<a id="stack"></a>
+## Composing sources: `source_stack`
+
+`#include "nucleus/configuration_source/source_stack.h"`
+
+The explicit, ordered set of sources handed to `load()`. **Order is
+precedence**: a later-listed source overlays an earlier-listed one. Sources are
+moved in and type-erased into `source_handle`s; the stack owns them.
+
+```cpp
+template <configuration_source... Ss> explicit source_stack(Ss... sources);
+source_stack &push_back(source_handle h);
+std::span<source_handle> layers() noexcept;
+std::size_t size() const noexcept;
+bool empty() const noexcept;
+```
+
+```cpp
+nucleus::runtime_source defaults;            // lowest precedence
+defaults.set("server/host", "localhost").set("server/port", "8080");
+
+nucleus::env_source env;                     // overrides defaults
+env.set("server/host", "staging-host");
+
+nucleus::argv_source argv(std::vector<std::string>{"--server-port=9090"});
+argv.recognize_with(nucleus::recognizer_of(space));   // highest precedence
+
+auto loaded = nucleus::load(space,
+    nucleus::source_stack{std::move(defaults), std::move(env), std::move(argv)},
+    {});
+```
+
+The shipped sources — `xml_source`, `env_source`, `argv_source`,
+`runtime_source` — are documented in
+[Shipped implementations](api-implementations.md); any plain struct satisfying
+the [source concept](api-extending.md#source_concept) composes the same way.
+See [`examples/source_stack.cpp`](../examples/source_stack.cpp).
+
+---
+
+<a id="load"></a>
+## `load()` and `load_options`
+
+`#include "nucleus/configuration_space.h"`
+
+```cpp
+load_result load(const configuration_space &space,
+                 source_stack stack,
+                 const load_options &options = {});
+// load_result = expected<configuration, std::string>
+
+struct load_options {
+    std::optional<std::string>                        selection;   // strain to select
+    strain_scope_policy                               scope = strain_scope_policy::space_open_container_closed;
+    inherit_policy                                    inherit;     // chain admissibility + depth cap (default 16)
+    std::vector<std::string>                          document_paths;
+    std::function<source_handle(const std::string &)> make_document;
+};
+```
+
+`load` is the one entry point. In order it:
+
+1. expands `document_paths` through `make_document` (the host's "path → source"
+   decision) and walks each document's inheritance chain (base documents first);
+2. **auto-gates capabilities**: the schema's shape derives its requirements and
+   the assembled stack is gated before any fold — a hard shortfall is a loud
+   named error, a soft one degrades observably (no host call required);
+3. folds all layers onto one keyspace, expanding `${...}` tokens per source as
+   it goes — documents (and their inheritance chains) occupy the lowest ranks,
+   then the stack's sources in stack order above them, so a stack source
+   overrides document content;
+4. slices the selected strain, validates against the schema, converts typed
+   paths, and freezes the result into an immutable `configuration`.
+
+Any failure — a source pull error, a gate refusal, a token error, a schema or
+conversion violation — returns the reason as the `expected` error, verbatim.
+
+```cpp
+const char *document = R"(<server host="127.0.0.1" mode="http"/>)";
+auto make = [document](const std::string &) -> nucleus::source_handle {
+    return nucleus::source_handle(
+        nucleus::xml_source::from(
+            nucleus::xml_source_options::of_string(document)));
+};
+
+auto loaded = nucleus::load(space,
+    nucleus::source_stack{std::move(argv)},
+    nucleus::load_options{.document_paths = {"config.xml"}, .make_document = make});
+```
+
+See [`examples/xml.cpp`](../examples/xml.cpp) (documents under argv),
+[`examples/strains.cpp`](../examples/strains.cpp) (selection), and
+[`examples/layering.cpp`](../examples/layering.cpp) (precedence and
+provenance).
+
+---
+
+<a id="preflight"></a>
+## Capability pre-flight: `check_capabilities`
+
+`#include "nucleus/configuration_space.h"`
+
+```cpp
+gate_result check_capabilities(const configuration_space &space,
+                               source_stack stack,
+                               const load_options &options = {});
+```
+
+Runs the same capability gate `load()` runs, without pulling or folding, so a
+host can validate fit ahead of a load; the pre-flight and the load never
+disagree. `gate_result` is `expected<gated_features, std::string>` — the honored
+capabilities plus the observable degradations, or the hard-shortfall error.
+
+The derivation is shape-driven (`"nucleus/schema/capability_requirements.h"`,
+`derive_capability_requirements(std::span<const schema_element>)`): any
+non-root element requires `nesting` (hard), any repeated element requires
+`duplicate_keys` (hard), any typed element requests `typed_scalars` (soft). A
+hard capability is satisfied when ANY layer in the stack provides it. See
+[`examples/capability_gating.cpp`](../examples/capability_gating.cpp).
+
+---
+
+<a id="configuration"></a>
+## `configuration` — the resolved result
+
+`#include "nucleus/configuration.h"`
+
+The immutable, self-owning output of a load. Every value is copied out into an
+owned string at the load boundary and the source buffers are dropped, so it
+outlives every source and is freely thread-safe to read.
+
+```cpp
+std::optional<std::string> get(const std::string &key) const;
+std::vector<std::string> get_all(const std::string &key) const;   // repeated paths: the full collection
+bool contains(const std::string &key) const;
+const origin *provenance_of(const std::string &key) const;        // "why is this value X?"
+const std::vector<origin> *collection_provenance_of(const std::string &key) const;
+template<typename T> expected<T, std::string> get_as(const std::string &key) const;
+template<typename T> expected<std::vector<T>, std::string> get_all_as(const std::string &key) const;
+std::size_t size() const noexcept;
+bool empty() const noexcept;
+std::vector<std::string> keys() const;   // canonical order, repeated paths once
+```
+
+For a path declared `repeated`, `get_all()` returns the full ordered collection
+and `get()` returns the last value; for a single-value path `get_all()` returns
+a one-element vector. `provenance_of()` covers scalar keys only; a collection's
+per-element origins come from `collection_provenance_of()`.
+
+The typed reads distinguish their failures by error substring:
+
+| Condition | Error substring |
+|-----------|-----------------|
+| path carries no value | `"is absent"` |
+| path has a value but no converter | `"declares no type converter"` |
+| stored type does not equal requested type | `"type mismatch"` |
+| path holds a typed collection — use `get_all_as` | `"use get_all_as"` |
+| path holds a single typed value — use `get_as` | `"use get_as"` |
+
+See [`examples/typed.cpp`](../examples/typed.cpp) and
+[`examples/reusable_space.cpp`](../examples/reusable_space.cpp).
+
+---
+
+<a id="provenance"></a>
+## Provenance: `origin`
+
+`#include "nucleus/keyspace/provenance.h"`
+
+`provenance_of(key)` returns the `origin` of the value that won, or `nullptr`.
+
+```cpp
+struct origin {
+    std::size_t rank;        // precedence rank of the winning layer
+    std::string layer;       // label: "stack[N]" for stack sources, "path:<path>" for documents
+    owner_token owner;       // opaque token of the winning source
+    std::optional<std::size_t> inheritance_layer;  // position within an inheritance chain, if any
+};
+```
+
+See [`examples/layering.cpp`](../examples/layering.cpp).
 
 ---
 
@@ -268,22 +484,20 @@ See [`examples/strains.cpp`](../examples/strains.cpp).
 
 `#include "nucleus/keyspace/key_path.h"`
 
-A decomposed `/`-separated path. Construct it from text via `parse` (fallible) or
-build it segment by segment.
+A decomposed `/`-separated path. Construct from text via `parse` (fallible) or
+from segments.
 
 ```cpp
-static result<key_path, std::string> key_path::parse(std::string_view text);
-key_path();
+static expected<key_path, std::string> key_path::parse(std::string_view text);
 explicit key_path(std::vector<std::string> segments);
 
-bool empty() const;
-std::size_t size() const;
-const std::vector<std::string> &segments() const;
+bool empty() const noexcept;
+std::size_t size() const noexcept;
+const std::vector<std::string> &segments() const noexcept;
 const std::string &front() const;
 const std::string &leaf() const;
-key_path parent() const;                 // a/b/c -> a/b
-key_path child(std::string segment) const;  // a/b + c -> a/b/c
-std::string str() const;                 // canonical "/"-joined form
+key_path parent() const;                    // a/b/c -> a/b
+std::string str() const;                    // canonical "/"-joined form
 ```
 
 `parse` rejects leading/trailing separators and empty segments. Most schema code
@@ -291,263 +505,15 @@ can skip `key_path` entirely and pass a string to `anchor::keyspace`.
 
 ---
 
-<a id="configuration"></a>
-## `configuration` — the resolved result
-
-`#include "nucleus/entry/configuration.h"`
-
-The immutable, self-owning output of a resolve. All values are owned strings; the
-source buffers have already been dropped. Freely readable from many threads.
-
-```cpp
-std::optional<std::string> get(const std::string &key) const;
-std::vector<std::string> get_all(const std::string &key) const;  // repeated paths: the full collection
-bool contains(const std::string &key) const;
-const origin *provenance_of(const std::string &key) const;  // "why is this value X?"
-const std::vector<origin> *collection_provenance_of(const std::string &key) const;
-std::size_t size() const;
-bool empty() const;
-std::vector<std::string> keys() const;  // canonical order
-```
-
-For a path declared `repeated`, `get_all()` returns the full ordered collection
-and `get()` returns the LAST value in precedence order; for a single-value path
-`get_all()` returns a one-element vector. `provenance_of()` covers scalar keys
-only; a collection's per-element origins come from `collection_provenance_of()`.
-
----
-
-<a id="typed"></a>
-## Typed fields: `typed_element<T>`
-
-`#include "nucleus/schema/converters.h"`
-
-### Registration
-
-`typed_element<T>` attaches a converter and a type identity to a `schema_element`; the
-element is otherwise identical to `element()`. Two overloads are available:
-
-- The two-argument overload `typed_element<T>(name, at)` uses the built-in scalar
-  converter for `T`. Only the following types have a built-in converter: `int8_t`,
-  `int16_t`, `int32_t`, `int64_t`, `uint8_t`, `uint16_t`, `uint32_t`, `uint64_t`,
-  `float`, `double`, `bool`, `char`, `std::string`. Passing any other type is a
-  static assertion failure.
-- The three-argument overload `typed_element<T>(name, at, conv)` accepts a
-  host-supplied converter of type
-  `std::function<result<std::any, std::string>(std::string_view)>`. The converter
-  must not throw; return `fail()` for any conversion error.
-
-Note on toolchain floor for floating-point `from_chars`: GCC 11+, LLVM Clang 14+,
-MSVC 19.29+, Apple Clang 15+. The Apple Clang floor is Xcode 15 -- `libc++` gained
-floating-point `from_chars` in Xcode 15, not Xcode 14.
-
-```cpp
-engine.register_element(
-    nucleus::typed_element<vec3>("pos", nucleus::anchor::keyspace("body"), make_vec3_converter()));
-engine.register_element(
-    nucleus::typed_element<int32_t>("count", nucleus::anchor::keyspace("body")));
-```
-
-### Content-contract semantics
-
-Declaring a type is a content contract -- every declared path that survives slicing is
-converted at the resolve boundary. A conversion failure fails the resolve loudly, naming
-the path, the reason the converter returned, and the winning layer's label. Absent paths
-are silently skipped (absence is orthogonal to required-ness, which `register_element`
-controls separately). A bad value in a pruned strain or a layer excluded by scope policy
-is never converted.
-
-The converter's type `T` must match the type passed to `get_as<T>` outright -- `type_index`
-equality, no implicit widening, no inheritance walking. Storing `int32_t` and reading as
-`int64_t` is a type mismatch.
-
-### Accessors
-
-The resolved configuration adds two typed reads alongside the existing text reads:
-
-```cpp
-template<typename T> result<T, std::string>              get_as(const std::string &key) const;
-template<typename T> result<std::vector<T>, std::string> get_all_as(const std::string &key) const;
-```
-
-| Condition | Error substring |
-|-----------|-----------------|
-| path carries no value | `"is absent"` |
-| path has a value but no converter | `"declares no type converter"` |
-| stored type does not equal requested type | `"type mismatch"` |
-| path holds a typed collection -- use `get_all_as` | `"use get_all_as"` |
-| path holds a single typed value -- use `get_as` | `"use get_as"` |
-
-`any_cast<T>` produces a copy of the stored value.
-
-### Host converter recipes
-
-Three patterns cover the most common host-side converter shapes.
-
-A complete custom-converter registration and typed read-back is shown in
-[`examples/typed.cpp`](../examples/typed.cpp).
-
-#### Closed-set enum
-
-```cpp
-enum class color { red, green, blue };
-auto make_color_converter()
-{
-    const std::map<std::string, color> table{
-        {"red", color::red}, {"green", color::green}, {"blue", color::blue}};
-    return [table](std::string_view sv) -> nucleus::result<std::any, std::string> {
-        auto it = table.find(std::string(sv));
-        if(it == table.end())
-            return nucleus::fail(std::string("unknown color '") + std::string(sv) + "'");
-        return std::any(it->second);
-    };
-}
-```
-
-The converter owns the name-to-value map as a closure. Any unrecognized string fails the
-resolve at load time with the converter's message. The host registers it as
-`typed_element<color>("color", at, make_color_converter())`.
-
-#### Flags (split and bitwise-OR)
-
-```cpp
-// Example: flags field accepting "read|write|exec".
-enum flags : int { read = 1, write = 2, exec = 4 };
-auto make_flags_converter(std::map<std::string, int> table)
-{
-    return [table = std::move(table)](std::string_view sv) -> nucleus::result<std::any, std::string> {
-        int result = 0;
-        std::string_view rest = sv;
-        while(!rest.empty()) {
-            auto pos = rest.find('|');
-            std::string token(rest.substr(0, pos));
-            auto it = table.find(token);
-            if(it == table.end())
-                return nucleus::fail(std::string("unknown flag '") + token + "'");
-            result |= it->second;
-            rest = (pos == std::string_view::npos) ? std::string_view{} : rest.substr(pos + 1);
-        }
-        return std::any(result);
-    };
-}
-```
-
-The converter splits the input on `'|'`, validates each token against the table, and
-accumulates the bits. A token not in the table fails the resolve at load time. Completion
-candidates and lenient/strict integration remain the host's responsibility.
-
-#### Leniency
-
-```cpp
-auto make_lenient_int_converter(std::int32_t fallback)
-{
-    auto base = nucleus::make_scalar_converter<std::int32_t>();
-    return [base, fallback](std::string_view sv) -> nucleus::result<std::any, std::string> {
-        auto r = base(sv);
-        if(!r)
-            return std::any(fallback);
-        return r;
-    };
-}
-```
-
-A converter that returns a fallback on failure implements lenient-policy behavior for that
-field -- the engine itself stays strict and never applies its own fallback. This lets
-individual fields opt into leniency without adding a policy knob to the engine.
-
----
-
-<a id="provenance"></a>
-## Provenance: `origin`, `provenance`
-
-`#include "nucleus/keyspace/provenance.h"`
-
-`provenance_of(key)` returns the `origin` of the value that won, or `nullptr`.
-
-```cpp
-struct origin {
-    std::size_t rank;     // precedence rank of the winning layer
-    std::string layer;    // host-readable label, e.g. "argv"
-    owner_token owner;    // opaque token of the winning source
-};
-```
-
-See [`examples/layering.cpp`](../examples/layering.cpp).
-
----
-
-<a id="precedence"></a>
-## Precedence: `source_stack`, `layer_rank`
-
-`#include "nucleus/entry/precedence.h"`
-
-A `source_stack` is the explicit, ranked set of sources handed to `resolve()`.
-Higher ranks win. Sources are borrowed (non-owning) -- they must outlive the
-resolve.
-
-```cpp
-enum class layer_rank { defaults = 0, env = 1, base = 2, overlay = 3, argv = 4 };
-
-source_stack &add(source &src, std::size_t rank, std::string label, owner_token owner = {});
-source_stack &add(source &src, layer_rank rank, std::string label, owner_token owner = {});
-const std::vector<source_layer> &layers() const;
-bool empty() const;
-std::size_t size() const;
-```
-
-```cpp
-nucleus::source_stack stack;
-stack.add(env, nucleus::layer_rank::env, "env");
-stack.add(argv, nucleus::layer_rank::argv, "argv");   // argv wins on conflict
-```
-
----
-
-<a id="sources"></a>
-## Built-in sources: `env_source`, `argv_source`
-
-Both are concrete sources you instantiate and configure directly. The full
-contract -- including how to write your own -- is in
-[Shipped implementations](api-implementations.md); the using-side summary:
-
-### `env_source`
-
-`#include "nucleus/source/env/env_source.h"` — a flat `(path → value)` source.
-The host chooses which names map to which key paths; the core never reads the
-process environment.
-
-```cpp
-env_source &set(std::string path, std::string text);   // fluent
-```
-
-See [`examples/env.cpp`](../examples/env.cpp).
-
-### `argv_source`
-
-`#include "nucleus/source/argv/argv_source.h"` — maps `--a-b-c=v` onto `a/b/c`
-(`-` is always the separator).
-
-```cpp
-explicit argv_source(std::vector<std::string> args);
-argv_source &recognize_with(key_recognizer recognizer);   // bool(const key_path&)
-argv_source &policy(unknown_key_policy policy);            // strict | lenient
-argv_source &log_to(log_sink &sink);
-```
-
-In `strict` mode an unrecognized flag fails the pull; in `lenient` mode it is
-stored as a string and warned through the sink. See
-[`examples/argv.cpp`](../examples/argv.cpp).
-
----
-
 <a id="emit"></a>
-## Emitting: the output seam (`config_emitter`)
+## Emitting: templates and documents
 
 `#include "nucleus/config_emitter.h"` (the concept)
 
-Output is the inverse of a source: the configuration you resolved can be rendered
-back into any shipped format. `config_emitter` is the format-agnostic contract --
-a stateless type with two operations, both writing into a caller-owned
+Output is the inverse of a source: a sealed space's declared schema can be
+projected into a blank document template, and a resolved configuration can be
+rendered back out. The format-agnostic contract is the `config_emitter`
+concept — a stateless type with two operations, both writing into a caller-owned
 `std::ostream`:
 
 ```cpp
@@ -559,60 +525,42 @@ concept config_emitter = requires(const Emitter e, const configuration_space &sp
 };
 ```
 
-`emit_template` projects a sealed space's **declared schema** into a blank document
-template; `emit_document` projects a **resolved configuration** into a populated
-one. A repeated field keeps all of its values. Each shipped format exposes the
-pair as free functions in its own namespace:
+Each shipped format exposes the pair as free functions in its own namespace,
+plus a `struct emitter` modeling the concept:
 
-| Format | Header | Free functions | Link |
-|--------|--------|----------------|------|
-| XML  | `"nucleus/sources/xml_emitter.h"`                     | `nucleus::xml::emit_template` / `emit_document`  | `nucleus::xml` |
-| env  | `"nucleus/configuration_source/env/env_emitter.h"`   | `nucleus::env::emit_template` / `emit_document`  | core |
-| args | `"nucleus/configuration_source/argv/argv_emitter.h"` | `nucleus::args::emit_template` / `emit_document` | core |
+| Format | Header | Free functions | CMake target |
+|--------|--------|----------------|--------------|
+| XML  | `"nucleus/xml/xml_emitter.h"`   | `nucleus::xml::emit_template` / `emit_document`  | `nucleus::xml` |
+| env  | `"nucleus/env/env_emitter.h"`   | `nucleus::env::emit_template` / `emit_document`  | `nucleus::env` |
+| argv | `"nucleus/argv/argv_emitter.h"` | `nucleus::argv::emit_template` / `emit_document` | `nucleus::argv` |
 
 ```cpp
-nucleus::xml::emit_document(config, std::cout);     // nested
-nucleus::env::emit_document(config, std::cout);     // KEY=value
-nucleus::args::emit_document(config, std::cout);    // --KEY=value
+nucleus::xml::emit_document(config, std::cout);     // nested XML
+nucleus::env::emit_document(config, std::cout);     // KEY=value lines
+nucleus::argv::emit_document(config, std::cout);    // --KEY=value lines
 ```
 
-The seam is **stream-based, and you own persistence** -- there is no `*_to_file`
-helper. Compose with the standard library: write to a file with a `std::ofstream`,
-capture into a string with a `std::ostringstream`.
-
-```cpp
-std::ofstream file("config.xml");
-nucleus::xml::emit_document(config, file);          // to a file
-
-std::ostringstream text;
-nucleus::env::emit_document(config, text);          // to a std::string
-```
-
-See [`examples/round_trip.cpp`](../examples/round_trip.cpp), which resolves one
-configuration and emits it as XML, env, and args.
+The seam is stream-based and the caller owns persistence — write to a file with
+a `std::ofstream`, capture into a string with a `std::ostringstream`. A repeated
+path keeps all of its values in every format. See
+[`examples/round_trip.cpp`](../examples/round_trip.cpp),
+[`examples/xml_persist.cpp`](../examples/xml_persist.cpp), and
+[`examples/emit_template.cpp`](../examples/emit_template.cpp).
 
 ---
 
-<a id="result"></a>
-## `result<T, E>` — fallible returns
+<a id="expected"></a>
+## `expected<T, E>` — fallible returns
 
-`#include "nucleus/result.h"`
+`#include "nucleus/expected.h"`
 
-The in-house fallible type used across the public API (not `std::expected`, which
-is C++23). Truthy when it holds a value.
-
-```cpp
-bool has_value() const;
-explicit operator bool() const;
-T &value();              // and const & / &&
-E &error();              // and const & / &&
-T value_or(U fallback) const &;
-
-constexpr failure<std::decay_t<E>> fail(E &&error);   // construct the error alternative
-```
+The fallible-return vocabulary used across the public API. It mirrors
+`std::expected` (C++23); a future migration points the aliases at the standard
+type and edits nothing else. Truthy when it holds a value; construct the error
+alternative with `nucleus::unexpected(error)`.
 
 ```cpp
-auto loaded = engine.load(args);
+auto loaded = nucleus::load(space, std::move(stack), {});
 if(!loaded) { std::cerr << loaded.error(); return 1; }
 const nucleus::configuration &config = loaded.value();
 ```
@@ -626,13 +574,13 @@ const nucleus::configuration &config = loaded.value();
 
 An opaque tag a host attaches to a registration. The core stores and surfaces it
 (in conflict reports and provenance) but never interprets it. Default-constructed
-tokens are anonymous and each is distinct; a token wrapping a value compares equal
-to another wrapping the same type and value.
+tokens are anonymous and each is distinct; a token wrapping a value compares
+equal to another wrapping the same type and value.
 
 ```cpp
 owner_token();              // anonymous, distinct
-owner_token(T value);       // typed; equality by wrapped type + value
-bool has_value() const;
+explicit owner_token(T value);  // typed; equality by wrapped type + value
+bool has_value() const noexcept;
 ```
 
 ---
@@ -643,7 +591,7 @@ bool has_value() const;
 ### `suggest_keys`
 
 `#include "nucleus/diagnostics/key_suggester.h"` — "did you mean...?" over a set
-of known keys, using a class-weighted edit distance.
+of known keys. The load uses it automatically when rejecting an undeclared key.
 
 ```cpp
 std::vector<std::string> suggest_keys(std::string_view unknown,
@@ -654,15 +602,16 @@ std::vector<std::string> suggest_keys(std::string_view unknown,
 ### `conflict_report`
 
 `#include "nucleus/diagnostics/conflict_report.h"` — returned by
-`configuration_space::conflicts()`. Two registrations claiming the same key path
+`configuration_space_builder::conflicts()` (and by the sealed space, which
+carries the ledger forward). Two registrations claiming the same key path
 produce one report that names every claimant and refuses to pick a winner;
 adjudication is the host's.
 
 ```cpp
 const std::string &key_path() const;
-const std::vector<claimant> &claimants() const;   // claimant { std::string location; owner_token owner; }
+const std::vector<claimant> &claimants() const;
 std::size_t size() const;
-std::string describe() const;                     // human-readable, states "no winner"
+std::string describe() const;
 ```
 
 See [`examples/diagnostics.cpp`](../examples/diagnostics.cpp).
@@ -672,7 +621,7 @@ See [`examples/diagnostics.cpp`](../examples/diagnostics.cpp).
 <a id="completion"></a>
 ## Completion: `generate_completion`, `shell`
 
-`#include "nucleus/completion/completion.h"`
+`#include "nucleus/completion/completion.h"` (for the `shell` enum)
 
 Projects the registered schema into a static shell completion script through the
 same flag mapping the CLI surface uses, so completion cannot drift from the CLI.
@@ -683,5 +632,6 @@ std::string configuration_space::generate_completion(shell which, std::string_vi
 ```
 
 An `enum_element`'s value set becomes that flag's completion candidates. A pure
-read of the schema -- callable in either phase. See
+read of the sealed schema. nucleus is a library, not a CLI — it returns the
+script as a string and the host decides how to surface it. See
 [`examples/completion.cpp`](../examples/completion.cpp).

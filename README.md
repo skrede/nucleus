@@ -33,21 +33,27 @@ structure, with referential-integrity enforcement at attach time and value-set
 validation at resolve.
 
 * **One keyspace, many sources** \
-The `source` / `provider` seam yields keyspace entries `(path -> value)`. argv,
-env, and a separately linked XML module (wrapping pugixml, privately linked and
-unreachable from the core) all feed the same fold; layering precedence is
-explicit and provenance travels with every value.
+A concept-based source seam yields keyspace entries `(path -> value)`. argv,
+env, a programmatic runtime source, and a separately linked XML module
+(wrapping pugixml, privately linked and unreachable from the core) all feed the
+same fold; layering precedence is explicit and provenance travels with every
+value. Capability gating runs automatically on every load: the schema's shape
+derives what it requires, and a source stack that cannot satisfy it fails
+loudly before folding.
 
 * **Two-phase lifecycle** \
-A `configuration_space` is configurable (`register_*` / `install_tokenizer`)
-until `load()` / `resolve()`, which yields an immutable, freely thread-readable
-`configuration`. Registration after resolve is a state-machine error.
+A `configuration_space_builder` accepts registrations (`register_*` /
+`install_tokenizer`) until `build()` seals it into an immutable
+`configuration_space`. The free function `nucleus::load(space, stack, options)`
+folds a source stack against the sealed space and yields an immutable, freely
+thread-readable `configuration`. Registration after `build()` is a
+state-machine error, and the space can be reused across many loads.
 
 * **Token expansion** \
-A `${...}` pipeline with generic core tokenizers (env, file/dir/self,
-string, scope) expands values at load, recursing to a fixpoint with depth and
-cycle guards. Host-specific vocabulary (machine identity, logging) is the
-host's to build and inject through `install_tokenizer()`.
+A `${...}` pipeline with generic core tokenizers (env, string) expands values
+at load, recursing to a fixpoint with depth and cycle guards. Host-specific
+vocabulary (machine identity, logging) is the host's to build with
+`tokenizer_builder` and inject through `install_tokenizer()`.
 
 * **Diagnostics and provenance** \
 Nearest-key suggestions on unknown keys, non-adjudicating conflict reports, and a
@@ -74,6 +80,39 @@ fallback. Options: `NUCLEUS_BUILD_TESTS`, `NUCLEUS_BUILD_EXAMPLES`,
 `NUCLEUS_BUILD_SOURCE_XML` (on by default), `NUCLEUS_BUILD_SANITIZER`,
 `NUCLEUS_COVERAGE`.
 
+## Consuming nucleus
+
+nucleus installs a standard CMake package. Build and install, then
+`find_package`:
+
+```sh
+cmake -B build
+cmake --build build
+cmake --install build --prefix /your/prefix
+```
+
+```cmake
+find_package(nucleus 0.2 REQUIRED)
+target_link_libraries(app PRIVATE nucleus::nucleus nucleus::xml)
+```
+
+Or vendor it directly with `FetchContent` (or `add_subdirectory`), which defines
+the same targets:
+
+```cmake
+include(FetchContent)
+FetchContent_Declare(nucleus
+    GIT_REPOSITORY https://github.com/skrede/nucleus.git
+    GIT_TAG v0.2.0)
+FetchContent_MakeAvailable(nucleus)
+```
+
+The exported targets are `nucleus::nucleus` (the core engine) and one per source
+module: `nucleus::xml` (compiled, built with `NUCLEUS_BUILD_SOURCE_XML=ON`, the
+default), and the header-only `nucleus::env`, `nucleus::argv`, and
+`nucleus::runtime`. Each module target links `nucleus::nucleus` transitively;
+link only the modules you use.
+
 ## Documentation
 
 The [`docs/`](docs/) directory holds the API reference, split three ways:
@@ -83,39 +122,40 @@ and the [shipped implementations](docs/api-implementations.md) of those seams.
 ## Examples
 
 See [`examples/`](examples/) for a small, self-contained program per concept --
-quickstart, schema, argv, env, layering, custom sources, the parser concept,
-tokens, logging, completion, diagnostics, the registration policy, and XML. Build
-them with `-DNUCLEUS_BUILD_EXAMPLES=ON`.
+quickstart, schema, argv, env, layering, source stacks, custom sources, the
+source concept, strains, typed fields, tokens, logging, completion, diagnostics,
+the registration policy, capability gating, XML, and the emitters (template,
+persist, round trip). Build them with `-DNUCLEUS_BUILD_EXAMPLES=ON`.
 
 ### Quickstart
 
-Register a small schema, then resolve a document and a command line onto the same
-keyspace. The command line outranks the document, so it overrides `mode`, while
-the document's `host` survives because no flag contests it &mdash; and provenance
-records which layer won each key.
+Declare a schema on a builder, seal it, and resolve a command line against it.
+The schema is the authority: it decides which flags exist, so `--server-port` is
+declared and resolves, while an undeclared flag would fail the load.
 
 ```cpp
-nucleus::configuration_space engine;
-engine.register_element(nucleus::element("server", nucleus::anchor::root()));
-engine.register_element(nucleus::required_element(
-    "host", nucleus::anchor::keyspace("server")));
-engine.register_element(nucleus::enum_element(
-    "mode", nucleus::anchor::keyspace("server"), {"http", "https"}));
+nucleus::configuration_space_builder builder;
+builder.register_element(nucleus::element("server", nucleus::anchor::root()));
+builder.register_element(
+    nucleus::element("port", nucleus::anchor::keyspace("server")));
+nucleus::configuration_space space = builder.build();
 
-const char *document = R"(<server host="127.0.0.1" mode="http"/>)";
-auto make = [document](const std::string &) -> std::unique_ptr<nucleus::source> {
-    return std::make_unique<nucleus::xml::xml_source>(
-        nucleus::xml::xml_source::from_string(document));
-};
+nucleus::argv_source argv(std::vector<std::string>{"--server-port=8080"});
+argv.recognize_with(nucleus::recognizer_of(space));
 
-auto config = engine.load({"--server-mode=https"}, {"config.xml"}, make).value();
+auto loaded = nucleus::load(space, nucleus::source_stack{std::move(argv)}, {});
+if(!loaded)
+{
+    std::cerr << "load failed: " << loaded.error() << '\n';
+    return 1;
+}
+
+const nucleus::configuration &config = loaded.value();
+std::cout << "server/port = " << config.get("server/port").value() << '\n';
 ```
 
 ```txt
-resolved 2 key(s):
-  server/host = 127.0.0.1  (from path:config.xml)
-  server/mode = https  (from argv)
-contains server/host: true
+server/port = 8080
 ```
 
 ### Tokens
@@ -127,34 +167,39 @@ another resolves inner-first.
 ```cpp
 nucleus::env_source values;
 values.set("service/region", "${string.upper(${env.NUCLEUS_REGION})}")
-      .set("service/banner", "${string.concat(node-, ${env.NUCLEUS_REGION})}");
+      .set("service/instance", "${string.lower(NODE-${env.NUCLEUS_REGION})}");
 ```
 
 ```txt
-service/banner = node-eu-west
+service/instance = node-eu-west
 service/region = EU-WEST
 ```
 
 ### Logging
 
-Inject a custom `log_sink` to redirect the engine's diagnostics. The default sink
-is a no-op; a host bridges the seam to its own logger by subclassing it, or by
-wrapping a callable (`log_sink_f`) or an `ostream` (`log_sink_s`).
+Inject a `log_sink` to redirect the engine's diagnostics. The default sink is a
+no-op; a host bridges the seam to its own logger by wrapping a callable
+(`log_sink_f`), wrapping an `ostream` (`log_sink_s`), or subclassing `log_sink`.
 
 ```cpp
-class counting_sink final : public nucleus::log_sink
-{
-public:
-    void log(nucleus::log_level level, std::string_view message) override
-    {
+auto sink = nucleus::log_sink_f(
+    [&warnings](nucleus::log_level level, std::string_view message) {
+        ++warnings;
         std::cout << "[app/" << nucleus::to_string(level) << "] " << message << '\n';
-    }
-};
+    });
+
+nucleus::argv_source args(
+    std::vector<std::string>{"--service-name=edge", "--service-mode=fast"});
+args.recognize_with([](const nucleus::key_path &path) {
+        return path.str() == "service/name";
+    })
+    .policy(nucleus::unknown_key_policy::lenient)
+    .log_to(sink);
 ```
 
 ```txt
-[app/warn] unknown CLI flag '--service-mode=fast'; lenient mode &mdash; stored as string at 'service/mode'
-the engine routed 1 message(s) through the injected sink
+[app/warn] unknown CLI flag '--service-mode=fast'; lenient mode -- stored as string at 'service/mode'
+routed 1 warning(s) through the sink
 ```
 
 ### Completion
@@ -164,22 +209,23 @@ library, not a CLI, so it ships no `completion` subcommand &mdash; it returns th
 script as a string and the host decides how to surface it.
 
 ```cpp
-engine.register_element(nucleus::element("logging", nucleus::anchor::root()));
-engine.register_element(nucleus::enum_element(
+nucleus::configuration_space_builder builder;
+builder.register_element(nucleus::element("logging", nucleus::anchor::root()));
+builder.register_element(nucleus::enum_element(
     "level", nucleus::anchor::keyspace("logging"),
     {"debug", "info", "warn", "error"}));
+nucleus::configuration_space space = builder.build();
 
-std::cout << engine.generate_completion(nucleus::shell::bash, "mytool");
+std::cout << space.generate_completion(nucleus::shell::bash, "mytool");
 ```
 
 ```bash
 _mytool_complete()
 {
-    local flags='--logging --logging-level --server --server-port'
     ...
     case "$flag" in
     '--logging-level')
-        COMPREPLY=( $(compgen -W 'debug info warn error' &mdash; "$val") )
+        COMPREPLY=( $(compgen -W 'debug info warn error' -- "$val") )
         ...
     esac
     ...
@@ -193,20 +239,21 @@ values the schema validates.
 
 ## Limitations
 
-This is the first release, and its scope is deliberately narrow.
+The scope is still deliberately narrow.
 
-* **Sources**: XML documents plus argv and env. Other document formats (YAML,
-  INI, JSON) are not yet implemented &mdash; the `source` seam is the extension point,
-  but only the XML module ships.
+* **Sources**: XML documents plus argv, env, and the programmatic runtime
+  source. Other document formats (YAML, INI, JSON) are not yet implemented
+  &mdash; the source concept is the extension point, but only the XML document
+  module ships.
 * **Completion** is static, for **bash and zsh** only. There is no dynamic
   (runtime) completion and no fish support; both are future single-file additions
   through the same emission seam.
-* **No serialization, mutation, or merge** of a resolved `configuration` yet. The
-  resolved value is read-only; producing a new configuration as a value (clone,
-  transfer, diff) is the next body of work.
-* **Capability gating** is host-driven: the schema model expresses presence and
-  selector role per element but does not yet carry per-element capability
-  requirements the resolve fold could gate a source against automatically.
+* **No mutation or merge** of a resolved `configuration`. The resolved value is
+  read-only (it can be emitted back out as XML, env, or argv text); producing a
+  new configuration as a value (clone, transfer, diff) is future work.
+* **Document inheritance** (`inherit=` chains) is implemented by the XML module
+  only; a custom document source must implement the inheritance affordance
+  itself to participate.
 * **Cross-platform** support (macOS, Linux, Windows; `std::format` with a `{fmt}`
   fallback) is verified by the CI matrix.
 
@@ -215,7 +262,3 @@ The public API may still change while the engine stabilizes.
 ## License
 
 Apache-2.0. See [`LICENSE`](LICENSE).
-
-## Conventions
-
-See [`CONVENTIONS.md`](CONVENTIONS.md).

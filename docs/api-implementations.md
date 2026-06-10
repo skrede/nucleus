@@ -1,30 +1,119 @@
 # Shipped implementations
 
-The concrete types nucleus ships that satisfy the seams in
-[Seams you extend](api-extending.md). Each is documented here as a worked
-realization of a seam -- both for direct use and as a model for your own.
+The concrete source and emitter modules nucleus ships, each a worked
+realization of the seams in [Seams you extend](api-extending.md) — both for
+direct use and as a model for your own. Every source is a plain struct
+satisfying the [source concept](api-extending.md#source_concept) by duck
+typing; none inherits from anything.
+
+| Module | Source type | Emitter namespace | Header root | CMake target | Kind |
+|--------|-------------|-------------------|-------------|--------------|------|
+| xml     | `nucleus::xml_source`     | `nucleus::xml`  | `nucleus/xml/`     | `nucleus::xml`     | compiled (pugixml, private) |
+| env     | `nucleus::env_source`     | `nucleus::env`  | `nucleus/env/`     | `nucleus::env`     | header-only |
+| argv    | `nucleus::argv_source`    | `nucleus::argv` | `nucleus/argv/`    | `nucleus::argv`    | header-only |
+| runtime | `nucleus::runtime_source` | —               | `nucleus/runtime/` | `nucleus::runtime` | header-only |
+
+Each module target links `nucleus::nucleus` transitively. The xml module is
+built when `NUCLEUS_BUILD_SOURCE_XML=ON` (the default).
 
 ## Contents
 
+- [`xml_source` — the document source](#xml_source)
 - [`env_source` — a flat source](#env_source)
-- [`argv_source` — a CLI-flag source](#argv_source)
-- [`xml_source` — a document source](#xml_source)
-- [`parser_adapter` / `adapt_parser` — concept → source](#parser_adapter)
+- [`argv_source` — the CLI-flag source](#argv_source)
+- [`runtime_source` — the programmatic source](#runtime_source)
+- [The emitters: `config_emitter` realizations](#emitters)
 - [`log_sink_f`, `log_sink_s` — log_sink adapters](#log_sink_adapters)
+
+---
+
+<a id="xml_source"></a>
+## `xml_source` — the document source
+
+`#include "nucleus/xml/xml_source.h"` · target `nucleus::xml` · satisfies
+[`configuration_source`](api-extending.md#source_concept) plus both optional
+affordances (`projects_source`, `inheriting_source`)
+
+The reference document source, backed by pugixml. The xml module is the only
+place pugixml is reachable: it is privately linked and nothing of pugixml
+appears in the public headers, so the core never sees it.
+
+```cpp
+struct xml_source_options {
+    enum class input_kind { string, file };
+    input_kind  kind = input_kind::string;
+    std::string data;  // XML text when kind==string; file path when kind==file
+
+    static xml_source_options of_string(std::string text);
+    static xml_source_options of_file(std::string path);
+};
+
+class xml_source final {
+public:
+    static xml_source from(xml_source_options options);
+
+    capability_descriptor capabilities() const;
+    configuration_source_result pull();
+    void apply_projection(const schema_projection &projection);
+    inherit_declaration inheritance() const;   // callable after pull()
+};
+```
+
+How it realizes the seams:
+
+- **Tree → keyspace.** Nested elements become `/`-separated key paths; an
+  element's attributes and pure-text leaf children become values. The root
+  element name anchors the path.
+- **View-node model.** Every value is a view into the pugixml document arena
+  (zero-copy), and `pull()` pins that arena in the batch's `retained_buffer` —
+  the [buffer lifetime contract](api-extending.md#buffer), honored. This is the
+  model to copy for any arena-backed parser.
+- **Capabilities:** `{ nesting, duplicate_keys, comments, ordering }`. Not
+  `typed_scalars` — XML text is untyped until a schema interprets it.
+- **Projection.** `apply_projection` retains the schema's keyed-container map so
+  the walk renders one instance per primary-key value instead of collapsing
+  repeated siblings last-wins.
+- **Inheritance.** It is the only shipped source that participates in
+  inheritance chains, via two grammar attributes:
+  - `inherit=` on the **document root** populates `inheritance()`:
+    `inherit="path/to/parent.xml"` → `kind::parent_path` (the chain walker
+    fetches the named file through `load_options::make_document`);
+    `inherit="none"` → `kind::opt_out`; absent → `kind::inherit_default`.
+    Placing `inherit=` on any non-root element is a loud parse error.
+  - `extend=` on a **keyed instance element** emits an `extend_disposition`:
+    `extend="narrow"` or `extend="wide"`; any other value is a loud parse
+    error.
+  The chain walker caps the depth at `inherit_policy::depth_cap` (default 16)
+  and consults `inherit_policy::admissibility` for each fetched parent.
+
+A host usually does not construct it at the call site of `load`: it hands a
+factory to `load_options::make_document` that builds one per requested path:
+
+```cpp
+auto make = [](const std::string &path) -> nucleus::source_handle {
+    return nucleus::source_handle(
+        nucleus::xml_source::from(nucleus::xml_source_options::of_file(path)));
+};
+```
+
+See [`examples/xml.cpp`](../examples/xml.cpp),
+[`examples/strains.cpp`](../examples/strains.cpp), and
+[`tests/inherit_chain_test.cpp`](../tests/inherit_chain_test.cpp).
 
 ---
 
 <a id="env_source"></a>
 ## `env_source` — a flat source
 
-`#include "nucleus/source/env/env_source.h"` · satisfies [`source`](api-extending.md#source)
+`#include "nucleus/env/env_source.h"` · target `nucleus::env`
 
 The minimal source: a flat `(path → value)` table the host populates. It is
-deliberately honest -- its capability descriptor is **empty**, which is what lets
-it exercise the [feature-gate](api-extending.md#feature_gate) degradation path
-(ask it for `nesting` and you get an observable downgrade, not a lie). The core
-never reads the process environment; the host decides which variable maps to which
-key path.
+deliberately honest — its capability descriptor is **empty**, which is what lets
+it exercise the gate's degradation and refusal paths (ask a schema with nesting
+for an env-only stack and the auto-gate refuses; see
+[`examples/capability_gating.cpp`](../examples/capability_gating.cpp)). The
+core never reads the process environment; the host decides which variable maps
+to which key path.
 
 ```cpp
 env_source();
@@ -32,8 +121,8 @@ explicit env_source(std::vector<std::pair<std::string, std::string>> entries);
 env_source &set(std::string path, std::string text);   // fluent
 
 static capability_descriptor descriptor() noexcept;     // empty
-capability_descriptor capabilities() const override;    // == descriptor()
-source_result pull() override;                           // owned values, retained_buffer::none()
+capability_descriptor capabilities() const;              // == descriptor()
+configuration_source_result pull();                      // owned values, no retained buffer
 ```
 
 Because its values are owned, `pull()` pins no buffer. This is the template for
@@ -49,112 +138,115 @@ See [`examples/env.cpp`](../examples/env.cpp).
 ---
 
 <a id="argv_source"></a>
-## `argv_source` — a CLI-flag source
+## `argv_source` — the CLI-flag source
 
-`#include "nucleus/source/argv/argv_source.h"` · satisfies [`source`](api-extending.md#source)
+`#include "nucleus/argv/argv_source.h"` · target `nucleus::argv`
 
 Consumes raw argv tokens and maps `--a-b-c=v` onto the key path `a/b/c` via the
 [`cli_surface`](api-extending.md#transforms) bijection (`-` is always the
 separator). `pull()` runs in two stages: the pure syntactic mapping, then an
-optional schema-validation pass driven by a host-supplied recognizer.
+optional schema-validation pass driven by a recognizer.
 
 ```cpp
 enum class unknown_key_policy { strict, lenient };
-using key_recognizer = std::function<bool(const key_path &)>;
+// key_recognizer = std::function<bool(const key_path &)>  ("nucleus/configuration_source/argv/key_recognizer.h")
 
 argv_source();
 explicit argv_source(std::vector<std::string> args);
-argv_source &recognize_with(key_recognizer recognizer);  // which keys are admissible
-argv_source &policy(unknown_key_policy policy) noexcept;  // strict | lenient
+argv_source &recognize_with(key_recognizer recognizer);   // which keys are admissible
+argv_source &policy(unknown_key_policy policy) noexcept;   // strict (default) | lenient
 argv_source &log_to(log_sink &sink) noexcept;
 
-static capability_descriptor descriptor() noexcept;       // empty
-capability_descriptor capabilities() const override;
-source_result pull() override;                            // owned values
+static capability_descriptor descriptor() noexcept;        // empty
+capability_descriptor capabilities() const;
+configuration_source_result pull();                        // owned values
 ```
 
 - With no recognizer, every syntactically valid flag is accepted.
 - With a recognizer, an unrecognized flag is an **error** under `strict` and is
   **stored with a warn-level message** under `lenient`.
-- `configuration_space::load(args)` constructs one of these for you and wires its
-  recognizer to the schema.
+- `nucleus::recognizer_of(space)` derives the recognizer from a sealed space's
+  schema surface, which is how argv stays schema-coupled:
 
-See [`examples/argv.cpp`](../examples/argv.cpp) and
+```cpp
+nucleus::argv_source argv(std::vector<std::string>{"--server-port=8080"});
+argv.recognize_with(nucleus::recognizer_of(space));
+```
+
+Its capability descriptor is empty: a flag stream is flat and untyped, like
+env. See [`examples/argv.cpp`](../examples/argv.cpp),
+[`examples/argv_recognizer.cpp`](../examples/argv_recognizer.cpp), and
 [`examples/logging.cpp`](../examples/logging.cpp).
 
 ---
 
-<a id="xml_source"></a>
-## `xml_source` — a document source
+<a id="runtime_source"></a>
+## `runtime_source` — the programmatic source
 
-`src/nucleus/xml/xml_source.h` · satisfies [`document_source`](api-extending.md#document_source)
+`#include "nucleus/runtime/runtime_source.h"` · target `nucleus::runtime`
 
-The reference document source, backed by pugixml. It is the **only** place
-pugixml is reachable: the module is privately linked and nothing of pugixml
-appears in its interface, so the core never sees it. It lives under the internal
-`src/` tree, so a consumer that uses it directly adds `src/` to its include path
-and links `nucleus::source_xml` (see the `xml` target in
-[`examples/CMakeLists.txt`](../examples/CMakeLists.txt)). Built when
-`-DNUCLEUS_BUILD_SOURCE_XML=ON` (the default).
+A first-class in-memory source: a host builds configuration directly via
+`.set(path, value)` with no document at all — embedding code, generated config,
+tests, defaults layers.
 
 ```cpp
-namespace nucleus::xml {
-class xml_source final : public document_source {
-public:
-    static xml_source from_string(std::string text);   // parse an in-memory string
-    static xml_source from_file(std::string path);      // parse a file at pull time
+runtime_source();
+explicit runtime_source(std::vector<std::pair<std::string, std::string>> entries);
+runtime_source &set(std::string path, std::string text);   // fluent
 
-    capability_descriptor capabilities() const override;
-    source_result pull() override;
-};
-}
+capability_descriptor capabilities() const;   // { nesting, duplicate_keys, typed_scalars }
+configuration_source_result pull();            // owned values
 ```
 
-How it realizes the seam:
+It emits flat `(path → value)` entries exactly like `env_source`, but declares
+`{ nesting, duplicate_keys, typed_scalars }` — a host-built source genuinely
+can carry nested, repeated, and typed data, so the auto-gate admits a
+nested/typed schema fed programmatically. This is the difference between the
+two flat in-memory sources: same fold result, different gate-visible honesty.
 
-- **Tree → keyspace.** Nested elements become `/`-separated key paths; an
-  element's attributes and pure-text leaf children become values. The root
-  element name anchors the path.
-- **View-node model.** Every value is a `string_view` into the pugixml pool
-  (zero-copy), and `pull()` pins that pool in the batch's `retained_buffer`. The
-  resolve copies the values out and only then drops the batch -- the
-  [`document_source`](api-extending.md#document_source) contract, honored. This is
-  the model to copy for any arena-backed parser.
-- **Honest capabilities:** `{ nesting, duplicate_keys, comments, ordering }`. Not
-  `typed_scalars` -- XML text is untyped until a schema interprets it.
+```cpp
+nucleus::runtime_source defaults;
+defaults.set("server/host", "localhost").set("server/port", "8080");
+```
 
-Usually a host does not name it directly: it hands a `document_factory` to
-`configuration_space::load(paths, make)` that builds one per path. See
-[`examples/xml.cpp`](../examples/xml.cpp).
+See [`examples/source_stack.cpp`](../examples/source_stack.cpp) and
+[`examples/reusable_space.cpp`](../examples/reusable_space.cpp).
 
 ---
 
-<a id="parser_adapter"></a>
-## `parser_adapter` / `adapt_parser` — concept → source
+<a id="emitters"></a>
+## The emitters: `config_emitter` realizations
 
-`#include "nucleus/source/parser_adapter.h"` · bridges [`Parser`](api-extending.md#parser) → [`source`](api-extending.md#source)
+Each format module ships the output pair as free functions in its own
+namespace, plus a stateless `struct emitter` whose members forward to them so
+the module satisfies the [`config_emitter`](api-using.md#emit) concept by type
+as well as by call surface. Both operations write into a caller-owned
+`std::ostream`; the caller owns persistence.
 
-Type-erases any type satisfying the `Parser` concept into a runtime-virtual
-`source`, owning the parser by value. It is how the compile-time authoring path
-reaches the same virtual seam a hand-written subclass uses.
+| Header | Free functions | Rendering |
+|--------|----------------|-----------|
+| `"nucleus/xml/xml_emitter.h"`   | `nucleus::xml::emit_template` / `emit_document`   | nested XML; anchor-path nesting; constrained leaves annotated with their allowed set; a repeated path keeps all its values as sibling elements |
+| `"nucleus/env/env_emitter.h"`   | `nucleus::env::emit_template` / `emit_document`   | flat `KEY=value` lines, one per resolved value; the template emits one blank `KEY=` per declared leaf with an `# allowed: a\|b\|c` annotation on constrained leaves |
+| `"nucleus/argv/argv_emitter.h"` | `nucleus::argv::emit_template` / `emit_document`  | flat `--KEY=value` lines, same shape as env with the `--` prefix |
+
+`emit_template` projects a **sealed space's declared schema** into a blank
+document template; `emit_document` projects a **resolved configuration** into a
+populated one. A repeated path emits one entry per value in fold order in every
+format.
 
 ```cpp
-template <typename T> class parser_adapter final : public source {
-public:
-    explicit parser_adapter(T parser);
-    capability_descriptor capabilities() const override;  // delegates to the parser
-    source_result pull() override;                        // delegates to the parser
-};
+nucleus::xml::emit_template(space, std::cout);    // blank template from the schema
+nucleus::xml::emit_document(config, std::cout);   // populated document from a load
 
-template <typename T>
-std::unique_ptr<source> adapt_parser(T parser);           // factory
+std::ofstream file("config.xml");
+nucleus::xml::emit_document(config, file);        // persistence is yours
 ```
 
-```cpp
-std::unique_ptr<nucleus::source> src = nucleus::adapt_parser(table_parser{});
-```
-
-See [`examples/parser_concept.cpp`](../examples/parser_concept.cpp).
+The runtime module ships no emitter — its "format" is C++ code. See
+[`examples/round_trip.cpp`](../examples/round_trip.cpp) (one configuration
+rendered through all three formats),
+[`examples/xml_persist.cpp`](../examples/xml_persist.cpp), and
+[`examples/emit_template.cpp`](../examples/emit_template.cpp).
 
 ---
 
@@ -180,7 +272,7 @@ public:
 ```
 
 - `log_sink_f` wraps any callable invocable as `f(log_level, std::string_view)`
-  -- typically a lambda. Class template argument deduction makes
+  — typically a lambda. Class template argument deduction makes
   `nucleus::log_sink_f(lambda)` work without naming the type.
 - `log_sink_s` wraps an `std::ostream`, prefixing each line with its level.
 
