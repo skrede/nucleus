@@ -20,6 +20,7 @@
 using nucleus::key_path;
 using nucleus::argv_source;
 using nucleus::normalize_arg;
+using nucleus::cli_delimiter;
 
 namespace {
 
@@ -73,6 +74,58 @@ TEST_CASE("the `-` <-> `/` bijection is invertible", "[argv]")
 {
     auto kv = normalize_arg("--plexus-udp-auth_mode=auth").value();
     REQUIRE(nucleus::flag_of(kv.key) == "--plexus-udp-auth_mode");
+}
+
+TEST_CASE("cli_delimiter validates its text", "[argv][delimiter]")
+{
+    REQUIRE(cli_delimiter::parse("-"));
+    REQUIRE(cli_delimiter::parse("__"));
+    REQUIRE(cli_delimiter::parse("/")); // the identity mapping
+    REQUIRE_FALSE(cli_delimiter::parse(""));
+    REQUIRE_FALSE(cli_delimiter::parse("=")); // eaten by the key/value split
+    REQUIRE_FALSE(cli_delimiter::parse("a/b")); // would forge path structure
+    REQUIRE(cli_delimiter() == cli_delimiter::parse("-").value());
+}
+
+TEST_CASE("normalize_arg maps a custom delimiter to the separator", "[argv][delimiter]")
+{
+    const auto delim = cli_delimiter::parse("__").value();
+
+    auto kv = normalize_arg("--plexus__udp__auth_mode=auth", delim);
+    REQUIRE(kv);
+    REQUIRE(kv.value().key.str() == "plexus/udp/auth_mode");
+    REQUIRE(kv.value().value == "auth");
+
+    // The inverse projection speaks the same delimiter.
+    REQUIRE(nucleus::flag_of(kv.value().key, delim) == "--plexus__udp__auth_mode");
+}
+
+TEST_CASE("the `/` delimiter makes flag body and key path one string", "[argv][delimiter]")
+{
+    const auto delim = cli_delimiter::parse("/").value();
+    auto kv = normalize_arg("--plexus/udp/auth_mode=auth", delim);
+    REQUIRE(kv);
+    REQUIRE(kv.value().key.str() == "plexus/udp/auth_mode");
+    REQUIRE(nucleus::flag_of(kv.value().key, delim) == "--plexus/udp/auth_mode");
+}
+
+TEST_CASE("a raw separator in a flag is rejected under a non-`/` delimiter", "[argv][delimiter]")
+{
+    auto kv = normalize_arg("--plexus/udp-auth_mode=auth");
+    REQUIRE_FALSE(kv);
+    REQUIRE(kv.error().find("keyspace separator") != std::string::npos);
+}
+
+TEST_CASE("argv_source pulls under a host-chosen delimiter", "[argv][delimiter]")
+{
+    argv_source src(std::vector<std::string>{"--plexus__udp__auth_mode=auth"});
+    src.delimit_with(cli_delimiter::parse("__").value());
+
+    auto batch = src.pull();
+    REQUIRE(batch);
+    REQUIRE(batch.value().entries.size() == 1);
+    REQUIRE(batch.value().entries[0].path == "plexus/udp/auth_mode");
+    REQUIRE(batch.value().entries[0].value.text() == "auth");
 }
 
 TEST_CASE("argv_source emits keyspace entries through the source seam", "[argv]")

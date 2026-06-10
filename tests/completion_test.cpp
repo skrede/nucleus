@@ -96,6 +96,14 @@ TEST_CASE("the zsh script matches the golden projection byte-for-byte", "[comple
     REQUIRE(generate_completion(shell::zsh, fixture(), "myapp") == expected_zsh);
 }
 
+TEST_CASE("completion renders flags under the host-chosen delimiter", "[completion][delimiter]")
+{
+    const auto delim = nucleus::cli_delimiter::parse("__").value();
+    const std::string bash = generate_completion(shell::bash, fixture(), "myapp", delim);
+    REQUIRE(bash.find("--logging__level") != std::string::npos);
+    REQUIRE(bash.find("--logging-level") == std::string::npos);
+}
+
 TEST_CASE("zsh uses its own _arguments model, not reused bash quoting", "[completion]")
 {
     const std::string zsh = generate_completion(shell::zsh, fixture(), "myapp");

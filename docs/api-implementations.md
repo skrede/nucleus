@@ -149,9 +149,10 @@ See [`examples/env.cpp`](../examples/env.cpp).
 `#include "nucleus/argv/argv_source.h"` · target `nucleus::argv`
 
 Consumes raw argv tokens and maps `--a-b-c=v` onto the key path `a/b/c` via the
-[`cli_surface`](api-extending.md#transforms) bijection (`-` is always the
-separator). `pull()` runs in two stages: the pure syntactic mapping, then an
-optional schema-validation pass driven by a recognizer.
+[`cli_surface`](api-extending.md#transforms) bijection. The flag delimiter is
+`-` by default and host-selectable via a validated `cli_delimiter` (multi-character
+delimiters such as `__` are legal). `pull()` runs in two stages: the pure
+syntactic mapping, then an optional schema-validation pass driven by a recognizer.
 
 ```cpp
 enum class unknown_key_policy { strict, lenient };
@@ -160,6 +161,7 @@ enum class unknown_key_policy { strict, lenient };
 argv_source();
 explicit argv_source(std::vector<std::string> args);
 argv_source &recognize_with(key_recognizer recognizer);   // which keys are admissible
+argv_source &delimit_with(cli_delimiter delimiter);        // flag delimiter, default "-"
 argv_source &policy(unknown_key_policy policy) noexcept;   // strict (default) | lenient
 argv_source &log_to(log_sink &sink) noexcept;
 
@@ -177,6 +179,16 @@ configuration_source_result pull();                        // owned values
 ```cpp
 nucleus::argv_source argv(std::vector<std::string>{"--server-port=8080"});
 argv.recognize_with(nucleus::recognizer_of(space));
+```
+
+- A custom delimiter changes the whole flag grammar at once; the argv emitter and
+  `generate_completion` accept the same `cli_delimiter`, so the projected surface
+  and the parsed surface cannot drift:
+
+```cpp
+auto delim = nucleus::cli_delimiter::parse("__").value();
+nucleus::argv_source argv(std::vector<std::string>{"--server__port=8080"});
+argv.delimit_with(delim);
 ```
 
 Its capability descriptor is empty: a flag stream is flat and untyped, like
@@ -228,16 +240,18 @@ See [`examples/source_stack.cpp`](../examples/source_stack.cpp) and
 ## The emitters: `config_emitter` realizations
 
 Each format module ships the output pair as free functions in its own
-namespace, plus a stateless `struct emitter` whose members forward to them so
-the module satisfies the [`config_emitter`](api-using.md#emit) concept by type
-as well as by call surface. Both operations write into a caller-owned
-`std::ostream`; the caller owns persistence.
+namespace, plus a `struct emitter` whose members forward to them so the module
+satisfies the [`config_emitter`](api-using.md#emit) concept by type as well as
+by call surface. Both operations write into a caller-owned `std::ostream`; the
+caller owns persistence. The argv pair takes an optional `cli_delimiter` (and
+`argv::emitter` carries one as its only state), which must match the
+`argv_source` it round-trips with.
 
 | Header | Free functions | Rendering |
 |--------|----------------|-----------|
 | `"nucleus/xml/xml_emitter.h"`   | `nucleus::xml::emit_template` / `emit_document`   | nested XML; anchor-path nesting; constrained leaves annotated with their allowed set; a repeated path keeps all its values as sibling elements |
 | `"nucleus/env/env_emitter.h"`   | `nucleus::env::emit_template` / `emit_document`   | flat `KEY=value` lines, one per resolved value; the template emits one blank `KEY=` per declared leaf with an `# allowed: a\|b\|c` annotation on constrained leaves |
-| `"nucleus/argv/argv_emitter.h"` | `nucleus::argv::emit_template` / `emit_document`  | flat `--KEY=value` lines, same shape as env with the `--` prefix |
+| `"nucleus/argv/argv_emitter.h"` | `nucleus::argv::emit_template` / `emit_document`  | flat `--KEY=value` lines: the key joined by the `cli_delimiter` (default `-`), the exact flags `argv_source` parses back |
 
 `emit_template` projects a **sealed space's declared schema** into a blank
 document template; `emit_document` projects a **resolved configuration** into a

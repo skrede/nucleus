@@ -79,12 +79,20 @@ TEST_CASE("env and args project a schema into flat KEY= templates", "[emit][seam
     REQUIRE(env.find("allowed: primary|secondary") != std::string::npos);
     REQUIRE(env.find('<') == std::string::npos);
 
+    // The argv template lines are REAL flags: the key joined by the delimiter,
+    // exactly what argv_source parses back.
     std::ostringstream args_out;
     nucleus::argv::emit_template(space, args_out);
     const std::string args = args_out.str();
-    REQUIRE(args.find("--server/host=") != std::string::npos);
-    REQUIRE(args.find("--server/mode=") != std::string::npos);
+    REQUIRE(args.find("--server-host=") != std::string::npos);
+    REQUIRE(args.find("--server-mode=") != std::string::npos);
     REQUIRE(args.find('<') == std::string::npos);
+
+    // A custom delimiter re-renders the same surface under the host's grammar.
+    const auto delim = nucleus::cli_delimiter::parse("__").value();
+    std::ostringstream custom_out;
+    nucleus::argv::emit_template(space, custom_out, delim);
+    REQUIRE(custom_out.str().find("--server__host=") != std::string::npos);
 }
 
 TEST_CASE("env and args emit one flat line per resolved value", "[emit][seam]")
@@ -103,7 +111,7 @@ TEST_CASE("env and args emit one flat line per resolved value", "[emit][seam]")
     std::ostringstream args_out;
     nucleus::argv::emit_document(config, args_out);
     const std::string args = args_out.str();
-    REQUIRE(count_occurrences(args, "--server/tag=") == 2);
+    REQUIRE(count_occurrences(args, "--server-tag=") == 2);
 }
 
 TEST_CASE("xml projects the SAME space into nested tree markup", "[emit][seam]")

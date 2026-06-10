@@ -3,11 +3,12 @@
 
 #include "nucleus/expected.h"
 
+#include "nucleus/schema/cli_flag.h"
+
 #include "nucleus/keyspace/key_path.h"
 
 #include <string>
 #include <utility>
-#include <algorithm>
 #include <string_view>
 
 namespace nucleus {
@@ -24,13 +25,16 @@ namespace nucleus {
 //     (so a value may itself contain `=`).
 //   * a bare flag with no `=` becomes a truthy presence value, the string
 //     "true".
-//   * `-` is ALWAYS the path separator; it maps to the keyspace separator `/`.
-//     multi-word segments use underscores, which pass through untouched. So
+//   * the delimiter (default `-`) is ALWAYS the path separator; every
+//     occurrence maps to the keyspace separator `/`. Multi-word segments use
+//     underscores, which pass through untouched. So
 //     `--plexus-udp-auth_mode=auth` -> key `plexus/udp/auth_mode` = `auth`.
 //
-// Segments cannot contain hyphens, and there is NO longest-match disambiguation
-// and NO escaping. That restriction is precisely what makes the bijection clean:
-// `-` <-> `/` is unambiguous, so a key path projects back to exactly one flag.
+// Segments cannot contain the delimiter, and there is NO longest-match
+// disambiguation and NO escaping. That restriction is precisely what makes the
+// bijection clean: delimiter <-> `/` is unambiguous, so a key path projects back
+// to exactly one flag. For the same reason a raw `/` in a flag is rejected
+// whenever the delimiter is not `/` itself.
 
 // The result of normalizing one token: the mapped key path and its value text.
 struct cli_assignment
@@ -44,7 +48,8 @@ using cli_normalize_result = expected<cli_assignment, std::string>;
 // Normalizes a single argv token into a (key path -> value) assignment, applying
 // the rules above. Reports an error for tokens that are not `--` flags or that
 // have an empty/ malformed key.
-[[nodiscard]] inline cli_normalize_result normalize_arg(std::string_view raw)
+[[nodiscard]] inline cli_normalize_result normalize_arg(std::string_view raw,
+                                                        const cli_delimiter &delimiter = {})
 {
     if(!raw.starts_with("--"))
         return unexpected(std::string("CLI argument '") + std::string(raw)
@@ -71,11 +76,28 @@ using cli_normalize_result = expected<cli_assignment, std::string>;
         return unexpected(std::string("CLI argument '") + std::string(raw)
                     + "' has an empty flag name");
 
-    // `-` -> path separator; everything else (including `_`) passes through.
+    // A raw separator would survive the mapping and forge path structure the
+    // delimiter did not spell, breaking invertibility.
+    if(!delimiter.is_separator()
+       && lhs.find(key_path::separator) != std::string_view::npos)
+        return unexpected(std::string("CLI argument '") + std::string(raw)
+                    + "' contains the keyspace separator '/'; the delimiter is '"
+                    + delimiter.str() + "'");
+
+    // Every delimiter occurrence -> path separator; everything else (including
+    // `_`) passes through.
+    const std::string &delim = delimiter.str();
     std::string key_text;
     key_text.reserve(lhs.size());
-    std::transform(lhs.begin(), lhs.end(), std::back_inserter(key_text),
-                   [](char c) { return c == '-' ? key_path::separator : c; });
+    std::size_t start = 0;
+    for(std::size_t pos = lhs.find(delim); pos != std::string_view::npos;
+        pos = lhs.find(delim, start))
+    {
+        key_text.append(lhs.substr(start, pos - start));
+        key_text.push_back(key_path::separator);
+        start = pos + delim.size();
+    }
+    key_text.append(lhs.substr(start));
 
     auto path = key_path::parse(key_text);
     if(!path)

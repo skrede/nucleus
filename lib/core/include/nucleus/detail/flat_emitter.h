@@ -32,19 +32,38 @@ namespace nucleus::detail {
     return true;
 }
 
+// Renders a '/'-joined key with `key_separator` standing in for every separator,
+// so a flat format can speak its own delimiter (argv flags) over the same paths.
+[[nodiscard]] inline std::string render_flat_key(std::string_view key,
+                                                 std::string_view key_separator)
+{
+    std::string out;
+    out.reserve(key.size());
+    for(char c : key)
+    {
+        if(c == key_path::separator)
+            out.append(key_separator);
+        else
+            out.push_back(c);
+    }
+    return out;
+}
+
 // Projects the declared schema into flat KEY= template lines: one line per declared
-// LEAF path (rendered as its '/'-joined path), blank value (template only), with
+// LEAF path (its path joined by `key_separator`), blank value (template only), with
 // `key_prefix` prepended to every key. A constrained leaf annotates its allowed
 // set as a trailing `# allowed: a|b|c`.
 inline void emit_flat_template(const configuration_space &space, std::ostream &out,
-                               std::string_view key_prefix)
+                               std::string_view key_prefix,
+                               std::string_view key_separator = "/")
 {
     const std::span<const schema_element> elements = space.schema_elements();
     for(const schema_element &el : elements)
     {
         if(!is_flat_leaf(el, elements))
             continue;
-        out << key_prefix << el.declared_path().str() << '=';
+        out << key_prefix << render_flat_key(el.declared_path().str(), key_separator)
+            << '=';
         if(!el.allowed_values.empty())
         {
             out << " # allowed: ";
@@ -64,11 +83,13 @@ inline void emit_flat_template(const configuration_space &space, std::ostream &o
 // `key_prefix` prepended to every key. The flat line contract carries no embedded
 // newline; values are written verbatim otherwise.
 inline void emit_flat_document(const configuration &config, std::ostream &out,
-                               std::string_view key_prefix)
+                               std::string_view key_prefix,
+                               std::string_view key_separator = "/")
 {
     for(const std::string &key : config.keys())
         for(const std::string &value : config.get_all(key))
-            out << key_prefix << key << '=' << value << '\n';
+            out << key_prefix << render_flat_key(key, key_separator) << '='
+                << value << '\n';
 }
 
 }

@@ -39,7 +39,8 @@ enum class unknown_key_policy
 //
 // Pull does two things in order, mirroring the locked design:
 //   1. Syntactic mapping  -- normalize_arg turns each token into a (path, value)
-//      via the `-` <-> `/` bijection. Bad syntax is a pull error.
+//      via the delimiter <-> `/` bijection (delimiter `-` unless the host picks
+//      another via delimit_with). Bad syntax is a pull error.
 //   2. Schema validation  -- the mapped path is checked against the schema-
 //      dictated surface (the recognizer). Unknown paths are an error (strict) or
 //      a logged store-as-string (lenient). This is where schema-as-authority
@@ -66,6 +67,15 @@ public:
     argv_source &recognize_with(key_recognizer recognizer)
     {
         m_recognizer = std::move(recognizer);
+        return *this;
+    }
+
+    // Picks the flag delimiter of the bijection. The emitter and the completion
+    // generator must be handed the SAME delimiter, or the projected flag surface
+    // drifts from what pull accepts.
+    argv_source &delimit_with(cli_delimiter delimiter)
+    {
+        m_delimiter = std::move(delimiter);
         return *this;
     }
 
@@ -99,7 +109,7 @@ public:
 
         for(const std::string &token : m_args)
         {
-            auto mapped = normalize_arg(token);
+            auto mapped = normalize_arg(token, m_delimiter);
             if(!mapped)
                 return unexpected(configuration_source_error{
                     errc::malformed_source, std::move(mapped).error()});
@@ -135,6 +145,7 @@ public:
 
 private:
     std::vector<std::string> m_args;
+    cli_delimiter m_delimiter;
     key_recognizer m_recognizer;
     unknown_key_policy m_policy = unknown_key_policy::strict;
     log_sink *m_log = nullptr;

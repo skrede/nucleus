@@ -561,11 +561,25 @@ uses its inverse, which is why the two cannot drift.
 struct cli_assignment { key_path key; std::string value; };
 using cli_normalize_result = expected<cli_assignment, std::string>;
 
-cli_normalize_result normalize_arg(std::string_view raw);   // "--a-b-c=v" -> {a/b/c, v}
+// "--a-b-c=v" -> {a/b/c, v} under the default delimiter "-"
+cli_normalize_result normalize_arg(std::string_view raw,
+                                   const cli_delimiter &delimiter = {});
 ```
 
-`-` is always the separator; the split is on the first `=` only; a bare flag
-becomes the value `"true"`.
+Every delimiter occurrence maps to the keyspace separator; the split is on the
+first `=` only; a bare flag becomes the value `"true"`. The delimiter is a
+validated value type from `"nucleus/schema/cli_flag.h"`:
+
+```cpp
+cli_delimiter();                                                  // "-"
+static expected<cli_delimiter, std::string> cli_delimiter::parse(std::string_view text);
+const std::string &cli_delimiter::str() const noexcept;
+```
+
+`parse` rejects an empty delimiter, one containing `=`, and one containing `/`
+unless it *is* `/` (the identity mapping). No schema segment may contain the
+chosen delimiter — that restriction is what keeps the bijection invertible — and
+a raw `/` in a flag is rejected whenever the delimiter is not `/` itself.
 
 ---
 

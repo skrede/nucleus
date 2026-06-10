@@ -41,7 +41,8 @@ value_sets(const schema_registry &schema)
 // reproducible. Each path becomes its canonical flag via the same flag_of() the
 // argv surface uses, so completion and the real CLI share one mapping.
 [[nodiscard]] completion_model project(const schema_registry &schema,
-                                       std::string_view prog)
+                                       std::string_view prog,
+                                       const cli_delimiter &delimiter)
 {
     const auto values = value_sets(schema);
 
@@ -50,7 +51,7 @@ value_sets(const schema_registry &schema)
     for(const key_path &path : schema.surface())
     {
         completion_option opt;
-        opt.flag = flag_of(path);
+        opt.flag = flag_of(path, delimiter);
         if(auto it = values.find(path.str()); it != values.end())
             opt.values = it->second;
         model.options.push_back(std::move(opt));
@@ -61,9 +62,9 @@ value_sets(const schema_registry &schema)
 }
 
 std::string generate_completion(shell which, const schema_registry &schema,
-                                std::string_view prog)
+                                std::string_view prog, const cli_delimiter &delimiter)
 {
-    const completion_model model = project(schema, prog);
+    const completion_model model = project(schema, prog, delimiter);
     switch(which)
     {
     case shell::zsh:

@@ -10,6 +10,7 @@
 #include "nucleus/registration_policy.h"
 
 #include "nucleus/schema/schema.h"
+#include "nucleus/schema/cli_flag.h"
 
 #include "nucleus/configuration_source/feature_gate.h"
 #include "nucleus/configuration_source/source_stack.h"
@@ -173,8 +174,10 @@ public:
     [[nodiscard]] std::vector<conflict_report> conflicts() const;
 
     // Generates a completion script for `which`, projected from the sealed schema
-    // and bound to `prog`. A pure read of the schema.
-    [[nodiscard]] std::string generate_completion(shell which, std::string_view prog) const;
+    // and bound to `prog`. Flags render under `delimiter`, which must match the
+    // argv_source grammar. A pure read of the schema.
+    [[nodiscard]] std::string generate_completion(shell which, std::string_view prog,
+                                                  const cli_delimiter &delimiter = {}) const;
 
     // The declared schema elements, the neutral data a format emitter projects into
     // a template. A pure read of the sealed schema; the registry stays encapsulated.
