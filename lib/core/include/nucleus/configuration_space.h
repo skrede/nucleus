@@ -174,10 +174,11 @@ public:
     [[nodiscard]] std::vector<conflict_report> conflicts() const;
 
     // Generates a completion script for `which`, projected from the sealed schema
-    // and bound to `prog`. Flags render under `delimiter`, which must match the
-    // argv_source grammar. A pure read of the schema.
+    // and bound to `prog`. Flags render under `delimiter` and relative to `anchor`,
+    // which must match the argv_source grammar. A pure read of the schema.
     [[nodiscard]] std::string generate_completion(shell which, std::string_view prog,
-                                                  const cli_delimiter &delimiter = {}) const;
+                                                  const cli_delimiter &delimiter = {},
+                                                  const key_path &anchor = {}) const;
 
     // The declared schema elements, the neutral data a format emitter projects into
     // a template. A pure read of the sealed schema; the registry stays encapsulated.

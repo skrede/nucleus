@@ -49,3 +49,33 @@ TEST_CASE("key_path from validated segments", "[key_path]")
     REQUIRE(path.str() == "a/b");
     REQUIRE(path.size() == 2);
 }
+
+TEST_CASE("key_path join concatenates segment-wise", "[key_path]")
+{
+    const key_path base = key_path::parse("a/b").value();
+    const key_path tail = key_path::parse("c/d").value();
+    REQUIRE(base.join(tail).str() == "a/b/c/d");
+    REQUIRE(key_path{}.join(tail) == tail);
+    REQUIRE(base.join(key_path{}) == base);
+}
+
+TEST_CASE("key_path starts_with matches leading segments, not text prefixes", "[key_path]")
+{
+    const key_path path = key_path::parse("server/host_name").value();
+    REQUIRE(path.starts_with(key_path::parse("server").value()));
+    REQUIRE(path.starts_with(path));
+    REQUIRE(path.starts_with(key_path{}));
+    // `host` is a TEXT prefix of the `host_name` segment, not a segment match.
+    REQUIRE_FALSE(key_path::parse("server/host_name/x").value()
+                      .starts_with(key_path::parse("server/host").value()));
+    REQUIRE_FALSE(key_path::parse("server").value().starts_with(path));
+}
+
+TEST_CASE("key_path relative_to strips a leading prefix", "[key_path]")
+{
+    const key_path path = key_path::parse("plugin/alpha/udp/auth_mode").value();
+    const key_path anchor = key_path::parse("plugin/alpha").value();
+    REQUIRE(path.relative_to(anchor).str() == "udp/auth_mode");
+    REQUIRE(path.relative_to(key_path{}) == path);
+    REQUIRE(path.relative_to(path).empty());
+}

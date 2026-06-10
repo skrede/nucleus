@@ -32,6 +32,22 @@ namespace nucleus::detail {
     return true;
 }
 
+// Strips `anchor` (a canonical '/'-joined prefix) off `key` in place. Returns
+// false for a key not strictly under the anchor -- such a key is not addressable
+// in an anchored flat grammar, so the caller skips it. An empty anchor keeps
+// every key absolute.
+[[nodiscard]] inline bool strip_flat_anchor(std::string_view &key,
+                                            std::string_view anchor)
+{
+    if(anchor.empty())
+        return true;
+    if(key.size() <= anchor.size() + 1 || !key.starts_with(anchor)
+       || key[anchor.size()] != key_path::separator)
+        return false;
+    key.remove_prefix(anchor.size() + 1);
+    return true;
+}
+
 // Renders a '/'-joined key with `key_separator` standing in for every separator,
 // so a flat format can speak its own delimiter (argv flags) over the same paths.
 [[nodiscard]] inline std::string render_flat_key(std::string_view key,
@@ -55,15 +71,19 @@ namespace nucleus::detail {
 // set as a trailing `# allowed: a|b|c`.
 inline void emit_flat_template(const configuration_space &space, std::ostream &out,
                                std::string_view key_prefix,
-                               std::string_view key_separator = "/")
+                               std::string_view key_separator = "/",
+                               std::string_view anchor = {})
 {
     const std::span<const schema_element> elements = space.schema_elements();
     for(const schema_element &el : elements)
     {
         if(!is_flat_leaf(el, elements))
             continue;
-        out << key_prefix << render_flat_key(el.declared_path().str(), key_separator)
-            << '=';
+        const std::string full = el.declared_path().str();
+        std::string_view key = full;
+        if(!strip_flat_anchor(key, anchor))
+            continue;
+        out << key_prefix << render_flat_key(key, key_separator) << '=';
         if(!el.allowed_values.empty())
         {
             out << " # allowed: ";
@@ -84,12 +104,18 @@ inline void emit_flat_template(const configuration_space &space, std::ostream &o
 // newline; values are written verbatim otherwise.
 inline void emit_flat_document(const configuration &config, std::ostream &out,
                                std::string_view key_prefix,
-                               std::string_view key_separator = "/")
+                               std::string_view key_separator = "/",
+                               std::string_view anchor = {})
 {
     for(const std::string &key : config.keys())
+    {
+        std::string_view rendered = key;
+        if(!strip_flat_anchor(rendered, anchor))
+            continue;
         for(const std::string &value : config.get_all(key))
-            out << key_prefix << render_flat_key(key, key_separator) << '='
+            out << key_prefix << render_flat_key(rendered, key_separator) << '='
                 << value << '\n';
+    }
 }
 
 }

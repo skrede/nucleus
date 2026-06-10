@@ -134,6 +134,47 @@ TEST_CASE("argv_source pulls under a host-chosen delimiter", "[argv][delimiter]"
     REQUIRE(batch.value().entries[0].value.text() == "auth");
 }
 
+TEST_CASE("an anchored source maps every flag relative to the anchor", "[argv][anchor]")
+{
+    argv_source src(std::vector<std::string>{"--udp-auth_mode=auth", "--name=alpha"});
+    src.anchor_at(key_path::parse("plexus").value());
+
+    auto batch = src.pull();
+    REQUIRE(batch);
+    REQUIRE(batch.value().entries.size() == 2);
+    REQUIRE(batch.value().entries[0].path == "plexus/udp/auth_mode");
+    REQUIRE(batch.value().entries[1].path == "plexus/name");
+}
+
+TEST_CASE("the recognizer sees the full anchored path", "[argv][anchor]")
+{
+    std::set<std::string> declared{"plexus/udp/auth_mode"};
+    argv_source src(std::vector<std::string>{"--udp-auth_mode=auth"});
+    src.anchor_at(key_path::parse("plexus").value())
+        .recognize_with([&](const key_path &p)
+                        { return declared.count(p.str()) != 0; });
+
+    REQUIRE(src.pull());
+
+    // The same flag without the anchor maps to a bare path the schema does not
+    // declare: strict validation rejects it.
+    argv_source unanchored(std::vector<std::string>{"--udp-auth_mode=auth"});
+    unanchored.recognize_with([&](const key_path &p)
+                              { return declared.count(p.str()) != 0; });
+    REQUIRE_FALSE(unanchored.pull());
+}
+
+TEST_CASE("anchor and delimiter compose", "[argv][anchor][delimiter]")
+{
+    argv_source src(std::vector<std::string>{"--udp__auth_mode=auth"});
+    src.anchor_at(key_path::parse("plugin/alpha").value())
+        .delimit_with(cli_delimiter::parse("__").value());
+
+    auto batch = src.pull();
+    REQUIRE(batch);
+    REQUIRE(batch.value().entries[0].path == "plugin/alpha/udp/auth_mode");
+}
+
 TEST_CASE("argv_source emits keyspace entries through the source seam", "[argv]")
 {
     argv_source src(std::vector<std::string>{

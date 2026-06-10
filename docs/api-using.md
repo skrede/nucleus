@@ -298,7 +298,8 @@ std::size_t tokenizer_count() const noexcept;   // includes the auto-installed c
 std::size_t converter_count() const noexcept;
 std::vector<conflict_report> conflicts() const;
 std::string generate_completion(shell which, std::string_view prog,
-                                const cli_delimiter &delimiter = {}) const;
+                                const cli_delimiter &delimiter = {},
+                                const key_path &anchor = {}) const;
 std::span<const schema_element> schema_elements() const;  // the declared schema, for emitters/derivation
 configuration_space_builder expand() const;  // a NEW builder seeded with a deep copy of this space
 ```
@@ -707,11 +708,13 @@ same flag mapping the CLI surface uses, so completion cannot drift from the CLI.
 ```cpp
 enum class shell { bash, zsh };
 std::string configuration_space::generate_completion(shell which, std::string_view prog,
-                                                     const cli_delimiter &delimiter = {}) const;
+                                                     const cli_delimiter &delimiter = {},
+                                                     const key_path &anchor = {}) const;
 ```
 
-A host that re-delimits its CLI (`argv_source::delimit_with`) passes the same
-`cli_delimiter` here, keeping the completed flags identical to the parsed ones.
+A host that re-delimits its CLI (`argv_source::delimit_with`) or anchors it
+(`argv_source::anchor_at`) passes the same `cli_delimiter` and anchor here,
+keeping the completed flags identical to the parsed ones.
 An `enum_element`'s value set becomes that flag's completion candidates. A pure
 read of the sealed schema. nucleus is a library, not a CLI — it returns the
 script as a string and the host decides how to surface it. See

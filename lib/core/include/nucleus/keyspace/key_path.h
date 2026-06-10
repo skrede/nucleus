@@ -7,6 +7,7 @@
 #include <vector>
 #include <cstddef>
 #include <utility>
+#include <algorithm>
 #include <string_view>
 
 namespace nucleus {
@@ -87,6 +88,33 @@ public:
         std::vector<std::string> next = m_segments;
         next.push_back(std::move(segment));
         return key_path(std::move(next));
+    }
+
+    // This path extended by every segment of `tail` (a/b join c/d -> a/b/c/d).
+    [[nodiscard]] key_path join(const key_path &tail) const
+    {
+        std::vector<std::string> next = m_segments;
+        next.insert(next.end(), tail.m_segments.begin(), tail.m_segments.end());
+        return key_path(std::move(next));
+    }
+
+    // True when `prefix` is this path's leading segments (a/b/c starts with a/b,
+    // with itself, and with the empty path).
+    [[nodiscard]] bool starts_with(const key_path &prefix) const noexcept
+    {
+        if(prefix.m_segments.size() > m_segments.size())
+            return false;
+        return std::equal(prefix.m_segments.begin(), prefix.m_segments.end(),
+                          m_segments.begin());
+    }
+
+    // The remainder after `prefix` (a/b/c relative to a -> b/c; relative to
+    // itself -> empty). Precondition: starts_with(prefix).
+    [[nodiscard]] key_path relative_to(const key_path &prefix) const
+    {
+        return key_path(std::vector<std::string>(
+            m_segments.begin() + static_cast<std::ptrdiff_t>(prefix.m_segments.size()),
+            m_segments.end()));
     }
 
     // The canonical `/`-joined string -- the same shape the source seam emits, so

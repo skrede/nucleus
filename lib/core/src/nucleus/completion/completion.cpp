@@ -42,7 +42,8 @@ value_sets(const schema_registry &schema)
 // argv surface uses, so completion and the real CLI share one mapping.
 [[nodiscard]] completion_model project(const schema_registry &schema,
                                        std::string_view prog,
-                                       const cli_delimiter &delimiter)
+                                       const cli_delimiter &delimiter,
+                                       const key_path &anchor)
 {
     const auto values = value_sets(schema);
 
@@ -50,8 +51,15 @@ value_sets(const schema_registry &schema)
     model.prog = std::string(prog);
     for(const key_path &path : schema.surface())
     {
+        // Under an anchor only strictly-descendant paths are addressable; they
+        // complete by their relative flag. Value sets stay keyed by full path.
+        if(!anchor.empty()
+           && (!path.starts_with(anchor) || path.size() == anchor.size()))
+            continue;
+
         completion_option opt;
-        opt.flag = flag_of(path, delimiter);
+        opt.flag = flag_of(anchor.empty() ? path : path.relative_to(anchor),
+                           delimiter);
         if(auto it = values.find(path.str()); it != values.end())
             opt.values = it->second;
         model.options.push_back(std::move(opt));
@@ -62,9 +70,10 @@ value_sets(const schema_registry &schema)
 }
 
 std::string generate_completion(shell which, const schema_registry &schema,
-                                std::string_view prog, const cli_delimiter &delimiter)
+                                std::string_view prog, const cli_delimiter &delimiter,
+                                const key_path &anchor)
 {
-    const completion_model model = project(schema, prog, delimiter);
+    const completion_model model = project(schema, prog, delimiter, anchor);
     switch(which)
     {
     case shell::zsh:

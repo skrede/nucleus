@@ -162,6 +162,7 @@ argv_source();
 explicit argv_source(std::vector<std::string> args);
 argv_source &recognize_with(key_recognizer recognizer);   // which keys are admissible
 argv_source &delimit_with(cli_delimiter delimiter);        // flag delimiter, default "-"
+argv_source &anchor_at(key_path anchor);                   // fixed path prefix, default none
 argv_source &policy(unknown_key_policy policy) noexcept;   // strict (default) | lenient
 argv_source &log_to(log_sink &sink) noexcept;
 
@@ -189,6 +190,17 @@ argv.recognize_with(nucleus::recognizer_of(space));
 auto delim = nucleus::cli_delimiter::parse("__").value();
 nucleus::argv_source argv(std::vector<std::string>{"--server__port=8080"});
 argv.delimit_with(delim);
+```
+
+- An anchor makes EVERY flag relative to a fixed path prefix, so a keyspace under
+  one never-changing root drops it from the whole flag surface (`--host=x` →
+  `server/host`). The recognizer still sees the full path, and the emitter and
+  `generate_completion` accept the same anchor — keys outside it are not
+  addressable in the anchored grammar and are skipped:
+
+```cpp
+nucleus::argv_source argv(std::vector<std::string>{"--host=edge"});
+argv.anchor_at(nucleus::key_path::parse("server").value());
 ```
 
 Its capability descriptor is `{ nesting, duplicate_keys }`, on runtime_source's
@@ -248,9 +260,9 @@ Each format module ships the output pair as free functions in its own
 namespace, plus a `struct emitter` whose members forward to them so the module
 satisfies the [`config_emitter`](api-using.md#emit) concept by type as well as
 by call surface. Both operations write into a caller-owned `std::ostream`; the
-caller owns persistence. The argv pair takes an optional `cli_delimiter` (and
-`argv::emitter` carries one as its only state), which must match the
-`argv_source` it round-trips with.
+caller owns persistence. The argv pair takes an optional `cli_delimiter` and
+`key_path` anchor (`argv::emitter` carries both as its only state), which must
+match the `argv_source` it round-trips with.
 
 | Header | Free functions | Rendering |
 |--------|----------------|-----------|

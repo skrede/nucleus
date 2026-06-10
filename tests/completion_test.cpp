@@ -104,6 +104,18 @@ TEST_CASE("completion renders flags under the host-chosen delimiter", "[completi
     REQUIRE(bash.find("--logging-level") == std::string::npos);
 }
 
+TEST_CASE("anchored completion offers only the anchor's subtree, relative", "[completion][anchor]")
+{
+    const std::string bash = generate_completion(shell::bash, fixture(), "myapp", {},
+                                                 path_of("logging"));
+    // Under the anchor: the leaf completes by its relative flag, values intact.
+    REQUIRE(bash.find("'--level'") != std::string::npos);
+    REQUIRE(bash.find("debug info warn error") != std::string::npos);
+    // Outside the anchor (and the anchor itself): not addressable, not offered.
+    REQUIRE(bash.find("--plexus") == std::string::npos);
+    REQUIRE(bash.find("--logging") == std::string::npos);
+}
+
 TEST_CASE("zsh uses its own _arguments model, not reused bash quoting", "[completion]")
 {
     const std::string zsh = generate_completion(shell::zsh, fixture(), "myapp");

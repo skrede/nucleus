@@ -93,6 +93,27 @@ TEST_CASE("env and args project a schema into flat KEY= templates", "[emit][seam
     std::ostringstream custom_out;
     nucleus::argv::emit_template(space, custom_out, delim);
     REQUIRE(custom_out.str().find("--server__host=") != std::string::npos);
+
+    // An anchored grammar drops the never-changing root from every flag.
+    std::ostringstream anchored_out;
+    nucleus::argv::emit_template(space, anchored_out, {},
+                                 nucleus::key_path::parse("server").value());
+    const std::string anchored = anchored_out.str();
+    REQUIRE(anchored.find("--host=") != std::string::npos);
+    REQUIRE(anchored.find("--server") == std::string::npos);
+}
+
+TEST_CASE("an anchored argv document renders keys relative to the anchor", "[emit][seam]")
+{
+    const nucleus::configuration config = make_server_config();
+
+    std::ostringstream out;
+    nucleus::argv::emit_document(config, out, {},
+                                 nucleus::key_path::parse("server").value());
+    const std::string args = out.str();
+    REQUIRE(args.find("--host=localhost") != std::string::npos);
+    REQUIRE(count_occurrences(args, "--tag=") == 2);
+    REQUIRE(args.find("--server") == std::string::npos);
 }
 
 TEST_CASE("env and args emit one flat line per resolved value", "[emit][seam]")

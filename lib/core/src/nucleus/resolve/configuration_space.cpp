@@ -329,11 +329,12 @@ std::size_t configuration_space::converter_count() const noexcept { return m_imp
 std::vector<conflict_report> configuration_space::conflicts() const { return m_impl->conflicts(); }
 
 std::string configuration_space::generate_completion(shell which, std::string_view prog,
-                                                     const cli_delimiter &delimiter) const
+                                                     const cli_delimiter &delimiter,
+                                                     const key_path &anchor) const
 {
     // Project the sealed schema through the free generator. Only the script string
     // crosses the boundary; the registry stays encapsulated.
-    return nucleus::generate_completion(which, m_impl->schema, prog, delimiter);
+    return nucleus::generate_completion(which, m_impl->schema, prog, delimiter, anchor);
 }
 
 std::span<const schema_element> configuration_space::schema_elements() const

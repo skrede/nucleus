@@ -581,6 +581,10 @@ unless it *is* `/` (the identity mapping). No schema segment may contain the
 chosen delimiter — that restriction is what keeps the bijection invertible — and
 a raw `/` in a flag is rejected whenever the delimiter is not `/` itself.
 
+Anchoring (`argv_source::anchor_at`) is deliberately NOT part of `normalize_arg`:
+the pure transform stays schema- and policy-free, and the source prepends its
+anchor to the mapped path afterwards.
+
 ---
 
 <a id="format-module"></a>

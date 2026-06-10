@@ -81,6 +81,16 @@ public:
         return *this;
     }
 
+    // Anchors every flag at a fixed path prefix: with anchor `server`, `--host=x`
+    // maps to `server/host`. EVERY flag is relative to the anchor -- a host whose
+    // keyspace lives under one never-changing root drops it from the whole flag
+    // surface. The emitter and the completion generator must share the anchor.
+    argv_source &anchor_at(key_path anchor)
+    {
+        m_anchor = std::move(anchor);
+        return *this;
+    }
+
     argv_source &policy(unknown_key_policy policy) noexcept
     {
         m_policy = policy;
@@ -117,7 +127,9 @@ public:
                 return unexpected(configuration_source_error{
                     errc::malformed_source, std::move(mapped).error()});
 
-            const key_path &path = mapped.value().key;
+            key_path path = std::move(mapped.value().key);
+            if(!m_anchor.empty())
+                path = m_anchor.join(path);
 
             const bool recognized = !m_recognizer || m_recognizer(path);
             if(!recognized)
@@ -149,6 +161,7 @@ public:
 private:
     std::vector<std::string> m_args;
     cli_delimiter m_delimiter;
+    key_path m_anchor;
     key_recognizer m_recognizer;
     unknown_key_policy m_policy = unknown_key_policy::strict;
     log_sink *m_log = nullptr;
