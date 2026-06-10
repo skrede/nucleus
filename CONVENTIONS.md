@@ -27,9 +27,9 @@ The rules a change is reviewed against. Several are enforced mechanically
 
 ## Formatting
 
-`.clang-format` (derived from the project's CLion code style) is authoritative
-for layout; the include order below is the one rule it cannot express, so
-`SortIncludes` is off. The shape it encodes:
+`.clang-format` (derived from the project's CLion code style; needs
+clang-format 17+) is authoritative for layout; the include order below is the
+one rule it cannot express, so `SortIncludes` is off. The shape it encodes:
 
 * 4-space indent, spaces only; continuation and constructor-initializer lines
   indent 8.
@@ -38,7 +38,8 @@ for layout; the include order below is the one rule it cannot express, so
 * Braces on the next line for functions, classes/structs/enums/unions, control
   statements, and case blocks; `else`/`catch` on their own line. Namespace
   braces stay on the declaration line, and namespace members are not indented.
-* One enumerator per line.
+* One enumerator per line. Case labels indent one level inside the switch;
+  short case statements may sit on one line and are column-aligned.
 * `&` and `*` bind the declarator: `const std::string &name`.
 * `template<typename T>` without a space; no space before statement or call
   parentheses (`if(cond)`); a space before the range-for colon

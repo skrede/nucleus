@@ -1,4 +1,7 @@
-# Derived from the project's CLion code style (.idea/codeStyles/Project.xml).
+# Derived from the project's CLion code style (.idea/codeStyles/Project.xml),
+# refined so a format run reproduces the codebase's authored shape (indented,
+# column-aligned single-line case statements; aligned struct members).
+# Requires clang-format 17+ (AlignConsecutiveShortCaseStatements).
 # SortIncludes is off because the project's include order (grouped by origin and
 # folder, sorted by line length then alphabetically) is not expressible here;
 # see CONVENTIONS.md.
@@ -7,9 +10,16 @@ Language: Cpp
 BasedOnStyle: LLVM
 AccessModifierOffset: -4
 AlignConsecutiveAssignments: Consecutive
-AlignConsecutiveDeclarations: false
+AlignConsecutiveDeclarations: Consecutive
 AlignOperands: false
 AlignTrailingComments: true
+AlignConsecutiveShortCaseStatements:
+  Enabled: true
+  AcrossEmptyLines: false
+  AcrossComments: false
+  AlignCaseColons: false
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: All
 AllowShortEnumsOnASingleLine: false
 AlwaysBreakAfterDefinitionReturnType: false
 AlwaysBreakTemplateDeclarations: Yes
@@ -32,10 +42,12 @@ BraceWrapping:
   SplitEmptyNamespace: true
 BreakBeforeBraces: Custom
 BreakConstructorInitializers: BeforeComma
+FixNamespaceComments: false
 ColumnLimit: 0
 ConstructorInitializerIndentWidth: 8
 ContinuationIndentWidth: 8
 IndentCaseBlocks: true
+IndentCaseLabels: true
 IndentGotoLabels: false
 IndentPPDirectives: BeforeHash
 IndentWidth: 4
