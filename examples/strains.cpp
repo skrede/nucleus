@@ -6,7 +6,7 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/sources/xml_source.h"
+#include "nucleus/xml/xml_source.h"
 
 #include <string>
 #include <iostream>
@@ -37,8 +37,8 @@ int main()
 
     auto make = [document](const std::string &) -> nucleus::source_handle {
         return nucleus::source_handle(
-            nucleus::xml::xml_source::from(
-                nucleus::xml::xml_source_options::of_string(document)));
+            nucleus::xml_source::from(
+                nucleus::xml_source_options::of_string(document)));
     };
 
     // Select the "primary" strain for this load -- a per-load parameter.

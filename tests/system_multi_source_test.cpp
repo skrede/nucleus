@@ -1,14 +1,14 @@
+#include "nucleus/configuration.h"
 #include "nucleus/configuration_space.h"
-#include "nucleus/entry/configuration.h"
 #include "nucleus/configuration_source/inherit_declaration.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/sources/env_source.h"
-#include "nucleus/sources/xml_source.h"
-#include "nucleus/sources/argv_source.h"
-#include "nucleus/sources/runtime_source.h"
+#include "nucleus/env/env_source.h"
+#include "nucleus/xml/xml_source.h"
+#include "nucleus/argv/argv_source.h"
+#include "nucleus/runtime/runtime_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -45,7 +45,7 @@ std::string filename_of(const std::string &path)
 source_handle xml_of(const std::string &text)
 {
     return source_handle(
-        xml::xml_source::from(xml::xml_source_options::of_string(text)));
+        xml_source::from(xml_source_options::of_string(text)));
 }
 
 // Schema: a server container with host, mode, and port leaves.

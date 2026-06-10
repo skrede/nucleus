@@ -4,10 +4,10 @@
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/converters.h"
 
-#include "nucleus/entry/strain_scope.h"
-#include "nucleus/entry/configuration.h"
+#include "nucleus/strain_scope.h"
+#include "nucleus/configuration.h"
 
-#include "nucleus/sources/runtime_source.h"
+#include "nucleus/runtime/runtime_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 

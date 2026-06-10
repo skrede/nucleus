@@ -69,7 +69,7 @@ nucleus_add_module(core
     ALIASES nucleus::nucleus nucleus::core
     SOURCES
         core/src/nucleus/version.cpp
-        core/src/nucleus/entry/configuration_space.cpp
+        core/src/nucleus/resolve/configuration_space.cpp
         core/src/nucleus/tokenizer/tokenizer.cpp
         core/src/nucleus/tokenizer/token_lexer.cpp
         core/src/nucleus/tokenizer/scope_keys.cpp
@@ -81,7 +81,7 @@ set_target_properties(nucleus_core PROPERTIES VERSION ${PROJECT_VERSION})
 
 # runtime: a header-only source module. runtime_source builds a configuration
 # programmatically (.set(path, value)) with no document or parser dependency. Its
-# public adapter header lives under nucleus/sources/; the INTERFACE link to
+# public adapter header lives under nucleus/runtime/; the INTERFACE link to
 # nucleus::nucleus means a consumer of nucleus::runtime also gets core.
 nucleus_add_module(runtime
     TYPE INTERFACE
@@ -97,13 +97,13 @@ nucleus_add_module(env
     ALIASES nucleus::env
     LINK_PUBLIC nucleus::nucleus)
 
-# args: a header-only CLI-argument source module. argv_source parses `--flag=value`
+# argv: a header-only CLI-argument source module. argv_source parses `--flag=value`
 # tokens via the `-` <-> `/` bijection (cli_surface.h) and emits flat keyspace entries.
 # Also header-only, so no link cost for non-users. LINK_PUBLIC nucleus::nucleus brings
 # the core include root (key_path, capability, configuration_source seam) in transitively.
-nucleus_add_module(args
+nucleus_add_module(argv
     TYPE INTERFACE
-    ALIASES nucleus::args
+    ALIASES nucleus::argv
     LINK_PUBLIC nucleus::nucleus)
 
 # Diagnostic formatting backend: when the standard library lacks std::format the
@@ -116,8 +116,7 @@ endif()
 
 # xml: a format module that wraps pugixml. pugixml is PRIVATE-linked and reachable
 # only inside lib/xml/src, so core (which cannot even see this target) never pulls
-# it. Public adapter headers live under nucleus/sources/. nucleus::source_xml is a
-# back-compat alias for the in-tree consumers. Built on demand.
+# it. Public adapter headers live under nucleus/xml/. Built on demand.
 if(NUCLEUS_BUILD_SOURCE_XML)
     include(FetchContent)
     FetchContent_Declare(
@@ -131,7 +130,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     nucleus_add_module(xml
         TYPE STATIC
         EXPORT_NAME xml
-        ALIASES nucleus::xml nucleus::source_xml
+        ALIASES nucleus::xml
         SOURCES
             xml/src/nucleus/xml/xml_source.cpp
             xml/src/nucleus/xml/xml_emitter.cpp

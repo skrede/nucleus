@@ -5,7 +5,7 @@
 
 #include "nucleus/keyspace/key_path.h"
 
-#include "nucleus/sources/runtime_source.h"
+#include "nucleus/runtime/runtime_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 

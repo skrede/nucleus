@@ -1,16 +1,16 @@
 #include "nucleus/config_emitter.h"
+#include "nucleus/configuration.h"
 #include "nucleus/configuration_space.h"
-#include "nucleus/entry/configuration.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
 #include "nucleus/keyspace/provenance.h"
 
-#include "nucleus/sources/env_emitter.h"
-#include "nucleus/sources/argv_emitter.h"
+#include "nucleus/env/env_emitter.h"
+#include "nucleus/argv/argv_emitter.h"
 
-#include "nucleus/sources/xml_emitter.h"
+#include "nucleus/xml/xml_emitter.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -25,7 +25,7 @@
 
 // Compile-time proof: each stateless emitter models the core concept.
 static_assert(nucleus::config_emitter<nucleus::env::emitter>);
-static_assert(nucleus::config_emitter<nucleus::args::emitter>);
+static_assert(nucleus::config_emitter<nucleus::argv::emitter>);
 static_assert(nucleus::config_emitter<nucleus::xml::emitter>);
 
 namespace {
@@ -80,7 +80,7 @@ TEST_CASE("env and args project a schema into flat KEY= templates", "[emit][seam
     REQUIRE(env.find('<') == std::string::npos);
 
     std::ostringstream args_out;
-    nucleus::args::emit_template(space, args_out);
+    nucleus::argv::emit_template(space, args_out);
     const std::string args = args_out.str();
     REQUIRE(args.find("--server/host=") != std::string::npos);
     REQUIRE(args.find("--server/mode=") != std::string::npos);
@@ -101,7 +101,7 @@ TEST_CASE("env and args emit one flat line per resolved value", "[emit][seam]")
     REQUIRE(env.find("server/tag=beta") != std::string::npos);
 
     std::ostringstream args_out;
-    nucleus::args::emit_document(config, args_out);
+    nucleus::argv::emit_document(config, args_out);
     const std::string args = args_out.str();
     REQUIRE(count_occurrences(args, "--server/tag=") == 2);
 }

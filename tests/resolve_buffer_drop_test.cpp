@@ -1,10 +1,10 @@
 #include "nucleus/configuration_space.h"
 
-#include "nucleus/sources/xml_source.h"
+#include "nucleus/xml/xml_source.h"
 
-#include "nucleus/entry/configuration.h"
+#include "nucleus/configuration.h"
 
-#include "nucleus/sources/env_source.h"
+#include "nucleus/env/env_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -38,8 +38,8 @@ TEST_CASE("resolved values survive dropping every source buffer", "[resolution][
         // A document source (views into the parser arena) layered beneath an env
         // overlay that overrides one key -- so both a view-backed and an
         // owned-backed value reach the freeze, and one key is contested.
-        auto doc = nucleus::xml::xml_source::from(
-            nucleus::xml::xml_source_options::of_string(kDocument));
+        auto doc = nucleus::xml_source::from(
+            nucleus::xml_source_options::of_string(kDocument));
         nucleus::env_source overlay;
         overlay.set("app/server/port", "9090");
 

@@ -9,19 +9,18 @@
 // config_emitter seam; the user owns the stream. The repeated tag keeps all its
 // values in every format.
 
+#include "nucleus/configuration.h"
 #include "nucleus/configuration_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/entry/configuration.h"
+#include "nucleus/xml/xml_source.h"
+#include "nucleus/xml/xml_emitter.h"
+#include "nucleus/runtime/runtime_source.h"
 
-#include "nucleus/sources/xml_source.h"
-#include "nucleus/sources/xml_emitter.h"
-#include "nucleus/sources/runtime_source.h"
-
-#include "nucleus/sources/env_emitter.h"
-#include "nucleus/sources/argv_emitter.h"
+#include "nucleus/env/env_emitter.h"
+#include "nucleus/argv/argv_emitter.h"
 
 #include <string>
 #include <iostream>
@@ -49,8 +48,8 @@ int main()
     const char *document = "<server><tag>alpha</tag><tag>beta</tag></server>";
     auto make = [document](const std::string &) -> nucleus::source_handle {
         return nucleus::source_handle(
-            nucleus::xml::xml_source::from(
-                nucleus::xml::xml_source_options::of_string(document)));
+            nucleus::xml_source::from(
+                nucleus::xml_source_options::of_string(document)));
     };
 
     // runtime_source at lower precedence (stack[0]); document overlay at higher via load_options.
@@ -75,7 +74,7 @@ int main()
     std::cout << "\n# env document\n";
     nucleus::env::emit_document(config, std::cout);
     std::cout << "\n# args document\n";
-    nucleus::args::emit_document(config, std::cout);
+    nucleus::argv::emit_document(config, std::cout);
 
     return 0;
 }

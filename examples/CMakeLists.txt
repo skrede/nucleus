@@ -5,31 +5,31 @@
 # CTest.
 
 # Registers an example executable linked against the core library. Additional
-# link targets (e.g. nucleus::env, nucleus::args) are passed as extra arguments.
+# link targets (e.g. nucleus::env, nucleus::argv) are passed as extra arguments.
 function(nucleus_add_example name)
     add_executable(${name} ${name}.cpp)
     target_link_libraries(${name} PRIVATE nucleus::nucleus ${ARGN})
 endfunction()
 
 # Getting started.
-nucleus_add_example(quickstart nucleus::args)
+nucleus_add_example(quickstart nucleus::argv)
 nucleus_add_example(schema nucleus::env)
 
 # Sources: the built-in flat sources and the seam a host extends.
-nucleus_add_example(argv nucleus::args)
+nucleus_add_example(argv nucleus::argv)
 nucleus_add_example(env nucleus::env)
-nucleus_add_example(layering nucleus::env nucleus::args)
+nucleus_add_example(layering nucleus::env nucleus::argv)
 nucleus_add_example(custom_source)
 nucleus_add_example(parser_concept)
 
 # New surface: explicit source_stack composition, reusable space, and argv recognizer.
-nucleus_add_example(source_stack nucleus::env nucleus::args nucleus::runtime)
+nucleus_add_example(source_stack nucleus::env nucleus::argv nucleus::runtime)
 nucleus_add_example(reusable_space nucleus::runtime)
-nucleus_add_example(argv_recognizer nucleus::args)
+nucleus_add_example(argv_recognizer nucleus::argv)
 
 # Tokens, logging, completion, diagnostics, and the registration-policy seam.
 nucleus_add_example(tokens nucleus::env)
-nucleus_add_example(logging nucleus::args)
+nucleus_add_example(logging nucleus::argv)
 nucleus_add_example(completion)
 nucleus_add_example(diagnostics)
 nucleus_add_example(registration_policy)
@@ -43,31 +43,31 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # Template emission lives in the xml module (nucleus::xml::emit_template); the
     # example links it and its header arrives via the nucleus::xml link.
     add_executable(emit_template emit_template.cpp)
-    target_link_libraries(emit_template PRIVATE nucleus::nucleus nucleus::source_xml)
+    target_link_libraries(emit_template PRIVATE nucleus::nucleus nucleus::xml)
     target_include_directories(emit_template PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
 
     add_executable(xml xml.cpp)
-    target_link_libraries(xml PRIVATE nucleus::nucleus nucleus::source_xml nucleus::args)
+    target_link_libraries(xml PRIVATE nucleus::nucleus nucleus::xml nucleus::argv)
     target_include_directories(xml PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
 
     add_executable(strains strains.cpp)
-    target_link_libraries(strains PRIVATE nucleus::nucleus nucleus::source_xml)
+    target_link_libraries(strains PRIVATE nucleus::nucleus nucleus::xml)
     target_include_directories(strains PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
 
     add_executable(typed typed.cpp)
-    target_link_libraries(typed PRIVATE nucleus::nucleus nucleus::source_xml)
+    target_link_libraries(typed PRIVATE nucleus::nucleus nucleus::xml)
     target_include_directories(typed PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
 
     add_executable(xml_persist xml_persist.cpp)
-    target_link_libraries(xml_persist PRIVATE nucleus::nucleus nucleus::source_xml)
+    target_link_libraries(xml_persist PRIVATE nucleus::nucleus nucleus::xml)
     target_include_directories(xml_persist PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
@@ -77,7 +77,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # the programmatic source. Headers arrive via the respective links.
     add_executable(round_trip round_trip.cpp)
     target_link_libraries(round_trip
-        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::runtime nucleus::env nucleus::args)
+        PRIVATE nucleus::nucleus nucleus::xml nucleus::runtime nucleus::env nucleus::argv)
     target_include_directories(round_trip PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )

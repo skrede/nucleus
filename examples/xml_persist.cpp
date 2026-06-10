@@ -6,14 +6,14 @@
 // its values. This is the resolved-config -> XML direction (the inverse of reading);
 // the user owns persistence (here, std::cout).
 
+#include "nucleus/configuration.h"
 #include "nucleus/configuration_space.h"
-#include "nucleus/entry/configuration.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/sources/xml_source.h"
-#include "nucleus/sources/xml_emitter.h"
+#include "nucleus/xml/xml_source.h"
+#include "nucleus/xml/xml_emitter.h"
 
 #include <string>
 #include <iostream>
@@ -31,8 +31,8 @@ int main()
         "<server><host>localhost</host><tag>alpha</tag><tag>beta</tag></server>";
     auto make = [document](const std::string &) -> nucleus::source_handle {
         return nucleus::source_handle(
-            nucleus::xml::xml_source::from(
-                nucleus::xml::xml_source_options::of_string(document)));
+            nucleus::xml_source::from(
+                nucleus::xml_source_options::of_string(document)));
     };
 
     auto loaded = nucleus::load(space, nucleus::source_stack{},

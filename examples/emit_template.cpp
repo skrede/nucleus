@@ -5,14 +5,14 @@
 // into a well-formed XML template -- one element per field, nested by anchor path,
 // with constrained fields annotated by their allowed values -- and writes it into
 // the caller's stream. This example links the xml module (nucleus::xml); its
-// header under nucleus/sources/ arrives via that link, pugixml stays private.
+// header under nucleus/xml/ arrives via that link, pugixml stays private.
 
 #include "nucleus/configuration_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/sources/xml_emitter.h"
+#include "nucleus/xml/xml_emitter.h"
 
 #include <vector>
 #include <iostream>

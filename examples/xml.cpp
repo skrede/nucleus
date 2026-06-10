@@ -10,9 +10,9 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/sources/xml_source.h"
+#include "nucleus/xml/xml_source.h"
 
-#include "nucleus/sources/argv_source.h"
+#include "nucleus/argv/argv_source.h"
 
 #include <vector>
 #include <string>
@@ -35,8 +35,8 @@ int main()
     const char *document = R"(<server host="127.0.0.1" mode="http"/>)";
     auto make = [document](const std::string &) -> nucleus::source_handle {
         return nucleus::source_handle(
-            nucleus::xml::xml_source::from(
-                nucleus::xml::xml_source_options::of_string(document)));
+            nucleus::xml_source::from(
+                nucleus::xml_source_options::of_string(document)));
     };
 
     // argv outranks the document band, so it overrides `mode`; the document's

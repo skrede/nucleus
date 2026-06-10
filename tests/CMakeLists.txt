@@ -49,12 +49,12 @@ nucleus_add_test(key_path_test)
 nucleus_add_test(keyspace_test)
 nucleus_add_test(schema_registry_test)
 nucleus_add_test(schema_enforcer_test)
-nucleus_add_test(argv_source_test nucleus::args)
-nucleus_add_test(schema_cli_bijection_test nucleus::args)
+nucleus_add_test(argv_source_test nucleus::argv)
+nucleus_add_test(schema_cli_bijection_test nucleus::argv)
 nucleus_add_test(token_lexer_test)
 nucleus_add_test(token_resolution_test)
 nucleus_add_test(token_cycle_test)
-nucleus_add_test(resolution_test nucleus::env nucleus::args)
+nucleus_add_test(resolution_test nucleus::env nucleus::argv)
 nucleus_add_test(diagnostics_test)
 nucleus_add_test(completion_test)
 nucleus_add_test(completion_smoke_test)
@@ -65,7 +65,7 @@ nucleus_add_test(builder_lifecycle_test)
 nucleus_add_test(expand_independence_test nucleus::env)
 nucleus_add_test(concurrent_load_test nucleus::runtime)
 nucleus_add_test(load_front_door_test nucleus::runtime)
-nucleus_add_test(recognizer_of_test nucleus::args)
+nucleus_add_test(recognizer_of_test nucleus::argv)
 nucleus_add_test(converter_edge_cases_test)
 
 # The concurrent-load guarantee test spawns std::threads; link the platform's
@@ -86,7 +86,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(xml_template_test xml_template_test.cpp)
     nucleus_enable_coverage(xml_template_test)
     target_link_libraries(xml_template_test
-        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+        PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
     target_include_directories(xml_template_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
@@ -97,7 +97,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(emit_seam_test emit_seam_test.cpp)
     nucleus_enable_coverage(emit_seam_test)
     target_link_libraries(emit_seam_test
-        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::env nucleus::args Catch2::Catch2WithMain)
+        PRIVATE nucleus::nucleus nucleus::xml nucleus::env nucleus::argv Catch2::Catch2WithMain)
     target_include_directories(emit_seam_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
@@ -106,7 +106,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(buffer_lifetime_test buffer_lifetime_test.cpp)
     nucleus_enable_coverage(buffer_lifetime_test)
     target_link_libraries(buffer_lifetime_test
-        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+        PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
     target_include_directories(buffer_lifetime_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
@@ -118,7 +118,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(resolve_buffer_drop_test resolve_buffer_drop_test.cpp)
     nucleus_enable_coverage(resolve_buffer_drop_test)
     target_link_libraries(resolve_buffer_drop_test
-        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::env Catch2::Catch2WithMain)
+        PRIVATE nucleus::nucleus nucleus::xml nucleus::env Catch2::Catch2WithMain)
     target_include_directories(resolve_buffer_drop_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
@@ -130,7 +130,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(keyed_projection_test keyed_projection_test.cpp)
     nucleus_enable_coverage(keyed_projection_test)
     target_link_libraries(keyed_projection_test
-        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+        PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
     target_include_directories(keyed_projection_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
@@ -139,7 +139,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(keyed_selection_test keyed_selection_test.cpp)
     nucleus_enable_coverage(keyed_selection_test)
     target_link_libraries(keyed_selection_test
-        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+        PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
     target_include_directories(keyed_selection_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
@@ -148,7 +148,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(inherit_chain_test inherit_chain_test.cpp)
     nucleus_enable_coverage(inherit_chain_test)
     target_link_libraries(inherit_chain_test
-        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::env Catch2::Catch2WithMain)
+        PRIVATE nucleus::nucleus nucleus::xml nucleus::env Catch2::Catch2WithMain)
     target_include_directories(inherit_chain_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
@@ -160,7 +160,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(xml_persist_test xml_persist_test.cpp)
     nucleus_enable_coverage(xml_persist_test)
     target_link_libraries(xml_persist_test
-        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+        PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
     target_include_directories(xml_persist_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
@@ -169,7 +169,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(integration_shape_test integration_shape_test.cpp)
     nucleus_enable_coverage(integration_shape_test)
     target_link_libraries(integration_shape_test
-        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::env Catch2::Catch2WithMain)
+        PRIVATE nucleus::nucleus nucleus::xml nucleus::env Catch2::Catch2WithMain)
     target_include_directories(integration_shape_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
@@ -180,7 +180,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(repeated_element_test repeated_element_test.cpp)
     nucleus_enable_coverage(repeated_element_test)
     target_link_libraries(repeated_element_test
-        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::runtime nucleus::env Catch2::Catch2WithMain)
+        PRIVATE nucleus::nucleus nucleus::xml nucleus::runtime nucleus::env Catch2::Catch2WithMain)
     target_include_directories(repeated_element_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
@@ -192,7 +192,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(typed_element_test typed_element_test.cpp)
     nucleus_enable_coverage(typed_element_test)
     target_link_libraries(typed_element_test
-        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+        PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
     target_include_directories(typed_element_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
@@ -205,7 +205,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(typed_shape_test typed_shape_test.cpp)
     nucleus_enable_coverage(typed_shape_test)
     target_link_libraries(typed_shape_test
-        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::env Catch2::Catch2WithMain)
+        PRIVATE nucleus::nucleus nucleus::xml nucleus::env Catch2::Catch2WithMain)
     target_include_directories(typed_shape_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
@@ -220,7 +220,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(inheritance_golden_test inheritance_golden/inheritance_golden_test.cpp)
     nucleus_enable_coverage(inheritance_golden_test)
     target_link_libraries(inheritance_golden_test
-        PRIVATE nucleus::nucleus nucleus::source_xml Catch2::Catch2WithMain)
+        PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
     target_include_directories(inheritance_golden_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
         ${CMAKE_CURRENT_SOURCE_DIR}/inheritance_golden
@@ -229,7 +229,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         NUCLEUS_GOLDEN_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/inheritance_golden/fixtures")
     add_test(NAME inheritance_golden_test COMMAND inheritance_golden_test)
 
-    # System tests: end-to-end coverage of the trident (space + stack + configuration).
+    # System tests: end-to-end coverage of the space + stack + configuration triple.
     # Each links the real shipped modules it exercises so the linker verifies the module
     # boundaries are correct.
 
@@ -238,7 +238,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(system_multi_source_test system_multi_source_test.cpp)
     nucleus_enable_coverage(system_multi_source_test)
     target_link_libraries(system_multi_source_test
-        PRIVATE nucleus::nucleus nucleus::env nucleus::args nucleus::source_xml nucleus::runtime
+        PRIVATE nucleus::nucleus nucleus::env nucleus::argv nucleus::xml nucleus::runtime
                 Catch2::Catch2WithMain)
     target_include_directories(system_multi_source_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
@@ -247,22 +247,22 @@ if(NUCLEUS_BUILD_SOURCE_XML)
 
     # Trident disconnection: inner-scope XML + env stack dropped; every value read back
     # after the entire source_stack, space, and arena are destroyed. Passes under ASan.
-    add_executable(system_trident_disconnect_test system_trident_disconnect_test.cpp)
-    nucleus_enable_coverage(system_trident_disconnect_test)
-    target_link_libraries(system_trident_disconnect_test
-        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::env
+    add_executable(system_stack_buffer_drop_test system_stack_buffer_drop_test.cpp)
+    nucleus_enable_coverage(system_stack_buffer_drop_test)
+    target_link_libraries(system_stack_buffer_drop_test
+        PRIVATE nucleus::nucleus nucleus::xml nucleus::env
                 Catch2::Catch2WithMain)
-    target_include_directories(system_trident_disconnect_test PRIVATE
+    target_include_directories(system_stack_buffer_drop_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
-    add_test(NAME system_trident_disconnect_test COMMAND system_trident_disconnect_test)
+    add_test(NAME system_stack_buffer_drop_test COMMAND system_stack_buffer_drop_test)
 
     # One-space-many-stacks: one sealed space serves two different source stacks
     # and yields two independent, simultaneously-valid configurations.
     add_executable(system_one_space_many_stacks_test system_one_space_many_stacks_test.cpp)
     nucleus_enable_coverage(system_one_space_many_stacks_test)
     target_link_libraries(system_one_space_many_stacks_test
-        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::env nucleus::runtime
+        PRIVATE nucleus::nucleus nucleus::xml nucleus::env nucleus::runtime
                 Catch2::Catch2WithMain)
     target_include_directories(system_one_space_many_stacks_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
@@ -274,7 +274,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(system_round_trip_test system_round_trip_test.cpp)
     nucleus_enable_coverage(system_round_trip_test)
     target_link_libraries(system_round_trip_test
-        PRIVATE nucleus::nucleus nucleus::source_xml nucleus::runtime nucleus::env
+        PRIVATE nucleus::nucleus nucleus::xml nucleus::runtime nucleus::env
                 Catch2::Catch2WithMain)
     target_include_directories(system_round_trip_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src

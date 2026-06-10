@@ -9,7 +9,7 @@
 
 #include "nucleus/schema/cli_flag.h"
 
-#include "nucleus/sources/argv_source.h"
+#include "nucleus/argv/argv_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 

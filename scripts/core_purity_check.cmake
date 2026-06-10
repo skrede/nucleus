@@ -5,7 +5,7 @@
 # their own per-target modules (e.g. lib/xml/), never in core. The boundary is now
 # STRUCTURAL -- the source/format adapters live in separate include roots and
 # targets (lib/xml, lib/runtime) that core cannot reach -- and this gate additionally
-# lint-asserts it: any core file that includes a nucleus/sources/ adapter header, or
+# lint-asserts it: any core file that includes a per-module adapter header, or
 # names a format, fails (nonzero exit). Run as a CTest gate.
 #
 # Invoke: cmake -DNUCLEUS_ROOT=<repo> -P scripts/core_purity_check.cmake
@@ -65,13 +65,17 @@ foreach(file ${core_files})
         endif()
     endforeach()
 
-    # Structural assertion: a source/format adapter lives under nucleus/sources/ in
-    # its own module; core must never include one. Either include spelling fails.
-    string(FIND "${lowered}" "#include <nucleus/sources/" angle_include)
-    string(FIND "${lowered}" "#include \"nucleus/sources/" quote_include)
-    if(NOT angle_include EQUAL -1 OR NOT quote_include EQUAL -1)
-        list(APPEND violations "${file}: includes a nucleus/sources/ adapter header")
-    endif()
+    # Structural assertion: a source/format adapter lives under its own module
+    # include root (nucleus/xml/, nucleus/env/, nucleus/argv/, nucleus/runtime/);
+    # core must never include one. Either include spelling fails.
+    foreach(adapter_root xml env argv runtime)
+        string(FIND "${lowered}" "#include <nucleus/${adapter_root}/" angle_include)
+        string(FIND "${lowered}" "#include \"nucleus/${adapter_root}/" quote_include)
+        if(NOT angle_include EQUAL -1 OR NOT quote_include EQUAL -1)
+            list(APPEND violations
+                "${file}: includes a nucleus/${adapter_root}/ adapter header")
+        endif()
+    endforeach()
 endforeach()
 
 list(LENGTH violations violation_count)

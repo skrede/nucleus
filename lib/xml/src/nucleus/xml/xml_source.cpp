@@ -1,5 +1,5 @@
 #include "xml_reader.h"
-#include "nucleus/sources/xml_source.h"
+#include "nucleus/xml/xml_source.h"
 
 #include "nucleus/format.h"
 #include "nucleus/capability.h"
@@ -18,7 +18,9 @@
 #include <string>
 #include <string_view>
 
-namespace nucleus::xml {
+namespace nucleus {
+
+using xml::document_arena;
 
 namespace {
 

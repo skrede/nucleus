@@ -4,7 +4,7 @@
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
 
-#include "nucleus/sources/xml_source.h"
+#include "nucleus/xml/xml_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -56,7 +56,7 @@ TEST_CASE("xml source values survive dropping the document arena", "[xml][lifeti
     std::map<std::string, std::string> values;
     {
         nucleus::source_handle src{
-            nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(kDocument))};
+            nucleus::xml_source::from(nucleus::xml_source_options::of_string(kDocument))};
         values = copy_out(src);
         // src and the pulled batch are destroyed at the end of this scope; the
         // pugixml document arena is freed here.
@@ -73,7 +73,7 @@ TEST_CASE("xml source values survive dropping the document arena", "[xml][lifeti
 
 TEST_CASE("the xml source declares document-shaped capabilities", "[xml]")
 {
-    auto src = nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string("<r a=\"1\"/>"));
+    auto src = nucleus::xml_source::from(nucleus::xml_source_options::of_string("<r a=\"1\"/>"));
     auto caps = src.capabilities();
     REQUIRE(caps.supports(nucleus::capability::nesting));
     REQUIRE(caps.supports(nucleus::capability::ordering));
@@ -84,7 +84,7 @@ TEST_CASE("the xml source declares document-shaped capabilities", "[xml]")
 
 TEST_CASE("the xml source reports a parse failure rather than dangling", "[xml]")
 {
-    auto src = nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string("<unterminated>"));
+    auto src = nucleus::xml_source::from(nucleus::xml_source_options::of_string("<unterminated>"));
     auto pulled = src.pull();
     REQUIRE_FALSE(pulled);
     REQUIRE(pulled.error().find("xml source") != std::string::npos);
@@ -96,7 +96,7 @@ TEST_CASE("a document source reaches the engine only as a source", "[xml]")
     // the same path env and any other plain struct source uses. The arena lives
     // inside the batch's retained_buffer, invisible to this call site.
     nucleus::source_handle as_source{
-        nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string("<root key=\"v\"/>"))};
+        nucleus::xml_source::from(nucleus::xml_source_options::of_string("<root key=\"v\"/>"))};
 
     auto pulled = as_source.pull();
     REQUIRE(pulled);

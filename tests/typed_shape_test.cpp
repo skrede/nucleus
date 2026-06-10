@@ -4,17 +4,17 @@
 
 #include "nucleus/configuration_space.h"
 
-#include "nucleus/entry/strain_scope.h"
-#include "nucleus/entry/configuration.h"
+#include "nucleus/strain_scope.h"
+#include "nucleus/configuration.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/converters.h"
 
 #include "nucleus/configuration_source/configuration_source.h"
-#include "nucleus/sources/env_source.h"
+#include "nucleus/env/env_source.h"
 
-#include "nucleus/sources/xml_source.h"
+#include "nucleus/xml/xml_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -32,9 +32,9 @@ using nucleus::strain_scope_policy;
 
 namespace {
 
-nucleus::xml::xml_source xml_of(const std::string &text)
+nucleus::xml_source xml_of(const std::string &text)
 {
-    return nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(text));
+    return nucleus::xml_source::from(nucleus::xml_source_options::of_string(text));
 }
 
 std::string filename_of(const std::string &path)

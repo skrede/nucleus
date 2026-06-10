@@ -6,16 +6,16 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/entry/configuration.h"
+#include "nucleus/configuration.h"
 
 #include "nucleus/capability.h"
 
 #include "nucleus/configuration_source/configuration_source.h"
 
-#include "nucleus/sources/env_source.h"
+#include "nucleus/env/env_source.h"
 
-#include "nucleus/sources/xml_source.h"
-#include "nucleus/sources/runtime_source.h"
+#include "nucleus/xml/xml_source.h"
+#include "nucleus/runtime/runtime_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -30,9 +30,9 @@ using nucleus::anchor;
 
 namespace {
 
-nucleus::xml::xml_source xml_of(const std::string &text)
+nucleus::xml_source xml_of(const std::string &text)
 {
-    return nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(text));
+    return nucleus::xml_source::from(nucleus::xml_source_options::of_string(text));
 }
 
 // Registers a flat schema: a <config> root container with a repeated <tag> leaf.

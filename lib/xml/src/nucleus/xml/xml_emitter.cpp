@@ -1,11 +1,10 @@
-#include "nucleus/sources/xml_emitter.h"
+#include "nucleus/xml/xml_emitter.h"
 
+#include "nucleus/configuration.h"
 #include "nucleus/config_emitter.h"
 #include "nucleus/configuration_space.h"
 
 #include "nucleus/schema/schema.h"
-
-#include "nucleus/entry/configuration.h"
 
 #include "nucleus/keyspace/key_path.h"
 

@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_NUCLEUS_ENTRY_CHAIN_WALKER_H
-#define HPP_GUARD_NUCLEUS_ENTRY_CHAIN_WALKER_H
+#ifndef HPP_GUARD_NUCLEUS_RESOLVE_CHAIN_WALKER_H
+#define HPP_GUARD_NUCLEUS_RESOLVE_CHAIN_WALKER_H
 
 #include "nucleus/format.h"
 #include "nucleus/expected.h"

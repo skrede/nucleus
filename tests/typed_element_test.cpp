@@ -5,17 +5,16 @@
 // conversion failure surfacing, get_as error distinctions,
 // repeated x typed (get_all_as), and orthogonality with other schema axes.
 
+#include "nucleus/configuration.h"
 #include "nucleus/configuration_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/converters.h"
 
-#include "nucleus/entry/configuration.h"
-
 #include "nucleus/configuration_source/configuration_source.h"
 
-#include "nucleus/sources/xml_source.h"
+#include "nucleus/xml/xml_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -32,9 +31,9 @@ using nucleus::anchor;
 
 namespace {
 
-nucleus::xml::xml_source xml_of(const std::string &text)
+nucleus::xml_source xml_of(const std::string &text)
 {
-    return nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(text));
+    return nucleus::xml_source::from(nucleus::xml_source_options::of_string(text));
 }
 
 // Seals `engine` into a space and loads `src` as the sole source.
@@ -498,7 +497,7 @@ TEST_CASE("conversion failure at resolve surfaces diagnostic", "[typed][failure]
         struct pair_t
         {
             nucleus::configuration_space_builder engine;
-            std::optional<nucleus::xml::xml_source> src;
+            std::optional<nucleus::xml_source> src;
         };
         pair_t p;
         p.engine.register_element(nucleus::element("cfg", anchor::root()));

@@ -8,7 +8,7 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/sources/argv_source.h"
+#include "nucleus/argv/argv_source.h"
 
 #include <vector>
 #include <iostream>

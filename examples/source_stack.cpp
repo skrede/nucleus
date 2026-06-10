@@ -6,11 +6,11 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/entry/configuration.h"
+#include "nucleus/configuration.h"
 
-#include "nucleus/sources/env_source.h"
-#include "nucleus/sources/argv_source.h"
-#include "nucleus/sources/runtime_source.h"
+#include "nucleus/env/env_source.h"
+#include "nucleus/argv/argv_source.h"
+#include "nucleus/runtime/runtime_source.h"
 
 #include <vector>
 #include <iostream>

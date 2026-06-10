@@ -11,7 +11,7 @@
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/converters.h"
 
-#include "nucleus/sources/env_source.h"
+#include "nucleus/env/env_source.h"
 
 #include <iostream>
 

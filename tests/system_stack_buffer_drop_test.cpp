@@ -1,11 +1,11 @@
+#include "nucleus/configuration.h"
 #include "nucleus/configuration_space.h"
-#include "nucleus/entry/configuration.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/sources/env_source.h"
-#include "nucleus/sources/xml_source.h"
+#include "nucleus/env/env_source.h"
+#include "nucleus/xml/xml_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -35,7 +35,7 @@ std::string filename_of(const std::string &path)
 source_handle xml_of(const std::string &text)
 {
     return source_handle(
-        xml::xml_source::from(xml::xml_source_options::of_string(text)));
+        xml_source::from(xml_source_options::of_string(text)));
 }
 
 // Two-file inheritance chain: base defines host and mode; derived extends and
@@ -133,7 +133,7 @@ TEST_CASE("configuration outlives a drop of the simplest xml+env stack on the ne
             "</app>";
 
         // Document source at stack[0]; env overlay at stack[1] overrides port.
-        auto doc = xml::xml_source::from(xml::xml_source_options::of_string(kDoc));
+        auto doc = xml_source::from(xml_source_options::of_string(kDoc));
         env_source overlay;
         overlay.set("app/server/port", "9090");
 

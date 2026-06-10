@@ -1,16 +1,15 @@
 #ifndef HPP_GUARD_NUCLEUS_TESTS_INHERITANCE_GOLDEN_GOLDEN_RUNNER_H
 #define HPP_GUARD_NUCLEUS_TESTS_INHERITANCE_GOLDEN_GOLDEN_RUNNER_H
 
+#include "nucleus/configuration.h"
 #include "nucleus/configuration_space.h"
-
-#include "nucleus/entry/configuration.h"
 
 #include "nucleus/keyspace/provenance.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/sources/xml_source.h"
+#include "nucleus/xml/xml_source.h"
 
 #include <memory>
 #include <string>
@@ -70,7 +69,7 @@ inline std::function<nucleus::source_handle(const std::string &)> file_factory(s
     return [dir = std::move(case_dir)](const std::string &path) -> nucleus::source_handle {
         const std::string full = dir + "/" + filename_of(path);
         return nucleus::source_handle(
-            nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_file(full)));
+            nucleus::xml_source::from(nucleus::xml_source_options::of_file(full)));
     };
 }
 

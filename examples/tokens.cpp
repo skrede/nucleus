@@ -6,7 +6,7 @@
 
 #include "nucleus/configuration_space.h"
 
-#include "nucleus/sources/env_source.h"
+#include "nucleus/env/env_source.h"
 
 #include <cstdlib>
 #include <iostream>

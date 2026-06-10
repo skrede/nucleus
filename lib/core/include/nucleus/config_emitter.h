@@ -1,9 +1,8 @@
 #ifndef HPP_GUARD_NUCLEUS_CONFIG_EMITTER_H
 #define HPP_GUARD_NUCLEUS_CONFIG_EMITTER_H
 
+#include "nucleus/configuration.h"
 #include "nucleus/configuration_space.h"
-
-#include "nucleus/entry/configuration.h"
 
 #include <iosfwd>
 #include <concepts>

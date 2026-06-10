@@ -1,11 +1,10 @@
 // argv_recognizer: argv stays coupled to the schema via a host-supplied recognizer.
 // It is composed explicitly and never auto-instantiated by load.
 
+#include "nucleus/configuration.h"
 #include "nucleus/configuration_space.h"
 
-#include "nucleus/entry/configuration.h"
-
-#include "nucleus/sources/argv_source.h"
+#include "nucleus/argv/argv_source.h"
 
 #include <vector>
 #include <iostream>

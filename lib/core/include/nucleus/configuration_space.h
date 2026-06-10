@@ -4,6 +4,8 @@
 #include "nucleus/expected.h"
 #include "nucleus/identity.h"
 #include "nucleus/log_sink.h"
+#include "nucleus/strain_scope.h"
+#include "nucleus/configuration.h"
 #include "nucleus/registration_policy.h"
 
 #include "nucleus/schema/schema.h"
@@ -13,9 +15,6 @@
 #include "nucleus/configuration_source/inherit_declaration.h"
 #include "nucleus/configuration_source/configuration_source.h"
 #include "nucleus/configuration_source/argv/key_recognizer.h"
-
-#include "nucleus/entry/strain_scope.h"
-#include "nucleus/entry/configuration.h"
 
 #include "nucleus/diagnostics/conflict_report.h"
 

@@ -9,9 +9,9 @@
 #include "nucleus/schema/converter_registry.h"
 #include "nucleus/schema/capability_requirements.h"
 
-#include "nucleus/entry/chain_walker.h"
-#include "nucleus/entry/strain_scope.h"
-#include "nucleus/entry/resolution_context.h"
+#include "nucleus/resolve/chain_walker.h"
+#include "nucleus/strain_scope.h"
+#include "nucleus/resolve/resolution_context.h"
 
 #include "nucleus/diagnostics/key_suggester.h"
 #include "nucleus/diagnostics/conflict_report.h"

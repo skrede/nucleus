@@ -1,8 +1,8 @@
 #include "nucleus/configuration_space.h"
 #include "nucleus/identity.h"
 
-#include "nucleus/sources/env_source.h"
-#include "nucleus/sources/argv_source.h"
+#include "nucleus/env/env_source.h"
+#include "nucleus/argv/argv_source.h"
 
 #include "nucleus/tokenizer/tokenizer_builder.h"
 #include "nucleus/tokenizer/builtin_tokenizers.h"

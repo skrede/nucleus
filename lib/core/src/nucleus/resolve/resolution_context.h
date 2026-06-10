@@ -1,11 +1,11 @@
-#ifndef HPP_GUARD_NUCLEUS_ENTRY_RESOLUTION_CONTEXT_H
-#define HPP_GUARD_NUCLEUS_ENTRY_RESOLUTION_CONTEXT_H
+#ifndef HPP_GUARD_NUCLEUS_RESOLVE_RESOLUTION_CONTEXT_H
+#define HPP_GUARD_NUCLEUS_RESOLVE_RESOLUTION_CONTEXT_H
 
 #include "nucleus/format.h"
 #include "nucleus/expected.h"
 
-#include "nucleus/entry/strain_scope.h"
-#include "nucleus/entry/configuration.h"
+#include "nucleus/strain_scope.h"
+#include "nucleus/configuration.h"
 
 #include "nucleus/keyspace/keyspace.h"
 #include "nucleus/keyspace/provenance.h"

@@ -3,7 +3,7 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/sources/xml_emitter.h"
+#include "nucleus/xml/xml_emitter.h"
 
 #include <catch2/catch_test_macros.hpp>
 

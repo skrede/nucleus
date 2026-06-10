@@ -1,14 +1,13 @@
 // typed: register a custom aggregate converter and a built-in int field; read back typed.
 
+#include "nucleus/configuration.h"
 #include "nucleus/configuration_space.h"
-
-#include "nucleus/entry/configuration.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/converters.h"
 
-#include "nucleus/sources/xml_source.h"
+#include "nucleus/xml/xml_source.h"
 
 #include <any>
 #include <string>
@@ -66,8 +65,8 @@ int main()
     const char *document = R"(<body><pos>1.0,2.5,3.0</pos><mass>42</mass></body>)";
     auto make = [document](const std::string &) -> nucleus::source_handle {
         return nucleus::source_handle(
-            nucleus::xml::xml_source::from(
-                nucleus::xml::xml_source_options::of_string(document)));
+            nucleus::xml_source::from(
+                nucleus::xml_source_options::of_string(document)));
     };
 
     auto loaded = nucleus::load(space, nucleus::source_stack{},

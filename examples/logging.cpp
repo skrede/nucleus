@@ -6,7 +6,7 @@
 
 #include "nucleus/log_sink.h"
 
-#include "nucleus/sources/argv_source.h"
+#include "nucleus/argv/argv_source.h"
 
 #include "nucleus/keyspace/key_path.h"
 

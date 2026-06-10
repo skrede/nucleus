@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_NUCLEUS_SOURCES_XML_SOURCE_H
-#define HPP_GUARD_NUCLEUS_SOURCES_XML_SOURCE_H
+#ifndef HPP_GUARD_NUCLEUS_XML_XML_SOURCE_H
+#define HPP_GUARD_NUCLEUS_XML_XML_SOURCE_H
 
 #include "nucleus/configuration_source/configuration_source.h"
 #include "nucleus/configuration_source/inherit_declaration.h"
@@ -10,13 +10,15 @@
 #include <string>
 #include <utility>
 
+// Forward declaration: the pugixml document arena, an xml-module internal.
+// Defined in xml_reader.h (which pulls in pugixml). The shared_ptr member only
+// needs an incomplete type here; the destructor and constructor are out-of-line
+// in xml_source.cpp where xml_reader.h is included.
 namespace nucleus::xml {
-
-// Forward declaration: the pugixml document arena. Defined in xml_reader.h
-// (which pulls in pugixml). The shared_ptr member only needs an incomplete type
-// here; the destructor and constructor are out-of-line in xml_source.cpp where
-// xml_reader.h is included.
 class document_arena;
+}
+
+namespace nucleus {
 
 // Value-semantics options describing where an xml_source reads its document from:
 // an in-memory XML string, or a file path read at pull time. This struct lives in
@@ -102,7 +104,7 @@ private:
     schema_projection m_projection;
     // Set during pull(); shared_ptr so inheritance() can read the root after
     // pull() returns without copying the arena.
-    std::shared_ptr<document_arena> m_arena;
+    std::shared_ptr<xml::document_arena> m_arena;
 };
 
 }

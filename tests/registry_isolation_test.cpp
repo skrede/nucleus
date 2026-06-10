@@ -6,7 +6,7 @@
 #include "nucleus/schema/converter_registry.h"
 #include "nucleus/schema/converters.h"
 
-#include "nucleus/entry/resolution_context.h"
+#include "nucleus/resolve/resolution_context.h"
 
 #include "nucleus/tokenizer/tokenizer_builder.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"

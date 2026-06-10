@@ -1,11 +1,11 @@
+#include "nucleus/configuration.h"
 #include "nucleus/configuration_space.h"
-#include "nucleus/entry/configuration.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/sources/xml_source.h"
-#include "nucleus/sources/xml_emitter.h"
+#include "nucleus/xml/xml_source.h"
+#include "nucleus/xml/xml_emitter.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -29,7 +29,7 @@ namespace {
 nucleus::source_handle xml_of(const std::string &text)
 {
     return nucleus::source_handle(
-        nucleus::xml::xml_source::from(nucleus::xml::xml_source_options::of_string(text)));
+        nucleus::xml_source::from(nucleus::xml_source_options::of_string(text)));
 }
 
 void declare_server(nucleus::configuration_space_builder &engine)

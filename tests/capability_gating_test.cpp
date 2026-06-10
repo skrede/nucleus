@@ -4,7 +4,7 @@
 #include "nucleus/configuration_source/configuration_source.h"
 #include "nucleus/configuration_source/feature_gate.h"
 
-#include "nucleus/sources/env_source.h"
+#include "nucleus/env/env_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 

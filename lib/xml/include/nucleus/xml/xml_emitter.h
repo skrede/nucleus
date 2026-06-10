@@ -1,9 +1,8 @@
-#ifndef HPP_GUARD_NUCLEUS_SOURCES_XML_EMITTER_H
-#define HPP_GUARD_NUCLEUS_SOURCES_XML_EMITTER_H
+#ifndef HPP_GUARD_NUCLEUS_XML_XML_EMITTER_H
+#define HPP_GUARD_NUCLEUS_XML_XML_EMITTER_H
 
+#include "nucleus/configuration.h"
 #include "nucleus/configuration_space.h"
-
-#include "nucleus/entry/configuration.h"
 
 #include <iosfwd>
 
