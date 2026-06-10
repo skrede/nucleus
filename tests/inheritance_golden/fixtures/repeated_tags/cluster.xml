@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<cluster>
+    <server name="primary">
+        <logger log_level="info"/>
+        <tag>edge</tag>
+        <tag>ipv6</tag>
+        <tag>canary</tag>
+        <profile name="demo">
+            <message>
+                <greeting>hello from primary (repeated_tags layout)</greeting>
+                <description>a repeated leaf carries all its values through selection</description>
+            </message>
+        </profile>
+    </server>
+</cluster>

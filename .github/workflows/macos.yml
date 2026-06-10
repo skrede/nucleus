@@ -51,7 +51,7 @@ jobs:
         run: cmake --build build
 
       - name: Test
-        run: cd build && ctest --output-on-failure
+        run: cd build && ctest --output-on-failure --timeout 300
 
   install-test:
     runs-on: macos-14

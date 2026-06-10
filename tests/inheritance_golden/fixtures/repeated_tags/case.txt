@@ -1,0 +1,4 @@
+# repeated_tags: a repeated leaf keeps every value in document order; the golden
+# serialization renders one indexed line per element with its own layer.
+input=cluster.xml
+selection=primary

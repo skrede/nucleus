@@ -1,8 +1,11 @@
 // Concurrent loads on one shared const configuration_space need no synchronization:
 // load borrows the space's registries by const reference and owns all
 // mutable resolve state on its own stack. N threads call it on the SAME const space
-// with no mutex; all succeed with byte-identical results. Under ASan this exercises
-// the shared-const-read design with no data race.
+// with no mutex; all succeed with byte-identical results. ASan cannot see data
+// races -- the race-freedom claim is validated by the ThreadSanitizer CI job
+// running this same test; the latch and the iteration loop exist to give TSan
+// genuinely overlapping access windows rather than threads that serialize
+// through their own setup.
 
 #include "nucleus/configuration_space.h"
 
@@ -16,6 +19,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <map>
+#include <latch>
 #include <vector>
 #include <thread>
 #include <string>
@@ -34,29 +38,40 @@ TEST_CASE("N threads load one shared const space lock-free with identical result
     const nucleus::configuration_space space = builder.build();
 
     constexpr std::size_t thread_count = 8;
+    constexpr std::size_t iterations = 64;
     std::vector<std::map<std::string, std::string>> results(thread_count);
     // char, not vector<bool>: the bit-packed specialization shares machine words
     // across indices, so concurrent per-thread writes would race on the same word.
     std::vector<char> ok(thread_count, 0);
 
+    // Every thread arrives at the latch before any thread touches the shared
+    // space, so the loads genuinely overlap instead of serializing through
+    // per-thread setup.
+    std::latch start(thread_count);
+
     std::vector<std::thread> threads;
     threads.reserve(thread_count);
     for(std::size_t i = 0; i < thread_count; ++i)
     {
-        threads.emplace_back([&space, &results, &ok, i]() {
+        threads.emplace_back([&space, &results, &ok, &start, i]() {
+            start.arrive_and_wait();
             // Borrow the shared space by const reference -- NO mutex anywhere. Each
             // thread owns its source and stack on its own stack so nothing mutable
             // is shared; the feeder declares nesting so the auto-gate admits it.
-            nucleus::runtime_source src;
-            src.set("server/host", "localhost").set("server/port", "8080");
-            auto loaded = nucleus::load(space,
-                nucleus::source_stack{std::move(src)},
-                {});
-            if(!loaded)
-                return;
             std::map<std::string, std::string> snapshot;
-            for(const std::string &key : loaded.value().keys())
-                snapshot.emplace(key, loaded.value().get(key).value_or(std::string{}));
+            for(std::size_t iter = 0; iter < iterations; ++iter)
+            {
+                nucleus::runtime_source src;
+                src.set("server/host", "localhost").set("server/port", "8080");
+                auto loaded = nucleus::load(space,
+                    nucleus::source_stack{std::move(src)},
+                    {});
+                if(!loaded)
+                    return;
+                snapshot.clear();
+                for(const std::string &key : loaded.value().keys())
+                    snapshot.emplace(key, loaded.value().get(key).value_or(std::string{}));
+            }
             results[i] = std::move(snapshot);
             ok[i] = 1;
         });

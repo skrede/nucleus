@@ -12,9 +12,19 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# NUCLEUS_SANITIZER selects the instrumentation flavor for sanitizer builds:
+# "address" pairs ASan with UBSan (they compose; TSan composes with neither),
+# "thread" is the data-race validator behind the concurrent-load claim.
+set(NUCLEUS_SANITIZER "address" CACHE STRING
+    "Sanitizer flavor for NUCLEUS_BUILD_SANITIZER builds: address or thread")
 if(NUCLEUS_BUILD_SANITIZER AND NOT MSVC)
-    add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
-    add_link_options(-fsanitize=address)
+    if(NUCLEUS_SANITIZER STREQUAL "thread")
+        add_compile_options(-fsanitize=thread -fno-omit-frame-pointer)
+        add_link_options(-fsanitize=thread)
+    else()
+        add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+        add_link_options(-fsanitize=address,undefined)
+    endif()
 endif()
 
 # Coverage instrumentation, gcc/clang only and off by default -- never in a

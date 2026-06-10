@@ -48,6 +48,7 @@ nucleus_add_test(capability_requirements_test)
 nucleus_add_test(auto_gating_test nucleus::env)
 nucleus_add_test(discovery_test)
 nucleus_add_test(key_path_test)
+nucleus_add_test(path_text_test)
 nucleus_add_test(keyspace_test)
 nucleus_add_test(schema_registry_test)
 nucleus_add_test(schema_enforcer_test)
@@ -354,16 +355,25 @@ add_test(
 )
 
 # ---------------------------------------------------------------------------
-# ASan trip test: built and registered ONLY when the sanitizer is enabled. It
-# deliberately reads freed heap memory to confirm ASan is wired and tripping; it
-# is never part of a normal (non-sanitizer) run.
+# Sanitizer trip tests: built and registered ONLY when the matching sanitizer is
+# enabled. Each deliberately commits the defect its sanitizer exists to catch
+# (a heap use-after-free; an unsynchronized cross-thread write), proving the
+# instrumentation is wired and tripping; neither is part of a normal run.
 # ---------------------------------------------------------------------------
-if(NUCLEUS_BUILD_SANITIZER)
+if(NUCLEUS_BUILD_SANITIZER AND NUCLEUS_SANITIZER STREQUAL "address")
     add_executable(asan_trip_test asan_trip_test.cpp)
     target_link_libraries(asan_trip_test PRIVATE nucleus::nucleus)
     add_test(NAME asan_trip_test COMMAND asan_trip_test)
     set_tests_properties(asan_trip_test PROPERTIES
         PASS_REGULAR_EXPRESSION "heap-use-after-free|AddressSanitizer")
+endif()
+
+if(NUCLEUS_BUILD_SANITIZER AND NUCLEUS_SANITIZER STREQUAL "thread")
+    add_executable(tsan_trip_test tsan_trip_test.cpp)
+    target_link_libraries(tsan_trip_test PRIVATE nucleus::nucleus)
+    add_test(NAME tsan_trip_test COMMAND tsan_trip_test)
+    set_tests_properties(tsan_trip_test PROPERTIES
+        PASS_REGULAR_EXPRESSION "data race|ThreadSanitizer")
 endif()
 
 # ---------------------------------------------------------------------------

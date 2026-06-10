@@ -79,7 +79,7 @@ jobs:
         run: cmake --build build
 
       - name: Test
-        run: cd build && ctest --output-on-failure
+        run: cd build && ctest --output-on-failure --timeout 300
 
       # NUCLEUS_COVERAGE scopes instrumentation to first-party targets, so the
       # fetched dependencies emit no gcov data; the exclude below is
@@ -114,21 +114,27 @@ jobs:
           fail_ci_if_error: false
 
   sanitizer:
+    strategy:
+      fail-fast: false
+      matrix:
+        flavor: [address, thread]
     runs-on: ubuntu-24.04
+    name: sanitizer (${{ matrix.flavor }})
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure (AddressSanitizer)
+      - name: Configure
         run: >-
-          cmake . -B build-asan
+          cmake . -B build-san
           -DNUCLEUS_BUILD_TESTS=ON
           -DNUCLEUS_BUILD_SANITIZER=ON
+          -DNUCLEUS_SANITIZER=${{ matrix.flavor }}
 
       - name: Build
-        run: cmake --build build-asan
+        run: cmake --build build-san
 
       - name: Test
-        run: cd build-asan && ctest --output-on-failure
+        run: cd build-san && ctest --output-on-failure --timeout 300
 
   core-purity:
     runs-on: ubuntu-24.04

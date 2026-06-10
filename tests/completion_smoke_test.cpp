@@ -85,11 +85,7 @@ TEST_CASE("the generated bash script actually completes under real bash",
           "[completion][smoke]")
 {
     if(!bash_available())
-    {
-        WARN("bash not found on PATH -- skipping the real-bash smoke test");
-        SUCCEED();
-        return;
-    }
+        SKIP("bash not found on PATH -- the real-bash smoke test needs it");
 
     const std::string completion = generate_completion(shell::bash, fixture(), "myapp");
 

@@ -53,6 +53,8 @@ inline void declare_schema(nucleus::configuration_space_builder &builder)
         nucleus::element("greeting", anchor::keyspace("cluster/server/profile/message"))));
     REQUIRE(builder.register_element(
         nucleus::element("description", anchor::keyspace("cluster/server/profile/message"))));
+    REQUIRE(builder.register_element(
+        nucleus::repeated_element("tag", anchor::keyspace("cluster/server"))));
 }
 
 // The filename portion of a (possibly absolute) path, so the factory can dispatch
