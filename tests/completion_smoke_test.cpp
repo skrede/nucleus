@@ -36,9 +36,9 @@ key_path path_of(const char *text) { return key_path::parse(text).value(); }
 schema_registry fixture()
 {
     schema_registry reg;
-    reg.attach(nucleus::element("logging", anchor::root()));
-    reg.attach(nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
-                                     {"debug", "info", "warn", "error"}));
+    REQUIRE(reg.attach(nucleus::element("logging", anchor::root())));
+    REQUIRE(reg.attach(nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
+                                     {"debug", "info", "warn", "error"})));
     return reg;
 }
 

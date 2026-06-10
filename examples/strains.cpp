@@ -15,14 +15,19 @@ int main()
 {
     // Schema: cluster/server keyed by name, leaves port and protocol.
     nucleus::configuration_space_builder builder;
-    builder.register_element(nucleus::element("cluster", nucleus::anchor::root()));
-    builder.register_element(nucleus::element("server", nucleus::anchor::keyspace("cluster")));
-    builder.register_element(
-        nucleus::primary_key_element("name", nucleus::anchor::keyspace("cluster/server")));
-    builder.register_element(
-        nucleus::element("port", nucleus::anchor::keyspace("cluster/server")));
-    builder.register_element(
-        nucleus::element("protocol", nucleus::anchor::keyspace("cluster/server")));
+    if(!builder.register_element(nucleus::element("cluster", nucleus::anchor::root())))
+        return 1;
+    if(!builder.register_element(nucleus::element("server", nucleus::anchor::keyspace("cluster"))))
+        return 1;
+    if(!builder.register_element(
+        nucleus::primary_key_element("name", nucleus::anchor::keyspace("cluster/server"))))
+        return 1;
+    if(!builder.register_element(
+        nucleus::element("port", nucleus::anchor::keyspace("cluster/server"))))
+        return 1;
+    if(!builder.register_element(
+        nucleus::element("protocol", nucleus::anchor::keyspace("cluster/server"))))
+        return 1;
     nucleus::configuration_space space = builder.build();
 
     // One document containing an anonymous template (protocol) and two named

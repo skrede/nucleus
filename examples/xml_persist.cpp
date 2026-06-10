@@ -21,10 +21,13 @@
 int main()
 {
     nucleus::configuration_space_builder builder;
-    builder.register_element(nucleus::element("server", nucleus::anchor::root()));
-    builder.register_element(nucleus::element("host", nucleus::anchor::keyspace("server")));
-    builder.register_element(
-        nucleus::repeated_element("tag", nucleus::anchor::keyspace("server")));
+    if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
+        return 1;
+    if(!builder.register_element(nucleus::element("host", nucleus::anchor::keyspace("server"))))
+        return 1;
+    if(!builder.register_element(
+        nucleus::repeated_element("tag", nucleus::anchor::keyspace("server"))))
+        return 1;
     nucleus::configuration_space space = builder.build();
 
     const char *document =

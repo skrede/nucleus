@@ -46,8 +46,8 @@ TEST_CASE("a pathologically deep document fails with a depth-cap error, not a cr
 TEST_CASE("a CDATA leaf value resolves like plain text", "[xml][robustness]")
 {
     nucleus::configuration_space_builder builder;
-    builder.register_element(nucleus::element("server", anchor::root()));
-    builder.register_element(nucleus::element("motd", anchor::keyspace("server")));
+    REQUIRE(builder.register_element(nucleus::element("server", anchor::root())));
+    REQUIRE(builder.register_element(nucleus::element("motd", anchor::keyspace("server"))));
     const nucleus::configuration_space space = builder.build();
 
     auto loaded = nucleus::load(space,
@@ -61,11 +61,11 @@ TEST_CASE("a CDATA leaf value resolves like plain text", "[xml][robustness]")
 TEST_CASE("a CDATA primary-key child element names its strain", "[xml][robustness]")
 {
     nucleus::configuration_space_builder builder;
-    builder.register_element(nucleus::element("cluster", anchor::root()));
-    builder.register_element(nucleus::element("server", anchor::keyspace("cluster")));
-    builder.register_element(
-        nucleus::primary_key_element("name", anchor::keyspace("cluster/server")));
-    builder.register_element(nucleus::element("port", anchor::keyspace("cluster/server")));
+    REQUIRE(builder.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(builder.register_element(nucleus::element("server", anchor::keyspace("cluster"))));
+    REQUIRE(builder.register_element(
+        nucleus::primary_key_element("name", anchor::keyspace("cluster/server"))));
+    REQUIRE(builder.register_element(nucleus::element("port", anchor::keyspace("cluster/server"))));
     const nucleus::configuration_space space = builder.build();
 
     nucleus::load_options options;

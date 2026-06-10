@@ -16,10 +16,12 @@
 int main()
 {
     nucleus::configuration_space_builder builder;
-    builder.register_element(nucleus::element("logging", nucleus::anchor::root()));
-    builder.register_element(
+    if(!builder.register_element(nucleus::element("logging", nucleus::anchor::root())))
+        return 1;
+    if(!builder.register_element(
         nucleus::enum_element("level", nucleus::anchor::keyspace("logging"),
-                              {"debug", "info", "warn", "error"}));
+                              {"debug", "info", "warn", "error"})))
+        return 1;
     nucleus::configuration_space space = builder.build();
 
     std::cout << "# ---- bash ----\n";

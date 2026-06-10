@@ -43,12 +43,12 @@ source_handle xml_of(const std::string &text)
 configuration_space make_space()
 {
     configuration_space_builder builder;
-    builder.register_element(element("server", anchor::root()));
-    builder.register_element(element("host", anchor::keyspace("server")));
-    builder.register_element(
+    REQUIRE(builder.register_element(element("server", anchor::root())));
+    REQUIRE(builder.register_element(element("host", anchor::keyspace("server"))));
+    REQUIRE(builder.register_element(
         enum_element("mode", anchor::keyspace("server"),
-                     std::vector<std::string>{"primary", "secondary"}));
-    builder.register_element(repeated_element("tag", anchor::keyspace("server")));
+                     std::vector<std::string>{"primary", "secondary"})));
+    REQUIRE(builder.register_element(repeated_element("tag", anchor::keyspace("server"))));
     return builder.build();
 }
 
@@ -162,8 +162,8 @@ TEST_CASE("round-trip via env emitter: scalar subset reloads its keys",
     // scalars. The schema uses flat (root-level) keys so that the capability-flat
     // env_source can satisfy the gate; nested schemas require nesting capability.
     configuration_space_builder builder;
-    builder.register_element(element("host", anchor::root()));
-    builder.register_element(element("port", anchor::root()));
+    REQUIRE(builder.register_element(element("host", anchor::root())));
+    REQUIRE(builder.register_element(element("port", anchor::root())));
     const configuration_space space = builder.build();
 
     env_source src;

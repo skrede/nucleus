@@ -36,13 +36,13 @@ nucleus::source_handle xml_of(const std::string &text)
 // `name` field; each server carries non-key `port` / `protocol` leaves.
 void declare_cluster(nucleus::configuration_space_builder &engine)
 {
-    engine.register_element(nucleus::element("cluster", anchor::root()));
-    engine.register_element(nucleus::element("server", anchor::keyspace("cluster")));
-    engine.register_element(
-        nucleus::primary_key_element("name", anchor::keyspace("cluster/server")));
-    engine.register_element(nucleus::element("port", anchor::keyspace("cluster/server")));
-    engine.register_element(
-        nucleus::element("protocol", anchor::keyspace("cluster/server")));
+    REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(engine.register_element(nucleus::element("server", anchor::keyspace("cluster"))));
+    REQUIRE(engine.register_element(
+        nucleus::primary_key_element("name", anchor::keyspace("cluster/server"))));
+    REQUIRE(engine.register_element(nucleus::element("port", anchor::keyspace("cluster/server"))));
+    REQUIRE(engine.register_element(
+        nucleus::element("protocol", anchor::keyspace("cluster/server"))));
 }
 
 // Loads `doc` as the sole document layer against `space`, with an optional strain

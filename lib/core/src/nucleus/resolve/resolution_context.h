@@ -100,7 +100,7 @@ public:
     // The caller assigns ascending ranks for cross-source precedence; the
     // stable_sort folds low rank first. Each handle is pulled exactly once per
     // load; the project->pull->inherit lifecycle contract holds unchanged.
-    [[nodiscard]] expected<std::monostate, resolve_fold_error>
+    [[nodiscard]] expected<void, resolve_fold_error>
     fold(std::span<layered_handle> layers)
     {
         std::vector<layered_handle *> ordered;
@@ -203,7 +203,7 @@ public:
             m_buffers.push_back(std::move(batch.buffer));
         }
 
-        return std::monostate{};
+        return {};
     }
 
     // Collapses keyed-container instances into the ONE unified hierarchy the
@@ -226,7 +226,7 @@ public:
     //
     // The scope policy applies whenever a strain resolves -- explicitly selected
     // or auto-resolved -- so the two paths cannot diverge for the same strain.
-    [[nodiscard]] expected<std::monostate, resolve_fold_error>
+    [[nodiscard]] expected<void, resolve_fold_error>
     slice(const std::optional<std::string> &selection = std::nullopt,
           strain_scope_policy policy = strain_scope_policy::space_open_container_closed)
     {
@@ -542,7 +542,7 @@ public:
             m_keyed_satisfied.push_back(container.str());
         }
 
-        return std::monostate{};
+        return {};
     }
 
     // Validates the folded keyspace against the borrowed schema -- the step that
@@ -552,15 +552,15 @@ public:
     // content gate (an empty schema is not a claim that nothing is allowed). An
     // undeclared key is reported with its nearest declared neighbor so a typo is
     // actionable; missing required fields are reported by the enforcer.
-    [[nodiscard]] expected<std::monostate, resolve_fold_error> validate()
+    [[nodiscard]] expected<void, resolve_fold_error> validate()
     {
         if(m_schema.surface().empty())
-            return std::monostate{};
+            return {};
 
         schema_validation checked = schema_enforcer::validate(m_schema, m_building,
                                                               m_keyed_satisfied);
         if(checked)
-            return std::monostate{};
+            return {};
 
         const std::vector<key_path> surface = m_schema.surface();
         std::vector<std::string> known;
@@ -592,7 +592,7 @@ public:
     // validate() enforces). A conversion failure fails the resolve with the path,
     // the converter's reason, and the winning layer label from provenance. Must
     // run after validate() and before freeze().
-    [[nodiscard]] expected<std::monostate, resolve_fold_error> convert()
+    [[nodiscard]] expected<void, resolve_fold_error> convert()
     {
         for(const schema_element &el : m_schema.elements())
         {
@@ -659,7 +659,7 @@ public:
                 m_typed.emplace(path_str, std::move(res).value());
             }
         }
-        return std::monostate{};
+        return {};
     }
 
     // Copies every building value OUT into an owned snapshot and pairs it with the

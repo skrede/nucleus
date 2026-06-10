@@ -30,14 +30,18 @@ int main()
     // Schema: a server container with a host leaf, a constrained mode leaf, and a
     // repeated tag leaf.
     nucleus::configuration_space_builder builder;
-    builder.register_element(nucleus::element("server", nucleus::anchor::root()));
-    builder.register_element(
-        nucleus::element("host", nucleus::anchor::keyspace("server")));
-    builder.register_element(
+    if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
+        return 1;
+    if(!builder.register_element(
+        nucleus::element("host", nucleus::anchor::keyspace("server"))))
+        return 1;
+    if(!builder.register_element(
         nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
-                              {"primary", "secondary"}));
-    builder.register_element(
-        nucleus::repeated_element("tag", nucleus::anchor::keyspace("server")));
+                              {"primary", "secondary"})))
+        return 1;
+    if(!builder.register_element(
+        nucleus::repeated_element("tag", nucleus::anchor::keyspace("server"))))
+        return 1;
     nucleus::configuration_space space = builder.build();
 
     // The scalar base, built in code.

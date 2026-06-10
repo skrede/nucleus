@@ -44,11 +44,11 @@ enum class shell;
 
 // The outcome of a registration: success, or a host-supplied rejection reason
 // surfaced verbatim from the registration-policy seam.
-using registration_result = expected<std::monostate, std::string>;
+using registration_result = expected<void, std::string>;
 
 [[nodiscard]] inline registration_result registration_ok()
 {
-    return registration_result(std::monostate{});
+    return registration_result();
 }
 
 // The outcome of a load: the immutable configuration, or a verbatim failure reason

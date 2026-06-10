@@ -33,7 +33,7 @@ struct schema_spec
 
 // The outcome of attaching a schema element: success, or a referential-integrity
 // rejection naming the undefined keyspace it tried to attach under.
-using schema_attach_result = expected<std::monostate, std::string>;
+using schema_attach_result = expected<void, std::string>;
 
 // One of the three flat sibling registries -- and the SINGLE upstream authority.
 // It stores schema elements anchored into the keyspace. Because the CLI surface
@@ -126,7 +126,7 @@ public:
 
         m_defined.insert(el.declared_path().str());
         m_elements.push_back(std::move(el));
-        return std::monostate{};
+        return {};
     }
 
     [[nodiscard]] const std::vector<schema_element> &elements() const noexcept

@@ -27,14 +27,14 @@ namespace {
 // "port" and "protocol", plus a general "app/name" element at the root.
 void declare_cluster_with_app(nucleus::configuration_space_builder &engine)
 {
-    engine.register_element(nucleus::element("cluster", anchor::root()));
-    engine.register_element(nucleus::element("server", anchor::keyspace("cluster")));
-    engine.register_element(
-        nucleus::primary_key_element("name", anchor::keyspace("cluster/server")));
-    engine.register_element(nucleus::element("port", anchor::keyspace("cluster/server")));
-    engine.register_element(nucleus::element("protocol", anchor::keyspace("cluster/server")));
-    engine.register_element(nucleus::element("app", anchor::root()));
-    engine.register_element(nucleus::element("name", anchor::keyspace("app")));
+    REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(engine.register_element(nucleus::element("server", anchor::keyspace("cluster"))));
+    REQUIRE(engine.register_element(
+        nucleus::primary_key_element("name", anchor::keyspace("cluster/server"))));
+    REQUIRE(engine.register_element(nucleus::element("port", anchor::keyspace("cluster/server"))));
+    REQUIRE(engine.register_element(nucleus::element("protocol", anchor::keyspace("cluster/server"))));
+    REQUIRE(engine.register_element(nucleus::element("app", anchor::root())));
+    REQUIRE(engine.register_element(nucleus::element("name", anchor::keyspace("app"))));
 }
 
 // Initializes the three sources for the standard three-layer scenario:

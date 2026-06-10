@@ -85,9 +85,9 @@ TEST_CASE("built-in int32_t converter", "[typed][builtin][integer]")
     SECTION("valid positive")
     {
         nucleus::configuration_space_builder engine;
-        engine.register_element(nucleus::element("cfg", anchor::root()));
-        engine.register_element(
-            nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
+        REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
+        REQUIRE(engine.register_element(
+            nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg"))));
 
         auto src = xml_of("<cfg><val>42</val></cfg>");
         auto loaded = resolve_one(engine, std::move(src));
@@ -100,9 +100,9 @@ TEST_CASE("built-in int32_t converter", "[typed][builtin][integer]")
     SECTION("valid negative")
     {
         nucleus::configuration_space_builder engine;
-        engine.register_element(nucleus::element("cfg", anchor::root()));
-        engine.register_element(
-            nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
+        REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
+        REQUIRE(engine.register_element(
+            nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg"))));
 
         auto src = xml_of("<cfg><val>-1</val></cfg>");
         auto loaded = resolve_one(engine, std::move(src));
@@ -447,10 +447,10 @@ TEST_CASE("custom point2 converter round-trips through typed_element", "[typed][
     SECTION("valid document resolves to point2{3,7}")
     {
         nucleus::configuration_space_builder engine;
-        engine.register_element(nucleus::element("cfg", anchor::root()));
-        engine.register_element(
+        REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
+        REQUIRE(engine.register_element(
             nucleus::typed_element<point2>("pos", anchor::keyspace("cfg"),
-                                           make_point2_converter()));
+                                           make_point2_converter())));
 
         auto src = xml_of("<cfg><pos>3,7</pos></cfg>");
         auto loaded = resolve_one(engine, std::move(src));
@@ -463,10 +463,10 @@ TEST_CASE("custom point2 converter round-trips through typed_element", "[typed][
     SECTION("missing comma causes resolve failure")
     {
         nucleus::configuration_space_builder engine;
-        engine.register_element(nucleus::element("cfg", anchor::root()));
-        engine.register_element(
+        REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
+        REQUIRE(engine.register_element(
             nucleus::typed_element<point2>("pos", anchor::keyspace("cfg"),
-                                           make_point2_converter()));
+                                           make_point2_converter())));
 
         auto src = xml_of("<cfg><pos>3</pos></cfg>");
         auto loaded = resolve_one(engine, std::move(src));
@@ -476,10 +476,10 @@ TEST_CASE("custom point2 converter round-trips through typed_element", "[typed][
     SECTION("bad x component causes resolve failure")
     {
         nucleus::configuration_space_builder engine;
-        engine.register_element(nucleus::element("cfg", anchor::root()));
-        engine.register_element(
+        REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
+        REQUIRE(engine.register_element(
             nucleus::typed_element<point2>("pos", anchor::keyspace("cfg"),
-                                           make_point2_converter()));
+                                           make_point2_converter())));
 
         auto src = xml_of("<cfg><pos>abc,7</pos></cfg>");
         auto loaded = resolve_one(engine, std::move(src));
@@ -500,9 +500,9 @@ TEST_CASE("conversion failure at resolve surfaces diagnostic", "[typed][failure]
             std::optional<nucleus::xml_source> src;
         };
         pair_t p;
-        p.engine.register_element(nucleus::element("cfg", anchor::root()));
-        p.engine.register_element(
-            nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
+        REQUIRE(p.engine.register_element(nucleus::element("cfg", anchor::root())));
+        REQUIRE(p.engine.register_element(
+            nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg"))));
         p.src = xml_of("<cfg><val>" + value + "</val></cfg>");
         return p;
     };
@@ -556,8 +556,8 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
     SECTION("absent path returns error containing 'absent'")
     {
         nucleus::configuration_space_builder engine;
-        engine.register_element(nucleus::element("cfg", anchor::root()));
-        engine.register_element(nucleus::element("name", anchor::keyspace("cfg")));
+        REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
+        REQUIRE(engine.register_element(nucleus::element("name", anchor::keyspace("cfg"))));
 
         auto src = xml_of("<cfg><name>hello</name></cfg>");
         auto loaded = resolve_one(engine, std::move(src));
@@ -572,9 +572,9 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
     SECTION("path with no converter returns error containing 'no type converter'")
     {
         nucleus::configuration_space_builder engine;
-        engine.register_element(nucleus::element("cfg", anchor::root()));
+        REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
         // Plain element -- no converter registered.
-        engine.register_element(nucleus::element("name", anchor::keyspace("cfg")));
+        REQUIRE(engine.register_element(nucleus::element("name", anchor::keyspace("cfg"))));
 
         auto src = xml_of("<cfg><name>hello</name></cfg>");
         auto loaded = resolve_one(engine, std::move(src));
@@ -589,9 +589,9 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
     SECTION("type mismatch returns error containing 'type mismatch'")
     {
         nucleus::configuration_space_builder engine;
-        engine.register_element(nucleus::element("cfg", anchor::root()));
-        engine.register_element(
-            nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
+        REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
+        REQUIRE(engine.register_element(
+            nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg"))));
 
         auto src = xml_of("<cfg><val>42</val></cfg>");
         auto loaded = resolve_one(engine, std::move(src));
@@ -607,10 +607,10 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
     SECTION("get_as on a repeated typed path returns 'use get_all_as' message")
     {
         nucleus::configuration_space_builder engine;
-        engine.register_element(nucleus::element("cfg", anchor::root()));
+        REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
         auto el = nucleus::typed_element<int32_t>("nums", anchor::keyspace("cfg"));
         el.repeated = true;
-        engine.register_element(el);
+        REQUIRE(engine.register_element(el));
 
         auto src = xml_of("<cfg><nums>1</nums><nums>2</nums></cfg>");
         auto loaded = resolve_one(engine, std::move(src));
@@ -632,9 +632,9 @@ TEST_CASE("get_all_as error distinctions", "[typed][accessor][errors]")
     SECTION("get_all_as on a scalar typed path returns 'use get_as' message")
     {
         nucleus::configuration_space_builder engine;
-        engine.register_element(nucleus::element("cfg", anchor::root()));
-        engine.register_element(
-            nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg")));
+        REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
+        REQUIRE(engine.register_element(
+            nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg"))));
 
         auto src = xml_of("<cfg><val>42</val></cfg>");
         auto loaded = resolve_one(engine, std::move(src));
@@ -656,12 +656,12 @@ TEST_CASE("repeated x typed: get_all_as", "[typed][repeated][typed]")
     SECTION("three valid elements returns ordered collection")
     {
         nucleus::configuration_space_builder engine;
-        engine.register_element(nucleus::element("cfg", anchor::root()));
+        REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
 
         // A repeated typed element: repeated flag + converter together.
         auto el = nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg"));
         el.repeated = true;
-        engine.register_element(el);
+        REQUIRE(engine.register_element(el));
 
         auto src = xml_of("<cfg><val>1</val><val>2</val><val>3</val></cfg>");
         auto loaded = resolve_one(engine, std::move(src));
@@ -675,11 +675,11 @@ TEST_CASE("repeated x typed: get_all_as", "[typed][repeated][typed]")
     SECTION("per-element failure names the zero-based index")
     {
         nucleus::configuration_space_builder engine;
-        engine.register_element(nucleus::element("cfg", anchor::root()));
+        REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
 
         auto el = nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg"));
         el.repeated = true;
-        engine.register_element(el);
+        REQUIRE(engine.register_element(el));
 
         // Second element (index 1) is bad.
         auto src = xml_of("<cfg><val>1</val><val>bad</val><val>3</val></cfg>");
@@ -699,7 +699,7 @@ TEST_CASE("typed is orthogonal to other schema axes at attach", "[typed][attach]
     SECTION("typed + repeated: attach succeeds")
     {
         nucleus::configuration_space_builder engine;
-        engine.register_element(nucleus::element("cfg", anchor::root()));
+        REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
 
         auto el = nucleus::typed_element<int32_t>("nums", anchor::keyspace("cfg"));
         el.repeated = true;
@@ -710,7 +710,7 @@ TEST_CASE("typed is orthogonal to other schema axes at attach", "[typed][attach]
     SECTION("typed + unique: attach succeeds")
     {
         nucleus::configuration_space_builder engine;
-        engine.register_element(nucleus::element("cfg", anchor::root()));
+        REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
 
         auto el = nucleus::typed_element<int32_t>("val", anchor::keyspace("cfg"));
         el.unique = true;
@@ -721,7 +721,7 @@ TEST_CASE("typed is orthogonal to other schema axes at attach", "[typed][attach]
     SECTION("typed + identity: attach succeeds")
     {
         nucleus::configuration_space_builder engine;
-        engine.register_element(nucleus::element("container", anchor::root()));
+        REQUIRE(engine.register_element(nucleus::element("container", anchor::root())));
 
         // A primary key with a converter is legal at attach -- the converter runs
         // at resolve time like any other typed path.
@@ -751,13 +751,13 @@ TEST_CASE("typed + identity: resolve interaction", "[typed][identity][resolve]")
         nucleus::configuration_space_builder engine;
 
         // Container with a typed primary key and a typed non-key field.
-        engine.register_element(nucleus::element("container", anchor::root()));
+        REQUIRE(engine.register_element(nucleus::element("container", anchor::root())));
         auto id_el = nucleus::typed_element<int32_t>("id",
                                                       anchor::keyspace("container"));
         id_el.identity = true;
-        engine.register_element(id_el);
-        engine.register_element(
-            nucleus::typed_element<int32_t>("score", anchor::keyspace("container")));
+        REQUIRE(engine.register_element(id_el));
+        REQUIRE(engine.register_element(
+            nucleus::typed_element<int32_t>("score", anchor::keyspace("container"))));
 
         // Document: one keyed instance with id=42 and score=100.
         auto src = xml_of(
@@ -791,13 +791,13 @@ TEST_CASE("typed + identity: resolve interaction", "[typed][identity][resolve]")
         // at container/id and silently skips it. Resolve still succeeds.
         nucleus::configuration_space_builder engine;
 
-        engine.register_element(nucleus::element("container", anchor::root()));
+        REQUIRE(engine.register_element(nucleus::element("container", anchor::root())));
         auto id_el = nucleus::typed_element<int32_t>("id",
                                                       anchor::keyspace("container"));
         id_el.identity = true;
-        engine.register_element(id_el);
-        engine.register_element(
-            nucleus::typed_element<int32_t>("score", anchor::keyspace("container")));
+        REQUIRE(engine.register_element(id_el));
+        REQUIRE(engine.register_element(
+            nucleus::typed_element<int32_t>("score", anchor::keyspace("container"))));
 
         // Document: one keyed instance.  The xml_source represents the key value
         // as the id child element, so the fold produces container/42/id=42 and

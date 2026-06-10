@@ -21,12 +21,15 @@
 int main()
 {
     nucleus::configuration_space_builder builder;
-    builder.register_element(nucleus::element("server", nucleus::anchor::root()));
-    builder.register_element(
-        nucleus::required_element("host", nucleus::anchor::keyspace("server")));
-    builder.register_element(
+    if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
+        return 1;
+    if(!builder.register_element(
+        nucleus::required_element("host", nucleus::anchor::keyspace("server"))))
+        return 1;
+    if(!builder.register_element(
         nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
-                              {"http", "https"}));
+                              {"http", "https"})))
+        return 1;
     nucleus::configuration_space space = builder.build();
 
     // Parse from an in-memory string so the example needs no file on disk. The

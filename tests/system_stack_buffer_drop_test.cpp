@@ -63,10 +63,10 @@ TEST_CASE("configuration outlives dropped source_stack, space, and XML arena on 
         // --- INNER SCOPE: build, load, then DROP everything ---
 
         configuration_space_builder builder;
-        builder.register_element(element("server", anchor::root()));
-        builder.register_element(element("host", anchor::keyspace("server")));
-        builder.register_element(element("mode", anchor::keyspace("server")));
-        builder.register_element(element("port", anchor::keyspace("server")));
+        REQUIRE(builder.register_element(element("server", anchor::root())));
+        REQUIRE(builder.register_element(element("host", anchor::keyspace("server"))));
+        REQUIRE(builder.register_element(element("mode", anchor::keyspace("server"))));
+        REQUIRE(builder.register_element(element("port", anchor::keyspace("server"))));
         configuration_space space = builder.build();
 
         // XML document source (views into the pugixml arena) + env overlay.

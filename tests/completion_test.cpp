@@ -26,11 +26,11 @@ key_path path_of(const char *text) { return key_path::parse(text).value(); }
 schema_registry fixture()
 {
     schema_registry reg;
-    reg.attach(nucleus::element("logging", anchor::root()));
-    reg.attach(nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
-                                     {"debug", "info", "warn", "error"}));
-    reg.attach(nucleus::element("plexus", anchor::root()));
-    reg.attach(nucleus::element("port", anchor::keyspace(path_of("plexus"))));
+    REQUIRE(reg.attach(nucleus::element("logging", anchor::root())));
+    REQUIRE(reg.attach(nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
+                                     {"debug", "info", "warn", "error"})));
+    REQUIRE(reg.attach(nucleus::element("plexus", anchor::root())));
+    REQUIRE(reg.attach(nucleus::element("port", anchor::keyspace(path_of("plexus")))));
     return reg;
 }
 
@@ -111,7 +111,7 @@ TEST_CASE("adding a flag changes the generated completion", "[completion][drift]
     schema_registry reg = fixture();
     const std::string before = generate_completion(shell::bash, reg, "myapp");
 
-    reg.attach(nucleus::element("verbose", anchor::root()));
+    REQUIRE(reg.attach(nucleus::element("verbose", anchor::root())));
     const std::string after = generate_completion(shell::bash, reg, "myapp");
 
     REQUIRE(after != before);
@@ -122,16 +122,16 @@ TEST_CASE("adding a flag changes the generated completion", "[completion][drift]
 TEST_CASE("adding an enum value changes the generated completion", "[completion][drift]")
 {
     schema_registry base;
-    base.attach(nucleus::element("logging", anchor::root()));
-    base.attach(nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
-                                      {"debug", "info"}));
+    REQUIRE(base.attach(nucleus::element("logging", anchor::root())));
+    REQUIRE(base.attach(nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
+                                      {"debug", "info"})));
     const std::string before = generate_completion(shell::bash, base, "myapp");
     const std::string before_zsh = generate_completion(shell::zsh, base, "myapp");
 
     schema_registry grown;
-    grown.attach(nucleus::element("logging", anchor::root()));
-    grown.attach(nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
-                                       {"debug", "info", "trace"}));
+    REQUIRE(grown.attach(nucleus::element("logging", anchor::root())));
+    REQUIRE(grown.attach(nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
+                                       {"debug", "info", "trace"})));
     const std::string after = generate_completion(shell::bash, grown, "myapp");
     const std::string after_zsh = generate_completion(shell::zsh, grown, "myapp");
 
@@ -146,9 +146,9 @@ TEST_CASE("a value containing a quote cannot break out of the bash literal",
           "[completion]")
 {
     schema_registry reg;
-    reg.attach(nucleus::element("mode", anchor::root()));
-    reg.attach(nucleus::enum_element("kind", anchor::keyspace(path_of("mode")),
-                                     {"a'b"}));
+    REQUIRE(reg.attach(nucleus::element("mode", anchor::root())));
+    REQUIRE(reg.attach(nucleus::enum_element("kind", anchor::keyspace(path_of("mode")),
+                                     {"a'b"})));
     const std::string bash = generate_completion(shell::bash, reg, "myapp");
     // The single quote is escaped via the close/escape/reopen idiom.
     REQUIRE(bash.find("'a'\\''b'") != std::string::npos);

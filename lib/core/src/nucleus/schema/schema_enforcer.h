@@ -32,7 +32,7 @@ struct schema_violation
     std::string reason;
 };
 
-using schema_validation = expected<std::monostate, std::vector<schema_violation>>;
+using schema_validation = expected<void, std::vector<schema_violation>>;
 
 // Validates a resolved keyspace against the registered schema -- the step that
 // makes the schema authoritative over CONTENT, not just shape. Three independent
@@ -163,7 +163,7 @@ public:
 
         if(!violations.empty())
             return unexpected(std::move(violations));
-        return std::monostate{};
+        return {};
     }
 };
 

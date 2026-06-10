@@ -149,7 +149,7 @@ private:
     // is_parent is false for the top-level requested source and true for every
     // recursive call that follows an inherit= declaration; the admissibility
     // callback is invoked only when is_parent is true.
-    [[nodiscard]] expected<std::monostate, std::string>
+    [[nodiscard]] expected<void, std::string>
     expand_one(const std::string &path,
                const factory_fn &make,
                const schema_projection &projection,
@@ -229,7 +229,7 @@ private:
         out.push_back(chain_entry{path, std::move(handle)});
 
         // depth_guard and path_guard released here by RAII.
-        return std::monostate{};
+        return {};
     }
 
     std::size_t m_depth = 0;

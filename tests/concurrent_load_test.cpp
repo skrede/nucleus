@@ -28,9 +28,9 @@ TEST_CASE("N threads load one shared const space lock-free with identical result
           "[concurrent][load]")
 {
     nucleus::configuration_space_builder builder;
-    builder.register_element(nucleus::element("server", anchor::root()));
-    builder.register_element(nucleus::element("host", anchor::keyspace("server")));
-    builder.register_element(nucleus::element("port", anchor::keyspace("server")));
+    REQUIRE(builder.register_element(nucleus::element("server", anchor::root())));
+    REQUIRE(builder.register_element(nucleus::element("host", anchor::keyspace("server"))));
+    REQUIRE(builder.register_element(nucleus::element("port", anchor::keyspace("server"))));
     const nucleus::configuration_space space = builder.build();
 
     constexpr std::size_t thread_count = 8;

@@ -33,13 +33,13 @@ namespace {
 [[nodiscard]] nucleus::configuration_space make_server_space()
 {
     nucleus::configuration_space_builder builder;
-    builder.register_element(nucleus::element("server", nucleus::anchor::root()));
-    builder.register_element(
-        nucleus::primary_key_element("name", nucleus::anchor::keyspace("server")));
-    builder.register_element(nucleus::element("host", nucleus::anchor::keyspace("server")));
-    builder.register_element(nucleus::enum_element(
+    REQUIRE(builder.register_element(nucleus::element("server", nucleus::anchor::root())));
+    REQUIRE(builder.register_element(
+        nucleus::primary_key_element("name", nucleus::anchor::keyspace("server"))));
+    REQUIRE(builder.register_element(nucleus::element("host", nucleus::anchor::keyspace("server"))));
+    REQUIRE(builder.register_element(nucleus::enum_element(
         "mode", nucleus::anchor::keyspace("server"),
-        std::vector<std::string>{"primary", "secondary"}));
+        std::vector<std::string>{"primary", "secondary"})));
     return builder.build();
 }
 

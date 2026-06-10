@@ -19,12 +19,16 @@ int main()
 {
     // Schema: a server container with host, port, and mode.
     nucleus::configuration_space_builder builder;
-    builder.register_element(nucleus::element("server", nucleus::anchor::root()));
-    builder.register_element(nucleus::element("host", nucleus::anchor::keyspace("server")));
-    builder.register_element(nucleus::element("port", nucleus::anchor::keyspace("server")));
-    builder.register_element(
+    if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
+        return 1;
+    if(!builder.register_element(nucleus::element("host", nucleus::anchor::keyspace("server"))))
+        return 1;
+    if(!builder.register_element(nucleus::element("port", nucleus::anchor::keyspace("server"))))
+        return 1;
+    if(!builder.register_element(
         nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
-                              std::vector<std::string>{"primary", "secondary"}));
+                              std::vector<std::string>{"primary", "secondary"})))
+        return 1;
     const nucleus::configuration_space space = builder.build();
 
     // Layer 0 (lowest precedence): programmatic defaults.

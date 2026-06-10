@@ -36,8 +36,8 @@ bool violation_mentions(const std::vector<nucleus::schema_violation> &vs,
 TEST_CASE("a resolved keyspace satisfying the schema validates", "[enforcer]")
 {
     schema_registry reg;
-    reg.attach(nucleus::element("plexus", anchor::root()));
-    reg.attach(nucleus::required_element("port", anchor::keyspace(path_of("plexus"))));
+    REQUIRE(reg.attach(nucleus::element("plexus", anchor::root())));
+    REQUIRE(reg.attach(nucleus::required_element("port", anchor::keyspace(path_of("plexus")))));
 
     keyspace ks;
     ks.set(path_of("plexus/port"), nucleus::value::owned("8080"));
@@ -48,8 +48,8 @@ TEST_CASE("a resolved keyspace satisfying the schema validates", "[enforcer]")
 TEST_CASE("a missing required field is a violation", "[enforcer]")
 {
     schema_registry reg;
-    reg.attach(nucleus::element("plexus", anchor::root()));
-    reg.attach(nucleus::required_element("port", anchor::keyspace(path_of("plexus"))));
+    REQUIRE(reg.attach(nucleus::element("plexus", anchor::root())));
+    REQUIRE(reg.attach(nucleus::required_element("port", anchor::keyspace(path_of("plexus")))));
 
     keyspace ks; // port absent
 
@@ -61,9 +61,9 @@ TEST_CASE("a missing required field is a violation", "[enforcer]")
 TEST_CASE("identity alone imposes no presence obligation", "[enforcer]")
 {
     schema_registry reg;
-    reg.attach(nucleus::element("node", anchor::root()));
-    reg.attach(nucleus::identity_element("name", anchor::keyspace(path_of("node"))));
-    reg.attach(nucleus::element("role", anchor::keyspace(path_of("node"))));
+    REQUIRE(reg.attach(nucleus::element("node", anchor::root())));
+    REQUIRE(reg.attach(nucleus::identity_element("name", anchor::keyspace(path_of("node")))));
+    REQUIRE(reg.attach(nucleus::element("role", anchor::keyspace(path_of("node")))));
 
     // An empty keyspace validates: a space with no strain at all is legal.
     keyspace ks;
@@ -78,12 +78,12 @@ TEST_CASE("identity alone imposes no presence obligation", "[enforcer]")
 TEST_CASE("a required identity demands a named strain", "[enforcer]")
 {
     schema_registry reg;
-    reg.attach(nucleus::element("node", anchor::root()));
+    REQUIRE(reg.attach(nucleus::element("node", anchor::root())));
     nucleus::schema_element id =
         nucleus::identity_element("name", anchor::keyspace(path_of("node")));
     id.required = true;
-    reg.attach(std::move(id));
-    reg.attach(nucleus::element("role", anchor::keyspace(path_of("node"))));
+    REQUIRE(reg.attach(std::move(id)));
+    REQUIRE(reg.attach(nucleus::element("role", anchor::keyspace(path_of("node")))));
 
     // Anonymous-only content violates: the host required a NAMED strain. The
     // failure speaks the required-field vocabulary -- identity adds no separate
@@ -102,9 +102,9 @@ TEST_CASE("a required identity demands a named strain", "[enforcer]")
 TEST_CASE("a value within a declared allowed set passes", "[enforcer]")
 {
     schema_registry reg;
-    reg.attach(nucleus::element("logging", anchor::root()));
-    reg.attach(nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
-                                     {"debug", "info", "warn", "error"}));
+    REQUIRE(reg.attach(nucleus::element("logging", anchor::root())));
+    REQUIRE(reg.attach(nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
+                                     {"debug", "info", "warn", "error"})));
 
     keyspace ks;
     ks.set(path_of("logging/level"), nucleus::value::owned("warn"));
@@ -115,9 +115,9 @@ TEST_CASE("a value within a declared allowed set passes", "[enforcer]")
 TEST_CASE("a value outside the declared allowed set is rejected", "[enforcer]")
 {
     schema_registry reg;
-    reg.attach(nucleus::element("logging", anchor::root()));
-    reg.attach(nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
-                                     {"debug", "info", "warn", "error"}));
+    REQUIRE(reg.attach(nucleus::element("logging", anchor::root())));
+    REQUIRE(reg.attach(nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
+                                     {"debug", "info", "warn", "error"})));
 
     keyspace ks;
     ks.set(path_of("logging/level"), nucleus::value::owned("warm"));
@@ -132,8 +132,8 @@ TEST_CASE("a value outside the declared allowed set is rejected", "[enforcer]")
 TEST_CASE("a value at an undeclared path is rejected", "[enforcer]")
 {
     schema_registry reg;
-    reg.attach(nucleus::element("plexus", anchor::root()));
-    reg.attach(nucleus::element("port", anchor::keyspace(path_of("plexus"))));
+    REQUIRE(reg.attach(nucleus::element("plexus", anchor::root())));
+    REQUIRE(reg.attach(nucleus::element("port", anchor::keyspace(path_of("plexus")))));
 
     keyspace ks;
     ks.set(path_of("plexus/port"), nucleus::value::owned("8080"));
@@ -147,11 +147,11 @@ TEST_CASE("a value at an undeclared path is rejected", "[enforcer]")
 TEST_CASE("a repeated element rejects a collection value outside the allowed set", "[enforcer]")
 {
     schema_registry reg;
-    reg.attach(nucleus::element("logging", anchor::root()));
+    REQUIRE(reg.attach(nucleus::element("logging", anchor::root())));
     auto level = nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
                                        {"debug", "info", "warn", "error"});
     level.repeated = true;
-    reg.attach(std::move(level));
+    REQUIRE(reg.attach(std::move(level)));
 
     keyspace ks;
     ks.append(path_of("logging/level"), nucleus::value::owned("info"));
@@ -167,11 +167,11 @@ TEST_CASE("a repeated element rejects a collection value outside the allowed set
 TEST_CASE("a repeated element accepts a collection of admissible values", "[enforcer]")
 {
     schema_registry reg;
-    reg.attach(nucleus::element("logging", anchor::root()));
+    REQUIRE(reg.attach(nucleus::element("logging", anchor::root())));
     auto level = nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
                                        {"debug", "info", "warn", "error"});
     level.repeated = true;
-    reg.attach(std::move(level));
+    REQUIRE(reg.attach(std::move(level)));
 
     keyspace ks;
     ks.append(path_of("logging/level"), nucleus::value::owned("info"));

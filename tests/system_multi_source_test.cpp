@@ -52,12 +52,12 @@ source_handle xml_of(const std::string &text)
 configuration_space make_space()
 {
     configuration_space_builder builder;
-    builder.register_element(element("server", anchor::root()));
-    builder.register_element(element("host", anchor::keyspace("server")));
-    builder.register_element(
+    REQUIRE(builder.register_element(element("server", anchor::root())));
+    REQUIRE(builder.register_element(element("host", anchor::keyspace("server"))));
+    REQUIRE(builder.register_element(
         enum_element("mode", anchor::keyspace("server"),
-                     std::vector<std::string>{"primary", "secondary"}));
-    builder.register_element(element("port", anchor::keyspace("server")));
+                     std::vector<std::string>{"primary", "secondary"})));
+    REQUIRE(builder.register_element(element("port", anchor::keyspace("server"))));
     return builder.build();
 }
 
@@ -155,9 +155,9 @@ TEST_CASE("multi-source system: env base shows through when document does not ov
     // Simpler shape: env sets a key; the XML document does NOT set it; env value
     // survives because the document provides no competing entry.
     configuration_space_builder builder;
-    builder.register_element(element("server", anchor::root()));
-    builder.register_element(element("host", anchor::keyspace("server")));
-    builder.register_element(element("mode", anchor::keyspace("server")));
+    REQUIRE(builder.register_element(element("server", anchor::root())));
+    REQUIRE(builder.register_element(element("host", anchor::keyspace("server"))));
+    REQUIRE(builder.register_element(element("mode", anchor::keyspace("server"))));
     const configuration_space space = builder.build();
 
     env_source env;
@@ -195,7 +195,7 @@ TEST_CASE("multi-source system: argv overrides env for a contested key",
     // The schema uses a flat (root-level) key so that both env_source and argv_source
     // can satisfy the capability gate (neither declares nesting capability).
     configuration_space_builder builder;
-    builder.register_element(element("port", anchor::root()));
+    REQUIRE(builder.register_element(element("port", anchor::root())));
     const configuration_space space = builder.build();
 
     env_source env;

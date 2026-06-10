@@ -35,8 +35,8 @@ TEST_CASE("expand() yields an independent builder; the base is unchanged", "[exp
 {
     // Base: one path-tagged schema registration + one converter (both countable).
     nucleus::configuration_space_builder base_builder;
-    base_builder.register_schema("port");
-    base_builder.register_converter<int>(nucleus::make_scalar_converter<int>());
+    REQUIRE(base_builder.register_schema("port"));
+    REQUIRE(base_builder.register_converter<int>(nucleus::make_scalar_converter<int>()));
     nucleus::configuration_space base = base_builder.build();
 
     const std::size_t base_schema = base.schema_count();
@@ -44,9 +44,9 @@ TEST_CASE("expand() yields an independent builder; the base is unchanged", "[exp
 
     // Derive a builder, add an ADDITIONAL schema + converter, and build it.
     nucleus::configuration_space_builder derived_builder = base.expand();
-    derived_builder.register_schema("host");
-    derived_builder.register_converter<std::int64_t>(
-        nucleus::make_scalar_converter<std::int64_t>());
+    REQUIRE(derived_builder.register_schema("host"));
+    REQUIRE(derived_builder.register_converter<std::int64_t>(
+        nucleus::make_scalar_converter<std::int64_t>()));
     nucleus::configuration_space derived = derived_builder.build();
 
     // The derived space carries the base's registrations PLUS the new ones.
@@ -61,8 +61,8 @@ TEST_CASE("expand() yields an independent builder; the base is unchanged", "[exp
 TEST_CASE("deriving does not perturb a later load on the base", "[expand][independence]")
 {
     nucleus::configuration_space_builder base_builder;
-    base_builder.register_element(nucleus::registered_element<int>("port", anchor::root()));
-    base_builder.register_converter<int>(nucleus::make_scalar_converter<int>());
+    REQUIRE(base_builder.register_element(nucleus::registered_element<int>("port", anchor::root())));
+    REQUIRE(base_builder.register_converter<int>(nucleus::make_scalar_converter<int>()));
     nucleus::configuration_space base = base_builder.build();
 
     // A load on the base BEFORE deriving.
@@ -73,7 +73,7 @@ TEST_CASE("deriving does not perturb a later load on the base", "[expand][indepe
 
     // Derive and build a divergent space.
     nucleus::configuration_space_builder derived_builder = base.expand();
-    derived_builder.register_element(nucleus::registered_element<int>("host", anchor::root()));
+    REQUIRE(derived_builder.register_element(nucleus::registered_element<int>("host", anchor::root())));
     nucleus::configuration_space derived = derived_builder.build();
     (void)derived;
 
@@ -93,7 +93,7 @@ TEST_CASE("deriving does not perturb a later load on the base", "[expand][indepe
 TEST_CASE("a copy of a sealed space is independent of the original", "[expand][independence]")
 {
     nucleus::configuration_space_builder builder;
-    builder.register_schema("port");
+    REQUIRE(builder.register_schema("port"));
     nucleus::configuration_space original = builder.build();
 
     // Copy-construct: a deep copy of the value-copyable registries (no shared_ptr
@@ -104,7 +104,7 @@ TEST_CASE("a copy of a sealed space is independent of the original", "[expand][i
 
     // Expanding the copy and adding to it leaves the original untouched.
     nucleus::configuration_space_builder copy_builder = copy.expand();
-    copy_builder.register_schema("extra");
+    REQUIRE(copy_builder.register_schema("extra"));
     nucleus::configuration_space grown = copy_builder.build();
     REQUIRE(grown.schema_count() == original.schema_count() + 1);
     REQUIRE(original.schema_count() == 1);

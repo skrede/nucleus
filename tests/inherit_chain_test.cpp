@@ -34,21 +34,21 @@ nucleus::source_handle xml_of(const std::string &text)
 // cluster/server keyed by "name"; leaves: port, protocol.
 void declare_cluster(nucleus::configuration_space_builder &engine)
 {
-    engine.register_element(nucleus::element("cluster", anchor::root()));
-    engine.register_element(nucleus::element("server", anchor::keyspace("cluster")));
-    engine.register_element(
-        nucleus::primary_key_element("name", anchor::keyspace("cluster/server")));
-    engine.register_element(nucleus::element("port", anchor::keyspace("cluster/server")));
-    engine.register_element(
-        nucleus::element("protocol", anchor::keyspace("cluster/server")));
+    REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(engine.register_element(nucleus::element("server", anchor::keyspace("cluster"))));
+    REQUIRE(engine.register_element(
+        nucleus::primary_key_element("name", anchor::keyspace("cluster/server"))));
+    REQUIRE(engine.register_element(nucleus::element("port", anchor::keyspace("cluster/server"))));
+    REQUIRE(engine.register_element(
+        nucleus::element("protocol", anchor::keyspace("cluster/server"))));
 }
 
 // Same as declare_cluster plus a unique (non-identity) "serial" field.
 void declare_cluster_with_unique(nucleus::configuration_space_builder &engine)
 {
     declare_cluster(engine);
-    engine.register_element(
-        nucleus::unique_element("serial", anchor::keyspace("cluster/server")));
+    REQUIRE(engine.register_element(
+        nucleus::unique_element("serial", anchor::keyspace("cluster/server"))));
 }
 
 // Returns the filename portion of a (possibly absolute) path string so factory
@@ -151,11 +151,11 @@ TEST_CASE("anonymous instances compose across chain in document order", "[chain]
 
     nucleus::configuration_space_builder engine;
     // Schema without identity: anonymous content composes by rank.
-    engine.register_element(nucleus::element("cluster", anchor::root()));
-    engine.register_element(nucleus::element("server", anchor::keyspace("cluster")));
-    engine.register_element(nucleus::element("port", anchor::keyspace("cluster/server")));
-    engine.register_element(
-        nucleus::element("protocol", anchor::keyspace("cluster/server")));
+    REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(engine.register_element(nucleus::element("server", anchor::keyspace("cluster"))));
+    REQUIRE(engine.register_element(nucleus::element("port", anchor::keyspace("cluster/server"))));
+    REQUIRE(engine.register_element(
+        nucleus::element("protocol", anchor::keyspace("cluster/server"))));
     nucleus::configuration_space space = engine.build();
 
     auto factory = [&](const std::string &path) -> nucleus::source_handle {
@@ -775,11 +775,11 @@ namespace {
 
 void declare_anon_cluster(nucleus::configuration_space_builder &engine)
 {
-    engine.register_element(nucleus::element("cluster", anchor::root()));
-    engine.register_element(nucleus::element("server", anchor::keyspace("cluster")));
-    engine.register_element(nucleus::element("port", anchor::keyspace("cluster/server")));
-    engine.register_element(
-        nucleus::element("protocol", anchor::keyspace("cluster/server")));
+    REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(engine.register_element(nucleus::element("server", anchor::keyspace("cluster"))));
+    REQUIRE(engine.register_element(nucleus::element("port", anchor::keyspace("cluster/server"))));
+    REQUIRE(engine.register_element(
+        nucleus::element("protocol", anchor::keyspace("cluster/server"))));
 }
 
 }

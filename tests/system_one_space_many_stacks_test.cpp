@@ -33,12 +33,12 @@ source_handle xml_of(const std::string &text)
 configuration_space make_server_space()
 {
     configuration_space_builder builder;
-    builder.register_element(element("server", anchor::root()));
-    builder.register_element(element("host", anchor::keyspace("server")));
-    builder.register_element(
+    REQUIRE(builder.register_element(element("server", anchor::root())));
+    REQUIRE(builder.register_element(element("host", anchor::keyspace("server"))));
+    REQUIRE(builder.register_element(
         enum_element("mode", anchor::keyspace("server"),
-                     std::vector<std::string>{"primary", "secondary"}));
-    builder.register_element(element("port", anchor::keyspace("server")));
+                     std::vector<std::string>{"primary", "secondary"})));
+    REQUIRE(builder.register_element(element("port", anchor::keyspace("server"))));
     return builder.build();
 }
 

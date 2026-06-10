@@ -76,7 +76,7 @@ TEST_CASE("the registration-policy seam can intercept a registration", "[facade]
     policy->reject_tokenizers = true;
 
     nucleus::configuration_space_builder engine;
-    engine.set_registration_policy(policy);
+    REQUIRE(engine.set_registration_policy(policy));
 
     REQUIRE(engine.register_schema("a"));
     auto rejected = engine.register_tokenizer("custom");
@@ -178,11 +178,11 @@ TEST_CASE("clearing the policy restores accept-all behavior", "[facade]")
     policy->reject_tokenizers = true;
 
     nucleus::configuration_space_builder engine;
-    engine.set_registration_policy(policy);
+    REQUIRE(engine.set_registration_policy(policy));
     const std::size_t builtin_count = engine.tokenizer_count();
     REQUIRE_FALSE(engine.register_tokenizer("custom"));
 
-    engine.set_registration_policy(nullptr);
+    REQUIRE(engine.set_registration_policy(nullptr));
     REQUIRE(engine.register_tokenizer("custom"));
     REQUIRE(engine.tokenizer_count() == builtin_count + 1);
 }

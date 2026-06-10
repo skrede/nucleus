@@ -31,10 +31,10 @@ key_path path_of(const char *text) { return key_path::parse(text).value(); }
 schema_registry build_schema()
 {
     schema_registry reg;
-    reg.attach(nucleus::element("plexus", anchor::root()));
-    reg.attach(nucleus::element("udp", anchor::keyspace(path_of("plexus"))));
-    reg.attach(nucleus::required_element(
-        "auth_mode", anchor::keyspace(path_of("plexus/udp"))));
+    REQUIRE(reg.attach(nucleus::element("plexus", anchor::root())));
+    REQUIRE(reg.attach(nucleus::element("udp", anchor::keyspace(path_of("plexus")))));
+    REQUIRE(reg.attach(nucleus::required_element(
+        "auth_mode", anchor::keyspace(path_of("plexus/udp")))));
     return reg;
 }
 

@@ -54,11 +54,14 @@ make_vec3_converter()
 int main()
 {
     nucleus::configuration_space_builder builder;
-    builder.register_element(nucleus::element("body", nucleus::anchor::root()));
-    builder.register_element(
-        nucleus::typed_element<vec3>("pos", nucleus::anchor::keyspace("body"), make_vec3_converter()));
-    builder.register_element(
-        nucleus::typed_element<int32_t>("mass", nucleus::anchor::keyspace("body")));
+    if(!builder.register_element(nucleus::element("body", nucleus::anchor::root())))
+        return 1;
+    if(!builder.register_element(
+        nucleus::typed_element<vec3>("pos", nucleus::anchor::keyspace("body"), make_vec3_converter())))
+        return 1;
+    if(!builder.register_element(
+        nucleus::typed_element<int32_t>("mass", nucleus::anchor::keyspace("body"))))
+        return 1;
     nucleus::configuration_space space = builder.build();
 
     // In-memory document -- no file on disk required.

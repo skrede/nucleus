@@ -38,20 +38,20 @@ nucleus::xml_source xml_of(const std::string &text)
 // Registers a flat schema: a <config> root container with a repeated <tag> leaf.
 void declare_tags_schema(nucleus::configuration_space_builder &engine)
 {
-    engine.register_element(nucleus::element("config", anchor::root()));
-    engine.register_element(
-        nucleus::repeated_element("tag", anchor::keyspace("config")));
+    REQUIRE(engine.register_element(nucleus::element("config", anchor::root())));
+    REQUIRE(engine.register_element(
+        nucleus::repeated_element("tag", anchor::keyspace("config"))));
 }
 
 // Registers: cluster/server keyed by name, plus a repeated leaf "tags".
 void declare_cluster_tags(nucleus::configuration_space_builder &engine)
 {
-    engine.register_element(nucleus::element("cluster", anchor::root()));
-    engine.register_element(nucleus::element("server", anchor::keyspace("cluster")));
-    engine.register_element(
-        nucleus::primary_key_element("name", anchor::keyspace("cluster/server")));
-    engine.register_element(
-        nucleus::repeated_element("tags", anchor::keyspace("cluster/server")));
+    REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(engine.register_element(nucleus::element("server", anchor::keyspace("cluster"))));
+    REQUIRE(engine.register_element(
+        nucleus::primary_key_element("name", anchor::keyspace("cluster/server"))));
+    REQUIRE(engine.register_element(
+        nucleus::repeated_element("tags", anchor::keyspace("cluster/server"))));
 }
 
 // A minimal source that emits two entries for the same repeated path with
@@ -135,8 +135,8 @@ TEST_CASE("get() on repeated path returns last value", "[repeated][accessor]")
 TEST_CASE("get_all() on single-value path returns one-element vector", "[repeated][accessor]")
 {
     nucleus::configuration_space_builder engine;
-    engine.register_element(nucleus::element("config", anchor::root()));
-    engine.register_element(nucleus::element("key", anchor::keyspace("config")));
+    REQUIRE(engine.register_element(nucleus::element("config", anchor::root())));
+    REQUIRE(engine.register_element(nucleus::element("key", anchor::keyspace("config"))));
     nucleus::configuration_space space = engine.build();
 
     auto src = xml_of("<config><key>v</key></config>");
@@ -152,8 +152,8 @@ TEST_CASE("get_all() on single-value path returns one-element vector", "[repeate
 TEST_CASE("get_all() on absent path returns empty vector", "[repeated][accessor]")
 {
     nucleus::configuration_space_builder engine;
-    engine.register_element(nucleus::element("config", anchor::root()));
-    engine.register_element(nucleus::element("key", anchor::keyspace("config")));
+    REQUIRE(engine.register_element(nucleus::element("config", anchor::root())));
+    REQUIRE(engine.register_element(nucleus::element("key", anchor::keyspace("config"))));
     nucleus::configuration_space space = engine.build();
 
     auto src = xml_of("<config><key>v</key></config>");
@@ -169,9 +169,9 @@ TEST_CASE("get_all() on absent path returns empty vector", "[repeated][accessor]
 TEST_CASE("keys() returns repeated path exactly once", "[repeated][accessor]")
 {
     nucleus::configuration_space_builder engine;
-    engine.register_element(nucleus::element("config", anchor::root()));
-    engine.register_element(nucleus::element("other", anchor::keyspace("config")));
-    engine.register_element(nucleus::repeated_element("tag", anchor::keyspace("config")));
+    REQUIRE(engine.register_element(nucleus::element("config", anchor::root())));
+    REQUIRE(engine.register_element(nucleus::element("other", anchor::keyspace("config"))));
+    REQUIRE(engine.register_element(nucleus::repeated_element("tag", anchor::keyspace("config"))));
     nucleus::configuration_space space = engine.build();
 
     auto src = xml_of("<config><other>x</other><tag>a</tag><tag>b</tag></config>");
@@ -193,11 +193,11 @@ TEST_CASE("keys() returns repeated path exactly once", "[repeated][accessor]")
 TEST_CASE("repeated path with required flag satisfies required check", "[repeated][required]")
 {
     nucleus::configuration_space_builder engine;
-    engine.register_element(nucleus::element("config", anchor::root()));
+    REQUIRE(engine.register_element(nucleus::element("config", anchor::root())));
 
     auto el = nucleus::repeated_element("tag", anchor::keyspace("config"));
     el.required = true;
-    engine.register_element(el);
+    REQUIRE(engine.register_element(el));
     nucleus::configuration_space space = engine.build();
 
     auto src = xml_of("<config><tag>present</tag></config>");
@@ -237,8 +237,8 @@ TEST_CASE("token expansion per value -- each value expanded independently",
           "[repeated][tokens]")
 {
     nucleus::configuration_space_builder engine;
-    engine.register_element(nucleus::element("config", anchor::root()));
-    engine.register_element(nucleus::repeated_element("val", anchor::keyspace("config")));
+    REQUIRE(engine.register_element(nucleus::element("config", anchor::root())));
+    REQUIRE(engine.register_element(nucleus::repeated_element("val", anchor::keyspace("config"))));
     nucleus::configuration_space space = engine.build();
 
     // ${string.upper(x)} is the built-in string tokenizer's upper function.
@@ -275,7 +275,7 @@ TEST_CASE("attach-time rejection of repeated + identity", "[repeated][attach][re
 TEST_CASE("attach-time rejection of repeated + unique", "[repeated][attach][reject]")
 {
     nucleus::configuration_space_builder engine;
-    engine.register_element(nucleus::element("container", anchor::root()));
+    REQUIRE(engine.register_element(nucleus::element("container", anchor::root())));
 
     // unique_element sets unique=true; adding repeated=true is illegal.
     auto el = nucleus::unique_element("val", anchor::keyspace("container"));
@@ -293,7 +293,7 @@ TEST_CASE("capability degradation -- non-duplicate_keys source into repeated fie
     // capability the schema needs is duplicate_keys, so a source lacking it fails
     // naming that capability specifically (not nesting).
     nucleus::configuration_space_builder engine;
-    engine.register_element(nucleus::repeated_element("tag", anchor::root()));
+    REQUIRE(engine.register_element(nucleus::repeated_element("tag", anchor::root())));
     nucleus::configuration_space space = engine.build();
 
     dual_entry_source fake("tag");
@@ -310,8 +310,8 @@ TEST_CASE("ASan: freeze copies values out before buffer drop", "[repeated][lifet
     // destroyed before we read from the returned configuration.
     nucleus::configuration cfg = [&]() {
         nucleus::configuration_space_builder engine;
-        engine.register_element(nucleus::element("config", anchor::root()));
-        engine.register_element(nucleus::repeated_element("tag", anchor::keyspace("config")));
+        REQUIRE(engine.register_element(nucleus::element("config", anchor::root())));
+        REQUIRE(engine.register_element(nucleus::repeated_element("tag", anchor::keyspace("config"))));
         nucleus::configuration_space space = engine.build();
 
         auto src = xml_of("<config><tag>x</tag><tag>y</tag></config>");

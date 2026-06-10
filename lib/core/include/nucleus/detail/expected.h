@@ -70,7 +70,7 @@ template <typename E>
 struct is_unexpected<unexpected<E>> : std::true_type {};
 
 template <typename T, typename E>
-class expected;
+class [[nodiscard]] expected;
 
 template <typename T>
 struct is_expected : std::false_type {};
@@ -79,8 +79,11 @@ struct is_expected<expected<T, E>> : std::true_type {};
 
 // Variant-backed value-or-error mirroring std::expected under the C++20 contract:
 // holds exactly one of a value (T) or an error (E). Index 0 is the value.
+// [[nodiscard]] on the type (std::expected itself is not marked): every result
+// channel in the library is fallible-by-value, so silently dropping one is
+// always a bug -- the builder's "loud state-machine error" contract depends on it.
 template <typename T, typename E>
-class expected
+class [[nodiscard]] expected
 {
 public:
     using value_type = T;
@@ -333,7 +336,7 @@ private:
 
 // expected<void, E>: no value storage; a chain may terminate in a void-returning callable.
 template <typename E>
-class expected<void, E>
+class [[nodiscard]] expected<void, E>
 {
 public:
     using value_type = void;

@@ -101,7 +101,7 @@ std::string_view keyed_value(const pugi::xml_node &node, const std::string &key_
 // the stack depth. 64 levels is far beyond any sane configuration document.
 constexpr std::size_t max_element_depth = 64;
 
-expected<std::monostate, configuration_source_error>
+expected<void, configuration_source_error>
 walk(const pugi::xml_node &node, std::string_view path,
      const capability_descriptor &caps, const schema_projection &proj,
      configuration_source_batch &batch, std::string_view skip,
@@ -216,7 +216,7 @@ walk(const pugi::xml_node &node, std::string_view path,
             return r;
     }
 
-    return std::monostate{};
+    return {};
 }
 
 }

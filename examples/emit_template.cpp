@@ -23,14 +23,18 @@ int main()
 
     // A `server` container primary-keyed by `name`, a unique-named `profile`, and a
     // constrained `mode` leaf.
-    builder.register_element(nucleus::element("server", nucleus::anchor::root()));
-    builder.register_element(
-        nucleus::primary_key_element("name", nucleus::anchor::keyspace("server")));
-    builder.register_element(
-        nucleus::unique_element("profile", nucleus::anchor::keyspace("server")));
-    builder.register_element(nucleus::enum_element(
+    if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
+        return 1;
+    if(!builder.register_element(
+        nucleus::primary_key_element("name", nucleus::anchor::keyspace("server"))))
+        return 1;
+    if(!builder.register_element(
+        nucleus::unique_element("profile", nucleus::anchor::keyspace("server"))))
+        return 1;
+    if(!builder.register_element(nucleus::enum_element(
         "mode", nucleus::anchor::keyspace("server"),
-        std::vector<std::string>{"primary", "secondary"}));
+        std::vector<std::string>{"primary", "secondary"})))
+        return 1;
 
     nucleus::configuration_space space = builder.build();
     nucleus::xml::emit_template(space, std::cout);

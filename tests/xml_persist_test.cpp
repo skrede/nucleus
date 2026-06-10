@@ -34,9 +34,9 @@ nucleus::source_handle xml_of(const std::string &text)
 
 void declare_server(nucleus::configuration_space_builder &engine)
 {
-    engine.register_element(nucleus::element("server", anchor::root()));
-    engine.register_element(nucleus::element("host", anchor::keyspace("server")));
-    engine.register_element(nucleus::repeated_element("tag", anchor::keyspace("server")));
+    REQUIRE(engine.register_element(nucleus::element("server", anchor::root())));
+    REQUIRE(engine.register_element(nucleus::element("host", anchor::keyspace("server"))));
+    REQUIRE(engine.register_element(nucleus::repeated_element("tag", anchor::keyspace("server"))));
 }
 
 nucleus::load_options document_options(const std::string &xml)

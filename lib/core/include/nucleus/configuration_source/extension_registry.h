@@ -29,7 +29,7 @@ using parser_factory = std::function<source_handle(const std::string &path)>;
 // The error a registration can produce.
 using extension_error = std::string;
 
-using extension_result = expected<std::monostate, extension_error>;
+using extension_result = expected<void, extension_error>;
 
 // Maps each file extension to exactly one parser.
 //
@@ -76,7 +76,7 @@ public:
 
         for(std::string &key : normalized)
             m_parsers.emplace(std::move(key), entry{factory, owner});
-        return extension_result(std::monostate{});
+        return extension_result();
     }
 
     [[nodiscard]] bool claims(std::string_view extension) const

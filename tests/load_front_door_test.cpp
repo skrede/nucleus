@@ -55,13 +55,13 @@ struct flat_only_source
 // plus a general "app/label" element so scope policies can be distinguished.
 void declare_cluster(nucleus::configuration_space_builder &engine)
 {
-    engine.register_element(nucleus::element("cluster", anchor::root()));
-    engine.register_element(nucleus::element("node", anchor::keyspace("cluster")));
-    engine.register_element(
-        nucleus::primary_key_element("name", anchor::keyspace("cluster/node")));
-    engine.register_element(nucleus::element("port", anchor::keyspace("cluster/node")));
-    engine.register_element(nucleus::element("app", anchor::root()));
-    engine.register_element(nucleus::element("label", anchor::keyspace("app")));
+    REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(engine.register_element(nucleus::element("node", anchor::keyspace("cluster"))));
+    REQUIRE(engine.register_element(
+        nucleus::primary_key_element("name", anchor::keyspace("cluster/node"))));
+    REQUIRE(engine.register_element(nucleus::element("port", anchor::keyspace("cluster/node"))));
+    REQUIRE(engine.register_element(nucleus::element("app", anchor::root())));
+    REQUIRE(engine.register_element(nucleus::element("label", anchor::keyspace("app"))));
 }
 
 }
@@ -265,8 +265,8 @@ TEST_CASE("the stack is borrowed: pre-flight then load then load again, one stac
           "[load][stack]")
 {
     nucleus::configuration_space_builder builder;
-    builder.register_element(nucleus::element("server", anchor::root()));
-    builder.register_element(nucleus::element("host", anchor::keyspace("server")));
+    REQUIRE(builder.register_element(nucleus::element("server", anchor::root())));
+    REQUIRE(builder.register_element(nucleus::element("host", anchor::keyspace("server"))));
     const nucleus::configuration_space space = builder.build();
 
     nucleus::runtime_source src;

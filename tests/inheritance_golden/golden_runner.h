@@ -11,6 +11,8 @@
 
 #include "nucleus/xml/xml_source.h"
 
+#include <catch2/catch_test_macros.hpp>
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -34,23 +36,23 @@ namespace nucleus::golden {
 inline void declare_schema(nucleus::configuration_space_builder &builder)
 {
     using nucleus::anchor;
-    builder.register_element(nucleus::element("cluster", anchor::root()));
-    builder.register_element(nucleus::element("server", anchor::keyspace("cluster")));
-    builder.register_element(
-        nucleus::primary_key_element("name", anchor::keyspace("cluster/server")));
-    builder.register_element(nucleus::element("logger", anchor::keyspace("cluster/server")));
-    builder.register_element(
-        nucleus::element("log_level", anchor::keyspace("cluster/server/logger")));
-    builder.register_element(
-        nucleus::element("profile", anchor::keyspace("cluster/server")));
-    builder.register_element(
-        nucleus::unique_element("name", anchor::keyspace("cluster/server/profile")));
-    builder.register_element(
-        nucleus::element("message", anchor::keyspace("cluster/server/profile")));
-    builder.register_element(
-        nucleus::element("greeting", anchor::keyspace("cluster/server/profile/message")));
-    builder.register_element(
-        nucleus::element("description", anchor::keyspace("cluster/server/profile/message")));
+    REQUIRE(builder.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(builder.register_element(nucleus::element("server", anchor::keyspace("cluster"))));
+    REQUIRE(builder.register_element(
+        nucleus::primary_key_element("name", anchor::keyspace("cluster/server"))));
+    REQUIRE(builder.register_element(nucleus::element("logger", anchor::keyspace("cluster/server"))));
+    REQUIRE(builder.register_element(
+        nucleus::element("log_level", anchor::keyspace("cluster/server/logger"))));
+    REQUIRE(builder.register_element(
+        nucleus::element("profile", anchor::keyspace("cluster/server"))));
+    REQUIRE(builder.register_element(
+        nucleus::unique_element("name", anchor::keyspace("cluster/server/profile"))));
+    REQUIRE(builder.register_element(
+        nucleus::element("message", anchor::keyspace("cluster/server/profile"))));
+    REQUIRE(builder.register_element(
+        nucleus::element("greeting", anchor::keyspace("cluster/server/profile/message"))));
+    REQUIRE(builder.register_element(
+        nucleus::element("description", anchor::keyspace("cluster/server/profile/message"))));
 }
 
 // The filename portion of a (possibly absolute) path, so the factory can dispatch

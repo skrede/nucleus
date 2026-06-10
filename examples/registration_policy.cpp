@@ -30,7 +30,8 @@ public:
 int main()
 {
     nucleus::configuration_space_builder builder;
-    builder.set_registration_policy(std::make_shared<reserve_tokenizers>());
+    if(!builder.set_registration_policy(std::make_shared<reserve_tokenizers>()))
+        return 1;
 
     auto schema = builder.register_schema("logging/level");
     std::cout << "schema registration accepted: " << std::boolalpha

@@ -13,8 +13,10 @@ int main()
 {
     // Schema: two declared key paths the argv source may supply.
     nucleus::configuration_space_builder builder;
-    builder.register_schema("server/host");
-    builder.register_schema("server/port");
+    if(!builder.register_schema("server/host"))
+        return 1;
+    if(!builder.register_schema("server/port"))
+        return 1;
     const nucleus::configuration_space space = builder.build();
 
     // Derive the recognizer from the sealed space. It answers true only for paths

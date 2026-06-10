@@ -42,7 +42,7 @@ TEST_CASE("registering on an already-built builder is a loud state-machine error
           "[builder][lifecycle]")
 {
     nucleus::configuration_space_builder builder;
-    builder.register_element(nucleus::element("server", anchor::root()));
+    REQUIRE(builder.register_element(nucleus::element("server", anchor::root())));
     nucleus::configuration_space space = builder.build();
     (void)space;
 

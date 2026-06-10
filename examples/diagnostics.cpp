@@ -23,8 +23,10 @@ int main()
 
     // Two owners claim the same path -> one conflict report, no winner chosen.
     nucleus::configuration_space_builder builder;
-    builder.register_schema("server/port", nucleus::owner_token(std::string("plugin.a")));
-    builder.register_schema("server/port", nucleus::owner_token(std::string("plugin.b")));
+    if(!builder.register_schema("server/port", nucleus::owner_token(std::string("plugin.a"))))
+        return 1;
+    if(!builder.register_schema("server/port", nucleus::owner_token(std::string("plugin.b"))))
+        return 1;
 
     for(const nucleus::conflict_report &report : builder.conflicts())
         std::cout << report.describe() << '\n';
