@@ -155,7 +155,7 @@ jobs:
             -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install \
             -DNUCLEUS_BUILD_TESTS=OFF \
             -DNUCLEUS_BUILD_EXAMPLES=OFF \
-            -DNUCLEUS_BUILD_SOURCE_XML=OFF
+            -DNUCLEUS_BUILD_SOURCE_XML=ON
           cmake --build build
           cmake --install build
 
@@ -163,7 +163,8 @@ jobs:
         run: |
           cmake tests/integration -B build-consumer \
             -DCMAKE_PREFIX_PATH=${{ github.workspace }}/install \
-            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_BUILD_TYPE=Release \
+            -DNUCLEUS_INTEGRATION_WITH_XML=ON
           cmake --build build-consumer
 
       - name: Run consumer test

@@ -9,6 +9,7 @@
 function(nucleus_add_example name)
     add_executable(${name} ${name}.cpp)
     target_link_libraries(${name} PRIVATE nucleus::nucleus ${ARGN})
+    nucleus_warnings(${name})
 endfunction()
 
 # Getting started.
@@ -36,7 +37,7 @@ nucleus_add_example(registration_policy)
 nucleus_add_example(capability_gating nucleus::env)
 
 # The XML example layers an XML document under the command line, so it links the
-# xml module (nucleus::xml). Its public adapter headers under nucleus/sources/
+# xml module (nucleus::xml). Its public adapter headers under nucleus/xml/
 # arrive via that link; pugixml stays private inside lib/xml. Built only when the
 # XML module is.
 if(NUCLEUS_BUILD_SOURCE_XML)
@@ -44,33 +45,23 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # example links it and its header arrives via the nucleus::xml link.
     add_executable(emit_template emit_template.cpp)
     target_link_libraries(emit_template PRIVATE nucleus::nucleus nucleus::xml)
-    target_include_directories(emit_template PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
+    nucleus_warnings(emit_template)
 
     add_executable(xml xml.cpp)
     target_link_libraries(xml PRIVATE nucleus::nucleus nucleus::xml nucleus::argv)
-    target_include_directories(xml PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
+    nucleus_warnings(xml)
 
     add_executable(strains strains.cpp)
     target_link_libraries(strains PRIVATE nucleus::nucleus nucleus::xml)
-    target_include_directories(strains PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
+    nucleus_warnings(strains)
 
     add_executable(typed typed.cpp)
     target_link_libraries(typed PRIVATE nucleus::nucleus nucleus::xml)
-    target_include_directories(typed PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
+    nucleus_warnings(typed)
 
     add_executable(xml_persist xml_persist.cpp)
     target_link_libraries(xml_persist PRIVATE nucleus::nucleus nucleus::xml)
-    target_include_directories(xml_persist PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
+    nucleus_warnings(xml_persist)
 
     # round_trip renders one resolved configuration through xml/env/args, so it links
     # the xml, env, and args modules (all three emitters); the runtime module supplies
@@ -78,7 +69,4 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_executable(round_trip round_trip.cpp)
     target_link_libraries(round_trip
         PRIVATE nucleus::nucleus nucleus::xml nucleus::runtime nucleus::env nucleus::argv)
-    target_include_directories(round_trip PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
 endif()

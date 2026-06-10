@@ -11,17 +11,27 @@
 
 #include "nucleus/runtime/runtime_source.h"
 
+#ifdef NUCLEUS_INTEGRATION_WITH_XML
+#include "nucleus/xml/xml_source.h"
+#endif
+
 #include <cstdint>
 #include <iostream>
 
 int main()
 {
     nucleus::configuration_space_builder engine;
-    engine.register_element(nucleus::element("server", nucleus::anchor::root()));
-    engine.register_element(
-        nucleus::typed_element<std::int32_t>("port", nucleus::anchor::keyspace("server")));
-    engine.register_element(
-        nucleus::element("name", nucleus::anchor::keyspace("server")));
+    const bool registered =
+        engine.register_element(nucleus::element("server", nucleus::anchor::root()))
+        && engine.register_element(
+            nucleus::typed_element<std::int32_t>("port", nucleus::anchor::keyspace("server")))
+        && engine.register_element(
+            nucleus::element("name", nucleus::anchor::keyspace("server")));
+    if(!registered)
+    {
+        std::cerr << "schema registration rejected\n";
+        return 1;
+    }
     nucleus::configuration_space space = engine.build();
 
     nucleus::runtime_source values;
@@ -49,6 +59,31 @@ int main()
         std::cerr << "typed accessor mismatch\n";
         return 1;
     }
+
+#ifdef NUCLEUS_INTEGRATION_WITH_XML
+    // The xml module rides the same install: parse a document through the
+    // exported nucleus::xml target and read a value back.
+    auto doc = nucleus::xml_source::from(
+        nucleus::xml_source_options::of_string("<server><zone>edge-1</zone></server>"));
+    nucleus::configuration_space_builder xml_engine;
+    if(!(xml_engine.register_element(nucleus::element("server", nucleus::anchor::root()))
+         && xml_engine.register_element(
+             nucleus::element("zone", nucleus::anchor::keyspace("server")))))
+    {
+        std::cerr << "xml schema registration rejected\n";
+        return 1;
+    }
+    nucleus::configuration_space xml_space = xml_engine.build();
+    auto xml_loaded = nucleus::load(xml_space,
+        nucleus::source_stack{std::move(doc)},
+        {});
+    if(!xml_loaded || xml_loaded.value().get("server/zone") != "edge-1")
+    {
+        std::cerr << "installed xml module failed to resolve\n";
+        return 1;
+    }
+    std::cout << "installed nucleus::xml consumed: server/zone=edge-1\n";
+#endif
 
     std::cout << "installed nucleus consumed: server/name=edge, server/port=8080 (typed)\n";
     return 0;

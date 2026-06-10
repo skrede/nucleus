@@ -23,14 +23,9 @@ include(cmake/buildflags.cmake)
 # link itself is wired onto nucleus_core inside lib/CMakeLists.txt.
 # ---------------------------------------------------------------------------
 include(CheckCXXSourceCompiles)
-# Drive the probe with the compiler's own standard selection rather than a
-# hardcoded GNU flag: -std=c++20 is wrong on MSVC (which wants /std:c++20) and
-# would make the probe falsely fail there, dragging in {fmt} despite MSVC having
-# std::format. CMAKE_CXX_STANDARD makes try_compile pick the right per-compiler
-# flag on every toolchain.
-set(CMAKE_REQUIRED_FLAGS "${CMAKE_CXX_FLAGS}")
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# The probe inherits CMAKE_CXX_STANDARD 20 from buildflags.cmake above, so
+# try_compile picks the right per-compiler standard flag (-std=c++20 vs
+# /std:c++20) on every toolchain.
 check_cxx_source_compiles(
     "#include <version>
      #ifndef __cpp_lib_format
@@ -39,7 +34,6 @@ check_cxx_source_compiles(
      int main() {}"
     NUCLEUS_HAVE_STD_FORMAT
 )
-unset(CMAKE_REQUIRED_FLAGS)
 
 # Whether {fmt} is part of the link interface. When the fallback is active, fmt
 # appears PUBLICly (the fallback lives in a public header), so the installed
@@ -52,7 +46,8 @@ if(NOT NUCLEUS_HAVE_STD_FORMAT)
     FetchContent_Declare(
         fmt
         GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-        GIT_TAG 11.0.2
+        # 11.0.2, pinned to the commit so a moved tag cannot change the build
+        GIT_TAG 0c9fce2ffefecfdce794e1859584e25877b7b592
         FIND_PACKAGE_ARGS NAMES fmt
     )
     FetchContent_MakeAvailable(fmt)

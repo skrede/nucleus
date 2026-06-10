@@ -4,13 +4,22 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "" FORCE)
+    message(STATUS "nucleus: CMAKE_BUILD_TYPE not set -- defaulting to Debug "
+                   "(pass -DCMAKE_BUILD_TYPE=Release for an optimized build)")
 endif()
 
-if(MSVC)
-    add_compile_options(/W4 /permissive-)
-else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
+# Warnings are applied PER TARGET, never directory-globally: a directory-scope
+# add_compile_options at the root would leak /W4 / -Wpedantic (and on MSVC
+# /permissive-) into the FetchContent builds of fmt, pugixml, and Catch2, whose
+# code is not ours to lint. Call nucleus_warnings(<target>) on every first-party
+# compiled target.
+function(nucleus_warnings target)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /W4 /permissive-)
+    else()
+        target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+endfunction()
 
 # NUCLEUS_SANITIZER selects the instrumentation flavor for sanitizer builds:
 # "address" pairs ASan with UBSan (they compose; TSan composes with neither),

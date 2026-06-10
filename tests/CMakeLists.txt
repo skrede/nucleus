@@ -6,7 +6,8 @@ if(NUCLEUS_FETCH_TEST_DEPS)
     FetchContent_Declare(
         Catch2
         GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-        GIT_TAG v3.15.0
+        # v3.15.0, pinned to the commit so a moved tag cannot change the build
+        GIT_TAG 6ee0826dcae55ed1e06b2c5701981221e979e1e6
     )
     FetchContent_MakeAvailable(Catch2)
 else()
@@ -21,6 +22,7 @@ function(nucleus_add_test name)
     add_executable(${name} ${name}.cpp)
     target_link_libraries(${name} PRIVATE nucleus::nucleus ${ARGN} Catch2::Catch2WithMain)
     nucleus_enable_coverage(${name})
+    nucleus_warnings(${name})
     target_include_directories(${name} PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
@@ -88,6 +90,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # so this test links the module; its header arrives via the nucleus::xml link.
     add_executable(xml_template_test xml_template_test.cpp)
     nucleus_enable_coverage(xml_template_test)
+    nucleus_warnings(xml_template_test)
     target_link_libraries(xml_template_test
         PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
     target_include_directories(xml_template_test PRIVATE
@@ -99,6 +102,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # so it links all three modules; headers arrive via the respective links.
     add_executable(emit_seam_test emit_seam_test.cpp)
     nucleus_enable_coverage(emit_seam_test)
+    nucleus_warnings(emit_seam_test)
     target_link_libraries(emit_seam_test
         PRIVATE nucleus::nucleus nucleus::xml nucleus::env nucleus::argv Catch2::Catch2WithMain)
     target_include_directories(emit_seam_test PRIVATE
@@ -108,6 +112,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
 
     add_executable(buffer_lifetime_test buffer_lifetime_test.cpp)
     nucleus_enable_coverage(buffer_lifetime_test)
+    nucleus_warnings(buffer_lifetime_test)
     target_link_libraries(buffer_lifetime_test
         PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
     target_include_directories(buffer_lifetime_test PRIVATE
@@ -117,6 +122,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
 
     add_executable(xml_robustness_test xml_robustness_test.cpp)
     nucleus_enable_coverage(xml_robustness_test)
+    nucleus_warnings(xml_robustness_test)
     target_link_libraries(xml_robustness_test
         PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
     add_test(NAME xml_robustness_test COMMAND xml_robustness_test)
@@ -126,6 +132,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # every value back. The single most valuable test in the project under ASan.
     add_executable(resolve_buffer_drop_test resolve_buffer_drop_test.cpp)
     nucleus_enable_coverage(resolve_buffer_drop_test)
+    nucleus_warnings(resolve_buffer_drop_test)
     target_link_libraries(resolve_buffer_drop_test
         PRIVATE nucleus::nucleus nucleus::xml nucleus::env Catch2::Catch2WithMain)
     target_include_directories(resolve_buffer_drop_test PRIVATE
@@ -138,6 +145,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # of collapsing them last-wins. Links the XML module for a real document walk.
     add_executable(keyed_projection_test keyed_projection_test.cpp)
     nucleus_enable_coverage(keyed_projection_test)
+    nucleus_warnings(keyed_projection_test)
     target_link_libraries(keyed_projection_test
         PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
     target_include_directories(keyed_projection_test PRIVATE
@@ -147,6 +155,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
 
     add_executable(keyed_selection_test keyed_selection_test.cpp)
     nucleus_enable_coverage(keyed_selection_test)
+    nucleus_warnings(keyed_selection_test)
     target_link_libraries(keyed_selection_test
         PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
     target_include_directories(keyed_selection_test PRIVATE
@@ -156,6 +165,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
 
     add_executable(inherit_chain_test inherit_chain_test.cpp)
     nucleus_enable_coverage(inherit_chain_test)
+    nucleus_warnings(inherit_chain_test)
     target_link_libraries(inherit_chain_test
         PRIVATE nucleus::nucleus nucleus::xml nucleus::env Catch2::Catch2WithMain)
     target_include_directories(inherit_chain_test PRIVATE
@@ -168,6 +178,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # values, and repeated collections must survive intact.
     add_executable(xml_persist_test xml_persist_test.cpp)
     nucleus_enable_coverage(xml_persist_test)
+    nucleus_warnings(xml_persist_test)
     target_link_libraries(xml_persist_test
         PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
     target_include_directories(xml_persist_test PRIVATE
@@ -177,6 +188,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
 
     add_executable(integration_shape_test integration_shape_test.cpp)
     nucleus_enable_coverage(integration_shape_test)
+    nucleus_warnings(integration_shape_test)
     target_link_libraries(integration_shape_test
         PRIVATE nucleus::nucleus nucleus::xml nucleus::env Catch2::Catch2WithMain)
     target_include_directories(integration_shape_test PRIVATE
@@ -188,6 +200,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # relay through keyed containers, capability gating, scope-policy exclusion.
     add_executable(repeated_element_test repeated_element_test.cpp)
     nucleus_enable_coverage(repeated_element_test)
+    nucleus_warnings(repeated_element_test)
     target_link_libraries(repeated_element_test
         PRIVATE nucleus::nucleus nucleus::xml nucleus::runtime nucleus::env Catch2::Catch2WithMain)
     target_include_directories(repeated_element_test PRIVATE
@@ -200,6 +213,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # orthogonality checks. Links the XML module for document-driven resolution.
     add_executable(typed_element_test typed_element_test.cpp)
     nucleus_enable_coverage(typed_element_test)
+    nucleus_warnings(typed_element_test)
     target_link_libraries(typed_element_test
         PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
     target_include_directories(typed_element_test PRIVATE
@@ -213,6 +227,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # composition-model integration rather than unit behavior.
     add_executable(typed_shape_test typed_shape_test.cpp)
     nucleus_enable_coverage(typed_shape_test)
+    nucleus_warnings(typed_shape_test)
     target_link_libraries(typed_shape_test
         PRIVATE nucleus::nucleus nucleus::xml nucleus::env Catch2::Catch2WithMain)
     target_include_directories(typed_shape_test PRIVATE
@@ -228,6 +243,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # XML-module block), making it the merge-blocking resolution gate.
     add_executable(inheritance_golden_test inheritance_golden/inheritance_golden_test.cpp)
     nucleus_enable_coverage(inheritance_golden_test)
+    nucleus_warnings(inheritance_golden_test)
     target_link_libraries(inheritance_golden_test
         PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
     target_include_directories(inheritance_golden_test PRIVATE
@@ -246,6 +262,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # provenance (winning layer), cross-source last-listed-wins, and inheritance resolution.
     add_executable(system_multi_source_test system_multi_source_test.cpp)
     nucleus_enable_coverage(system_multi_source_test)
+    nucleus_warnings(system_multi_source_test)
     target_link_libraries(system_multi_source_test
         PRIVATE nucleus::nucleus nucleus::env nucleus::argv nucleus::xml nucleus::runtime
                 Catch2::Catch2WithMain)
@@ -258,6 +275,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # after the entire source_stack, space, and arena are destroyed. Passes under ASan.
     add_executable(system_stack_buffer_drop_test system_stack_buffer_drop_test.cpp)
     nucleus_enable_coverage(system_stack_buffer_drop_test)
+    nucleus_warnings(system_stack_buffer_drop_test)
     target_link_libraries(system_stack_buffer_drop_test
         PRIVATE nucleus::nucleus nucleus::xml nucleus::env
                 Catch2::Catch2WithMain)
@@ -270,6 +288,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # and yields two independent, simultaneously-valid configurations.
     add_executable(system_one_space_many_stacks_test system_one_space_many_stacks_test.cpp)
     nucleus_enable_coverage(system_one_space_many_stacks_test)
+    nucleus_warnings(system_one_space_many_stacks_test)
     target_link_libraries(system_one_space_many_stacks_test
         PRIVATE nucleus::nucleus nucleus::xml nucleus::env nucleus::runtime
                 Catch2::Catch2WithMain)
@@ -282,6 +301,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # asserts C2 == C1 by value (key set, scalars, repeated-field multiplicity).
     add_executable(system_round_trip_test system_round_trip_test.cpp)
     nucleus_enable_coverage(system_round_trip_test)
+    nucleus_warnings(system_round_trip_test)
     target_link_libraries(system_round_trip_test
         PRIVATE nucleus::nucleus nucleus::xml nucleus::runtime nucleus::env
                 Catch2::Catch2WithMain)

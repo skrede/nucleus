@@ -29,7 +29,12 @@ function(nucleus_add_module name)
     else()
         add_library(${target} ${ARG_SOURCES})
         nucleus_enable_coverage(${target})
+        nucleus_warnings(${target})
         target_compile_features(${target} PUBLIC cxx_std_20)
+        # Static archives end up inside consumers' shared libraries (a natural
+        # embedding for a configuration engine); without PIC that link fails to
+        # relocate on Linux.
+        set_target_properties(${target} PROPERTIES POSITION_INDEPENDENT_CODE ON)
         target_include_directories(${target}
             PUBLIC
                 $<BUILD_INTERFACE:${include_root}>
@@ -122,7 +127,8 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     FetchContent_Declare(
         pugixml
         GIT_REPOSITORY https://github.com/zeux/pugixml.git
-        GIT_TAG v1.15
+        # v1.15, pinned to the commit so a moved tag cannot change the build
+        GIT_TAG ee86beb30e4973f5feffe3ce63bfa4fbadf72f38
         FIND_PACKAGE_ARGS NAMES pugixml
     )
     FetchContent_MakeAvailable(pugixml)
