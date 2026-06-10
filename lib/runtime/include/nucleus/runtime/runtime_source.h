@@ -16,12 +16,12 @@ namespace nucleus {
 
 // A first-class programmatic in-memory source: a host builds a configuration directly
 // via .set(path, value) with no document at all (embedding code, generated config,
-// tests). It emits flat (path -> value) entries exactly like env_source, but honestly
-// DECLARES full structural capabilities (nesting, duplicate_keys, typed_scalars) at
-// the source level, because a host-built source genuinely CAN carry nested, repeated,
-// and typed data. The per-entry values carry no capability flags, so the fold result
-// is identical to env's; only the gate-visible source descriptor differs, which lets
-// the auto-gate admit a nested/repeated schema fed programmatically.
+// tests). It emits flat (path -> value) entries, and DECLARES full structural
+// capabilities (nesting, duplicate_keys, typed_scalars), because a host-built source
+// genuinely CAN carry nested, repeated, and typed data. The same descriptor travels
+// on every entry, so the gate's admit decision and the fold's per-entry checks
+// (duplicate_keys in particular) can never disagree: two .set() calls on a repeated
+// path compose instead of failing as a flat-source violation.
 //
 // Plain struct satisfying the source concept by duck typing.
 class runtime_source final
@@ -52,8 +52,7 @@ public:
         configuration_source_batch batch;
         batch.entries.reserve(m_entries.size());
         for(const auto &[path, text] : m_entries)
-            batch.entries.push_back(
-                make_entry(path, value::owned(text), capability_descriptor{}));
+            batch.entries.push_back(make_entry(path, value::owned(text), capabilities()));
         return batch;
     }
 

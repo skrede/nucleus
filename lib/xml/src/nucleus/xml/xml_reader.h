@@ -26,16 +26,16 @@ class document_arena
 public:
     // Loads XML from an in-memory buffer. The buffer is copied into pugixml's
     // pool during parse, so the caller's bytes need not outlive this object.
-    [[nodiscard]] bool load_string(std::string_view text)
+    // Returns the full parse result so the caller can distinguish an unreadable
+    // file from a malformed document and surface pugixml's description.
+    [[nodiscard]] pugi::xml_parse_result load_string(std::string_view text)
     {
-        auto result = m_document.load_buffer(text.data(), text.size());
-        return result.status == pugi::status_ok;
+        return m_document.load_buffer(text.data(), text.size());
     }
 
-    [[nodiscard]] bool load_file(const std::string &path)
+    [[nodiscard]] pugi::xml_parse_result load_file(const std::string &path)
     {
-        auto result = m_document.load_file(path.c_str());
-        return result.status == pugi::status_ok;
+        return m_document.load_file(path.c_str());
     }
 
     [[nodiscard]] pugi::xml_node root() const { return m_document.document_element(); }

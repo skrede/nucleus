@@ -36,15 +36,23 @@ std::string join(std::string_view parent, std::string_view segment)
     return out;
 }
 
+// True when a node carries element text: plain character data or a CDATA
+// section (the standard escape for values containing markup characters).
+// pugixml's child_value() reads both.
+bool is_value_node(const pugi::xml_node &node)
+{
+    return node.type() == pugi::node_pcdata || node.type() == pugi::node_cdata;
+}
+
 // True when an element is a pure-text leaf: no attributes, no child elements,
-// exactly one pcdata child. Such an element models a `<key>value</key>` leaf, the
+// exactly one text child. Such an element models a `<key>value</key>` leaf, the
 // element-form analog of an attribute.
 bool is_text_leaf(const pugi::xml_node &node)
 {
     return node.attributes().empty()
         && node.first_child()
         && node.first_child() == node.last_child()
-        && node.first_child().type() == pugi::node_pcdata;
+        && is_value_node(node.first_child());
 }
 
 // The value of an element's primary-key field: the attribute named `key_field`,
@@ -58,7 +66,7 @@ std::string_view keyed_value(const pugi::xml_node &node, const std::string &key_
     pugi::xml_node child = node.child(key_field.c_str());
     if(child && child.first_child()
             && child.first_child() == child.last_child()
-            && child.first_child().type() == pugi::node_pcdata)
+            && is_value_node(child.first_child()))
         return std::string_view(child.child_value());
 
     return {};
@@ -88,13 +96,23 @@ std::string_view keyed_value(const pugi::xml_node &node, const std::string &key_
 // recursive calls.
 //
 // batch is shared so the keyed-instance branch can push extend dispositions.
+// Hostile or runaway nesting must produce a loud error, not a stack overflow:
+// the walk recurses once per element level, so an unbounded document controls
+// the stack depth. 64 levels is far beyond any sane configuration document.
+constexpr std::size_t max_element_depth = 64;
+
 expected<std::monostate, configuration_source_error>
 walk(const pugi::xml_node &node, std::string_view path,
      const capability_descriptor &caps, const schema_projection &proj,
      configuration_source_batch &batch, std::string_view skip,
      std::map<std::string, std::set<std::string>> &seen_keys,
-     bool is_root)
+     bool is_root, std::size_t depth)
 {
+    if(depth > max_element_depth)
+        return unexpected(configuration_source_error{nucleus::format(
+            "element nesting exceeds the depth cap ({}) at '{}'",
+            max_element_depth, path)});
+
     for(const pugi::xml_attribute &attr : node.attributes())
     {
         std::string_view attr_name = std::string_view(attr.name());
@@ -187,13 +205,14 @@ walk(const pugi::xml_node &node, std::string_view path,
                 }
 
                 if(auto r = walk(child, join(child_path, key_val), caps, proj,
-                                 batch, *key, seen_keys, false); !r)
+                                 batch, *key, seen_keys, false, depth + 1); !r)
                     return r;
                 continue;
             }
         }
 
-        if(auto r = walk(child, child_path, caps, proj, batch, {}, seen_keys, false); !r)
+        if(auto r = walk(child, child_path, caps, proj, batch, {}, seen_keys,
+                         false, depth + 1); !r)
             return r;
     }
 
@@ -221,10 +240,21 @@ configuration_source_result xml_source::pull()
     if(!m_arena)
     {
         m_arena = std::make_shared<document_arena>();
-        const bool loaded = m_kind == kind::file ? m_arena->load_file(m_input)
-                                                 : m_arena->load_string(m_input);
-        if(!loaded)
-            return unexpected(std::string("xml source: failed to parse input"));
+        const pugi::xml_parse_result parsed =
+            m_kind == kind::file ? m_arena->load_file(m_input)
+                                 : m_arena->load_string(m_input);
+        if(parsed.status != pugi::status_ok)
+        {
+            m_arena.reset();
+            if(parsed.status == pugi::status_file_not_found
+               || parsed.status == pugi::status_io_error)
+                return unexpected(nucleus::format(
+                    "xml source: cannot read file '{}': {}", m_input,
+                    parsed.description()));
+            return unexpected(nucleus::format(
+                "xml source: failed to parse input: {} (at offset {})",
+                parsed.description(), parsed.offset));
+        }
     }
 
     pugi::xml_node root = m_arena->root();
@@ -238,7 +268,7 @@ configuration_source_result xml_source::pull()
     // projection (empty unless the schema declared keyed containers) controls how
     // repeatable instances are distinguished.
     if(auto r = walk(root, std::string_view(root.name()), capabilities(), m_projection,
-                     batch, {}, seen_keys, true); !r)
+                     batch, {}, seen_keys, true, 0); !r)
         return unexpected(r.error());
 
     // Pin the arena: the entries' views point into it and must stay valid until

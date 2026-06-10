@@ -114,6 +114,12 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     )
     add_test(NAME buffer_lifetime_test COMMAND buffer_lifetime_test)
 
+    add_executable(xml_robustness_test xml_robustness_test.cpp)
+    nucleus_enable_coverage(xml_robustness_test)
+    target_link_libraries(xml_robustness_test
+        PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
+    add_test(NAME xml_robustness_test COMMAND xml_robustness_test)
+
     # Convergence buffer-drop checkpoint: drives the full facade resolve() with an
     # XML document source in the precedence stack, drops every buffer, then reads
     # every value back. The single most valuable test in the project under ASan.

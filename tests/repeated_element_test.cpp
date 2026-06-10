@@ -438,3 +438,25 @@ TEST_CASE("collection scope-policy exclusion and admission",
                 == std::vector<std::string>{"derived"});
     }
 }
+
+TEST_CASE("a runtime source supplies multiple values for a repeated path",
+          "[repeated][runtime]")
+{
+    // The runtime source declares duplicate_keys at BOTH the source and the entry
+    // level, so the auto-gate's admit decision and the fold's per-entry duplicate
+    // check agree: two .set() calls on a repeated path compose into a collection
+    // instead of failing as a flat-source violation.
+    nucleus::configuration_space_builder engine;
+    declare_tags_schema(engine);
+    nucleus::configuration_space space = engine.build();
+
+    nucleus::runtime_source src;
+    src.set("config/tag", "alpha").set("config/tag", "beta");
+
+    auto loaded = nucleus::load(space,
+        nucleus::source_stack{std::move(src)},
+        {});
+    REQUIRE(loaded);
+    REQUIRE(loaded.value().get_all("config/tag")
+            == std::vector<std::string>{"alpha", "beta"});
+}
