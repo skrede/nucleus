@@ -185,8 +185,8 @@ public:
 
 private:
     friend class configuration_space_builder;
-    friend load_result   load(const configuration_space &, source_stack, const load_options &);
-    friend gate_result   check_capabilities(const configuration_space &, source_stack, const load_options &);
+    friend load_result   load(const configuration_space &, source_stack &, const load_options &);
+    friend gate_result   check_capabilities(const configuration_space &, const source_stack &, const load_options &);
     friend key_recognizer recognizer_of(const configuration_space &);
     class impl;
     explicit configuration_space(std::unique_ptr<impl> sealed);
@@ -197,14 +197,25 @@ private:
 // sealed space using index-as-rank precedence, optionally expanding document_paths
 // from load_options through the inheritance chain walker. Concurrent-safe;
 // borrows the space by const reference and owns all mutable resolve state locally.
+// The stack is BORROWED, not consumed: it stays valid afterward, so the same
+// stack can pre-flight via check_capabilities() and then load, or load more than
+// once (sources are pulled again; a document source reuses its cached parse).
 [[nodiscard]] load_result load(const configuration_space &space,
-                               source_stack stack,
+                               source_stack &stack,
+                               const load_options &options = {});
+
+// Convenience overload for inline composition: load(space, source_stack{...}).
+// The temporary lives for the full call; nothing dangles.
+[[nodiscard]] load_result load(const configuration_space &space,
+                               source_stack &&stack,
                                const load_options &options = {});
 
 // Capability pre-flight for the source_stack-based load. Reads capabilities
-// only -- no pull, no fold. Consistent with load() over the same stack+options.
+// only -- no pull, no fold -- so the stack is borrowed const and stays intact
+// for the load() that follows it. Consistent with load() over the same
+// stack+options.
 [[nodiscard]] gate_result check_capabilities(const configuration_space &space,
-                                             source_stack stack,
+                                             const source_stack &stack,
                                              const load_options &options = {});
 
 // Derives a key recognizer from the sealed space's schema surface. The returned

@@ -260,3 +260,27 @@ TEST_CASE("load degrades a SOFT-absent optional capability and does not abort",
             typed_degraded = true;
     REQUIRE(typed_degraded);
 }
+
+TEST_CASE("the stack is borrowed: pre-flight then load then load again, one stack",
+          "[load][stack]")
+{
+    nucleus::configuration_space_builder builder;
+    builder.register_element(nucleus::element("server", anchor::root()));
+    builder.register_element(nucleus::element("host", anchor::keyspace("server")));
+    const nucleus::configuration_space space = builder.build();
+
+    nucleus::runtime_source src;
+    src.set("server/host", "localhost");
+    source_stack stack{std::move(src)};
+
+    REQUIRE(nucleus::check_capabilities(space, stack, {}));
+
+    auto first = nucleus::load(space, stack, {});
+    REQUIRE(first);
+    REQUIRE(first.value().get("server/host") == "localhost");
+
+    // The same stack loads again: nothing was consumed by the first load.
+    auto second = nucleus::load(space, stack, {});
+    REQUIRE(second);
+    REQUIRE(second.value().get("server/host") == "localhost");
+}

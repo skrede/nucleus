@@ -31,6 +31,8 @@ public:
     // Returns the ordered layers; index corresponds to precedence rank.
     [[nodiscard]] std::span<source_handle> layers() noexcept { return m_layers; }
 
+    [[nodiscard]] std::span<const source_handle> layers() const noexcept { return m_layers; }
+
     [[nodiscard]] std::size_t size() const noexcept { return m_layers.size(); }
 
     [[nodiscard]] bool empty() const noexcept { return m_layers.empty(); }

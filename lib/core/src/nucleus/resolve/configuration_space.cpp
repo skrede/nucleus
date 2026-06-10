@@ -366,7 +366,7 @@ key_recognizer recognizer_of(const configuration_space &space)
 // --- load(space, source_stack, load_options) --------------------------------
 
 load_result load(const configuration_space &space,
-                 source_stack stack,
+                 source_stack &stack,
                  const load_options &options)
 {
     const space_core &state = *space.m_impl;
@@ -394,23 +394,48 @@ load_result load(const configuration_space &space,
     return ctx.freeze();
 }
 
+load_result load(const configuration_space &space,
+                 source_stack &&stack,
+                 const load_options &options)
+{
+    return load(space, stack, options);
+}
+
 // --- check_capabilities(space, source_stack, load_options) ------------------
 
 gate_result check_capabilities(const configuration_space &space,
-                                source_stack stack,
+                                const source_stack &stack,
                                 const load_options &options)
 {
     const space_core &state = *space.m_impl;
 
-    // Mirror load()'s assembly exactly so the gate sees the same handle scheme.
+    // Mirror load()'s precedence scheme (chain at the base ranks, stack above)
+    // without touching the stack: the gate needs only labels and capability
+    // descriptors, both readable through the const surface, so a pre-flight
+    // leaves the stack intact for the load() that follows.
     std::vector<chain_walker::chain_entry> entries;
-    auto assembled = assemble_handles(state, stack, options, entries);
-    if(!assembled)
-        return unexpected(std::move(assembled).error());
-    std::vector<resolution_context::layered_handle> handles = std::move(assembled).value();
+    if(!options.document_paths.empty() && options.make_document)
+    {
+        const schema_projection projection = state.schema.projection();
+        auto expanded = chain_walker::expand(options.document_paths, options.make_document,
+                                             projection, options.inherit);
+        if(!expanded)
+            return unexpected(std::move(expanded).error());
+        entries = std::move(expanded).value();
+    }
+
+    std::vector<std::pair<std::string, capability_descriptor>> descriptors;
+    const std::span<const source_handle> layers = stack.layers();
+    descriptors.reserve(entries.size() + layers.size());
+    for(const chain_walker::chain_entry &entry : entries)
+        descriptors.emplace_back(nucleus::format("path:{}", entry.path),
+                                 entry.src.capabilities());
+    for(std::size_t i = 0; i < layers.size(); ++i)
+        descriptors.emplace_back(nucleus::format("stack[{}]", i), layers[i].capabilities());
 
     log_sink default_log;
-    return gate_assembled_handles(state.schema, handles, default_log);
+    return gate_stack("schema", descriptors,
+                      derive_capability_requirements(state.schema.elements()), default_log);
 }
 
 }
