@@ -98,7 +98,7 @@ TEST_CASE("schema validation is a separate step after mapping (strict)", "[argv]
 
     auto batch = src.pull();
     REQUIRE_FALSE(batch); // strict by default: unknown path is an error
-    REQUIRE(batch.error().find("undeclared key") != std::string::npos);
+    REQUIRE(batch.error().message.find("undeclared key") != std::string::npos);
 }
 
 TEST_CASE("lenient mode stores unknown flags as strings with a warning", "[argv]")

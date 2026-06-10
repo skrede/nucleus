@@ -142,10 +142,10 @@ TEST_CASE("typed x inheritance chain: bad value in winning layer fails resolve",
     REQUIRE(!loaded);
     INFO("error: " << loaded.error());
     // The convert() format is "conversion failed for '...': ... (layer: ...)"
-    REQUIRE(loaded.error().find("conversion failed for") != std::string::npos);
-    REQUIRE(loaded.error().find("cluster/server/port") != std::string::npos);
-    REQUIRE(loaded.error().find("invalid characters") != std::string::npos);
-    REQUIRE(loaded.error().find("derived") != std::string::npos);
+    REQUIRE(loaded.error().message.find("conversion failed for") != std::string::npos);
+    REQUIRE(loaded.error().message.find("cluster/server/port") != std::string::npos);
+    REQUIRE(loaded.error().message.find("invalid characters") != std::string::npos);
+    REQUIRE(loaded.error().message.find("derived") != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ TEST_CASE("typed x pruned strain: selected strain resolves; bad value in pruned 
             nucleus::source_stack{xml_of(doc)},
             nucleus::load_options{.selection = "secondary"});
         REQUIRE(!loaded);
-        REQUIRE(loaded.error().find("invalid characters") != std::string::npos);
+        REQUIRE(loaded.error().message.find("invalid characters") != std::string::npos);
     }
 }
 
@@ -245,9 +245,9 @@ TEST_CASE("typed x repeated across layers: winning layer collection replaces bas
             {});
         REQUIRE(!loaded);
         INFO("error: " << loaded.error());
-        REQUIRE(loaded.error().find("cfg/nums") != std::string::npos);
-        REQUIRE(loaded.error().find("[1]") != std::string::npos);
-        REQUIRE(loaded.error().find("stack[1]") != std::string::npos);
+        REQUIRE(loaded.error().message.find("cfg/nums") != std::string::npos);
+        REQUIRE(loaded.error().message.find("[1]") != std::string::npos);
+        REQUIRE(loaded.error().message.find("stack[1]") != std::string::npos);
     }
 
     SECTION("bad element only in losing collection does not fail")
@@ -366,7 +366,7 @@ TEST_CASE("typed access surface: get and get_as agree; type mismatch pinned",
         // int32_t was stored; requesting double is a type mismatch.
         auto r = loaded.value().get_as<double>("cfg/val");
         REQUIRE(!r);
-        REQUIRE(r.error().find("type mismatch") != std::string::npos);
+        REQUIRE(r.error().message.find("type mismatch") != std::string::npos);
     }
 }
 
@@ -447,13 +447,13 @@ TEST_CASE("repeated_typed_element<T> convert pass fails on a mid-collection defe
         {});
     REQUIRE_FALSE(loaded);
     INFO("error: " << loaded.error());
-    REQUIRE(loaded.error().find("conversion failed for") != std::string::npos);
-    REQUIRE(loaded.error().find("cfg/nums") != std::string::npos);
+    REQUIRE(loaded.error().message.find("conversion failed for") != std::string::npos);
+    REQUIRE(loaded.error().message.find("cfg/nums") != std::string::npos);
     // The exact failing element index...
-    REQUIRE(loaded.error().find("[1]") != std::string::npos);
-    REQUIRE(loaded.error().find("invalid characters") != std::string::npos);
+    REQUIRE(loaded.error().message.find("[1]") != std::string::npos);
+    REQUIRE(loaded.error().message.find("invalid characters") != std::string::npos);
     // ...and the winning layer label.
-    REQUIRE(loaded.error().find("stack[0]") != std::string::npos);
+    REQUIRE(loaded.error().message.find("stack[0]") != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------

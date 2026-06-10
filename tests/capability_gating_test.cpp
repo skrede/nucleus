@@ -52,7 +52,7 @@ TEST_CASE("a required-but-unsatisfiable capability is a loud error naming both p
     auto gated = nucleus::gate_features("logging-schema", "env", env.capabilities(), reqs, log);
 
     REQUIRE_FALSE(gated);                       // gating fails loudly.
-    const std::string &message = gated.error();
+    const std::string &message = gated.error().message;
     // The diagnostic names BOTH parties and the capability.
     REQUIRE(message.find("env") != std::string::npos);
     REQUIRE(message.find("logging-schema") != std::string::npos);

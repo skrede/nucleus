@@ -83,7 +83,7 @@ TEST_CASE("argv_source with recognizer_of rejects an undeclared flag in strict m
     auto loaded = nucleus::load(space, nucleus::source_stack{std::move(argv)}, {});
     REQUIRE_FALSE(loaded);
     // The error must reference the unrecognized path.
-    REQUIRE(loaded.error().find("logging/verbosity") != std::string::npos);
+    REQUIRE(loaded.error().message.find("logging/verbosity") != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------

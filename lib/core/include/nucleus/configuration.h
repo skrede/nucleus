@@ -1,6 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_H
 #define HPP_GUARD_NUCLEUS_CONFIGURATION_H
 
+#include "nucleus/error.h"
 #include "nucleus/expected.h"
 
 #include "nucleus/keyspace/provenance.h"
@@ -112,53 +113,61 @@ public:
 
     // Returns the typed value at `key` converted by the registered converter.
     // Errors distinguish three cases:
-    //   absent path         -- the key carries no value at all
-    //   no type converter   -- the key has a string value but no converter was
-    //                          registered (untyped path)
-    //   type mismatch       -- the stored type does not equal T (outright
-    //                          type_index equality; no widening or coercion)
+    //   errc::absent_key        -- the key carries no value at all
+    //   errc::missing_converter -- the key has a string value but no converter
+    //                              was registered (untyped path)
+    //   errc::mismatched_type   -- the stored type does not equal T (outright
+    //                              type_index equality; no widening or coercion)
     // Note: any_cast<T> produces a copy of the stored value.
     template<typename T>
-    [[nodiscard]] expected<T, std::string> get_as(const std::string &key) const
+    [[nodiscard]] expected<T, error> get_as(const std::string &key) const
     {
         auto it = m_typed.find(key);
         if(it == m_typed.end())
         {
             if(m_typed_collections.find(key) != m_typed_collections.end())
-                return unexpected(std::string("path '") + key
-                            + "' holds a typed collection; use get_all_as<T>()");
+                return unexpected(error{errc::mismatched_type,
+                            std::string("path '") + key
+                            + "' holds a typed collection; use get_all_as<T>()"});
             if(contains(key))
-                return unexpected(std::string("path '") + key + "' declares no type converter");
-            return unexpected(std::string("path '") + key + "' is absent");
+                return unexpected(error{errc::missing_converter,
+                            std::string("path '") + key + "' declares no type converter"});
+            return unexpected(error{errc::absent_key,
+                        std::string("path '") + key + "' is absent"});
         }
         if(it->second.type() != typeid(T))
-            return unexpected(std::string("type mismatch for path '") + key
-                        + "': stored type does not match requested type");
+            return unexpected(error{errc::mismatched_type,
+                        std::string("type mismatch for path '") + key
+                        + "': stored type does not match requested type"});
         return std::any_cast<T>(it->second);
     }
 
     // Returns all typed elements for a repeated path.
     // Same error distinctions as get_as<T>.
     template<typename T>
-    [[nodiscard]] expected<std::vector<T>, std::string> get_all_as(const std::string &key) const
+    [[nodiscard]] expected<std::vector<T>, error> get_all_as(const std::string &key) const
     {
         auto it = m_typed_collections.find(key);
         if(it == m_typed_collections.end())
         {
             if(m_typed.find(key) != m_typed.end())
-                return unexpected(std::string("path '") + key
-                            + "' holds a single typed value; use get_as<T>()");
+                return unexpected(error{errc::mismatched_type,
+                            std::string("path '") + key
+                            + "' holds a single typed value; use get_as<T>()"});
             if(contains(key))
-                return unexpected(std::string("path '") + key + "' declares no type converter");
-            return unexpected(std::string("path '") + key + "' is absent");
+                return unexpected(error{errc::missing_converter,
+                            std::string("path '") + key + "' declares no type converter"});
+            return unexpected(error{errc::absent_key,
+                        std::string("path '") + key + "' is absent"});
         }
         std::vector<T> out;
         out.reserve(it->second.size());
         for(const std::any &a : it->second)
         {
             if(a.type() != typeid(T))
-                return unexpected(std::string("type mismatch for path '") + key
-                            + "': stored element type does not match requested type");
+                return unexpected(error{errc::mismatched_type,
+                            std::string("type mismatch for path '") + key
+                            + "': stored element type does not match requested type"});
             out.push_back(std::any_cast<T>(a));
         }
         return out;

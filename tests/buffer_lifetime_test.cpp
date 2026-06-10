@@ -87,7 +87,7 @@ TEST_CASE("the xml source reports a parse failure rather than dangling", "[xml]"
     auto src = nucleus::xml_source::from(nucleus::xml_source_options::of_string("<unterminated>"));
     auto pulled = src.pull();
     REQUIRE_FALSE(pulled);
-    REQUIRE(pulled.error().find("xml source") != std::string::npos);
+    REQUIRE(pulled.error().message.find("xml source") != std::string::npos);
 }
 
 TEST_CASE("a document source reaches the engine only as a source", "[xml]")

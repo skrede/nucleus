@@ -84,7 +84,7 @@ TEST_CASE("each extension resolves to exactly one parser", "[extension]")
     // A second parser claiming the same extension is a registration-time error.
     auto clash = registry.claim({"xml"}, tagging_factory("other"));
     REQUIRE_FALSE(clash);
-    REQUIRE(clash.error().find(".xml") != std::string::npos);
+    REQUIRE(clash.error().message.find(".xml") != std::string::npos);
 
     // The clash committed nothing: the original parser still owns the extension.
     REQUIRE(registry.size() == 1);
@@ -130,7 +130,7 @@ TEST_CASE("an extension claimed twice in one call is rejected atomically", "[ext
     // registration-time error and commit nothing.
     auto dup = registry.claim({".cfg", ".cfg"}, tagging_factory("cfg"));
     REQUIRE_FALSE(dup);
-    REQUIRE(dup.error().find(".cfg") != std::string::npos);
+    REQUIRE(dup.error().message.find(".cfg") != std::string::npos);
     REQUIRE(registry.size() == 0);
     REQUIRE_FALSE(registry.claims(".cfg"));
 

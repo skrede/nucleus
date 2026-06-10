@@ -107,7 +107,7 @@ TEST_CASE("gate_stack errors loudly naming the capability and every layer when n
 
     auto gated = nucleus::gate_stack("schema", layers, reqs, log);
     REQUIRE_FALSE(gated);
-    const std::string &message = gated.error();
+    const std::string &message = gated.error().message;
     REQUIRE(message.find("nesting") != std::string::npos);
     REQUIRE(message.find("env") != std::string::npos);
     REQUIRE(message.find("argv") != std::string::npos);

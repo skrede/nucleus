@@ -102,9 +102,9 @@ TEST_CASE("several named strains with no selection fail loudly",
     // Resolving "whichever strain" is undefined and must never happen silently:
     // the error names the container and every strain it found.
     REQUIRE_FALSE(loaded);
-    REQUIRE(loaded.error().find("primary-keyed instances") != std::string::npos);
-    REQUIRE(loaded.error().find("'web'") != std::string::npos);
-    REQUIRE(loaded.error().find("'db'") != std::string::npos);
+    REQUIRE(loaded.error().message.find("primary-keyed instances") != std::string::npos);
+    REQUIRE(loaded.error().message.find("'web'") != std::string::npos);
+    REQUIRE(loaded.error().message.find("'db'") != std::string::npos);
 }
 
 TEST_CASE("a key carried as a text-leaf child is consumed the same way",

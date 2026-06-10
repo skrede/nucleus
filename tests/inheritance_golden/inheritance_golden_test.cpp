@@ -110,7 +110,7 @@ TEST_CASE("inheritance golden fixtures match nucleus-derived resolution", "[gold
             opts.selection = spec.selection;
 
             nucleus::load_result loaded = nucleus::load(space, nucleus::source_stack{}, opts);
-            INFO("load error (if any): " << (loaded ? std::string("<none>") : loaded.error()));
+            INFO("load error (if any): " << (loaded ? std::string("<none>") : nucleus::to_string(loaded.error())));
             REQUIRE(loaded);
 
             const std::string actual = nucleus::golden::serialize(loaded.value());

@@ -112,7 +112,7 @@ TEST_CASE("a sealed space loads repeatedly and a built builder rejects registrat
     // Registering on an already-built builder is a loud state-machine error.
     auto reg = engine.register_schema("late");
     REQUIRE_FALSE(reg);
-    REQUIRE(reg.error().find("already been built") != std::string::npos);
+    REQUIRE(reg.error().message.find("already been built") != std::string::npos);
 }
 
 TEST_CASE("the args-only options wire the argv recognizer to the schema", "[resolution][lifecycle]")
@@ -140,7 +140,7 @@ TEST_CASE("the args-only options wire the argv recognizer to the schema", "[reso
         argv.recognize_with(nucleus::recognizer_of(space));
         auto loaded = nucleus::load(space, nucleus::source_stack{std::move(argv)}, {});
         REQUIRE_FALSE(loaded);
-        REQUIRE(loaded.error().find("logging/levle") != std::string::npos);
+        REQUIRE(loaded.error().message.find("logging/levle") != std::string::npos);
     }
 }
 
@@ -203,7 +203,7 @@ TEST_CASE("an unresolvable token fails the fold loudly rather than passing throu
     // unexpanded text.
     auto loaded = nucleus::load(space, nucleus::source_stack{std::move(env)}, {});
     REQUIRE_FALSE(loaded);
-    REQUIRE(loaded.error().find("greeting") != std::string::npos);
+    REQUIRE(loaded.error().message.find("greeting") != std::string::npos);
 }
 
 TEST_CASE("the space resolves core builtin tokens with no extra registration", "[resolution][tokens]")

@@ -1,6 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_EXTENSION_REGISTRY_H
 #define HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_EXTENSION_REGISTRY_H
 
+#include "nucleus/error.h"
 #include "nucleus/format.h"
 #include "nucleus/expected.h"
 #include "nucleus/identity.h"
@@ -27,7 +28,7 @@ namespace nucleus {
 using parser_factory = std::function<source_handle(const std::string &path)>;
 
 // The error a registration can produce.
-using extension_error = std::string;
+using extension_error = error;
 
 using extension_result = expected<void, extension_error>;
 
@@ -60,17 +61,19 @@ public:
             if(auto it = m_parsers.find(key); it != m_parsers.end())
             {
                 const bool same_owner = it->second.owner == owner;
-                return unexpected(nucleus::format(
-                    "extension '{}' is already claimed by {} parser",
-                    key, same_owner ? "the same" : "another"));
+                return unexpected(extension_error{errc::rejected_registration,
+                    nucleus::format(
+                        "extension '{}' is already claimed by {} parser",
+                        key, same_owner ? "the same" : "another")});
             }
             // A double-claim WITHIN one call is just as much a registration-time
             // error as colliding with an already-registered parser: the map
             // would silently no-op the second emplace, so reject it here before
             // anything is committed (the registration stays atomic).
             if(std::find(normalized.begin(), normalized.end(), key) != normalized.end())
-                return unexpected(nucleus::format(
-                    "extension '{}' is claimed twice in the same registration", key));
+                return unexpected(extension_error{errc::rejected_registration,
+                    nucleus::format(
+                        "extension '{}' is claimed twice in the same registration", key)});
             normalized.push_back(std::move(key));
         }
 

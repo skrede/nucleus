@@ -1,6 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_CONFIGURATION_SOURCE_H
 #define HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_CONFIGURATION_SOURCE_H
 
+#include "nucleus/error.h"
 #include "nucleus/expected.h"
 #include "nucleus/capability.h"
 
@@ -56,7 +57,7 @@ struct configuration_source_batch
 };
 
 // The error a pull can report (e.g. a missing file or a malformed document).
-using configuration_source_error = std::string;
+using configuration_source_error = error;
 
 // The result of pulling from a source.
 using configuration_source_result = expected<configuration_source_batch, configuration_source_error>;

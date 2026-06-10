@@ -1,6 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_RESOLVE_RESOLUTION_CONTEXT_H
 #define HPP_GUARD_NUCLEUS_RESOLVE_RESOLUTION_CONTEXT_H
 
+#include "nucleus/error.h"
 #include "nucleus/format.h"
 #include "nucleus/expected.h"
 
@@ -39,7 +40,7 @@ namespace nucleus {
 
 // The error a resolve fold can report: a source pull failure or a token
 // resolution failure, surfaced verbatim with the offending layer named.
-using resolve_fold_error = std::string;
+using resolve_fold_error = error;
 
 // The transient hand-off vehicle and the convergence keystone. It BORROWS (holds
 // references to) the flat sibling registries it actually consults during a
@@ -126,8 +127,9 @@ public:
             lh->handle->apply_projection(projection);
             configuration_source_result pulled = lh->handle->pull();
             if(!pulled)
-                return unexpected(nucleus::format("source '{}': {}",
-                                              lh->label, pulled.error()));
+                return unexpected(error{pulled.error().code,
+                                        nucleus::format("source '{}': {}",
+                                            lh->label, pulled.error().message)});
 
             configuration_source_batch &batch = pulled.value();
 
@@ -137,9 +139,9 @@ public:
             {
                 token_result expanded = resolve_tokens(entry.value.text(), m_tokenizer);
                 if(!expanded)
-                    return unexpected(nucleus::format(
+                    return unexpected(error{errc::unresolved_token, nucleus::format(
                         "source '{}': token resolution failed for key '{}': {}",
-                        lh->label, entry.path, expanded.error().message));
+                        lh->label, entry.path, expanded.error().message)});
 
                 auto path = key_path::parse(entry.path);
                 if(!path)
@@ -151,12 +153,13 @@ public:
                     if(!entry.capabilities.supports(capability::duplicate_keys)
                        && seen_repeated_this_layer.count(entry.path) != 0)
                     {
-                        return unexpected(nucleus::format(
-                            "source '{}': repeated field '{}' received multiple "
-                            "values from a source that does not support "
-                            "duplicate_keys; a flat source can supply at most one "
-                            "value per repeated field per layer",
-                            lh->label, entry.path));
+                        return unexpected(error{errc::layering_violation,
+                            nucleus::format(
+                                "source '{}': repeated field '{}' received multiple "
+                                "values from a source that does not support "
+                                "duplicate_keys; a flat source can supply at most one "
+                                "value per repeated field per layer",
+                                lh->label, entry.path)});
                     }
 
                     const bool is_first_in_layer =
@@ -242,10 +245,10 @@ public:
                 if(any.identity) { has_identity = true; break; }
             }
             if(!has_identity)
-                return unexpected(nucleus::format(
+                return unexpected(error{errc::invalid_selection, nucleus::format(
                     "selection '{}' cannot be applied: the schema declares "
                     "no primary key",
-                    selection.value()));
+                    selection.value())});
         }
 
         for(const schema_element &el : m_schema.elements())
@@ -266,11 +269,11 @@ public:
                 if(m_schema.keyed_instance_path(container, path))
                     strains[path.segments()[container.size()]].push_back(path);
                 else if(m_schema.key_value_collision(container, path))
-                    return unexpected(nucleus::format(
+                    return unexpected(error{errc::schema_violation, nucleus::format(
                         "primary-key value '{}' in container '{}' collides with "
                         "a declared element of the same name: a strain cannot "
                         "be keyed by a sibling element's name",
-                        path.segments()[container.size()], container.str()));
+                        path.segments()[container.size()], container.str())});
             }
 
             if(strains.empty())
@@ -279,10 +282,10 @@ public:
                 // unsatisfiable and must fail loudly, never silently resolve to
                 // whatever template content exists.
                 if(selection.has_value())
-                    return unexpected(nucleus::format(
+                    return unexpected(error{errc::invalid_selection, nucleus::format(
                         "selection '{}' does not match any strain in container "
                         "'{}': the container holds no primary-keyed instances",
-                        selection.value(), container.str()));
+                        selection.value(), container.str())});
                 continue;
             }
 
@@ -303,10 +306,10 @@ public:
                             available += ", ";
                         available += nucleus::format("'{}'", key_value);
                     }
-                    return unexpected(nucleus::format(
+                    return unexpected(error{errc::invalid_selection, nucleus::format(
                         "selection '{}' does not match any strain in container "
                         "'{}'; available: {}",
-                        selection.value(), container.str(), available));
+                        selection.value(), container.str(), available)});
                 }
                 chosen = selection.value();
             }
@@ -319,11 +322,11 @@ public:
                         keys += ", ";
                     keys += nucleus::format("'{}'", key_value);
                 }
-                return unexpected(nucleus::format(
+                return unexpected(error{errc::invalid_selection, nucleus::format(
                     "container '{}' holds {} primary-keyed instances ({}) and "
                     "no instance is selected: a configuration space resolves "
                     "exactly one",
-                    container.str(), strains.size(), keys));
+                    container.str(), strains.size(), keys)});
             }
             else
                 chosen = strains.begin()->first;
@@ -346,10 +349,10 @@ public:
                     }
                 }
                 if(!found_any)
-                    return unexpected(nucleus::format(
+                    return unexpected(error{errc::layering_violation, nucleus::format(
                         "strain '{}' in container '{}' has no recorded "
                         "provenance: resolve cannot bound its defining layer",
-                        chosen, container.str()));
+                        chosen, container.str())});
             }
 
             // Ls: the first layer ABOVE the defining layer that introduces a
@@ -417,19 +420,21 @@ public:
                 const bool has_disposition = (disp_it != disp_index.end());
 
                 if(has_cross_layer && !has_disposition)
-                    return unexpected(nucleus::format(
-                        "primary-key value '{}' in container '{}' is introduced "
-                        "at multiple layers without an extend disposition: "
-                        "re-opening a named instance in a derived file requires "
-                        "an explicit extend attribute",
-                        key_value, container.str()));
+                    return unexpected(error{errc::layering_violation,
+                        nucleus::format(
+                            "primary-key value '{}' in container '{}' is introduced "
+                            "at multiple layers without an extend disposition: "
+                            "re-opening a named instance in a derived file requires "
+                            "an explicit extend attribute",
+                            key_value, container.str())});
 
                 if(has_disposition && !has_cross_layer)
-                    return unexpected(nucleus::format(
-                        "extend disposition for '{}' in container '{}' has no "
-                        "base: no layer below the extending layer provides "
-                        "entries for this instance",
-                        key_value, container.str()));
+                    return unexpected(error{errc::layering_violation,
+                        nucleus::format(
+                            "extend disposition for '{}' in container '{}' has no "
+                            "base: no layer below the extending layer provides "
+                            "entries for this instance",
+                            key_value, container.str())});
             }
 
             // Unique-value enforcement across sibling instances.
@@ -472,10 +477,11 @@ public:
                                 which += ", ";
                             which += nucleus::format("'{}'", strain_kv);
                         }
-                        return unexpected(nucleus::format(
-                            "unique field '{}' in container '{}' has duplicate "
-                            "value '{}' across instances: {}",
-                            uel.name, container.str(), val_text, which));
+                        return unexpected(error{errc::layering_violation,
+                            nucleus::format(
+                                "unique field '{}' in container '{}' has duplicate "
+                                "value '{}' across instances: {}",
+                                uel.name, container.str(), val_text, which)});
                     }
                 }
             }
@@ -579,7 +585,7 @@ public:
                     report += nucleus::format(" (did you mean '{}'?)", near.front());
             }
         }
-        return unexpected(std::move(report));
+        return unexpected(error{errc::schema_violation, std::move(report)});
     }
 
     // Runs the typed conversion pass: for every typed schema element, resolves the
@@ -631,9 +637,10 @@ public:
                             m_provenance.collection_origins_of(path_str);
                         if(co != nullptr && i < co->size())
                             layer_label = (*co)[i].layer;
-                        return unexpected(nucleus::format(
-                            "conversion failed for '{}' element [{}]: {} (layer: {})",
-                            path_str, i, res.error(), layer_label));
+                        return unexpected(error{errc::failed_conversion,
+                            nucleus::format(
+                                "conversion failed for '{}' element [{}]: {} (layer: {})",
+                                path_str, i, res.error(), layer_label)});
                     }
                     typed_col.push_back(std::move(res).value());
                 }
@@ -652,9 +659,9 @@ public:
                     const origin *orig = m_provenance.of(path_str);
                     if(orig != nullptr)
                         layer_label = orig->layer;
-                    return unexpected(nucleus::format(
+                    return unexpected(error{errc::failed_conversion, nucleus::format(
                         "conversion failed for '{}': {} (layer: {})",
-                        path_str, res.error(), layer_label));
+                        path_str, res.error(), layer_label)});
                 }
                 m_typed.emplace(path_str, std::move(res).value());
             }

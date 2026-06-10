@@ -1,3 +1,4 @@
+#include "nucleus/error.h"
 #include "nucleus/format.h"
 #include "nucleus/configuration_space.h"
 #include "nucleus/registration_policy.h"
@@ -57,7 +58,7 @@ struct space_core
         registration_request request{kind, owner};
         policy_verdict verdict = m_policy->review(request);
         if(!verdict.accepted())
-            return unexpected(verdict.reason());
+            return unexpected(error{errc::rejected_registration, verdict.reason()});
         return registration_ok();
     }
 
@@ -122,8 +123,8 @@ namespace {
 [[nodiscard]] registration_result reject_if_built(bool built, std::string_view what)
 {
     if(built)
-        return unexpected(nucleus::format(
-            "{} is not allowed: the builder has already been built", what));
+        return unexpected(error{errc::sealed_builder, nucleus::format(
+            "{} is not allowed: the builder has already been built", what)});
     return registration_ok();
 }
 
@@ -137,7 +138,7 @@ namespace {
 // (equal to the chain index), which the slice step keys its re-open rules on.
 // `entries` is an out-parameter the caller owns: the chain sources must outlive
 // the fold. Returns the assembled handles or a chain-expansion error.
-[[nodiscard]] expected<std::vector<resolution_context::layered_handle>, std::string>
+[[nodiscard]] expected<std::vector<resolution_context::layered_handle>, error>
 assemble_handles(const space_core &state,
                  source_stack &stack,
                  const load_options &options,
@@ -238,7 +239,7 @@ registration_result configuration_space_builder::register_element(schema_element
     const std::string claimed = element.declared_path().str();
     // attach() enforces referential integrity; surface its rejection verbatim.
     if(auto attached = m_impl->schema.attach(std::move(element)); !attached)
-        return unexpected(std::move(attached).error());
+        return unexpected(error{errc::rejected_registration, std::move(attached).error()});
     m_impl->note_claim(claimed, registration_kind::schema, owner);
     return registration_ok();
 }

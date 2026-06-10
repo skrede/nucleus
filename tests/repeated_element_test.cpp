@@ -269,7 +269,7 @@ TEST_CASE("attach-time rejection of repeated + identity", "[repeated][attach][re
 
     auto result = engine.register_element(el);
     REQUIRE(!result);
-    REQUIRE(result.error().find("primary key") != std::string::npos);
+    REQUIRE(result.error().message.find("primary key") != std::string::npos);
 }
 
 TEST_CASE("attach-time rejection of repeated + unique", "[repeated][attach][reject]")
@@ -283,7 +283,7 @@ TEST_CASE("attach-time rejection of repeated + unique", "[repeated][attach][reje
 
     auto result = engine.register_element(el);
     REQUIRE(!result);
-    REQUIRE(result.error().find("unique") != std::string::npos);
+    REQUIRE(result.error().message.find("unique") != std::string::npos);
 }
 
 TEST_CASE("capability degradation -- non-duplicate_keys source into repeated field fails",
@@ -301,7 +301,7 @@ TEST_CASE("capability degradation -- non-duplicate_keys source into repeated fie
         nucleus::source_stack{std::move(fake)},
         {});
     REQUIRE(!loaded);
-    REQUIRE(loaded.error().find("duplicate_keys") != std::string::npos);
+    REQUIRE(loaded.error().message.find("duplicate_keys") != std::string::npos);
 }
 
 TEST_CASE("ASan: freeze copies values out before buffer drop", "[repeated][lifetime]")

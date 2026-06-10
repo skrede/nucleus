@@ -109,9 +109,10 @@ walk(const pugi::xml_node &node, std::string_view path,
      bool is_root, std::size_t depth)
 {
     if(depth > max_element_depth)
-        return unexpected(configuration_source_error{nucleus::format(
-            "element nesting exceeds the depth cap ({}) at '{}'",
-            max_element_depth, path)});
+        return unexpected(configuration_source_error{errc::malformed_source,
+            nucleus::format(
+                "element nesting exceeds the depth cap ({}) at '{}'",
+                max_element_depth, path)});
 
     for(const pugi::xml_attribute &attr : node.attributes())
     {
@@ -122,10 +123,11 @@ walk(const pugi::xml_node &node, std::string_view path,
         if(attr_name == "inherit")
         {
             if(!is_root)
-                return unexpected(configuration_source_error{nucleus::format(
-                    "inherit attribute is not permitted on element '{}'; "
-                    "it is only valid on the document root element",
-                    node.name())});
+                return unexpected(configuration_source_error{errc::malformed_source,
+                    nucleus::format(
+                        "inherit attribute is not permitted on element '{}'; "
+                        "it is only valid on the document root element",
+                        node.name())});
             continue; // root: skip silently -- inheritance() reads m_arena
         }
 
@@ -138,10 +140,11 @@ walk(const pugi::xml_node &node, std::string_view path,
         if(attr_name == "extend")
         {
             if(skip.empty())
-                return unexpected(configuration_source_error{nucleus::format(
-                    "extend attribute is not permitted on element '{}'; "
-                    "it is only valid on a primary-keyed container instance",
-                    node.name())});
+                return unexpected(configuration_source_error{errc::malformed_source,
+                    nucleus::format(
+                        "extend attribute is not permitted on element '{}'; "
+                        "it is only valid on a primary-keyed container instance",
+                        node.name())});
             continue; // keyed instance: suppress from entries (already consumed by caller)
         }
 
@@ -179,10 +182,11 @@ walk(const pugi::xml_node &node, std::string_view path,
                 // the same key value in one document are an error.
                 auto &seen = seen_keys[child_path];
                 if(seen.count(std::string(key_val)))
-                    return unexpected(configuration_source_error{nucleus::format(
-                        "duplicate primary-key value '{}' in container '{}': "
-                        "the same key value appears more than once in this document",
-                        key_val, child_path)});
+                    return unexpected(configuration_source_error{errc::malformed_source,
+                        nucleus::format(
+                            "duplicate primary-key value '{}' in container '{}': "
+                            "the same key value appears more than once in this document",
+                            key_val, child_path)});
                 seen.insert(std::string(key_val));
 
                 // extend= on this instance element: parse the disposition.
@@ -198,10 +202,11 @@ walk(const pugi::xml_node &node, std::string_view path,
                                                       std::string(key_val),
                                                       extend_strength::wide});
                     else
-                        return unexpected(configuration_source_error{nucleus::format(
-                            "unknown extend value '{}' on element '{}'; "
-                            "expected \"narrow\" or \"wide\"",
-                            ext_val, child.name())});
+                        return unexpected(configuration_source_error{errc::malformed_source,
+                            nucleus::format(
+                                "unknown extend value '{}' on element '{}'; "
+                                "expected \"narrow\" or \"wide\"",
+                                ext_val, child.name())});
                 }
 
                 if(auto r = walk(child, join(child_path, key_val), caps, proj,
@@ -248,18 +253,21 @@ configuration_source_result xml_source::pull()
             m_arena.reset();
             if(parsed.status == pugi::status_file_not_found
                || parsed.status == pugi::status_io_error)
-                return unexpected(nucleus::format(
-                    "xml source: cannot read file '{}': {}", m_input,
-                    parsed.description()));
-            return unexpected(nucleus::format(
-                "xml source: failed to parse input: {} (at offset {})",
-                parsed.description(), parsed.offset));
+                return unexpected(configuration_source_error{errc::unreadable_source,
+                    nucleus::format(
+                        "xml source: cannot read file '{}': {}", m_input,
+                        parsed.description())});
+            return unexpected(configuration_source_error{errc::malformed_source,
+                nucleus::format(
+                    "xml source: failed to parse input: {} (at offset {})",
+                    parsed.description(), parsed.offset)});
         }
     }
 
     pugi::xml_node root = m_arena->root();
     if(!root)
-        return unexpected(std::string("xml source: document has no root element"));
+        return unexpected(configuration_source_error{errc::malformed_source,
+            std::string("xml source: document has no root element")});
 
     configuration_source_batch batch;
     std::map<std::string, std::set<std::string>> seen_keys;

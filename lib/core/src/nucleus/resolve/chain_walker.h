@@ -1,6 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_RESOLVE_CHAIN_WALKER_H
 #define HPP_GUARD_NUCLEUS_RESOLVE_CHAIN_WALKER_H
 
+#include "nucleus/error.h"
 #include "nucleus/format.h"
 #include "nucleus/expected.h"
 
@@ -97,7 +98,7 @@ public:
     // the declaring source, so index 0 is the deepest ancestor and the last entry
     // is the requested file itself. The factory and projection are the same ones
     // used by the load() caller. Errors propagate immediately on the first failure.
-    [[nodiscard]] static expected<std::vector<chain_entry>, std::string>
+    [[nodiscard]] static expected<std::vector<chain_entry>, error>
     expand(const std::vector<std::string> &requested_paths,
            const factory_fn &make,
            const schema_projection &projection,
@@ -120,26 +121,26 @@ private:
         , m_admissibility(policy.admissibility)
     {}
 
-    [[nodiscard]] expected<depth_guard, std::string> push_depth()
+    [[nodiscard]] expected<depth_guard, error> push_depth()
     {
         if(m_depth >= m_cap)
-            return unexpected(nucleus::format(
+            return unexpected(error{errc::invalid_inheritance, nucleus::format(
                 "inheritance chain depth {} exceeded the configured limit of {}; "
                 "raise the depth cap if intentional",
-                m_depth, m_cap));
+                m_depth, m_cap)});
         ++m_depth;
         return depth_guard(this);
     }
 
-    [[nodiscard]] expected<path_guard, std::string> push_path(
+    [[nodiscard]] expected<path_guard, error> push_path(
         const std::filesystem::path &absolute)
     {
         std::string key = absolute.generic_string();
         if(m_visited.count(key))
-            return unexpected(nucleus::format(
+            return unexpected(error{errc::invalid_inheritance, nucleus::format(
                 "inheritance cycle detected at '{}': this file was already visited "
                 "in the current chain",
-                key));
+                key)});
         m_visited.insert(key);
         return path_guard(this, std::move(key));
     }
@@ -149,7 +150,7 @@ private:
     // is_parent is false for the top-level requested source and true for every
     // recursive call that follows an inherit= declaration; the admissibility
     // callback is invoked only when is_parent is true.
-    [[nodiscard]] expected<void, std::string>
+    [[nodiscard]] expected<void, error>
     expand_one(const std::string &path,
                const factory_fn &make,
                const schema_projection &projection,
@@ -165,8 +166,8 @@ private:
         }
         catch(...)
         {
-            return unexpected(nucleus::format(
-                "inheritance chain: could not normalize path '{}'", path));
+            return unexpected(error{errc::invalid_inheritance, nucleus::format(
+                "inheritance chain: could not normalize path '{}'", path)});
         }
 
         auto pg = push_path(std::filesystem::path(norm));
@@ -184,10 +185,12 @@ private:
         // via the handle stored in chain_entry.
         handle.apply_projection(projection);
 
+        // A pull failure is already a typed source error (unreadable, malformed);
+        // forward its code and add the chain context to the message.
         configuration_source_result pulled = handle.pull();
         if(!pulled)
-            return unexpected(nucleus::format(
-                "inheritance chain: source '{}': {}", path, pulled.error()));
+            return unexpected(error{pulled.error().code, nucleus::format(
+                "inheritance chain: source '{}': {}", path, pulled.error().message)});
 
         // Query the inheritance declaration AFTER pull() (arena is populated).
         inherit_declaration decl = handle.inheritance();
@@ -219,8 +222,8 @@ private:
             // Pull capabilities for the admissibility check via the handle.
             std::string reason = m_admissibility(handle.capabilities());
             if(!reason.empty())
-                return unexpected(nucleus::format(
-                    "chain admissibility check rejected parent '{}': {}", path, reason));
+                return unexpected(error{errc::invalid_inheritance, nucleus::format(
+                    "chain admissibility check rejected parent '{}': {}", path, reason)});
         }
 
         // Append this source AFTER its parent (root-first). The handle is move-only;

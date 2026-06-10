@@ -1,6 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SPACE_H
 #define HPP_GUARD_NUCLEUS_CONFIGURATION_SPACE_H
 
+#include "nucleus/error.h"
 #include "nucleus/expected.h"
 #include "nucleus/identity.h"
 #include "nucleus/log_sink.h"
@@ -42,18 +43,20 @@ class tokenizer;
 // generate_completion is reachable without pulling the completion machinery.
 enum class shell;
 
-// The outcome of a registration: success, or a host-supplied rejection reason
-// surfaced verbatim from the registration-policy seam.
-using registration_result = expected<void, std::string>;
+// The outcome of a registration: success, or an error whose code separates a
+// policy rejection (errc::rejected_registration, host reason verbatim) from a
+// post-build state-machine misuse (errc::sealed_builder).
+using registration_result = expected<void, error>;
 
 [[nodiscard]] inline registration_result registration_ok()
 {
     return registration_result();
 }
 
-// The outcome of a load: the immutable configuration, or a verbatim failure reason
-// (a configuration_source/token error, or a schema/conversion violation).
-using load_result = expected<configuration, std::string>;
+// The outcome of a load: the immutable configuration, or an error whose code
+// names the pipeline stage that failed (source, inheritance, gate, layering,
+// tokens, selection, schema, conversion) with the verbatim reason in message.
+using load_result = expected<configuration, error>;
 
 class configuration_space;
 

@@ -513,7 +513,7 @@ TEST_CASE("conversion failure at resolve surfaces diagnostic", "[typed][failure]
         auto loaded = resolve_one(p.engine, std::move(*p.src));
         REQUIRE(!loaded);
         INFO("error: " << loaded.error());
-        REQUIRE(loaded.error().find("cfg/val") != std::string::npos);
+        REQUIRE(loaded.error().message.find("cfg/val") != std::string::npos);
     }
 
     SECTION("error contains the layer label")
@@ -523,7 +523,7 @@ TEST_CASE("conversion failure at resolve surfaces diagnostic", "[typed][failure]
         REQUIRE(!loaded);
         INFO("error: " << loaded.error());
         // The convert() format is "conversion failed for '...': ... (layer: stack[0])"
-        REQUIRE(loaded.error().find("stack[0]") != std::string::npos);
+        REQUIRE(loaded.error().message.find("stack[0]") != std::string::npos);
     }
 
     SECTION("error contains the converter reason substring")
@@ -534,7 +534,7 @@ TEST_CASE("conversion failure at resolve surfaces diagnostic", "[typed][failure]
         INFO("error: " << loaded.error());
         // "notanumber" is pure alphabetic: the corrected converter returns
         // "invalid characters in value", which the resolve error embeds.
-        REQUIRE(loaded.error().find("invalid characters") != std::string::npos);
+        REQUIRE(loaded.error().message.find("invalid characters") != std::string::npos);
     }
 
     SECTION("alphabetic input yields 'invalid characters' not 'out of range'")
@@ -566,7 +566,7 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
         auto r = loaded.value().get_as<int32_t>("nonexistent");
         REQUIRE(!r);
         INFO("error: " << r.error());
-        REQUIRE(r.error().find("absent") != std::string::npos);
+        REQUIRE(r.error().message.find("absent") != std::string::npos);
     }
 
     SECTION("path with no converter returns error containing 'no type converter'")
@@ -583,7 +583,7 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
         auto r = loaded.value().get_as<int32_t>("cfg/name");
         REQUIRE(!r);
         INFO("error: " << r.error());
-        REQUIRE(r.error().find("no type converter") != std::string::npos);
+        REQUIRE(r.error().message.find("no type converter") != std::string::npos);
     }
 
     SECTION("type mismatch returns error containing 'type mismatch'")
@@ -601,7 +601,7 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
         auto r = loaded.value().get_as<float>("cfg/val");
         REQUIRE(!r);
         INFO("error: " << r.error());
-        REQUIRE(r.error().find("type mismatch") != std::string::npos);
+        REQUIRE(r.error().message.find("type mismatch") != std::string::npos);
     }
 
     SECTION("get_as on a repeated typed path returns 'use get_all_as' message")
@@ -620,7 +620,7 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
         auto r = loaded.value().get_as<int32_t>("cfg/nums");
         REQUIRE(!r);
         INFO("error: " << r.error());
-        REQUIRE(r.error().find("get_all_as") != std::string::npos);
+        REQUIRE(r.error().message.find("get_all_as") != std::string::npos);
     }
 }
 
@@ -644,7 +644,7 @@ TEST_CASE("get_all_as error distinctions", "[typed][accessor][errors]")
         auto r = loaded.value().get_all_as<int32_t>("cfg/val");
         REQUIRE(!r);
         INFO("error: " << r.error());
-        REQUIRE(r.error().find("get_as") != std::string::npos);
+        REQUIRE(r.error().message.find("get_as") != std::string::npos);
     }
 }
 
@@ -687,7 +687,7 @@ TEST_CASE("repeated x typed: get_all_as", "[typed][repeated][typed]")
         REQUIRE(!loaded);
         INFO("error: " << loaded.error());
         // The convert() format for repeated: "... element [1]: ..."
-        REQUIRE(loaded.error().find("[1]") != std::string::npos);
+        REQUIRE(loaded.error().message.find("[1]") != std::string::npos);
     }
 }
 

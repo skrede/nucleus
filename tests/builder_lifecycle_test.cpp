@@ -50,9 +50,9 @@ TEST_CASE("registering on an already-built builder is a loud state-machine error
     // NOT a silent success.
     auto check = [](const nucleus::registration_result &r, const char *op) {
         REQUIRE_FALSE(r);
-        REQUIRE(!r.error().empty());
-        REQUIRE(r.error().find(op) != std::string::npos);
-        REQUIRE(r.error().find("already been built") != std::string::npos);
+        REQUIRE(!r.error().message.empty());
+        REQUIRE(r.error().message.find(op) != std::string::npos);
+        REQUIRE(r.error().message.find("already been built") != std::string::npos);
     };
 
     check(builder.register_schema("late"), "register_schema");

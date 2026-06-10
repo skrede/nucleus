@@ -119,9 +119,9 @@ TEST_CASE("selecting an unknown strain value fails with available listed",
     REQUIRE_FALSE(loaded);
 
     // The error must name the requested value and list every available strain.
-    REQUIRE(loaded.error().find("missing") != std::string::npos);
-    REQUIRE(loaded.error().find("'web'") != std::string::npos);
-    REQUIRE(loaded.error().find("'db'") != std::string::npos);
+    REQUIRE(loaded.error().message.find("missing") != std::string::npos);
+    REQUIRE(loaded.error().message.find("'web'") != std::string::npos);
+    REQUIRE(loaded.error().message.find("'db'") != std::string::npos);
 }
 
 TEST_CASE("selecting when schema has no primary key fails",
@@ -141,7 +141,7 @@ TEST_CASE("selecting when schema has no primary key fails",
 
     auto loaded = load_doc(space, doc, "anything");
     REQUIRE_FALSE(loaded);
-    REQUIRE(loaded.error().find("no primary key") != std::string::npos);
+    REQUIRE(loaded.error().message.find("no primary key") != std::string::npos);
 }
 
 TEST_CASE("anonymous-only content collapses without a selection",
@@ -183,8 +183,8 @@ TEST_CASE("a selection against anonymous-only content fails loudly",
 
     auto loaded = load_doc(space, doc, "web");
     REQUIRE_FALSE(loaded);
-    REQUIRE(loaded.error().find("web") != std::string::npos);
-    REQUIRE(loaded.error().find("no primary-keyed instances") != std::string::npos);
+    REQUIRE(loaded.error().message.find("web") != std::string::npos);
+    REQUIRE(loaded.error().message.find("no primary-keyed instances") != std::string::npos);
 }
 
 TEST_CASE("a key value shadowing a declared element name is a loud error",
@@ -205,6 +205,6 @@ TEST_CASE("a key value shadowing a declared element name is a loud error",
 
     auto loaded = load_doc(space, doc);
     REQUIRE_FALSE(loaded);
-    REQUIRE(loaded.error().find("primary-key value 'port'") != std::string::npos);
-    REQUIRE(loaded.error().find("collides") != std::string::npos);
+    REQUIRE(loaded.error().message.find("primary-key value 'port'") != std::string::npos);
+    REQUIRE(loaded.error().message.find("collides") != std::string::npos);
 }

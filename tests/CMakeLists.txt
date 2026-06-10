@@ -186,6 +186,15 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     )
     add_test(NAME xml_persist_test COMMAND xml_persist_test)
 
+    # Typed error model: every public failure channel must carry the errc that
+    # names its pipeline stage. Links xml + runtime to drive each path for real.
+    add_executable(error_code_test error_code_test.cpp)
+    nucleus_enable_coverage(error_code_test)
+    nucleus_warnings(error_code_test)
+    target_link_libraries(error_code_test
+        PRIVATE nucleus::nucleus nucleus::xml nucleus::runtime Catch2::Catch2WithMain)
+    add_test(NAME error_code_test COMMAND error_code_test)
+
     add_executable(integration_shape_test integration_shape_test.cpp)
     nucleus_enable_coverage(integration_shape_test)
     nucleus_warnings(integration_shape_test)

@@ -365,7 +365,7 @@ TEST_CASE("integration: multiple strains with no selection is a loud error",
 
     auto loaded = load_chain(space, {"derived6.xml"}, factory);
     REQUIRE_FALSE(loaded);
-    REQUIRE(loaded.error().find("no instance is selected") != std::string::npos);
+    REQUIRE(loaded.error().message.find("no instance is selected") != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------
@@ -399,7 +399,7 @@ TEST_CASE("integration: select with unknown key value is a loud error",
 
     auto loaded = load_chain(space, {"derived7.xml"}, factory, "ghost");
     REQUIRE_FALSE(loaded);
-    REQUIRE(loaded.error().find("does not match any strain") != std::string::npos);
+    REQUIRE(loaded.error().message.find("does not match any strain") != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------
@@ -423,6 +423,6 @@ TEST_CASE("integration: duplicate unique field value across strains is a loud er
     auto loaded = load_chain(space, {"doc8.xml"},
                              [&](const std::string &) { return xml_of(doc8); }, "primary");
     REQUIRE_FALSE(loaded);
-    REQUIRE(loaded.error().find("unique field") != std::string::npos);
-    REQUIRE(loaded.error().find("SN001") != std::string::npos);
+    REQUIRE(loaded.error().message.find("unique field") != std::string::npos);
+    REQUIRE(loaded.error().message.find("SN001") != std::string::npos);
 }

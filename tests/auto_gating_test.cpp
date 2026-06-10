@@ -61,7 +61,7 @@ TEST_CASE("load auto-gates: a flat env stack fails a nested schema loudly", "[au
         nucleus::source_stack{std::move(empty_env)},
         {});
     REQUIRE_FALSE(loaded);
-    REQUIRE(loaded.error().find("nesting") != std::string::npos);
+    REQUIRE(loaded.error().message.find("nesting") != std::string::npos);
 
     // The standalone pre-flight gates the SAME stack and returns the SAME verdict,
     // so a host can validate fit before a load without the two ever disagreeing.

@@ -64,9 +64,9 @@ TEST_CASE("resolve rejects an undeclared key and suggests the nearest declared o
     auto src = one("logging/levle", "debug"); // typo'd key
     auto loaded = nucleus::load(space, nucleus::source_stack{std::move(src)}, {});
     REQUIRE_FALSE(loaded);
-    REQUIRE(loaded.error().find("not declared") != std::string::npos);
-    REQUIRE(loaded.error().find("did you mean") != std::string::npos);
-    REQUIRE(loaded.error().find("logging/level") != std::string::npos);
+    REQUIRE(loaded.error().message.find("not declared") != std::string::npos);
+    REQUIRE(loaded.error().message.find("did you mean") != std::string::npos);
+    REQUIRE(loaded.error().message.find("logging/level") != std::string::npos);
 }
 
 TEST_CASE("resolve rejects a missing required field", "[facade][schema]")
@@ -83,7 +83,7 @@ TEST_CASE("resolve rejects a missing required field", "[facade][schema]")
     auto src = one("server/port", "8080");
     auto loaded = nucleus::load(space, nucleus::source_stack{std::move(src)}, {});
     REQUIRE_FALSE(loaded);
-    REQUIRE(loaded.error().find("required field 'server/host'") != std::string::npos);
+    REQUIRE(loaded.error().message.find("required field 'server/host'") != std::string::npos);
 }
 
 TEST_CASE("resolve admits an anonymous strain without the identity field",
@@ -124,7 +124,7 @@ TEST_CASE("resolve rejects anonymous-only content when the identity is required"
     auto src = one("node/role", "primary");
     auto loaded = nucleus::load(space, nucleus::source_stack{std::move(src)}, {});
     REQUIRE_FALSE(loaded);
-    REQUIRE(loaded.error().find("required field 'node/name'") != std::string::npos);
+    REQUIRE(loaded.error().message.find("required field 'node/name'") != std::string::npos);
 }
 
 TEST_CASE("resolve admits a document that satisfies the schema", "[facade][schema]")

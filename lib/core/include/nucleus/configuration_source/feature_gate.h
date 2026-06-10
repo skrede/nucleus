@@ -1,6 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_FEATURE_GATE_H
 #define HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_FEATURE_GATE_H
 
+#include "nucleus/error.h"
 #include "nucleus/format.h"
 #include "nucleus/expected.h"
 #include "nucleus/log_sink.h"
@@ -48,7 +49,7 @@ struct degradation
 // The error a required-but-unsatisfiable capability produces. It names BOTH
 // parties -- the requesting consumer and the source's capability shortfall --
 // so the diagnostic is actionable, never a bare "unsupported".
-using gate_error = std::string;
+using gate_error = error;
 
 // What survives gating: the capabilities a source actually honors for this
 // consumer, plus the observable degradations for the optional ones it lacked.
@@ -88,9 +89,9 @@ using gate_result = expected<gated_features, gate_error>;
 
         if(req.strength == requirement_strength::required)
         {
-            return unexpected(nucleus::format(
+            return unexpected(gate_error{errc::unmet_capability, nucleus::format(
                 "source '{}' cannot satisfy capability '{}' required by '{}'",
-                source_name, to_string(req.cap), consumer));
+                source_name, to_string(req.cap), consumer)});
         }
 
         std::string note = nucleus::format(
@@ -142,9 +143,9 @@ using gate_result = expected<gated_features, gate_error>;
 
         if(req.strength == requirement_strength::required)
         {
-            return unexpected(nucleus::format(
+            return unexpected(gate_error{errc::unmet_capability, nucleus::format(
                 "no source can satisfy capability '{}' required by '{}'; lacking layers: {}",
-                to_string(req.cap), consumer, lacking));
+                to_string(req.cap), consumer, lacking)});
         }
 
         std::string note = nucleus::format(

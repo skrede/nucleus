@@ -177,7 +177,7 @@ TEST_CASE("load with a flat-only stack fails a schema requiring nesting, naming 
     auto loaded = nucleus::load(space, source_stack{flat_only_source{}}, {});
     REQUIRE_FALSE(loaded);
 
-    const std::string &msg = loaded.error();
+    const std::string &msg = loaded.error().message;
     // Both the capability name and the stack layer label must appear.
     REQUIRE(msg.find("nesting") != std::string::npos);
     REQUIRE(msg.find("stack[0]") != std::string::npos);
@@ -185,7 +185,7 @@ TEST_CASE("load with a flat-only stack fails a schema requiring nesting, naming 
     // check_capabilities must agree with load's verdict.
     auto preflight = nucleus::check_capabilities(space, source_stack{flat_only_source{}}, {});
     REQUIRE_FALSE(preflight);
-    REQUIRE(preflight.error() == msg);
+    REQUIRE(preflight.error().message == msg);
 }
 
 TEST_CASE("load with a capable stack satisfies the HARD nesting requirement",

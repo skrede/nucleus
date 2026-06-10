@@ -40,7 +40,7 @@ TEST_CASE("a pathologically deep document fails with a depth-cap error, not a cr
     auto src = xml_of(doc);
     auto pulled = src.pull();
     REQUIRE_FALSE(pulled);
-    REQUIRE(pulled.error().find("depth cap") != std::string::npos);
+    REQUIRE(pulled.error().message.find("depth cap") != std::string::npos);
 }
 
 TEST_CASE("a CDATA leaf value resolves like plain text", "[xml][robustness]")
@@ -86,9 +86,9 @@ TEST_CASE("a nonexistent file reports an unreadable file, not a parse failure",
         nucleus::xml_source_options::of_file("no/such/directory/config.xml"));
     auto pulled = src.pull();
     REQUIRE_FALSE(pulled);
-    REQUIRE(pulled.error().find("cannot read file") != std::string::npos);
-    REQUIRE(pulled.error().find("no/such/directory/config.xml") != std::string::npos);
-    REQUIRE(pulled.error().find("parse") == std::string::npos);
+    REQUIRE(pulled.error().message.find("cannot read file") != std::string::npos);
+    REQUIRE(pulled.error().message.find("no/such/directory/config.xml") != std::string::npos);
+    REQUIRE(pulled.error().message.find("parse") == std::string::npos);
 }
 
 TEST_CASE("garbage input reports a parse failure with an offset", "[xml][robustness]")
@@ -96,8 +96,8 @@ TEST_CASE("garbage input reports a parse failure with an offset", "[xml][robustn
     auto src = xml_of("\x01\x02 this is not xml at all >>>");
     auto pulled = src.pull();
     REQUIRE_FALSE(pulled);
-    REQUIRE(pulled.error().find("failed to parse input") != std::string::npos);
-    REQUIRE(pulled.error().find("offset") != std::string::npos);
+    REQUIRE(pulled.error().message.find("failed to parse input") != std::string::npos);
+    REQUIRE(pulled.error().message.find("offset") != std::string::npos);
 }
 
 TEST_CASE("an element-free document reports the missing document element",
@@ -108,5 +108,5 @@ TEST_CASE("an element-free document reports the missing document element",
     auto src = xml_of("<!-- only a comment, no root -->");
     auto pulled = src.pull();
     REQUIRE_FALSE(pulled);
-    REQUIRE(pulled.error().find("document element") != std::string::npos);
+    REQUIRE(pulled.error().message.find("document element") != std::string::npos);
 }

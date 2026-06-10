@@ -286,8 +286,8 @@ TEST_CASE("depth cap exceeded returns loud error naming the limit", "[chain]")
 
     auto loaded = load_chain(space, {"a.xml"}, factory, std::nullopt, std::move(policy));
     REQUIRE_FALSE(loaded);
-    REQUIRE(loaded.error().find("depth") != std::string::npos);
-    REQUIRE(loaded.error().find("2") != std::string::npos);
+    REQUIRE(loaded.error().message.find("depth") != std::string::npos);
+    REQUIRE(loaded.error().message.find("2") != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------
@@ -313,7 +313,7 @@ TEST_CASE("cycle in inheritance chain fails loudly naming the path", "[chain]")
 
     auto loaded = load_chain(space, {"a.xml"}, factory);
     REQUIRE_FALSE(loaded);
-    REQUIRE(loaded.error().find("cycle") != std::string::npos);
+    REQUIRE(loaded.error().message.find("cycle") != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------
@@ -352,10 +352,10 @@ TEST_CASE("admissibility callback rejection fails naming the parent", "[chain]")
     auto loaded = load_chain(space, {"derived.xml"}, factory, "web", std::move(policy));
     REQUIRE_FALSE(loaded);
     // The error must mention admission rejection and the rejected parent path.
-    const bool has_rejected = loaded.error().find("admissibility") != std::string::npos
-                              || loaded.error().find("rejected") != std::string::npos;
+    const bool has_rejected = loaded.error().message.find("admissibility") != std::string::npos
+                              || loaded.error().message.find("rejected") != std::string::npos;
     REQUIRE(has_rejected);
-    REQUIRE(loaded.error().find("base.xml") != std::string::npos);
+    REQUIRE(loaded.error().message.find("base.xml") != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------
@@ -423,7 +423,7 @@ TEST_CASE("admissibility reject-all fails naming the parent in a two-file chain"
     auto loaded = load_chain(space, {"derived.xml"}, factory, "web", std::move(policy));
     REQUIRE_FALSE(loaded);
     // The error must name the rejected parent, not "derived.xml".
-    REQUIRE(loaded.error().find("base.xml") != std::string::npos);
+    REQUIRE(loaded.error().message.find("base.xml") != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------
@@ -564,9 +564,9 @@ TEST_CASE("extend-without-base fails loudly", "[chain]")
     // before the extend-without-base check.
     auto loaded = load_chain(space, {"derived.xml"}, factory, "web");
     REQUIRE_FALSE(loaded);
-    const bool has_extend = loaded.error().find("extend") != std::string::npos
-                            || loaded.error().find("base") != std::string::npos
-                            || loaded.error().find("no base") != std::string::npos;
+    const bool has_extend = loaded.error().message.find("extend") != std::string::npos
+                            || loaded.error().message.find("base") != std::string::npos
+                            || loaded.error().message.find("no base") != std::string::npos;
     REQUIRE(has_extend);
 }
 
@@ -600,10 +600,10 @@ TEST_CASE("re-open without extend disposition fails loudly", "[chain]")
 
     auto loaded = load_chain(space, {"derived.xml"}, factory);
     REQUIRE_FALSE(loaded);
-    const bool has_reopen = loaded.error().find("re-opening") != std::string::npos
-                            || loaded.error().find("re-open") != std::string::npos
-                            || loaded.error().find("multiple layers") != std::string::npos
-                            || loaded.error().find("extend") != std::string::npos;
+    const bool has_reopen = loaded.error().message.find("re-opening") != std::string::npos
+                            || loaded.error().message.find("re-open") != std::string::npos
+                            || loaded.error().message.find("multiple layers") != std::string::npos
+                            || loaded.error().message.find("extend") != std::string::npos;
     REQUIRE(has_reopen);
 }
 
@@ -625,8 +625,8 @@ TEST_CASE("duplicate primary-key value in one document fails at pull", "[chain]"
     auto loaded = load_chain(space, {"doc.xml"},
                              [&](const std::string &) { return xml_of(doc); });
     REQUIRE_FALSE(loaded);
-    REQUIRE(loaded.error().find("duplicate") != std::string::npos);
-    REQUIRE(loaded.error().find("web") != std::string::npos);
+    REQUIRE(loaded.error().message.find("duplicate") != std::string::npos);
+    REQUIRE(loaded.error().message.find("web") != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------
@@ -659,9 +659,9 @@ TEST_CASE("duplicate primary-key across chain layers without extend fails", "[ch
 
     auto loaded = load_chain(space, {"derived.xml"}, factory);
     REQUIRE_FALSE(loaded);
-    const bool has_error = loaded.error().find("re-opening") != std::string::npos
-                           || loaded.error().find("multiple layers") != std::string::npos
-                           || loaded.error().find("extend") != std::string::npos;
+    const bool has_error = loaded.error().message.find("re-opening") != std::string::npos
+                           || loaded.error().message.find("multiple layers") != std::string::npos
+                           || loaded.error().message.find("extend") != std::string::npos;
     REQUIRE(has_error);
 }
 
@@ -685,9 +685,9 @@ TEST_CASE("duplicate unique-field value across sibling instances fails", "[chain
     auto loaded = load_chain(space, {"doc.xml"},
                              [&](const std::string &) { return xml_of(doc); }, "web");
     REQUIRE_FALSE(loaded);
-    REQUIRE(loaded.error().find("unique") != std::string::npos);
-    REQUIRE(loaded.error().find("SN001") != std::string::npos);
-    REQUIRE(loaded.error().find("serial") != std::string::npos);
+    REQUIRE(loaded.error().message.find("unique") != std::string::npos);
+    REQUIRE(loaded.error().message.find("SN001") != std::string::npos);
+    REQUIRE(loaded.error().message.find("serial") != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------
@@ -722,8 +722,8 @@ TEST_CASE("duplicate unique-field value across chain files fails", "[chain]")
     // selection" guard would fire.
     auto loaded = load_chain(space, {"derived.xml"}, factory, "web");
     REQUIRE_FALSE(loaded);
-    REQUIRE(loaded.error().find("unique") != std::string::npos);
-    REQUIRE(loaded.error().find("SN001") != std::string::npos);
+    REQUIRE(loaded.error().message.find("unique") != std::string::npos);
+    REQUIRE(loaded.error().message.find("SN001") != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------
@@ -743,8 +743,8 @@ TEST_CASE("inherit attribute on non-root element fails loudly", "[chain]")
     auto loaded = load_chain(space, {"doc.xml"},
                              [&](const std::string &) { return xml_of(doc); });
     REQUIRE_FALSE(loaded);
-    REQUIRE(loaded.error().find("inherit") != std::string::npos);
-    REQUIRE(loaded.error().find("server") != std::string::npos);
+    REQUIRE(loaded.error().message.find("inherit") != std::string::npos);
+    REQUIRE(loaded.error().message.find("server") != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------
@@ -764,8 +764,8 @@ TEST_CASE("unknown extend value is a loud parse error", "[chain]")
     auto loaded = load_chain(space, {"doc.xml"},
                              [&](const std::string &) { return xml_of(doc); });
     REQUIRE_FALSE(loaded);
-    REQUIRE(loaded.error().find("extend") != std::string::npos);
-    REQUIRE(loaded.error().find("diagonal") != std::string::npos);
+    REQUIRE(loaded.error().message.find("extend") != std::string::npos);
+    REQUIRE(loaded.error().message.find("diagonal") != std::string::npos);
 }
 
 // Schema for the guard-axis cases below: anonymous (no primary key) so multi-file
@@ -823,8 +823,8 @@ TEST_CASE("depth-cap boundary: exactly at the cap loads, one beyond fails", "[ch
         policy.depth_cap = 2;
         auto loaded = load_chain(space, {"a.xml"}, factory, std::nullopt, std::move(policy));
         REQUIRE_FALSE(loaded);
-        REQUIRE(loaded.error().find("depth") != std::string::npos);
-        REQUIRE(loaded.error().find("2") != std::string::npos);
+        REQUIRE(loaded.error().message.find("depth") != std::string::npos);
+        REQUIRE(loaded.error().message.find("2") != std::string::npos);
     }
 }
 
@@ -851,9 +851,9 @@ TEST_CASE("three-file cycle fails loudly naming a path on the cycle", "[chain]")
 
     auto loaded = load_chain(space, {"a.xml"}, factory);
     REQUIRE_FALSE(loaded);
-    REQUIRE(loaded.error().find("cycle") != std::string::npos);
+    REQUIRE(loaded.error().message.find("cycle") != std::string::npos);
     // The reported path names a file on the cycle (a.xml is re-entered).
-    REQUIRE(loaded.error().find("a.xml") != std::string::npos);
+    REQUIRE(loaded.error().message.find("a.xml") != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------

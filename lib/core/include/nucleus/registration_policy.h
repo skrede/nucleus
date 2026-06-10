@@ -29,7 +29,7 @@ enum class registration_kind : std::uint8_t
         case registration_kind::configuration_source: return "source";
         case registration_kind::converter: return "converter";
     }
-    return "schema";
+    return "unknown";
 }
 
 // The context a registration-policy seam sees before a registration commits.

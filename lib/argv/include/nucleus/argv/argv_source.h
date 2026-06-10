@@ -1,6 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_ARGV_ARGV_SOURCE_H
 #define HPP_GUARD_NUCLEUS_ARGV_ARGV_SOURCE_H
 
+#include "nucleus/error.h"
 #include "nucleus/format.h"
 #include "nucleus/expected.h"
 #include "nucleus/log_sink.h"
@@ -100,7 +101,8 @@ public:
         {
             auto mapped = normalize_arg(token);
             if(!mapped)
-                return unexpected(mapped.error());
+                return unexpected(configuration_source_error{
+                    errc::malformed_source, std::move(mapped).error()});
 
             const key_path &path = mapped.value().key;
 
@@ -109,9 +111,10 @@ public:
             {
                 if(m_policy == unknown_key_policy::strict)
                 {
-                    return unexpected(nucleus::format(
-                        "unknown CLI flag '{}' maps to undeclared key '{}'",
-                        token, path.str()));
+                    return unexpected(configuration_source_error{
+                        errc::schema_violation, nucleus::format(
+                            "unknown CLI flag '{}' maps to undeclared key '{}'",
+                            token, path.str())});
                 }
                 if(m_log)
                 {

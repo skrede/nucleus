@@ -81,7 +81,7 @@ TEST_CASE("the registration-policy seam can intercept a registration", "[facade]
     REQUIRE(engine.register_schema("a"));
     auto rejected = engine.register_tokenizer("custom");
     REQUIRE_FALSE(rejected);
-    REQUIRE(rejected.error() == "tokenizers are reserved by the host");
+    REQUIRE(rejected.error().message == "tokenizers are reserved by the host");
 
     // The schema registration committed; the tokenizer registration did not.
     REQUIRE(engine.schema_count() == 1);
@@ -161,8 +161,8 @@ TEST_CASE("the per-source capability gate applies the loud/quiet contract", "[fa
         {nucleus::capability::nesting, nucleus::requirement_strength::required}};
     auto refused = nucleus::gate_features("schema", "env", env.capabilities(), required, sink);
     REQUIRE_FALSE(refused);
-    REQUIRE(refused.error().find("nesting") != std::string::npos);
-    REQUIRE(refused.error().find("env") != std::string::npos);
+    REQUIRE(refused.error().message.find("nesting") != std::string::npos);
+    REQUIRE(refused.error().message.find("env") != std::string::npos);
 
     std::vector<nucleus::feature_requirement> optional{
         {nucleus::capability::ordering, nucleus::requirement_strength::optional}};
