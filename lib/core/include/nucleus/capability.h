@@ -14,8 +14,8 @@ namespace nucleus {
 // is honored, degraded, or refused. (See feature_gate.)
 enum class capability : std::uint8_t
 {
-    // Hierarchical structure: a value can nest under another (a/b/c). A flat
-    // source (env, argv) cannot.
+    // Hierarchical structure: a value can nest under another (a/b/c). A
+    // map-shaped source (env) cannot; a path-addressed one (argv, runtime) can.
     nesting,
     // Two entries may share a key path within the same scope (repeated keys).
     // A map-shaped source collapses repeats to last-wins.

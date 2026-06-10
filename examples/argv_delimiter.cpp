@@ -5,10 +5,8 @@
 // and the completion generator -- so the surface a user sees and the surface the
 // parser accepts can never drift.
 
+#include "nucleus/configuration.h"
 #include "nucleus/configuration_space.h"
-
-#include "nucleus/keyspace/entry.h"
-#include "nucleus/keyspace/value.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -50,16 +48,16 @@ int main()
     args.delimit_with(delim.value())
         .recognize_with(nucleus::recognizer_of(space));
 
-    auto pulled = args.pull();
-    if(!pulled)
+    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(args)}, {});
+    if(!loaded)
     {
-        std::cerr << "pull failed: " << pulled.error() << '\n';
+        std::cerr << "load failed: " << loaded.error() << '\n';
         return 1;
     }
 
-    std::cout << "mapped from `__`-delimited flags:\n";
-    for(const nucleus::keyspace_entry &entry : pulled.value().entries)
-        std::cout << "  " << entry.path << " = " << entry.value.text() << '\n';
+    std::cout << "resolved from `__`-delimited flags:\n";
+    for(const std::string &key : loaded.value().keys())
+        std::cout << "  " << key << " = " << loaded.value().get(key).value() << '\n';
 
     // The emitter renders the SAME grammar back: every template line is a flag
     // the source above would accept verbatim.

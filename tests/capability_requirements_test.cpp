@@ -100,7 +100,7 @@ TEST_CASE("gate_stack errors loudly naming the capability and every layer when n
     recording_sink log;
     std::vector<std::pair<std::string, nucleus::capability_descriptor>> layers{
         {"env", nucleus::capability_descriptor{}},
-        {"argv", nucleus::capability_descriptor{}},
+        {"flat-table", nucleus::capability_descriptor{}},
     };
     std::vector<nucleus::feature_requirement> reqs{
         {nucleus::capability::nesting, nucleus::requirement_strength::required}};
@@ -110,7 +110,7 @@ TEST_CASE("gate_stack errors loudly naming the capability and every layer when n
     const std::string &message = gated.error().message;
     REQUIRE(message.find("nesting") != std::string::npos);
     REQUIRE(message.find("env") != std::string::npos);
-    REQUIRE(message.find("argv") != std::string::npos);
+    REQUIRE(message.find("flat-table") != std::string::npos);
 }
 
 TEST_CASE("gate_stack degrades a SOFT capability no layer provides, and the load proceeds", "[capability]")

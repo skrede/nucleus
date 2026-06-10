@@ -46,10 +46,12 @@ enum class unknown_key_policy
 //      a logged store-as-string (lenient). This is where schema-as-authority
 //      lives; segmentation stays simple.
 //
-// Its capability descriptor is honestly restrictive: a flag stream is flat (no
-// nesting structure of its own -- the hierarchy comes from the path), carries no
-// typed scalars, comments, or ordering guarantees. Like env, that makes it a real
-// exerciser of feature degradation rather than a source that claims everything.
+// Its capability descriptor declares nesting and duplicate_keys, mirroring
+// runtime_source's rationale: the bijection genuinely addresses nested paths
+// (the hierarchy comes from the flag's path, exactly as it comes from set()'s),
+// and repeating a flag (`--tag=a --tag=b`) is the CLI idiom for collections --
+// pull() emits one entry per token in order, so repeats compose. typed_scalars
+// and comments stay undeclared: flag values are text, so typing degrades softly.
 //
 // Plain struct satisfying the source concept by duck typing.
 class argv_source final
@@ -94,7 +96,8 @@ public:
 
     [[nodiscard]] static capability_descriptor descriptor() noexcept
     {
-        return capability_descriptor{};
+        return capability_descriptor{capability::nesting,
+                                     capability::duplicate_keys};
     }
 
     [[nodiscard]] capability_descriptor capabilities() const

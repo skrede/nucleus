@@ -167,9 +167,9 @@ same-named entry as one ordered collection — distinct from keyed containers
 (instances distinguished by the primary key) and template merging (anonymous
 instances composing). An element cannot be both `repeated` and `identity`, nor
 `repeated` and `unique`. Feeding a repeated element requires a source layer with
-the `duplicate_keys` capability (XML or the runtime source); within one source
-layer occurrences accumulate in document order, and a higher-precedence layer
-replaces the collection wholesale. `get_all()` / `get_all_as<T>()` return values
+the `duplicate_keys` capability (XML, argv, or the runtime source); within one
+source layer occurrences accumulate in document/flag order, and a
+higher-precedence layer replaces the collection wholesale. `get_all()` / `get_all_as<T>()` return values
 in fold order, and `collection_provenance_of()` returns one origin per element
 in the same order. See [`examples/round_trip.cpp`](../examples/round_trip.cpp).
 

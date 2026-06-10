@@ -165,7 +165,7 @@ argv_source &delimit_with(cli_delimiter delimiter);        // flag delimiter, de
 argv_source &policy(unknown_key_policy policy) noexcept;   // strict (default) | lenient
 argv_source &log_to(log_sink &sink) noexcept;
 
-static capability_descriptor descriptor() noexcept;        // empty
+static capability_descriptor descriptor() noexcept;        // { nesting, duplicate_keys }
 capability_descriptor capabilities() const;
 configuration_source_result pull();                        // owned values
 ```
@@ -191,8 +191,12 @@ nucleus::argv_source argv(std::vector<std::string>{"--server__port=8080"});
 argv.delimit_with(delim);
 ```
 
-Its capability descriptor is empty: a flag stream is flat and untyped, like
-env. See [`examples/argv.cpp`](../examples/argv.cpp),
+Its capability descriptor is `{ nesting, duplicate_keys }`, on runtime_source's
+rationale: the bijection genuinely addresses nested paths, and repeating a flag
+(`--tag=a --tag=b`) is the CLI idiom for collections — occurrences compose into
+one ordered collection. So a nested schema loads from argv alone. Not
+`typed_scalars`: flag values are text, so typing degrades softly. See
+[`examples/argv.cpp`](../examples/argv.cpp),
 [`examples/argv_recognizer.cpp`](../examples/argv_recognizer.cpp),
 [`examples/argv_delimiter.cpp`](../examples/argv_delimiter.cpp), and
 [`examples/logging.cpp`](../examples/logging.cpp).

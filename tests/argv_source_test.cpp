@@ -1,4 +1,10 @@
 #include "nucleus/log_sink.h"
+#include "nucleus/capability.h"
+#include "nucleus/configuration.h"
+#include "nucleus/configuration_space.h"
+
+#include "nucleus/schema/anchor.h"
+#include "nucleus/schema/schema.h"
 
 #include "nucleus/configuration_source/source_handle.h"
 #include "nucleus/configuration_source/configuration_source.h"
@@ -181,4 +187,57 @@ TEST_CASE("a recognized flag passes strict validation", "[argv]")
     auto batch = src.pull();
     REQUIRE(batch);
     REQUIRE(batch.value().entries.size() == 1);
+}
+
+TEST_CASE("argv declares nesting and duplicate_keys, not typing", "[argv][capability]")
+{
+    const auto caps = argv_source::descriptor();
+    REQUIRE(caps.supports(nucleus::capability::nesting));
+    REQUIRE(caps.supports(nucleus::capability::duplicate_keys));
+    REQUIRE_FALSE(caps.supports(nucleus::capability::typed_scalars));
+    REQUIRE_FALSE(caps.supports(nucleus::capability::comments));
+}
+
+namespace {
+
+// A nested schema with a repeated leaf: the shape that derives HARD nesting and
+// HARD duplicate_keys -- the requirements argv must satisfy on its own.
+[[nodiscard]] nucleus::configuration_space make_nested_space()
+{
+    nucleus::configuration_space_builder builder;
+    REQUIRE(builder.register_element(
+        nucleus::element("server", nucleus::anchor::root())));
+    REQUIRE(builder.register_element(
+        nucleus::element("host", nucleus::anchor::keyspace("server"))));
+    REQUIRE(builder.register_element(
+        nucleus::repeated_element("tag", nucleus::anchor::keyspace("server"))));
+    return builder.build();
+}
+
+}
+
+TEST_CASE("a nested element schema loads from argv alone", "[argv][capability]")
+{
+    const nucleus::configuration_space space = make_nested_space();
+
+    argv_source src(std::vector<std::string>{"--server-host=edge"});
+    src.recognize_with(nucleus::recognizer_of(space));
+
+    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(src)}, {});
+    REQUIRE(loaded);
+    REQUIRE(loaded.value().get("server/host").value() == "edge");
+}
+
+TEST_CASE("repeated flags compose into one ordered collection", "[argv][capability]")
+{
+    const nucleus::configuration_space space = make_nested_space();
+
+    argv_source src(std::vector<std::string>{
+        "--server-host=edge", "--server-tag=alpha", "--server-tag=beta"});
+    src.recognize_with(nucleus::recognizer_of(space));
+
+    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(src)}, {});
+    REQUIRE(loaded);
+    const auto tags = loaded.value().get_all("server/tag");
+    REQUIRE(tags == std::vector<std::string>{"alpha", "beta"});
 }
