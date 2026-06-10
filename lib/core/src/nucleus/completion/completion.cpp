@@ -1,4 +1,4 @@
-#include "nucleus/completion/completion.h"
+#include "nucleus/completion/completion_generator.h"
 #include "nucleus/completion/bash_emitter.h"
 #include "nucleus/completion/zsh_emitter.h"
 #include "nucleus/completion/completion_model.h"

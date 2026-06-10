@@ -37,7 +37,7 @@ TEST_CASE("a flat, untyped, non-repeated schema derives no requirements", "[capa
     nucleus::schema_registry schema;
     REQUIRE(schema.attach(nucleus::element("name", nucleus::anchor::root())));
 
-    auto reqs = nucleus::derive_capability_requirements(schema);
+    auto reqs = nucleus::derive_capability_requirements(schema.elements());
     REQUIRE(reqs.empty());
 }
 
@@ -49,7 +49,7 @@ TEST_CASE("a nested schema derives exactly one HARD nesting requirement", "[capa
     REQUIRE(schema.attach(nucleus::element("host", nucleus::anchor::keyspace("name"))));
     REQUIRE(schema.attach(nucleus::element("port", nucleus::anchor::keyspace("name"))));
 
-    auto reqs = nucleus::derive_capability_requirements(schema);
+    auto reqs = nucleus::derive_capability_requirements(schema.elements());
     REQUIRE(reqs.size() == 1);
     REQUIRE(reqs[0].cap == nucleus::capability::nesting);
     REQUIRE(reqs[0].strength == nucleus::requirement_strength::required);
@@ -60,7 +60,7 @@ TEST_CASE("a repeated element derives a HARD duplicate_keys requirement", "[capa
     nucleus::schema_registry schema;
     REQUIRE(schema.attach(nucleus::repeated_element("tag", nucleus::anchor::root())));
 
-    auto reqs = nucleus::derive_capability_requirements(schema);
+    auto reqs = nucleus::derive_capability_requirements(schema.elements());
     REQUIRE(reqs.size() == 1);
     REQUIRE(reqs[0].cap == nucleus::capability::duplicate_keys);
     REQUIRE(reqs[0].strength == nucleus::requirement_strength::required);
@@ -71,7 +71,7 @@ TEST_CASE("a typed element derives a SOFT typed_scalars requirement", "[capabili
     nucleus::schema_registry schema;
     REQUIRE(schema.attach(nucleus::typed_element<int>("port", nucleus::anchor::root())));
 
-    auto reqs = nucleus::derive_capability_requirements(schema);
+    auto reqs = nucleus::derive_capability_requirements(schema.elements());
     REQUIRE(reqs.size() == 1);
     REQUIRE(reqs[0].cap == nucleus::capability::typed_scalars);
     REQUIRE(reqs[0].strength == nucleus::requirement_strength::optional);

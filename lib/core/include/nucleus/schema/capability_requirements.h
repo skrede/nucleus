@@ -4,10 +4,10 @@
 #include "nucleus/capability.h"
 
 #include "nucleus/schema/schema.h"
-#include "nucleus/schema/schema_registry.h"
 
 #include "nucleus/configuration_source/feature_gate.h"
 
+#include <span>
 #include <vector>
 
 namespace nucleus {
@@ -17,14 +17,16 @@ namespace nucleus {
 // nesting (HARD); any repeated element needs duplicate_keys (HARD); any typed
 // element would use typed_scalars (SOFT). comments and ordering are never
 // requested. The set is deduplicated (N nested elements yield one nesting
-// requirement) and emitted in a stable order so callers and tests are deterministic.
+// requirement) and emitted in a stable order so callers and tests are
+// deterministic. Takes the declared elements directly (the host reaches them via
+// configuration_space::schema_elements()), not the registry that owns them.
 [[nodiscard]] inline std::vector<feature_requirement>
-derive_capability_requirements(const schema_registry &schema)
+derive_capability_requirements(std::span<const schema_element> elements)
 {
     bool needs_nesting = false;
     bool needs_duplicate_keys = false;
     bool uses_typed_scalars = false;
-    for(const schema_element &el : schema.elements())
+    for(const schema_element &el : elements)
     {
         if(!el.at.is_root())
             needs_nesting = true;

@@ -2,7 +2,7 @@
 #include "nucleus/configuration_space.h"
 #include "nucleus/registration_policy.h"
 
-#include "nucleus/completion/completion.h"
+#include "nucleus/completion/completion_generator.h"
 
 #include "nucleus/schema/schema_enforcer.h"
 #include "nucleus/schema/schema_registry.h"
@@ -187,7 +187,7 @@ assemble_handles(const space_core &state,
     descriptors.reserve(layers.size());
     for(const resolution_context::layered_handle &lh : layers)
         descriptors.emplace_back(lh.label, lh.handle->capabilities());
-    return gate_stack("schema", descriptors, derive_capability_requirements(schema), log);
+    return gate_stack("schema", descriptors, derive_capability_requirements(schema.elements()), log);
 }
 
 }

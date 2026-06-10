@@ -1,4 +1,4 @@
-#include "nucleus/completion/completion.h"
+#include "nucleus/completion/completion_generator.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"

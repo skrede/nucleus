@@ -33,8 +33,9 @@
 
 namespace nucleus {
 
-// A constructed tokenizer (internal header). Forward declared so install_tokenizer
-// is reachable without the public header pulling the tokenizer machinery.
+// A constructed tokenizer (nucleus/tokenizer/tokenizer.h). Forward declared so
+// install_tokenizer is reachable without this header pulling the tokenizer
+// machinery into every consumer.
 class tokenizer;
 
 // The shell a completion script targets (completion header). Forward declared so
