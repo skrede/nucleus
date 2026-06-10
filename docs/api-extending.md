@@ -63,10 +63,11 @@ static_assert(nucleus::configuration_source<table_source>);
 - **`capabilities()`** — declare which structural affordances this source
   provides (see [`capability_descriptor`](#capability)). Be honest: a source
   that claims an affordance it lacks defeats graceful degradation.
-- **`pull()`** — produce one batch of entries, or an error string naming why it
+- **`pull()`** — produce one batch of entries, or a typed error naming why it
   failed (`configuration_source_result` is
-  `expected<configuration_source_batch, std::string>`). The core never silently
-  drops a source.
+  `expected<configuration_source_batch, error>`; use `errc::unreadable_source`
+  for an input that cannot be read and `errc::malformed_source` for one that
+  cannot be parsed). The core never silently drops a source.
 
 A concept-satisfying struct is moved into a `source_handle` and reaches the
 engine through the same fold path as any shipped source. See
@@ -231,7 +232,8 @@ The primitives behind the automatic gate. A requirement is a capability plus a
 strength; gating intersects requirements with declared capabilities, applying
 loud-vs-quiet:
 
-- a **required** capability no source provides → a loud, named error; gating stops.
+- a **required** capability no source provides → a loud, named error
+  (`errc::unmet_capability`); gating stops.
 - an **optional** capability no source provides → observable degradation: a
   warn-level message through the `log_sink`, recorded and returned.
 
@@ -240,7 +242,7 @@ enum class requirement_strength : std::uint8_t { required, optional };
 struct feature_requirement { capability cap; requirement_strength strength; };
 struct degradation        { capability cap; std::string note; };
 struct gated_features     { std::vector<capability> honored; std::vector<degradation> degraded; };
-using gate_result = expected<gated_features, gate_error>;   // gate_error = std::string
+using gate_result = expected<gated_features, gate_error>;   // gate_error = nucleus::error
 
 gate_result gate_features(std::string_view consumer, std::string_view source_name,
                           const capability_descriptor &caps,
@@ -369,7 +371,8 @@ nucleus::tokenizer_builder builder("greet");
 builder.set_wildcard([](std::string_view who) -> nucleus::token_result {
     return std::string("hello ") + std::string(who);
 });
-engine.install_tokenizer(std::move(builder).build());
+if(!engine.install_tokenizer(std::move(builder).build()))
+    return 1;
 nucleus::configuration_space space = engine.build();
 
 // A value "${greet.world}" now resolves to "hello world" at load.
@@ -401,20 +404,24 @@ Two ways to attach one:
 
 ```cpp
 // Per element: the converter travels with the schema_element.
-builder.register_element(
-    nucleus::typed_element<vec3>("pos", nucleus::anchor::keyspace("body"), make_vec3_converter()));
+if(!builder.register_element(
+    nucleus::typed_element<vec3>("pos", nucleus::anchor::keyspace("body"), make_vec3_converter())))
+    return 1;
 
 // Per type: register once, declare elements with registered_element<T>.
-builder.register_converter<vec3>(make_vec3_converter());
-builder.register_element(
-    nucleus::registered_element<vec3>("pos", nucleus::anchor::keyspace("body")));
+if(!builder.register_converter<vec3>(make_vec3_converter()))
+    return 1;
+if(!builder.register_element(
+    nucleus::registered_element<vec3>("pos", nucleus::anchor::keyspace("body"))))
+    return 1;
 ```
 
 A per-element converter overrides the registry's converter for that element.
 Conversion runs after validation on the post-slice keyspace; a failure produces
-a load error of the form
+a load error with code `errc::failed_conversion` and a message of the form
 `conversion failed for '<path>': <reason> (layer: <label>)` (repeated paths add
-the zero-based element index). `make_scalar_converter<T>()` is public so a host
+the zero-based element index) — the converter supplies only the `<reason>`
+string; the engine attaches the code. `make_scalar_converter<T>()` is public so a host
 can wrap the built-in parsing with extra validation instead of reimplementing
 it — [`examples/typed.cpp`](../examples/typed.cpp) composes the float converter
 into an aggregate `vec3` converter.
@@ -451,8 +458,10 @@ public:
 
 Install it with
 `configuration_space_builder::set_registration_policy(std::make_shared<...>())`.
-A rejection's `reason()` is surfaced verbatim as the `registration_result`
-error. See [`examples/registration_policy.cpp`](../examples/registration_policy.cpp).
+The verdict traffics in a plain reason string; a rejection's `reason()` is
+surfaced verbatim as the `message` of the `registration_result` error, with
+code `errc::rejected_registration` attached by the engine. See
+[`examples/registration_policy.cpp`](../examples/registration_policy.cpp).
 
 ---
 
@@ -496,6 +505,7 @@ precedence order. Neither type decides filename conventions.
 
 ```cpp
 using parser_factory = std::function<source_handle(const std::string &path)>;
+using extension_result = expected<void, extension_error>;   // extension_error = nucleus::error
 
 extension_result claim(std::initializer_list<std::string_view> extensions,
                        parser_factory factory, owner_token owner = {});  // atomic
@@ -504,7 +514,7 @@ std::vector<std::string> extensions() const;
 
 A parser may claim several extensions, but each extension resolves to exactly
 one parser; a colliding `claim` rejects the whole registration (all-or-nothing)
-with a message naming the conflicting owners.
+with `errc::rejected_registration` and a message naming the conflicting owners.
 
 ### `discovery`
 

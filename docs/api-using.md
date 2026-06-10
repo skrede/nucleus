@@ -19,7 +19,7 @@ back. None of these requires subclassing. For the seams a host extends, see
 - [Provenance: `origin`](#provenance)
 - [`key_path` — addressing the keyspace](#key_path)
 - [Emitting: templates and documents](#emit)
-- [`expected<T, E>` — fallible returns](#expected)
+- [`expected<T, E>` and `error` — fallible returns](#expected)
 - [`owner_token` — opaque identity](#owner_token)
 - [Diagnostics: `suggest_keys`, `conflict_report`](#diagnostics)
 - [Completion: `generate_completion`, `shell`](#completion)
@@ -36,7 +36,7 @@ configuration_space_builder  --register_* / install_tokenizer-->  build()
 configuration_space (sealed, immutable, reusable)
         |
         v
-nucleus::load(space, source_stack, load_options)  -->  expected<configuration, std::string>
+nucleus::load(space, source_stack, load_options)  -->  expected<configuration, error>
 ```
 
 A builder accepts registrations and `build()` seals it into an immutable
@@ -44,6 +44,9 @@ A builder accepts registrations and `build()` seals it into an immutable
 composed `source_stack` against the sealed space and yields an immutable
 `configuration`. The space is never modified by a load, so one space serves many
 loads — even concurrently (see [`examples/reusable_space.cpp`](../examples/reusable_space.cpp)).
+The stack is borrowed by the load, not consumed, so one stack serves many loads
+too. Every fallible step reports a typed [`error`](#expected): an `errc` code a
+program branches on plus a verbatim human-readable message.
 
 ---
 
@@ -77,12 +80,15 @@ std::vector<conflict_report> conflicts() const;
 configuration_space build();   // seals; the builder is spent afterwards
 ```
 
-- `registration_result` is `expected<std::monostate, std::string>`: truthy on
-  success, carrying the registration policy's rejection reason on failure.
+- `registration_result` is `expected<void, error>`: truthy on success. On
+  failure the code is `errc::rejected_registration` (the registration policy's
+  reason, verbatim, in `message`) or `errc::sealed_builder`.
+- `expected` is `[[nodiscard]]`, so silently dropping a registration result is a
+  compiler warning — check each one, `if(!builder.register_element(...)) ...`.
 - Every registration carries an opaque `owner_token` and is first offered to the
   [registration policy](api-extending.md#registration_policy).
 - After `build()`, every `register_*` / `install_*` call is a loud state-machine
-  error, never a silent no-op.
+  error (`errc::sealed_builder`), never a silent no-op.
 
 See [`examples/quickstart.cpp`](../examples/quickstart.cpp).
 
@@ -141,10 +147,15 @@ suggestion), missing `required` fields, and values outside an `enum_element`'s
 gate — an empty schema is not a claim that nothing is allowed.
 
 ```cpp
-builder.register_element(nucleus::element("server", nucleus::anchor::root()));
-builder.register_element(nucleus::required_element("host", nucleus::anchor::keyspace("server")));
-builder.register_element(nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
-                                               {"http", "https"}));
+if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
+    return 1;
+if(!builder.register_element(
+    nucleus::required_element("host", nucleus::anchor::keyspace("server"))))
+    return 1;
+if(!builder.register_element(
+    nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
+                          {"http", "https"})))
+    return 1;
 ```
 
 See [`examples/schema.cpp`](../examples/schema.cpp).
@@ -189,15 +200,17 @@ in the same order. See [`examples/round_trip.cpp`](../examples/round_trip.cpp).
 
 Declaring a type is a content contract: every declared path that survives
 slicing is converted at the load boundary, and a conversion failure fails the
-load loudly, naming the path, the converter's reason, and the winning layer's
-label. Absent paths are skipped (absence is `required`'s concern, not the
-converter's).
+load loudly (`errc::failed_conversion`), naming the path, the converter's
+reason, and the winning layer's label. Absent paths are skipped (absence is
+`required`'s concern, not the converter's).
 
 ```cpp
-builder.register_element(
-    nucleus::typed_element<vec3>("pos", nucleus::anchor::keyspace("body"), make_vec3_converter()));
-builder.register_element(
-    nucleus::typed_element<int32_t>("mass", nucleus::anchor::keyspace("body")));
+if(!builder.register_element(
+    nucleus::typed_element<vec3>("pos", nucleus::anchor::keyspace("body"), make_vec3_converter())))
+    return 1;
+if(!builder.register_element(
+    nucleus::typed_element<int32_t>("mass", nucleus::anchor::keyspace("body"))))
+    return 1;
 // ... load ...
 auto pos  = config.get_as<vec3>("body/pos");
 auto mass = config.get_as<int32_t>("body/mass");
@@ -254,9 +267,15 @@ consent: the derived document marks the instance with an `extend` disposition
 `extend` is rejected as a duplicate.
 
 ```cpp
-builder.register_element(nucleus::element("server", nucleus::anchor::keyspace("cluster")));
-builder.register_element(nucleus::primary_key_element("name", nucleus::anchor::keyspace("cluster/server")));
-builder.register_element(nucleus::unique_element("serial", nucleus::anchor::keyspace("cluster/server")));
+if(!builder.register_element(
+    nucleus::element("server", nucleus::anchor::keyspace("cluster"))))
+    return 1;
+if(!builder.register_element(
+    nucleus::primary_key_element("name", nucleus::anchor::keyspace("cluster/server"))))
+    return 1;
+if(!builder.register_element(
+    nucleus::unique_element("serial", nucleus::anchor::keyspace("cluster/server"))))
+    return 1;
 ```
 
 See [`examples/strains.cpp`](../examples/strains.cpp).
@@ -342,9 +361,12 @@ See [`examples/source_stack.cpp`](../examples/source_stack.cpp).
 
 ```cpp
 load_result load(const configuration_space &space,
-                 source_stack stack,
+                 source_stack &stack,
                  const load_options &options = {});
-// load_result = expected<configuration, std::string>
+load_result load(const configuration_space &space,
+                 source_stack &&stack,         // inline composition: source_stack{...}
+                 const load_options &options = {});
+// load_result = expected<configuration, error>
 
 struct load_options {
     std::optional<std::string>                        selection;   // strain to select
@@ -369,8 +391,12 @@ struct load_options {
 4. slices the selected strain, validates against the schema, converts typed
    paths, and freezes the result into an immutable `configuration`.
 
-Any failure — a source pull error, a gate refusal, a token error, a schema or
-conversion violation — returns the reason as the `expected` error, verbatim.
+The stack is borrowed, not consumed: it stays valid afterward, so the same
+stack can pre-flight via `check_capabilities()` and then load, or load more
+than once. Any failure — a source pull error, a gate refusal, a token error, a
+schema or conversion violation — returns an [`error`](#expected) whose `code`
+names the failing pipeline stage and whose `message` carries the verbatim
+reason.
 
 ```cpp
 const char *document = R"(<server host="127.0.0.1" mode="http"/>)";
@@ -399,14 +425,16 @@ provenance).
 
 ```cpp
 gate_result check_capabilities(const configuration_space &space,
-                               source_stack stack,
+                               const source_stack &stack,
                                const load_options &options = {});
 ```
 
 Runs the same capability gate `load()` runs, without pulling or folding, so a
 host can validate fit ahead of a load; the pre-flight and the load never
-disagree. `gate_result` is `expected<gated_features, std::string>` — the honored
-capabilities plus the observable degradations, or the hard-shortfall error.
+disagree. The stack is borrowed const — it stays intact for the `load()` that
+follows it. `gate_result` is `expected<gated_features, error>` — the honored
+capabilities plus the observable degradations, or the hard-shortfall error
+(`errc::unmet_capability`).
 
 The derivation is shape-driven (`"nucleus/schema/capability_requirements.h"`,
 `derive_capability_requirements(std::span<const schema_element>)`): any
@@ -432,8 +460,8 @@ std::vector<std::string> get_all(const std::string &key) const;   // repeated pa
 bool contains(const std::string &key) const;
 const origin *provenance_of(const std::string &key) const;        // "why is this value X?"
 const std::vector<origin> *collection_provenance_of(const std::string &key) const;
-template<typename T> expected<T, std::string> get_as(const std::string &key) const;
-template<typename T> expected<std::vector<T>, std::string> get_all_as(const std::string &key) const;
+template<typename T> expected<T, error> get_as(const std::string &key) const;
+template<typename T> expected<std::vector<T>, error> get_all_as(const std::string &key) const;
 std::size_t size() const noexcept;
 bool empty() const noexcept;
 std::vector<std::string> keys() const;   // canonical order, repeated paths once
@@ -444,15 +472,30 @@ and `get()` returns the last value; for a single-value path `get_all()` returns
 a one-element vector. `provenance_of()` covers scalar keys only; a collection's
 per-element origins come from `collection_provenance_of()`.
 
-The typed reads distinguish their failures by error substring:
+The typed reads return `expected<T, error>`; branch on the `code`, print the
+whole `error` (or its `message`) for humans:
 
-| Condition | Error substring |
-|-----------|-----------------|
-| path carries no value | `"is absent"` |
-| path has a value but no converter | `"declares no type converter"` |
-| stored type does not equal requested type | `"type mismatch"` |
-| path holds a typed collection — use `get_all_as` | `"use get_all_as"` |
-| path holds a single typed value — use `get_as` | `"use get_as"` |
+| Condition | `error.code` | `error.message` says |
+|-----------|--------------|----------------------|
+| path carries no value | `errc::absent_key` | the path is absent |
+| path has a value but no converter | `errc::missing_converter` | the path declares no type converter |
+| stored type does not equal requested type | `errc::mismatched_type` | type mismatch for the path |
+| path holds a typed collection — use `get_all_as` | `errc::mismatched_type` | use `get_all_as<T>()` |
+| path holds a single typed value — use `get_as` | `errc::mismatched_type` | use `get_as<T>()` |
+
+Branching on the code is the supported host pattern:
+
+```cpp
+auto port = config.get_as<int32_t>("server/port");
+int32_t resolved_port = 8080;                      // the fallback default
+if(port)
+    resolved_port = port.value();
+else if(port.error().code != nucleus::errc::absent_key)
+{
+    std::cerr << port.error() << '\n';             // e.g. "mismatched_type: type mismatch for ..."
+    return 1;
+}
+```
 
 See [`examples/typed.cpp`](../examples/typed.cpp) and
 [`examples/reusable_space.cpp`](../examples/reusable_space.cpp).
@@ -550,18 +593,52 @@ path keeps all of its values in every format. See
 ---
 
 <a id="expected"></a>
-## `expected<T, E>` — fallible returns
+## `expected<T, E>` and `error` — fallible returns
 
-`#include "nucleus/expected.h"`
+`#include "nucleus/expected.h"` and `"nucleus/error.h"`
 
-The fallible-return vocabulary used across the public API. It mirrors
-`std::expected` (C++23); a future migration points the aliases at the standard
-type and edits nothing else. Truthy when it holds a value; construct the error
-alternative with `nucleus::unexpected(error)`.
+`expected<T, E>` is the fallible-return vocabulary used across the public API.
+It mirrors `std::expected` (C++23); a future migration points the aliases at
+the standard type and edits nothing else. Truthy when it holds a value;
+construct the error alternative with `nucleus::unexpected(e)`. The type is
+`[[nodiscard]]`, so discarding any result — a load, a registration — is a
+compiler warning.
+
+Every public result channel carries `nucleus::error` as its `E`:
 
 ```cpp
-auto loaded = nucleus::load(space, std::move(stack), {});
-if(!loaded) { std::cerr << loaded.error(); return 1; }
+enum class errc {
+    unreadable_source, malformed_source, invalid_inheritance, unmet_capability,
+    layering_violation, unresolved_token, invalid_selection, schema_violation,
+    failed_conversion, rejected_registration, sealed_builder,
+    absent_key, missing_converter, mismatched_type,
+};
+constexpr std::string_view to_string(errc code) noexcept;
+
+struct error {
+    errc        code;       // machine-readable: branch on this
+    std::string message;    // verbatim human-readable reason
+};
+std::string to_string(const error &e);                      // "code: message"
+std::ostream &operator<<(std::ostream &os, const error &e); // same rendering
+```
+
+The codes follow the load pipeline (source → inheritance → gate → fold →
+tokens → selection → schema → conversion), then registration, then typed
+reads. A host branches on `code`; the human detail travels in `message`.
+Host-supplied seams (converters, the registration policy verdict) still
+traffic in plain reason strings — the engine attaches the code at the seam
+where the failure class is known.
+
+```cpp
+auto loaded = nucleus::load(space, stack, {});
+if(!loaded)
+{
+    std::cerr << loaded.error() << '\n';   // streams "code: message"
+    if(loaded.error().code == nucleus::errc::invalid_selection)
+        print_available_strains();
+    return 1;
+}
 const nucleus::configuration &config = loaded.value();
 ```
 

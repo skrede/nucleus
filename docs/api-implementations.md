@@ -62,8 +62,14 @@ public:
 How it realizes the seams:
 
 - **Tree → keyspace.** Nested elements become `/`-separated key paths; an
-  element's attributes and pure-text leaf children become values. The root
-  element name anchors the path.
+  element's attributes and pure-text leaf children (plain character data or
+  CDATA sections) become values. The root element name anchors the path. The
+  walk caps element nesting at 64 levels; deeper documents are rejected as
+  malformed.
+- **Errors.** A failed `pull()` distinguishes an unreadable file
+  (`errc::unreadable_source`) from a malformed document
+  (`errc::malformed_source`), carrying pugixml's parse description — and, for a
+  malformed document, the byte offset — in the message.
 - **View-node model.** Every value is a view into the pugixml document arena
   (zero-copy), and `pull()` pins that arena in the batch's `retained_buffer` —
   the [buffer lifetime contract](api-extending.md#buffer), honored. This is the
@@ -203,6 +209,10 @@ It emits flat `(path → value)` entries exactly like `env_source`, but declares
 can carry nested, repeated, and typed data, so the auto-gate admits a
 nested/typed schema fed programmatically. This is the difference between the
 two flat in-memory sources: same fold result, different gate-visible honesty.
+The declared descriptor travels on every emitted entry, so the gate's admit
+decision and the fold's per-entry checks can never disagree: two `.set()` calls
+on a repeated path compose into a collection instead of failing as a
+flat-source violation.
 
 ```cpp
 nucleus::runtime_source defaults;

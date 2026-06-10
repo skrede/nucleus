@@ -47,7 +47,9 @@ A `configuration_space_builder` accepts registrations (`register_*` /
 `configuration_space`. The free function `nucleus::load(space, stack, options)`
 folds a source stack against the sealed space and yields an immutable, freely
 thread-readable `configuration`. Registration after `build()` is a
-state-machine error, and the space can be reused across many loads.
+state-machine error; the space can be reused across many loads, and the source
+stack is borrowed (never consumed), so one stack can pre-flight and load
+repeatedly.
 
 * **Token expansion** \
 A `${...}` pipeline with generic core tokenizers (env, string) expands values
@@ -56,9 +58,11 @@ vocabulary (machine identity, logging) is the host's to build with
 `tokenizer_builder` and inject through `install_tokenizer()`.
 
 * **Diagnostics and provenance** \
-Nearest-key suggestions on unknown keys, non-adjudicating conflict reports, and a
-`provenance_of` answer to "why is this value X?". Logging is a `log_sink` seam
-(level + message, `std::format`, no-op by default) the host bridges to its logger.
+Every failure is a typed `nucleus::error` &mdash; a machine-readable `errc` code a
+host branches on, plus a verbatim human-readable message. Nearest-key suggestions
+on unknown keys, non-adjudicating conflict reports, and a `provenance_of` answer
+to "why is this value X?". Logging is a `log_sink` seam (level + message,
+`std::format`, no-op by default) the host bridges to its logger.
 
 * **Schema-projected shell completion** \
 `generate_completion` projects the registered schema into a static bash or zsh
@@ -135,9 +139,11 @@ declared and resolves, while an undeclared flag would fail the load.
 
 ```cpp
 nucleus::configuration_space_builder builder;
-builder.register_element(nucleus::element("server", nucleus::anchor::root()));
-builder.register_element(
-    nucleus::element("port", nucleus::anchor::keyspace("server")));
+if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
+    return 1;
+if(!builder.register_element(
+    nucleus::element("port", nucleus::anchor::keyspace("server"))))
+    return 1;
 nucleus::configuration_space space = builder.build();
 
 nucleus::argv_source argv(std::vector<std::string>{"--server-port=8080"});
@@ -210,10 +216,12 @@ script as a string and the host decides how to surface it.
 
 ```cpp
 nucleus::configuration_space_builder builder;
-builder.register_element(nucleus::element("logging", nucleus::anchor::root()));
-builder.register_element(nucleus::enum_element(
+if(!builder.register_element(nucleus::element("logging", nucleus::anchor::root())))
+    return 1;
+if(!builder.register_element(nucleus::enum_element(
     "level", nucleus::anchor::keyspace("logging"),
-    {"debug", "info", "warn", "error"}));
+    {"debug", "info", "warn", "error"})))
+    return 1;
 nucleus::configuration_space space = builder.build();
 
 std::cout << space.generate_completion(nucleus::shell::bash, "mytool");
