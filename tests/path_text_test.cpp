@@ -19,7 +19,9 @@ TEST_CASE("path_to_text yields forward-slash separators on every platform",
 
 TEST_CASE("path_to_text preserves non-ASCII text as UTF-8", "[path_text]")
 {
-    const std::filesystem::path p(u8"konfigurasjon/æøå.xml");
+    // \u escapes keep the test independent of the source file's encoding (an
+    // MSVC build without /utf-8 would double-encode a literal non-ASCII byte).
+    const std::filesystem::path p(u8"konfigurasjon/\u00e6\u00f8\u00e5.xml");
     REQUIRE(nucleus::path_to_text(p) == "konfigurasjon/\xc3\xa6\xc3\xb8\xc3\xa5.xml");
 }
 

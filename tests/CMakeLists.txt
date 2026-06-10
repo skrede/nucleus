@@ -63,6 +63,9 @@ nucleus_add_test(resolution_test nucleus::env nucleus::argv)
 nucleus_add_test(diagnostics_test)
 nucleus_add_test(completion_test)
 nucleus_add_test(completion_smoke_test)
+# Catch2 exits 4 when every selected test was skipped (here: no bash on PATH);
+# tell CTest that is a skip, not a failure.
+set_tests_properties(completion_smoke_test PROPERTIES SKIP_RETURN_CODE 4)
 nucleus_add_test(facade_completion_test)
 nucleus_add_test(strain_scope_policy_test nucleus::runtime)
 nucleus_add_test(converter_registry_test nucleus::env)

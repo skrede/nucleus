@@ -15,7 +15,9 @@ endif()
 # compiled target.
 function(nucleus_warnings target)
     if(MSVC)
-        target_compile_options(${target} PRIVATE /W4 /permissive-)
+        # /utf-8: MSVC otherwise reads source as the active code page, silently
+        # double-encoding any non-ASCII byte in a u8 literal.
+        target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)
     else()
         target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
     endif()
