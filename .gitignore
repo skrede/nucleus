@@ -49,6 +49,5 @@ coverage.*
 .planning/
 CLAUDE.md
 GEMINI.md
-CONVENTIONS.md
 
 **/*vcpkg_installed/

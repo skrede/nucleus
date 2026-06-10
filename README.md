@@ -122,6 +122,7 @@ link only the modules you use.
 The [`docs/`](docs/) directory holds the API reference, split three ways:
 [types you use](docs/api-using.md), [seams you extend](docs/api-extending.md),
 and the [shipped implementations](docs/api-implementations.md) of those seams.
+Contributions follow [`CONVENTIONS.md`](CONVENTIONS.md).
 
 ## Examples
 
