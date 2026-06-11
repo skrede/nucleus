@@ -88,6 +88,7 @@ struct space_core
         return out;
     }
 
+    std::string name;
     schema_registry schema;
     tokenizer_registry tokenizer;
     converter_registry converters;
@@ -277,6 +278,12 @@ registration_result configuration_space_builder::register_converter(
     return registration_ok();
 }
 
+configuration_space_builder &configuration_space_builder::name(std::string space_name)
+{
+    m_impl->name = std::move(space_name);
+    return *this;
+}
+
 std::size_t configuration_space_builder::schema_count() const noexcept { return m_impl->schema.size(); }
 
 std::size_t configuration_space_builder::tokenizer_count() const noexcept { return m_impl->tokenizer.size(); }
@@ -327,6 +334,8 @@ std::size_t configuration_space::tokenizer_count() const noexcept { return m_imp
 std::size_t configuration_space::converter_count() const noexcept { return m_impl->converters.size(); }
 
 std::vector<conflict_report> configuration_space::conflicts() const { return m_impl->conflicts(); }
+
+std::string_view configuration_space::space_name() const noexcept { return m_impl->name; }
 
 std::string configuration_space::generate_completion(shell which, std::string_view prog,
                                                      const cli_delimiter &delimiter,

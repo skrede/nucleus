@@ -108,7 +108,10 @@ void emit_node(const tree_node &n, std::ostream &out, std::size_t depth)
 // declared field, nested by anchor path (a child is emitted inside its anchor's
 // element), with a constrained field annotated by its allowed values. Deterministic
 // hand-built projection (no values -- template only).
-void emit_template(const configuration_space &space, std::ostream &out)
+// When space_name is non-empty, all roots are wrapped under <space_name>...</space_name>
+// for symmetric round-trip with xml_source::with_space_name().
+void emit_template(const configuration_space &space, std::ostream &out,
+                   std::string_view space_name)
 {
     std::vector<tree_node> roots;
     for(const schema_element &el : space.schema_elements())
@@ -127,7 +130,15 @@ void emit_template(const configuration_space &space, std::ostream &out)
             current->allowed_values = el.allowed_values;
     }
 
-    if(roots.size() == 1)
+    if(!space_name.empty())
+    {
+        // Named-space: always wrap in the space-name root regardless of root count.
+        out << '<' << space_name << ">\n";
+        for(const tree_node &r : roots)
+            emit_node(r, out, 1);
+        out << "</" << space_name << ">\n";
+    }
+    else if(roots.size() == 1)
     {
         emit_node(roots.front(), out, 0);
     }
@@ -145,7 +156,10 @@ void emit_template(const configuration_space &space, std::ostream &out)
 // key splits into element segments, intermediate segments are shared parent nodes,
 // and the leaf is appended once per value so a repeated path persists ALL its values.
 // A malformed key is skipped (never thrown), consistent with the read path.
-void emit_document(const configuration &config, std::ostream &out)
+// When space_name is non-empty, all top-level elements are re-parented under a new
+// wrapper element named space_name for symmetric round-trip with with_space_name().
+void emit_document(const configuration &config, std::ostream &out,
+                   std::string_view space_name)
 {
     pugi::xml_document doc;
     for(const std::string &key : config.keys())
@@ -172,6 +186,20 @@ void emit_document(const configuration &config, std::ostream &out)
             leaf_node.append_child(pugi::node_pcdata).set_value(value.c_str());
         }
     }
+
+    if(!space_name.empty())
+    {
+        // Collect top-level children before mutation, then re-parent them under
+        // the space-name wrapper. pugixml's append_move removes the node from its
+        // current parent as it adds it to the new one.
+        std::vector<pugi::xml_node> top_level;
+        for(pugi::xml_node child = doc.first_child(); child; child = child.next_sibling())
+            top_level.push_back(child);
+        pugi::xml_node wrapper = doc.append_child(std::string(space_name).c_str());
+        for(pugi::xml_node &child : top_level)
+            wrapper.append_move(child);
+    }
+
     doc.save(out, "  ");
 }
 

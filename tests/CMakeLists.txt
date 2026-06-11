@@ -89,6 +89,8 @@ target_link_libraries(concurrent_load_test PRIVATE Threads::Threads)
 # use-after-free guard real.
 # ---------------------------------------------------------------------------
 if(NUCLEUS_BUILD_SOURCE_XML)
+    nucleus_add_test(identity_envelope_test nucleus::xml nucleus::argv)
+
     # Template emission lives in the xml module now (nucleus::xml::emit_template),
     # so this test links the module; its header arrives via the nucleus::xml link.
     add_executable(xml_template_test xml_template_test.cpp)

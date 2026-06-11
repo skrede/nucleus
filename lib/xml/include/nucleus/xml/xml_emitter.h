@@ -5,6 +5,8 @@
 #include "nucleus/configuration_space.h"
 
 #include <iosfwd>
+#include <string>
+#include <string_view>
 
 namespace nucleus::xml {
 
@@ -15,21 +17,27 @@ namespace nucleus::xml {
 // (one leaf element per value, so repeated paths keep ALL their values). Both write
 // into the caller's stream -- the user owns persistence. No pugixml type appears
 // here; the library is reachable only in xml_emitter.cpp.
-void emit_template(const configuration_space &space, std::ostream &out);
-void emit_document(const configuration &config, std::ostream &out);
+// When space_name is non-empty, the output is wrapped under <space_name>...</space_name>
+// for symmetric round-trip with xml_source::with_space_name().
+void emit_template(const configuration_space &space, std::ostream &out,
+                   std::string_view space_name = {});
+void emit_document(const configuration &config, std::ostream &out,
+                   std::string_view space_name = {});
 
-// The stateless emitter modeling nucleus::config_emitter: its members forward to the
+// The stateful emitter modeling nucleus::config_emitter: its members forward to the
 // free functions above, so the xml module satisfies the output contract by type as
-// well as by call surface.
+// well as by call surface. space_name is forwarded for named-space round-trips.
 struct emitter
 {
+    std::string space_name;
+
     void emit_template(const configuration_space &space, std::ostream &out) const
     {
-        nucleus::xml::emit_template(space, out);
+        nucleus::xml::emit_template(space, out, space_name);
     }
     void emit_document(const configuration &config, std::ostream &out) const
     {
-        nucleus::xml::emit_document(config, out);
+        nucleus::xml::emit_document(config, out, space_name);
     }
 };
 

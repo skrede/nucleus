@@ -72,6 +72,28 @@ std::string_view keyed_value(const pugi::xml_node &node, const std::string &key_
     return {};
 }
 
+// Validates grammar attributes on a transparent named-space root without emitting
+// any keyspace entries. Accepts inherit= (consumed by inheritance()) and rejects
+// extend= on the root (not a keyed instance). Other attributes pass silently --
+// the root envelope carries metadata, not keyspace content.
+expected<void, configuration_source_error>
+validate_root_attrs(const pugi::xml_node &root)
+{
+    for(const pugi::xml_attribute &attr : root.attributes())
+    {
+        std::string_view name = std::string_view(attr.name());
+        if(name == "inherit")
+            continue; // consumed by inheritance()
+        if(name == "extend")
+            return unexpected(configuration_source_error{errc::malformed_source,
+                nucleus::format(
+                    "extend attribute is not permitted on element '{}'; "
+                    "it is only valid on a primary-keyed container instance",
+                    root.name())});
+    }
+    return {};
+}
+
 // Walks one element into keyspace entries under `path`. Attributes and pure-text
 // leaf children become value entries; nested elements recurse. Every value is a
 // string_view into the document arena -- never copied here -- so the batch must
@@ -271,13 +293,38 @@ configuration_source_result xml_source::pull()
 
     configuration_source_batch batch;
     std::map<std::string, std::set<std::string>> seen_keys;
-    // The root element name anchors the keyspace path so a document's top-level
-    // element is addressable, matching the nested-element-as-path model. The
-    // projection (empty unless the schema declared keyed containers) controls how
-    // repeatable instances are distinguished.
-    if(auto r = walk(root, std::string_view(root.name()), capabilities(), m_projection,
-                     batch, {}, seen_keys, true, 0); !r)
-        return unexpected(r.error());
+
+    if(!m_space_name.empty())
+    {
+        // Named-space envelope: validate root name, then walk each child directly
+        // so the root element name is stripped from all key paths.
+        if(std::string_view(root.name()) != m_space_name)
+            return unexpected(configuration_source_error{errc::malformed_source,
+                nucleus::format("xml source: expected root element '{}', found '{}'",
+                    m_space_name, root.name())});
+
+        // Validate root grammar attributes (inherit= suppressed, anything else
+        // that is not a known grammar attr is a walk error) without emitting entries.
+        if(auto r = validate_root_attrs(root); !r)
+            return unexpected(r.error());
+
+        // Walk each direct child as a top-level keyspace entry (root is transparent).
+        for(const pugi::xml_node &child : root.children())
+        {
+            if(child.type() != pugi::node_element)
+                continue;
+            if(auto r = walk(child, std::string_view(child.name()), capabilities(), m_projection,
+                             batch, {}, seen_keys, false, 1); !r)
+                return unexpected(r.error());
+        }
+    }
+    else
+    {
+        // Unnamed space: root element name is the first key segment (unchanged behavior).
+        if(auto r = walk(root, std::string_view(root.name()), capabilities(), m_projection,
+                         batch, {}, seen_keys, true, 0); !r)
+            return unexpected(r.error());
+    }
 
     // Pin the arena: the entries' views point into it and must stay valid until
     // resolution copies them out. m_arena is also kept alive as a member so

@@ -74,6 +74,15 @@ public:
 
     [[nodiscard]] configuration_source_result pull();
 
+    // Sets the expected root element name for named-space envelope validation.
+    // When non-empty, pull() validates the root element name and strips it from
+    // all key paths (children become top-level keyspaces). Empty = current behavior.
+    xml_source &with_space_name(std::string_view name)
+    {
+        m_space_name = std::string(name);
+        return *this;
+    }
+
     // Retains the schema-derived projection the resolve fold hands over before
     // pull(), so the walk can render repeatable keyed containers (one instance
     // per primary-key value) instead of collapsing repeated siblings last-wins.
@@ -101,6 +110,7 @@ private:
 
     kind m_kind;
     std::string m_input;
+    std::string m_space_name;
     schema_projection m_projection;
     // Set during pull(); shared_ptr so inheritance() can read the root after
     // pull() returns without copying the arena.

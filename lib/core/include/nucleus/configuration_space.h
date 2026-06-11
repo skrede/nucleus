@@ -135,6 +135,10 @@ public:
     // host adjudicates. Empty when none occurred.
     [[nodiscard]] std::vector<conflict_report> conflicts() const;
 
+    // Sets the space name -- the identity each source format validates at its boundary
+    // (document root element, env prefix, argv first segment). Empty = unnamed.
+    configuration_space_builder &name(std::string space_name);
+
     // Seals the builder into an immutable configuration_space. Infallible (it never
     // returns an error); it copies the three registries + policy + ledger into the
     // sealed product and marks the builder spent. After build(), every register_* /
@@ -169,6 +173,9 @@ public:
     [[nodiscard]] std::size_t schema_count() const noexcept;
     [[nodiscard]] std::size_t tokenizer_count() const noexcept;
     [[nodiscard]] std::size_t converter_count() const noexcept;
+
+    // The name set via configuration_space_builder::name(); empty for unnamed spaces.
+    [[nodiscard]] std::string_view space_name() const noexcept;
 
     // Key-path collisions recorded during the originating builder's registrations.
     [[nodiscard]] std::vector<conflict_report> conflicts() const;
