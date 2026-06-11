@@ -70,6 +70,14 @@ completion script &mdash; flag names plus each element's declared value set &mda
 the SAME flag mapping the CLI surface uses, so completion cannot drift from the
 CLI.
 
+* **Multi-space CLI addressing** \
+`multispace_argv_source` partitions one argv token vector across independently-declared
+configuration spaces by the flag's first segment (`--alpha-x=1` routes to the `alpha`
+space as key `x`). `argv::emit_template`, `argv::emit_document`, and
+`generate_completion` all accept an optional `space_name` so the emitted surface
+round-trips exactly with the parser. See [`docs/cli-grammar.md`](docs/cli-grammar.md)
+for the full grammar reference, setup example, and cross-format envelope table.
+
 ## Build
 
 ```sh

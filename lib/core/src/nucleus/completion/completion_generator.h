@@ -23,7 +23,8 @@ class schema_registry;
                                               const schema_registry &schema,
                                               std::string_view prog,
                                               const cli_delimiter &delimiter = {},
-                                              const key_path &anchor = {});
+                                              const key_path &anchor = {},
+                                              std::string_view space_name = {});
 
 }
 

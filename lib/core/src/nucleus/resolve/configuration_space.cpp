@@ -339,11 +339,12 @@ std::string_view configuration_space::space_name() const noexcept { return m_imp
 
 std::string configuration_space::generate_completion(shell which, std::string_view prog,
                                                      const cli_delimiter &delimiter,
-                                                     const key_path &anchor) const
+                                                     const key_path &anchor,
+                                                     std::string_view space_name) const
 {
     // Project the sealed schema through the free generator. Only the script string
     // crosses the boundary; the registry stays encapsulated.
-    return nucleus::generate_completion(which, m_impl->schema, prog, delimiter, anchor);
+    return nucleus::generate_completion(which, m_impl->schema, prog, delimiter, anchor, space_name);
 }
 
 std::span<const schema_element> configuration_space::schema_elements() const

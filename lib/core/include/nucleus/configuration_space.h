@@ -182,10 +182,12 @@ public:
 
     // Generates a completion script for `which`, projected from the sealed schema
     // and bound to `prog`. Flags render under `delimiter` and relative to `anchor`,
-    // which must match the argv_source grammar. A pure read of the schema.
+    // which must match the argv_source grammar. When space_name is non-empty, every
+    // completion entry is prefixed with the space name, matching multispace_argv_source.
     [[nodiscard]] std::string generate_completion(shell which, std::string_view prog,
                                                   const cli_delimiter &delimiter = {},
-                                                  const key_path &anchor = {}) const;
+                                                  const key_path &anchor = {},
+                                                  std::string_view space_name = {}) const;
 
     // The declared schema elements, the neutral data a format emitter projects into
     // a template. A pure read of the sealed schema; the registry stays encapsulated.

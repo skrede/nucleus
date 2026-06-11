@@ -40,10 +40,13 @@ value_sets(const schema_registry &schema)
 // is deterministically ordered, so the model -- and every generated script -- is
 // reproducible. Each path becomes its canonical flag via the same flag_of() the
 // argv surface uses, so completion and the real CLI share one mapping.
+// When space_name is non-empty, it is prepended as the leading segment before
+// applying flag_of(), so the completion entries match the multispace_argv_source grammar.
 [[nodiscard]] completion_model project(const schema_registry &schema,
                                        std::string_view prog,
                                        const cli_delimiter &delimiter,
-                                       const key_path &anchor)
+                                       const key_path &anchor,
+                                       std::string_view space_name)
 {
     const auto values = value_sets(schema);
 
@@ -57,9 +60,12 @@ value_sets(const schema_registry &schema)
            && (!path.starts_with(anchor) || path.size() == anchor.size()))
             continue;
 
+        const key_path relative = anchor.empty() ? path : path.relative_to(anchor);
+        const key_path effective = space_name.empty() ? relative
+            : key_path::parse(std::string(space_name) + "/" + relative.str()).value();
+
         completion_option opt;
-        opt.flag = flag_of(anchor.empty() ? path : path.relative_to(anchor),
-                           delimiter);
+        opt.flag = flag_of(effective, delimiter);
         if(auto it = values.find(path.str()); it != values.end())
             opt.values = it->second;
         model.options.push_back(std::move(opt));
@@ -71,9 +77,9 @@ value_sets(const schema_registry &schema)
 
 std::string generate_completion(shell which, const schema_registry &schema,
                                 std::string_view prog, const cli_delimiter &delimiter,
-                                const key_path &anchor)
+                                const key_path &anchor, std::string_view space_name)
 {
-    const completion_model model = project(schema, prog, delimiter, anchor);
+    const completion_model model = project(schema, prog, delimiter, anchor, space_name);
     switch(which)
     {
     case shell::zsh:
