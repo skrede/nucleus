@@ -223,6 +223,18 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     )
     add_test(NAME integration_shape_test COMMAND integration_shape_test)
 
+    # Unified fold: repeated containers and repeated leaves stored as indexed scalars;
+    # wholesale-replace across layers; extend= guard; get_all numeric ordinal order.
+    add_executable(repeated_container_test repeated_container_test.cpp)
+    nucleus_enable_coverage(repeated_container_test)
+    nucleus_warnings(repeated_container_test)
+    target_link_libraries(repeated_container_test
+        PRIVATE nucleus::nucleus nucleus::xml nucleus::runtime Catch2::Catch2WithMain)
+    target_include_directories(repeated_container_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/lib/core/src
+    )
+    add_test(NAME repeated_container_test COMMAND repeated_container_test)
+
     # Repeated-values mode: schema flag, fold accumulation/replacement, get_all(),
     # relay through keyed containers, capability gating, scope-policy exclusion.
     add_executable(repeated_element_test repeated_element_test.cpp)
