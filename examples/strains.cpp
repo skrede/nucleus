@@ -1,7 +1,7 @@
 // strains: ship two named strains in one document, then select one by
 // primary-key value. The resolved keyspace never contains the key segment.
 
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -14,7 +14,7 @@
 int main()
 {
     // Schema: cluster/server keyed by name, leaves port and protocol.
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     if(!builder.register_element(nucleus::element("cluster", nucleus::anchor::root())))
         return 1;
     if(!builder.register_element(nucleus::element("server", nucleus::anchor::keyspace("cluster"))))
@@ -28,7 +28,7 @@ int main()
     if(!builder.register_element(
         nucleus::element("protocol", nucleus::anchor::keyspace("cluster/server"))))
         return 1;
-    nucleus::configuration_space space = builder.build();
+    nucleus::config_space space = builder.build();
 
     // One document containing an anonymous template (protocol) and two named
     // strains (primary and secondary). No file on disk: the factory ignores the path
@@ -47,7 +47,7 @@ int main()
     };
 
     // Select the "primary" strain for this load -- a per-load parameter.
-    auto loaded = nucleus::load(space, nucleus::source_stack{},
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{},
         nucleus::load_options{
             .selection = "primary",
             .document_paths = {"config.xml"},
@@ -58,7 +58,7 @@ int main()
         return 1;
     }
 
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
 
     // Print all resolved keys. The anonymous template's protocol and primary's
     // port both appear at the unified cluster/server/* path.

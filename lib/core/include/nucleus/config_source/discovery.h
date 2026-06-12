@@ -1,8 +1,8 @@
-#ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_DISCOVERY_H
-#define HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_DISCOVERY_H
+#ifndef HPP_GUARD_NUCLEUS_CONFIG_SOURCE_DISCOVERY_H
+#define HPP_GUARD_NUCLEUS_CONFIG_SOURCE_DISCOVERY_H
 
-#include "nucleus/configuration_source/path_text.h"
-#include "nucleus/configuration_source/extension_registry.h"
+#include "nucleus/config_source/path_text.h"
+#include "nucleus/config_source/extension_registry.h"
 
 #include <string>
 #include <vector>

@@ -1,8 +1,8 @@
 #ifndef HPP_GUARD_NUCLEUS_TESTS_INHERITANCE_GOLDEN_GOLDEN_RUNNER_H
 #define HPP_GUARD_NUCLEUS_TESTS_INHERITANCE_GOLDEN_GOLDEN_RUNNER_H
 
-#include "nucleus/configuration.h"
-#include "nucleus/configuration_space.h"
+#include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/keyspace/provenance.h"
 
@@ -29,11 +29,11 @@
 namespace nucleus::golden {
 
 // Declares the schema once: cluster(root) / server keyed by name /
-// logger@log_level / profile / message / {greeting, description}. A configuration
+// logger@log_level / profile / message / {greeting, description}. A config
 // space carries exactly one primary key, so `server/name` is THE selector and
 // `profile/name` is a plain leaf. Elements are registered parent-first so each
 // anchor references an already-declared node.
-inline void declare_schema(nucleus::configuration_space_builder &builder)
+inline void declare_schema(nucleus::config_space_builder &builder)
 {
     using nucleus::anchor;
     REQUIRE(builder.register_element(nucleus::element("cluster", anchor::root())));
@@ -77,11 +77,11 @@ inline std::function<nucleus::source_handle(const std::string &)> file_factory(s
     };
 }
 
-// Serializes a resolved configuration to one deterministic line per key, in the
+// Serializes a resolved config to one deterministic line per key, in the
 // already-sorted keys() order. A scalar key emits `key = value [layer]`; a
 // repeated path emits one indexed line per element, `key[i] = value [layer]`,
 // each carrying its own per-element layer. Every line ends with a newline.
-inline std::string serialize(const nucleus::configuration &config)
+inline std::string serialize(const nucleus::config &config)
 {
     std::string out;
     for(const std::string &key : config.keys())

@@ -1,7 +1,7 @@
-#ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_SOURCE_STACK_H
-#define HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_SOURCE_STACK_H
+#ifndef HPP_GUARD_NUCLEUS_CONFIG_SOURCE_SOURCE_STACK_H
+#define HPP_GUARD_NUCLEUS_CONFIG_SOURCE_SOURCE_STACK_H
 
-#include "nucleus/configuration_source/source_handle.h"
+#include "nucleus/config_source/source_handle.h"
 
 #include <span>
 #include <vector>
@@ -14,7 +14,7 @@ class source_stack
 {
 public:
     // Constructs a stack from any pack of concept-satisfying sources.
-    template <configuration_source... Ss>
+    template <config_source... Ss>
     explicit source_stack(Ss... sources)
     {
         m_layers.reserve(sizeof...(Ss));

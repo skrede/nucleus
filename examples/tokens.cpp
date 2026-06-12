@@ -1,10 +1,10 @@
 // tokens: values carrying `${...}` are expanded at load.
 //
 // The generic core tokenizers (env, string, ...) are installed on every
-// configuration_space automatically. Expansion recurses to a fixpoint, so a
+// config_space automatically. Expansion recurses to a fixpoint, so a
 // token nested inside another resolves inner-first.
 
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/env/env_source.h"
 
@@ -32,16 +32,16 @@ int main()
     values.set("service/region", "${string.upper(${env.NUCLEUS_REGION})}")
           .set("service/instance", "${string.lower(NODE-${env.NUCLEUS_REGION})}");
 
-    nucleus::configuration_space space = nucleus::configuration_space_builder{}.build();
+    nucleus::config_space space = nucleus::config_space_builder{}.build();
 
-    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(values)}, {});
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(values)}, {});
     if(!loaded)
     {
         std::cerr << "resolve failed: " << loaded.error() << '\n';
         return 1;
     }
 
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
     for(const std::string &key : config.keys())
         std::cout << key << " = " << config.get(key).value() << '\n';
     return 0;

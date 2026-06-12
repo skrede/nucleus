@@ -44,7 +44,7 @@ using schema_validation = expected<void, std::vector<schema_violation>>;
 //   * required        -- every element marked required must carry a value. The
 //                        identity (primary-key) element imposes NO presence
 //                        obligation of its own: anonymous (keyless) strains are
-//                        legal and collapse into the configuration space.
+//                        legal and collapse into the config space.
 //                        Marking the identity element required is the host's
 //                        knob for demanding a NAMED strain -- a sliced strain
 //                        satisfies it structurally (the key value named the

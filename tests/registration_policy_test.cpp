@@ -19,7 +19,7 @@ TEST_CASE("registration_kind names every surface", "[policy]")
 {
     CHECK(nucleus::to_string(registration_kind::schema) == "schema");
     CHECK(nucleus::to_string(registration_kind::tokenizer) == "tokenizer");
-    CHECK(nucleus::to_string(registration_kind::configuration_source) == "source");
+    CHECK(nucleus::to_string(registration_kind::config_source) == "source");
     CHECK(nucleus::to_string(registration_kind::converter) == "converter");
 }
 
@@ -38,7 +38,7 @@ TEST_CASE("the default registration policy accepts every surface", "[policy]")
 {
     registration_policy policy;
     for(const auto kind : {registration_kind::schema, registration_kind::tokenizer,
-                           registration_kind::configuration_source,
+                           registration_kind::config_source,
                            registration_kind::converter})
         CHECK(policy.review(registration_request{kind, owner_token{}}).accepted());
 }

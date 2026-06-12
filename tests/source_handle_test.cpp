@@ -1,10 +1,10 @@
 #include "nucleus/capability.h"
 
-#include "nucleus/configuration_source/source_concept.h"
-#include "nucleus/configuration_source/source_handle.h"
-#include "nucleus/configuration_source/source_stack.h"
+#include "nucleus/config_source/source_concept.h"
+#include "nucleus/config_source/source_handle.h"
+#include "nucleus/config_source/source_stack.h"
 
-#include "nucleus/configuration_source/configuration_source.h"
+#include "nucleus/config_source/config_source.h"
 
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
@@ -24,9 +24,9 @@ struct flat_source
         return {nucleus::capability::nesting};
     }
 
-    [[nodiscard]] nucleus::configuration_source_result pull()
+    [[nodiscard]] nucleus::config_source_result pull()
     {
-        nucleus::configuration_source_batch batch;
+        nucleus::config_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(
             "a/b", nucleus::value::owned("flat"), capabilities()));
         return batch;
@@ -50,9 +50,9 @@ struct full_source
         return {nucleus::inherit_declaration::kind::parent_path, "parent.xml"};
     }
 
-    [[nodiscard]] nucleus::configuration_source_result pull()
+    [[nodiscard]] nucleus::config_source_result pull()
     {
-        nucleus::configuration_source_batch batch;
+        nucleus::config_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(
             "x/y", nucleus::value::owned("full"), capabilities()));
         return batch;
@@ -60,9 +60,9 @@ struct full_source
 };
 
 // Concept satisfaction checks.
-static_assert(nucleus::configuration_source<flat_source>,
+static_assert(nucleus::config_source<flat_source>,
               "flat_source must satisfy the required source concept");
-static_assert(nucleus::configuration_source<full_source>,
+static_assert(nucleus::config_source<full_source>,
               "full_source must satisfy the required source concept");
 
 static_assert(!nucleus::projects_source<flat_source>,

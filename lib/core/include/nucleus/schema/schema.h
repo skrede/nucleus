@@ -106,7 +106,7 @@ struct schema_element
 }
 
 // The primary key of its parent container: the single slice selector for the whole
-// schema hierarchy (exactly one per configuration space). A key VALUE must not shadow
+// schema hierarchy (exactly one per config space). A key VALUE must not shadow
 // a declared sibling element's name (the load rejects the collision loudly).
 // `primary_key_element` is an alias for hosts that think in primary-key terms.
 [[nodiscard]] inline schema_element identity_element(std::string name, anchor at)

@@ -1,8 +1,8 @@
 #ifndef HPP_GUARD_NUCLEUS_ARGV_ARGV_EMITTER_H
 #define HPP_GUARD_NUCLEUS_ARGV_ARGV_EMITTER_H
 
-#include "nucleus/configuration.h"
-#include "nucleus/configuration_space.h"
+#include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/cli_flag.h"
 
@@ -21,7 +21,7 @@ namespace nucleus::argv {
 // address them. When space_name is non-empty, it is prepended as the leading
 // segment so the emitted flags match what multispace_argv_source parses, e.g.
 // `--vagus-plugin-x=` for key `plugin/x` in space `vagus`.
-inline void emit_template(const configuration_space &space, std::ostream &out,
+inline void emit_template(const config_space &space, std::ostream &out,
                           const cli_delimiter &delimiter = {},
                           const key_path &anchor = {},
                           std::string_view space_name = {})
@@ -34,12 +34,12 @@ inline void emit_template(const configuration_space &space, std::ostream &out,
     detail::emit_flat_template(space, out, effective_prefix, delimiter.str(), anchor.str());
 }
 
-// Projects a resolved configuration into flat `--KEY=value` lines: one line per
+// Projects a resolved config into flat `--KEY=value` lines: one line per
 // resolved value, so a repeated path emits one line per value in order. The flat
 // flag contract carries no embedded newline; values are written verbatim otherwise.
 // When space_name is non-empty, it is prepended as the leading segment to match
 // the multispace_argv_source grammar.
-inline void emit_document(const configuration &config, std::ostream &out,
+inline void emit_document(const config &config, std::ostream &out,
                           const cli_delimiter &delimiter = {},
                           const key_path &anchor = {},
                           std::string_view space_name = {})
@@ -59,11 +59,11 @@ struct emitter
     key_path anchor;
     std::string space_name;
 
-    void emit_template(const configuration_space &space, std::ostream &out) const
+    void emit_template(const config_space &space, std::ostream &out) const
     {
         nucleus::argv::emit_template(space, out, delimiter, anchor, space_name);
     }
-    void emit_document(const configuration &config, std::ostream &out) const
+    void emit_document(const config &config, std::ostream &out) const
     {
         nucleus::argv::emit_document(config, out, delimiter, anchor, space_name);
     }

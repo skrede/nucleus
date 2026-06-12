@@ -1,10 +1,10 @@
 #include "nucleus/capability.h"
 
-#include "nucleus/configuration_source/source_concept.h"
-#include "nucleus/configuration_source/source_handle.h"
-#include "nucleus/configuration_source/configuration_source.h"
-#include "nucleus/configuration_source/discovery.h"
-#include "nucleus/configuration_source/extension_registry.h"
+#include "nucleus/config_source/source_concept.h"
+#include "nucleus/config_source/source_handle.h"
+#include "nucleus/config_source/config_source.h"
+#include "nucleus/config_source/discovery.h"
+#include "nucleus/config_source/extension_registry.h"
 
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
@@ -33,9 +33,9 @@ struct labelled_source
         return {};
     }
 
-    [[nodiscard]] nucleus::configuration_source_result pull()
+    [[nodiscard]] nucleus::config_source_result pull()
     {
-        nucleus::configuration_source_batch batch;
+        nucleus::config_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(
             "where", nucleus::value::owned(m_label), capabilities()));
         return batch;
@@ -44,7 +44,7 @@ struct labelled_source
     std::string m_label;
 };
 
-static_assert(nucleus::configuration_source<labelled_source>,
+static_assert(nucleus::config_source<labelled_source>,
               "labelled_source must satisfy the source concept");
 
 // A factory that tags the source it builds with the format name, so the test can

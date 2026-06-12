@@ -7,8 +7,8 @@
 
 #include "nucleus/schema/projection.h"
 
-#include "nucleus/configuration_source/source_handle.h"
-#include "nucleus/configuration_source/inherit_declaration.h"
+#include "nucleus/config_source/source_handle.h"
+#include "nucleus/config_source/inherit_declaration.h"
 
 #include <memory>
 #include <string>
@@ -187,7 +187,7 @@ private:
 
         // A pull failure is already a typed source error (unreadable, malformed);
         // forward its code and add the chain context to the message.
-        configuration_source_result pulled = handle.pull();
+        config_source_result pulled = handle.pull();
         if(!pulled)
             return unexpected(error{pulled.error().code, nucleus::format(
                 "inheritance chain: source '{}': {}", path, pulled.error().message)});

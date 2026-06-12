@@ -4,7 +4,7 @@
 // reports which layer supplied each surviving value -- here the env layer's
 // `region` survives, while argv overrides `tier`.
 
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/keyspace/provenance.h"
 
@@ -21,10 +21,10 @@ int main()
 
     nucleus::argv_source argv(std::vector<std::string>{"--service-tier=gold"});
 
-    nucleus::configuration_space space = nucleus::configuration_space_builder{}.build();
+    nucleus::config_space space = nucleus::config_space_builder{}.build();
 
     // env at lower precedence (stack[0]), argv at higher precedence (stack[1]).
-    auto loaded = nucleus::load(space,
+    auto loaded = nucleus::load_config(space,
         nucleus::source_stack{std::move(env), std::move(argv)},
         {});
     if(!loaded)
@@ -33,7 +33,7 @@ int main()
         return 1;
     }
 
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
     for(const std::string &key : config.keys())
     {
         const nucleus::origin *from = config.provenance_of(key);

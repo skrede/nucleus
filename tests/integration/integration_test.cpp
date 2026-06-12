@@ -2,8 +2,8 @@
 // nested schema (including a typed element), resolves a runtime-backed stack, and
 // reads values back as text and as the declared type. Exit code is the verdict.
 
-#include "nucleus/configuration.h"
-#include "nucleus/configuration_space.h"
+#include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -20,7 +20,7 @@
 
 int main()
 {
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     const bool registered =
         engine.register_element(nucleus::element("server", nucleus::anchor::root()))
         && engine.register_element(
@@ -32,12 +32,12 @@ int main()
         std::cerr << "schema registration rejected\n";
         return 1;
     }
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     nucleus::runtime_source values;
     values.set("server/port", "8080").set("server/name", "edge");
 
-    auto loaded = nucleus::load(space,
+    auto loaded = nucleus::load_config(space,
         nucleus::source_stack{std::move(values)},
         {});
     if(!loaded)
@@ -46,7 +46,7 @@ int main()
         return 1;
     }
 
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
     if(config.get("server/name") != "edge")
     {
         std::cerr << "text accessor mismatch\n";
@@ -65,7 +65,7 @@ int main()
     // exported nucleus::xml target and read a value back.
     auto doc = nucleus::xml_source::from(
         nucleus::xml_source_options::of_string("<server><zone>edge-1</zone></server>"));
-    nucleus::configuration_space_builder xml_engine;
+    nucleus::config_space_builder xml_engine;
     if(!(xml_engine.register_element(nucleus::element("server", nucleus::anchor::root()))
          && xml_engine.register_element(
              nucleus::element("zone", nucleus::anchor::keyspace("server")))))
@@ -73,8 +73,8 @@ int main()
         std::cerr << "xml schema registration rejected\n";
         return 1;
     }
-    nucleus::configuration_space xml_space = xml_engine.build();
-    auto xml_loaded = nucleus::load(xml_space,
+    nucleus::config_space xml_space = xml_engine.build();
+    auto xml_loaded = nucleus::load_config(xml_space,
         nucleus::source_stack{std::move(doc)},
         {});
     if(!xml_loaded || xml_loaded.value().get("server/zone") != "edge-1")

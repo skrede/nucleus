@@ -1,7 +1,7 @@
 // typed: register a custom aggregate converter and a built-in int field; read back typed.
 
-#include "nucleus/configuration.h"
-#include "nucleus/configuration_space.h"
+#include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -53,7 +53,7 @@ make_vec3_converter()
 
 int main()
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     if(!builder.register_element(nucleus::element("body", nucleus::anchor::root())))
         return 1;
     if(!builder.register_element(
@@ -62,7 +62,7 @@ int main()
     if(!builder.register_element(
         nucleus::typed_element<int32_t>("mass", nucleus::anchor::keyspace("body"))))
         return 1;
-    nucleus::configuration_space space = builder.build();
+    nucleus::config_space space = builder.build();
 
     // In-memory document -- no file on disk required.
     const char *document = R"(<body><pos>1.0,2.5,3.0</pos><mass>42</mass></body>)";
@@ -72,14 +72,14 @@ int main()
                 nucleus::xml_source_options::of_string(document)));
     };
 
-    auto loaded = nucleus::load(space, nucleus::source_stack{},
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{},
         nucleus::load_options{.document_paths = {"config.xml"}, .make_document = make});
     if(!loaded) {
         std::cerr << "load failed: " << loaded.error() << '\n';
         return 1;
     }
 
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
 
     auto pos = config.get_as<vec3>("body/pos");
     if(!pos) {

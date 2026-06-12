@@ -3,8 +3,8 @@
 // the code instead of parsing the human-readable message.
 
 #include "nucleus/error.h"
-#include "nucleus/configuration.h"
-#include "nucleus/configuration_space.h"
+#include "nucleus/config.h"
+#include "nucleus/config_space.h"
 #include "nucleus/registration_policy.h"
 
 #include "nucleus/schema/anchor.h"
@@ -38,9 +38,9 @@ struct flat_only_source
 {
     [[nodiscard]] nucleus::capability_descriptor capabilities() const { return {}; }
 
-    [[nodiscard]] nucleus::configuration_source_result pull()
+    [[nodiscard]] nucleus::config_source_result pull()
     {
-        return nucleus::configuration_source_batch{};
+        return nucleus::config_source_batch{};
     }
 };
 
@@ -73,8 +73,8 @@ TEST_CASE("garbage xml pulls errc::malformed_source and the load preserves it",
     CHECK(pulled.error().code == errc::malformed_source);
 
     // Through the front door the fold adds the layer label but keeps the code.
-    nucleus::configuration_space space = nucleus::configuration_space_builder{}.build();
-    auto loaded = nucleus::load(space, source_stack{xml_of("<garbage")}, {});
+    nucleus::config_space space = nucleus::config_space_builder{}.build();
+    auto loaded = nucleus::load_config(space, source_stack{xml_of("<garbage")}, {});
     REQUIRE_FALSE(loaded);
     CHECK(loaded.error().code == errc::malformed_source);
 }
@@ -82,13 +82,13 @@ TEST_CASE("garbage xml pulls errc::malformed_source and the load preserves it",
 TEST_CASE("a flat-only stack against a nested schema fails with errc::unmet_capability",
           "[error][code]")
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("node", anchor::root())));
     REQUIRE(builder.register_element(
         nucleus::primary_key_element("name", anchor::keyspace("node"))));
-    const nucleus::configuration_space space = builder.build();
+    const nucleus::config_space space = builder.build();
 
-    auto loaded = nucleus::load(space, source_stack{flat_only_source{}}, {});
+    auto loaded = nucleus::load_config(space, source_stack{flat_only_source{}}, {});
     REQUIRE_FALSE(loaded);
     CHECK(loaded.error().code == errc::unmet_capability);
 
@@ -99,7 +99,7 @@ TEST_CASE("a flat-only stack against a nested schema fails with errc::unmet_capa
 
 TEST_CASE("an unknown selection fails with errc::invalid_selection", "[error][code]")
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("cluster", anchor::root())));
     REQUIRE(builder.register_element(
         nucleus::element("node", anchor::keyspace("cluster"))));
@@ -107,7 +107,7 @@ TEST_CASE("an unknown selection fails with errc::invalid_selection", "[error][co
         nucleus::primary_key_element("name", anchor::keyspace("cluster/node"))));
     REQUIRE(builder.register_element(
         nucleus::element("port", anchor::keyspace("cluster/node"))));
-    const nucleus::configuration_space space = builder.build();
+    const nucleus::config_space space = builder.build();
 
     nucleus::runtime_source src;
     src.set("cluster/node/alpha/name", "alpha")
@@ -115,7 +115,7 @@ TEST_CASE("an unknown selection fails with errc::invalid_selection", "[error][co
 
     nucleus::load_options options;
     options.selection = "nope";
-    auto loaded = nucleus::load(space, source_stack{src}, options);
+    auto loaded = nucleus::load_config(space, source_stack{src}, options);
     REQUIRE_FALSE(loaded);
     CHECK(loaded.error().code == errc::invalid_selection);
 }
@@ -123,15 +123,15 @@ TEST_CASE("an unknown selection fails with errc::invalid_selection", "[error][co
 TEST_CASE("an undeclared path fails validation with errc::schema_violation",
           "[error][code]")
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("server", anchor::root())));
     REQUIRE(builder.register_element(nucleus::element("host", anchor::keyspace("server"))));
-    const nucleus::configuration_space space = builder.build();
+    const nucleus::config_space space = builder.build();
 
     nucleus::runtime_source src;
     src.set("server/bogus", "x");
 
-    auto loaded = nucleus::load(space, source_stack{src}, {});
+    auto loaded = nucleus::load_config(space, source_stack{src}, {});
     REQUIRE_FALSE(loaded);
     CHECK(loaded.error().code == errc::schema_violation);
 }
@@ -139,16 +139,16 @@ TEST_CASE("an undeclared path fails validation with errc::schema_violation",
 TEST_CASE("a typed element with a garbage value fails with errc::failed_conversion",
           "[error][code]")
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("server", anchor::root())));
     REQUIRE(builder.register_element(
         nucleus::typed_element<std::int32_t>("port", anchor::keyspace("server"))));
-    const nucleus::configuration_space space = builder.build();
+    const nucleus::config_space space = builder.build();
 
     nucleus::runtime_source src;
     src.set("server/port", "notanumber");
 
-    auto loaded = nucleus::load(space, source_stack{src}, {});
+    auto loaded = nucleus::load_config(space, source_stack{src}, {});
     REQUIRE_FALSE(loaded);
     CHECK(loaded.error().code == errc::failed_conversion);
 }
@@ -156,7 +156,7 @@ TEST_CASE("a typed element with a garbage value fails with errc::failed_conversi
 TEST_CASE("registering on a built builder fails with errc::sealed_builder",
           "[error][code]")
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     (void)builder.build();
 
     auto rejected = builder.register_schema("server/host");
@@ -167,7 +167,7 @@ TEST_CASE("registering on a built builder fails with errc::sealed_builder",
 TEST_CASE("a rejecting policy fails with errc::rejected_registration and the "
           "verbatim reason", "[error][code]")
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     REQUIRE(builder.set_registration_policy(std::make_shared<deny_schema>()));
 
     auto rejected = builder.register_element(nucleus::element("server", anchor::root()));
@@ -179,17 +179,17 @@ TEST_CASE("a rejecting policy fails with errc::rejected_registration and the "
 TEST_CASE("get_as distinguishes absent_key, missing_converter, and mismatched_type",
           "[error][code]")
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("cfg", anchor::root())));
     REQUIRE(builder.register_element(nucleus::element("name", anchor::keyspace("cfg"))));
     REQUIRE(builder.register_element(
         nucleus::typed_element<std::int32_t>("val", anchor::keyspace("cfg"))));
-    const nucleus::configuration_space space = builder.build();
+    const nucleus::config_space space = builder.build();
 
     nucleus::runtime_source src;
     src.set("cfg/name", "hello").set("cfg/val", "42");
 
-    auto loaded = nucleus::load(space, source_stack{src}, {});
+    auto loaded = nucleus::load_config(space, source_stack{src}, {});
     REQUIRE(loaded);
 
     auto absent = loaded.value().get_as<std::int32_t>("cfg/nonexistent");

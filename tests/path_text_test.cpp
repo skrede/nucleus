@@ -3,7 +3,7 @@
 // assertions pin the canonical conversion on every platform, so the Windows CI
 // leg proves the divergence is actually neutralized.
 
-#include "nucleus/configuration_source/path_text.h"
+#include "nucleus/config_source/path_text.h"
 
 #include <catch2/catch_test_macros.hpp>
 

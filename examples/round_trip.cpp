@@ -1,16 +1,16 @@
-// round_trip: resolve one configuration, then render it through three source formats.
+// round_trip: resolve one config, then render it through three source formats.
 //
 // A runtime_source builds the scalar base in code via chained .set() -- no document,
 // no parser. A small XML overlay supplies the repeated tag values (a flat source can
 // carry at most one value per repeated field per layer, so the duplicate_keys-capable
 // XML source is what genuinely supplies a repeated field). load unifies them, then
-// the ONE resolved configuration is emitted as XML (nested), env (KEY=value), and
+// the ONE resolved config is emitted as XML (nested), env (KEY=value), and
 // args (--KEY=value) into std::cout. Each emitter models the format-agnostic
 // config_emitter seam; the user owns the stream. The repeated tag keeps all its
 // values in every format.
 
-#include "nucleus/configuration.h"
-#include "nucleus/configuration_space.h"
+#include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -29,7 +29,7 @@ int main()
 {
     // Schema: a server container with a host leaf, a constrained mode leaf, and a
     // repeated tag leaf.
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
         return 1;
     if(!builder.register_element(
@@ -42,7 +42,7 @@ int main()
     if(!builder.register_element(
         nucleus::repeated_element("tag", nucleus::anchor::keyspace("server"))))
         return 1;
-    nucleus::configuration_space space = builder.build();
+    nucleus::config_space space = builder.build();
 
     // The scalar base, built in code.
     nucleus::runtime_source base;
@@ -57,7 +57,7 @@ int main()
     };
 
     // runtime_source at lower precedence (stack[0]); document overlay at higher via load_options.
-    auto loaded = nucleus::load(space,
+    auto loaded = nucleus::load_config(space,
         nucleus::source_stack{std::move(base)},
         nucleus::load_options{.document_paths = {"config.xml"}, .make_document = make});
     if(!loaded)
@@ -66,13 +66,13 @@ int main()
         return 1;
     }
 
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
 
     // The blank schema template (declared fields, no values) for contrast.
     std::cout << "# xml template\n";
     nucleus::xml::emit_template(space, std::cout);
 
-    // The same resolved configuration rendered through each source format.
+    // The same resolved config rendered through each source format.
     std::cout << "\n# xml document\n";
     nucleus::xml::emit_document(config, std::cout);
     std::cout << "\n# env document\n";

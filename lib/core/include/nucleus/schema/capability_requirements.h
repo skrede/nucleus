@@ -5,7 +5,7 @@
 
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/configuration_source/feature_gate.h"
+#include "nucleus/config_source/feature_gate.h"
 
 #include <span>
 #include <vector>
@@ -19,7 +19,7 @@ namespace nucleus {
 // requested. The set is deduplicated (N nested elements yield one nesting
 // requirement) and emitted in a stable order so callers and tests are
 // deterministic. Takes the declared elements directly (the host reaches them via
-// configuration_space::schema_elements()), not the registry that owns them.
+// config_space::schema_elements()), not the registry that owns them.
 [[nodiscard]] inline std::vector<feature_requirement>
 derive_capability_requirements(std::span<const schema_element> elements)
 {

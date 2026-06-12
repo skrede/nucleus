@@ -8,7 +8,7 @@ documents the parts nucleus ships that satisfy those seams.
 | Document | Scope |
 | --- | --- |
 | [Types you use](api-using.md) | The host-facing vocabulary a program instantiates and reads: the builder and the sealed space, the schema, `load()` and its options, the resolved configuration, source stacks, emitters, diagnostics, completion. |
-| [Seams you extend](api-extending.md) | The concepts a host makes a type satisfy and the policies it composes: the `configuration_source` concept and its optional affordances, capability descriptors and gating, inheritance, custom tokenizers and converters, `registration_policy`, `log_sink`, discovery. |
+| [Seams you extend](api-extending.md) | The concepts a host makes a type satisfy and the policies it composes: the `config_source` concept and its optional affordances, capability descriptors and gating, inheritance, custom tokenizers and converters, `registration_policy`, `log_sink`, discovery. |
 | [Shipped implementations](api-implementations.md) | The concrete modules nucleus ships that satisfy the seams: `xml_source`, `env_source`, `argv_source`, `runtime_source`, the per-format emitters, and the `log_sink` adapters — with the capability descriptor and CMake target of each. |
 
 The [`examples/`](../examples) directory holds a small, self-contained program per
@@ -22,19 +22,19 @@ paths. A registered **schema** is the single upstream authority: it dictates
 both the command-line surface and the document structure, so a source never
 decides what is admissible.
 
-The lifecycle has two phases. A `configuration_space_builder` accepts
+The lifecycle has two phases. A `config_space_builder` accepts
 registrations (`register_element` / `register_*` / `install_tokenizer`) until
-`build()` seals it into an immutable `configuration_space`. The free function
+`build()` seals it into an immutable `config_space`. The free function
 `nucleus::load(space, source_stack, load_options)` gates the stack's
 capabilities against the schema's shape, folds the sources, validates, expands
 `${...}` tokens, converts typed values, and yields an immutable, freely
-thread-readable `configuration`. Registration after `build()` is a
+thread-readable `config`. Registration after `build()` is a
 state-machine error, and one sealed space serves any number of loads.
 
 ```
-configuration_space_builder  --register_*-->  build()  -->  configuration_space (sealed)
+config_space_builder  --register_*-->  build()  -->  config_space (sealed)
                                                                   |
-                          nucleus::load(space, stack, options)  --+-->  configuration (resolved, immutable)
+                          nucleus::load(space, stack, options)  --+-->  config (resolved, immutable)
 ```
 
 The core carries no policy: ownership, reservation, filename conventions, and

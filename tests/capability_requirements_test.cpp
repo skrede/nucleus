@@ -7,7 +7,7 @@
 #include "nucleus/schema/schema_registry.h"
 #include "nucleus/schema/capability_requirements.h"
 
-#include "nucleus/configuration_source/feature_gate.h"
+#include "nucleus/config_source/feature_gate.h"
 
 #include <catch2/catch_test_macros.hpp>
 

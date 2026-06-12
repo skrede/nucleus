@@ -125,7 +125,7 @@ TEST_CASE("many unique fields may share one container", "[schema][unique]")
         nucleus::unique_element("mac", anchor::keyspace(path_of("cluster/server")))));
 }
 
-TEST_CASE("a configuration space has exactly one primary key", "[schema][unique]")
+TEST_CASE("a config space has exactly one primary key", "[schema][unique]")
 {
     schema_registry reg;
     REQUIRE(reg.attach(nucleus::element("cluster", anchor::root())));
@@ -140,15 +140,15 @@ TEST_CASE("a configuration space has exactly one primary key", "[schema][unique]
     auto second = reg.attach(
         nucleus::primary_key_element("id", anchor::keyspace(path_of("cluster/server"))));
     REQUIRE_FALSE(second);
-    REQUIRE(second.error().find("already the configuration space's primary key")
+    REQUIRE(second.error().find("already the config space's primary key")
             != std::string::npos);
 
     // A primary key under a DIFFERENT container is rejected just the same: the
-    // primary key is singular per configuration space, not per container.
+    // primary key is singular per config space, not per container.
     auto elsewhere = reg.attach(
         nucleus::primary_key_element("name", anchor::keyspace(path_of("cluster"))));
     REQUIRE_FALSE(elsewhere);
-    REQUIRE(elsewhere.error().find("already the configuration space's primary key")
+    REQUIRE(elsewhere.error().find("already the config space's primary key")
             != std::string::npos);
 
     // Unique fields remain freely attachable alongside the primary key.

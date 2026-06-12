@@ -1,8 +1,8 @@
 #include "nucleus/log_sink.h"
 #include "nucleus/capability.h"
 
-#include "nucleus/configuration_source/configuration_source.h"
-#include "nucleus/configuration_source/feature_gate.h"
+#include "nucleus/config_source/config_source.h"
+#include "nucleus/config_source/feature_gate.h"
 
 #include "nucleus/env/env_source.h"
 

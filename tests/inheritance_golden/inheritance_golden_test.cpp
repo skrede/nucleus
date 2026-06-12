@@ -1,6 +1,6 @@
 #include "golden_runner.h"
 
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -100,16 +100,16 @@ TEST_CASE("inheritance golden fixtures match nucleus-derived resolution", "[gold
             const fixture_case spec = parse_case(read_file(dir / "case.txt"));
             REQUIRE_FALSE(spec.inputs.empty());
 
-            nucleus::configuration_space_builder builder;
+            nucleus::config_space_builder builder;
             nucleus::golden::declare_schema(builder);
-            const nucleus::configuration_space space = builder.build();
+            const nucleus::config_space space = builder.build();
 
             nucleus::load_options opts;
             opts.document_paths = spec.inputs;
             opts.make_document = nucleus::golden::file_factory(dir.string());
             opts.selection = spec.selection;
 
-            nucleus::load_result loaded = nucleus::load(space, nucleus::source_stack{}, opts);
+            nucleus::load_result loaded = nucleus::load_config(space, nucleus::source_stack{}, opts);
             INFO("load error (if any): " << (loaded ? std::string("<none>") : nucleus::to_string(loaded.error())));
             REQUIRE(loaded);
 

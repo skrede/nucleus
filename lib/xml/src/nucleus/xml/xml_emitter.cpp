@@ -1,8 +1,8 @@
 #include "nucleus/xml/xml_emitter.h"
 
-#include "nucleus/configuration.h"
+#include "nucleus/config.h"
 #include "nucleus/config_emitter.h"
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/schema.h"
 
@@ -110,7 +110,7 @@ void emit_node(const tree_node &n, std::ostream &out, std::size_t depth)
 // hand-built projection (no values -- template only).
 // When space_name is non-empty, all roots are wrapped under <space_name>...</space_name>
 // for symmetric round-trip with xml_source::with_space_name().
-void emit_template(const configuration_space &space, std::ostream &out,
+void emit_template(const config_space &space, std::ostream &out,
                    std::string_view space_name)
 {
     std::vector<tree_node> roots;
@@ -145,20 +145,20 @@ void emit_template(const configuration_space &space, std::ostream &out,
     else
     {
         // Multiple (or zero) top-level keyspaces: wrap them in a single root.
-        out << "<configuration>\n";
+        out << "<config>\n";
         for(const tree_node &r : roots)
             emit_node(r, out, 1);
-        out << "</configuration>\n";
+        out << "</config>\n";
     }
 }
 
-// Projects a resolved configuration into a populated XML document: each '/'-separated
+// Projects a resolved config into a populated XML document: each '/'-separated
 // key splits into element segments, intermediate segments are shared parent nodes,
 // and the leaf is appended once per value so a repeated path persists ALL its values.
 // A malformed key is skipped (never thrown), consistent with the read path.
 // When space_name is non-empty, all top-level elements are re-parented under a new
 // wrapper element named space_name for symmetric round-trip with with_space_name().
-void emit_document(const configuration &config, std::ostream &out,
+void emit_document(const config &config, std::ostream &out,
                    std::string_view space_name)
 {
     pugi::xml_document doc;

@@ -13,7 +13,7 @@ namespace nucleus {
 // a retained buffer), a transforming source yields an owned string. The discriminator
 // makes the wrong state unrepresentable.
 // Load-bearing view contract: the buffer a view points into must outlive every read;
-// the producing source pins it (see configuration_source_batch). At the load boundary
+// the producing source pins it (see config_source_batch). At the load boundary
 // values are copied out and the buffers are dropped, leaving only owned values.
 class value
 {

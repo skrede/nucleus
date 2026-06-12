@@ -4,7 +4,7 @@
 // key paths; the core never reads the process environment itself. Here it is the
 // only layer in the stack, resolved without a schema.
 
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/env/env_source.h"
 
@@ -12,21 +12,21 @@
 
 int main()
 {
-    nucleus::configuration_space space = nucleus::configuration_space_builder{}.build();
+    nucleus::config_space space = nucleus::config_space_builder{}.build();
 
     // An env_source carrying the host-mapped (path, value) entries by value.
     nucleus::env_source values;
     values.set("service/region", "eu-west")
           .set("service/tier", "gold");
 
-    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(values)}, {});
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(values)}, {});
     if(!loaded)
     {
         std::cerr << "resolve failed: " << loaded.error() << '\n';
         return 1;
     }
 
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
     for(const std::string &key : config.keys())
         std::cout << key << " = " << config.get(key).value() << '\n';
     return 0;

@@ -1,22 +1,22 @@
-#ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SPACE_H
-#define HPP_GUARD_NUCLEUS_CONFIGURATION_SPACE_H
+#ifndef HPP_GUARD_NUCLEUS_CONFIG_SPACE_H
+#define HPP_GUARD_NUCLEUS_CONFIG_SPACE_H
 
 #include "nucleus/error.h"
 #include "nucleus/expected.h"
 #include "nucleus/identity.h"
 #include "nucleus/log_sink.h"
 #include "nucleus/strain_scope.h"
-#include "nucleus/configuration.h"
+#include "nucleus/config.h"
 #include "nucleus/registration_policy.h"
 
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/cli_flag.h"
 
-#include "nucleus/configuration_source/feature_gate.h"
-#include "nucleus/configuration_source/source_stack.h"
-#include "nucleus/configuration_source/inherit_declaration.h"
-#include "nucleus/configuration_source/configuration_source.h"
-#include "nucleus/configuration_source/argv/key_recognizer.h"
+#include "nucleus/config_source/feature_gate.h"
+#include "nucleus/config_source/source_stack.h"
+#include "nucleus/config_source/inherit_declaration.h"
+#include "nucleus/config_source/config_source.h"
+#include "nucleus/config_source/argv/key_recognizer.h"
 
 #include "nucleus/diagnostics/conflict_report.h"
 
@@ -54,14 +54,14 @@ using registration_result = expected<void, error>;
     return registration_result();
 }
 
-// The outcome of a load: the immutable configuration, or an error whose code
+// The outcome of load_config: the immutable config, or an error whose code
 // names the pipeline stage that failed (source, inheritance, gate, layering,
 // tokens, selection, schema, conversion) with the verbatim reason in message.
-using load_result = expected<configuration, error>;
+using load_result = expected<config, error>;
 
-class configuration_space;
+class config_space;
 
-// Per-load resolution knobs for load(space, source_stack, load_options).
+// Per-load resolution knobs for load_config(space, source_stack, load_options).
 // Carries document expansion (paths + host factory returning source_handle)
 // and the resolution parameters; the sources themselves live in the source_stack.
 struct load_options
@@ -76,19 +76,19 @@ struct load_options
 // The mutable, free-standing builder: sole owner of the three flat sibling
 // registries (schema / tokenizer / converter) plus the host registration policy
 // and the claim/conflict ledger. A host registers on it and then build() seals an
-// immutable configuration_space. Every registration carries an opaque owner token
+// immutable config_space. Every registration carries an opaque owner token
 // and is first offered to the registration-policy seam.
-class configuration_space_builder
+class config_space_builder
 {
 public:
-    configuration_space_builder();
-    ~configuration_space_builder();
+    config_space_builder();
+    ~config_space_builder();
 
-    configuration_space_builder(configuration_space_builder &&) noexcept;
-    configuration_space_builder &operator=(configuration_space_builder &&) noexcept;
+    config_space_builder(config_space_builder &&) noexcept;
+    config_space_builder &operator=(config_space_builder &&) noexcept;
 
-    configuration_space_builder(const configuration_space_builder &) = delete;
-    configuration_space_builder &operator=(const configuration_space_builder &) = delete;
+    config_space_builder(const config_space_builder &) = delete;
+    config_space_builder &operator=(const config_space_builder &) = delete;
 
     // Installs a host registration policy. The default policy accepts every
     // registration; the core imposes no reservation or namespacing rules itself.
@@ -97,7 +97,7 @@ public:
     registration_result register_schema(std::string key_path, owner_token owner = {});
 
     // Registers a typed schema element (anchor::root / anchor::keyspace, required,
-    // identity), making the schema authoritative over content: the load path
+    // identity), making the schema authoritative over content: the load_config path
     // validates the resolved keyspace against these elements and enforces
     // referential integrity at attach time. Same state-machine/policy seam as above.
     registration_result register_element(schema_element element, owner_token owner = {});
@@ -137,17 +137,17 @@ public:
 
     // Sets the space name -- the identity each source format validates at its boundary
     // (document root element, env prefix, argv first segment). Empty = unnamed.
-    configuration_space_builder &name(std::string space_name);
+    config_space_builder &name(std::string space_name);
 
-    // Seals the builder into an immutable configuration_space. Infallible (it never
+    // Seals the builder into an immutable config_space. Infallible (it never
     // returns an error); it copies the three registries + policy + ledger into the
     // sealed product and marks the builder spent. After build(), every register_* /
     // install_* / set_registration_policy is a LOUD state-machine error, never a
     // silent no-op.
-    [[nodiscard]] configuration_space build();
+    [[nodiscard]] config_space build();
 
 private:
-    friend class configuration_space;
+    friend class config_space;
     class impl;
     std::unique_ptr<impl> m_impl;
 };
@@ -156,25 +156,25 @@ private:
 // the policy and claim/conflict ledger. Its surface is read-only -- registration on
 // a sealed space is impossible by construction. It is COPYABLE (a deep copy of the
 // value-copyable registries + ledger; NO shared_ptr links two spaces) so expand()
-// can clone it, and freely thread-readable: load() borrows it by const reference
+// can clone it, and freely thread-readable: load_config() borrows it by const reference
 // and owns all mutable resolve state on its own stack.
-class configuration_space
+class config_space
 {
 public:
-    configuration_space();
-    ~configuration_space();
+    config_space();
+    ~config_space();
 
-    configuration_space(const configuration_space &);
-    configuration_space &operator=(const configuration_space &);
+    config_space(const config_space &);
+    config_space &operator=(const config_space &);
 
-    configuration_space(configuration_space &&) noexcept;
-    configuration_space &operator=(configuration_space &&) noexcept;
+    config_space(config_space &&) noexcept;
+    config_space &operator=(config_space &&) noexcept;
 
     [[nodiscard]] std::size_t schema_count() const noexcept;
     [[nodiscard]] std::size_t tokenizer_count() const noexcept;
     [[nodiscard]] std::size_t converter_count() const noexcept;
 
-    // The name set via configuration_space_builder::name(); empty for unnamed spaces.
+    // The name set via config_space_builder::name(); empty for unnamed spaces.
     [[nodiscard]] std::string_view space_name() const noexcept;
 
     // Key-path collisions recorded during the originating builder's registrations.
@@ -197,47 +197,47 @@ public:
     // three registries + policy + claim/conflict ledger. Base and derived are fully
     // independent: building or mutating one never affects the other, and no
     // shared_ptr base pointer links them.
-    [[nodiscard]] configuration_space_builder expand() const;
+    [[nodiscard]] config_space_builder expand() const;
 
 private:
-    friend class configuration_space_builder;
-    friend load_result   load(const configuration_space &, source_stack &, const load_options &);
-    friend gate_result   check_capabilities(const configuration_space &, const source_stack &, const load_options &);
-    friend key_recognizer recognizer_of(const configuration_space &);
+    friend class config_space_builder;
+    friend load_result   load_config(const config_space &, source_stack &, const load_options &);
+    friend gate_result   check_capabilities(const config_space &, const source_stack &, const load_options &);
+    friend key_recognizer recognizer_of(const config_space &);
     class impl;
-    explicit configuration_space(std::unique_ptr<impl> sealed);
+    explicit config_space(std::unique_ptr<impl> sealed);
     std::unique_ptr<impl> m_impl;
 };
 
-// The load entry point: folds the explicitly-composed source_stack against the
+// The load_config entry point: folds the explicitly-composed source_stack against the
 // sealed space using index-as-rank precedence, optionally expanding document_paths
 // from load_options through the inheritance chain walker. Concurrent-safe;
 // borrows the space by const reference and owns all mutable resolve state locally.
 // The stack is BORROWED, not consumed: it stays valid afterward, so the same
-// stack can pre-flight via check_capabilities() and then load, or load more than
-// once (sources are pulled again; a document source reuses its cached parse).
-[[nodiscard]] load_result load(const configuration_space &space,
+// stack can pre-flight via check_capabilities() and then load_config, or load_config
+// more than once (sources are pulled again; a document source reuses its cached parse).
+[[nodiscard]] load_result load_config(const config_space &space,
                                source_stack &stack,
                                const load_options &options = {});
 
-// Convenience overload for inline composition: load(space, source_stack{...}).
+// Convenience overload for inline composition: load_config(space, source_stack{...}).
 // The temporary lives for the full call; nothing dangles.
-[[nodiscard]] load_result load(const configuration_space &space,
+[[nodiscard]] load_result load_config(const config_space &space,
                                source_stack &&stack,
                                const load_options &options = {});
 
-// Capability pre-flight for the source_stack-based load. Reads capabilities
+// Capability pre-flight for the source_stack-based load_config. Reads capabilities
 // only -- no pull, no fold -- so the stack is borrowed const and stays intact
-// for the load() that follows it. Consistent with load() over the same
+// for the load_config() that follows it. Consistent with load_config() over the same
 // stack+options.
-[[nodiscard]] gate_result check_capabilities(const configuration_space &space,
+[[nodiscard]] gate_result check_capabilities(const config_space &space,
                                              const source_stack &stack,
                                              const load_options &options = {});
 
 // Derives a key recognizer from the sealed space's schema surface. The returned
 // closure is valid for as long as the space outlives it; it captures the space by
 // reference. Used to wire argv_source schema-coupled recognition at compose time.
-[[nodiscard]] key_recognizer recognizer_of(const configuration_space &space);
+[[nodiscard]] key_recognizer recognizer_of(const config_space &space);
 
 }
 

@@ -1,5 +1,5 @@
-#include "nucleus/configuration.h"
-#include "nucleus/configuration_space.h"
+#include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-// Trident reusable-authority property: one configuration_space serves two DIFFERENT
+// Trident reusable-authority property: one config_space serves two DIFFERENT
 // source stacks and yields two INDEPENDENT configurations. The space does not hold
 // mutable state -- it is borrowed by const reference during each load. Loading a
 // second stack against the same space must not perturb the first result, and both
@@ -30,9 +30,9 @@ source_handle xml_of(const std::string &text)
 }
 
 // Schema: server with host, mode, and port.
-configuration_space make_server_space()
+config_space make_server_space()
 {
-    configuration_space_builder builder;
+    config_space_builder builder;
     REQUIRE(builder.register_element(element("server", anchor::root())));
     REQUIRE(builder.register_element(element("host", anchor::keyspace("server"))));
     REQUIRE(builder.register_element(
@@ -48,7 +48,7 @@ TEST_CASE("one space, two different stacks yield two independent configurations"
           "[system][one_space_many_stacks]")
 {
     // One sealed space -- shared across both loads by const reference.
-    const configuration_space space = make_server_space();
+    const config_space space = make_server_space();
 
     // Stack A: primary profile.
     runtime_source primary_src;
@@ -62,13 +62,13 @@ TEST_CASE("one space, two different stacks yield two independent configurations"
                  .set("server/mode", "secondary")
                  .set("server/port", "9000");
 
-    auto loaded_a = load(space, source_stack{std::move(primary_src)}, {});
+    auto loaded_a = load_config(space, source_stack{std::move(primary_src)}, {});
     REQUIRE(loaded_a);
-    const configuration config_a = std::move(loaded_a).value();
+    const config config_a = std::move(loaded_a).value();
 
-    auto loaded_b = load(space, source_stack{std::move(secondary_src)}, {});
+    auto loaded_b = load_config(space, source_stack{std::move(secondary_src)}, {});
     REQUIRE(loaded_b);
-    const configuration config_b = std::move(loaded_b).value();
+    const config config_b = std::move(loaded_b).value();
 
     // Both simultaneously valid: A and B can be read in any order.
     REQUIRE(config_a.get("server/host") == "primary-host");
@@ -91,7 +91,7 @@ TEST_CASE("one space, two different stacks yield two independent configurations"
 TEST_CASE("same space loaded with an XML stack and a runtime stack yields independent configs",
           "[system][one_space_many_stacks]")
 {
-    const configuration_space space = make_server_space();
+    const config_space space = make_server_space();
 
     // Stack A: an XML document source.
     constexpr const char *kDocA =
@@ -105,9 +105,9 @@ TEST_CASE("same space loaded with an XML stack and a runtime stack yields indepe
     opts_a.document_paths = {"a.xml"};
     opts_a.make_document  = [](const std::string &) -> source_handle { return xml_of(kDocA); };
 
-    auto loaded_a = load(space, source_stack{}, opts_a);
+    auto loaded_a = load_config(space, source_stack{}, opts_a);
     REQUIRE(loaded_a);
-    const configuration config_a = std::move(loaded_a).value();
+    const config config_a = std::move(loaded_a).value();
 
     // Stack B: a runtime_source with different values.
     runtime_source rt;
@@ -115,9 +115,9 @@ TEST_CASE("same space loaded with an XML stack and a runtime stack yields indepe
       .set("server/mode", "secondary")
       .set("server/port", "3030");
 
-    auto loaded_b = load(space, source_stack{std::move(rt)}, {});
+    auto loaded_b = load_config(space, source_stack{std::move(rt)}, {});
     REQUIRE(loaded_b);
-    const configuration config_b = std::move(loaded_b).value();
+    const config config_b = std::move(loaded_b).value();
 
     // Both are independently readable and disagree on every value.
     REQUIRE(config_a.get("server/host") == "xml-host");
@@ -130,10 +130,10 @@ TEST_CASE("same space loaded with an XML stack and a runtime stack yields indepe
     REQUIRE(config_b.get("server/port") == "3030");
 }
 
-TEST_CASE("loading the same space N times leaves each configuration independent",
+TEST_CASE("loading the same space N times leaves each config independent",
           "[system][one_space_many_stacks]")
 {
-    const configuration_space space = make_server_space();
+    const config_space space = make_server_space();
 
     // Three loads against the same space, each with a distinct port.
     auto make_stack = [](const char *host, const char *mode, const char *port)
@@ -145,9 +145,9 @@ TEST_CASE("loading the same space N times leaves each configuration independent"
         return source_stack{std::move(src)};
     };
 
-    auto r0 = load(space, make_stack("h0", "primary",   "1000"), {});
-    auto r1 = load(space, make_stack("h1", "secondary", "2000"), {});
-    auto r2 = load(space, make_stack("h2", "primary",   "3000"), {});
+    auto r0 = load_config(space, make_stack("h0", "primary",   "1000"), {});
+    auto r1 = load_config(space, make_stack("h1", "secondary", "2000"), {});
+    auto r2 = load_config(space, make_stack("h2", "primary",   "3000"), {});
 
     REQUIRE(r0); REQUIRE(r1); REQUIRE(r2);
 

@@ -1,13 +1,13 @@
-// xml_persist: load a configuration from XML, then persist it back to XML.
+// xml_persist: load a config from XML, then persist it back to XML.
 //
-// nucleus::xml::emit_document takes a resolved configuration and writes a well-formed
+// nucleus::xml::emit_document takes a resolved config and writes a well-formed
 // XML document into the caller's stream via the pugixml write API -- entirely inside
 // the xml module, so no pugixml type crosses into core. A repeated leaf persists all
 // its values. This is the resolved-config -> XML direction (the inverse of reading);
 // the user owns persistence (here, std::cout).
 
-#include "nucleus/configuration.h"
-#include "nucleus/configuration_space.h"
+#include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -20,7 +20,7 @@
 
 int main()
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
         return 1;
     if(!builder.register_element(nucleus::element("host", nucleus::anchor::keyspace("server"))))
@@ -28,7 +28,7 @@ int main()
     if(!builder.register_element(
         nucleus::repeated_element("tag", nucleus::anchor::keyspace("server"))))
         return 1;
-    nucleus::configuration_space space = builder.build();
+    nucleus::config_space space = builder.build();
 
     const char *document =
         "<server><host>localhost</host><tag>alpha</tag><tag>beta</tag></server>";
@@ -38,7 +38,7 @@ int main()
                 nucleus::xml_source_options::of_string(document)));
     };
 
-    auto loaded = nucleus::load(space, nucleus::source_stack{},
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{},
         nucleus::load_options{.document_paths = {"config.xml"}, .make_document = make});
     if(!loaded)
     {

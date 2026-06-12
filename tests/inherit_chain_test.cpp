@@ -1,6 +1,6 @@
-#include "nucleus/configuration.h"
-#include "nucleus/configuration_space.h"
-#include "nucleus/configuration_source/inherit_declaration.h"
+#include "nucleus/config.h"
+#include "nucleus/config_space.h"
+#include "nucleus/config_source/inherit_declaration.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -32,7 +32,7 @@ nucleus::source_handle xml_of(const std::string &text)
 }
 
 // cluster/server keyed by "name"; leaves: port, protocol.
-void declare_cluster(nucleus::configuration_space_builder &engine)
+void declare_cluster(nucleus::config_space_builder &engine)
 {
     REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
     REQUIRE(engine.register_element(nucleus::element("server", anchor::keyspace("cluster"))));
@@ -44,7 +44,7 @@ void declare_cluster(nucleus::configuration_space_builder &engine)
 }
 
 // Same as declare_cluster plus a unique (non-identity) "serial" field.
-void declare_cluster_with_unique(nucleus::configuration_space_builder &engine)
+void declare_cluster_with_unique(nucleus::config_space_builder &engine)
 {
     declare_cluster(engine);
     REQUIRE(engine.register_element(
@@ -62,7 +62,7 @@ std::string filename_of(const std::string &path)
 
 // Loads a document chain against `space`, carrying the per-load selection and
 // inherit policy as options.
-nucleus::load_result load_chain(const nucleus::configuration_space &space,
+nucleus::load_result load_chain(const nucleus::config_space &space,
                                 std::vector<std::string> paths,
                                 std::function<nucleus::source_handle(const std::string &)> factory,
                                 std::optional<std::string> selection = std::nullopt,
@@ -73,7 +73,7 @@ nucleus::load_result load_chain(const nucleus::configuration_space &space,
     opts.make_document = std::move(factory);
     opts.selection = std::move(selection);
     opts.inherit = std::move(policy);
-    return nucleus::load(space, nucleus::source_stack{}, opts);
+    return nucleus::load_config(space, nucleus::source_stack{}, opts);
 }
 
 }
@@ -88,9 +88,9 @@ TEST_CASE("single file with no inherit attribute resolves normally", "[chain]")
             <server name="web"><port>80</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto factory = [&](const std::string &) { return xml_of(base_doc); };
     auto loaded = load_chain(space, {"base.xml"}, factory, "web");
@@ -114,9 +114,9 @@ TEST_CASE("two-file chain assembles root-first, derived overrides root", "[chain
             <server name="web" extend="wide"><port>8080</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
@@ -149,14 +149,14 @@ TEST_CASE("anonymous instances compose across chain in document order", "[chain]
             <server><protocol>tcp</protocol></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     // Schema without identity: anonymous content composes by rank.
     REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
     REQUIRE(engine.register_element(nucleus::element("server", anchor::keyspace("cluster"))));
     REQUIRE(engine.register_element(nucleus::element("port", anchor::keyspace("cluster/server"))));
     REQUIRE(engine.register_element(
         nucleus::element("protocol", anchor::keyspace("cluster/server"))));
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
@@ -189,9 +189,9 @@ TEST_CASE("named strain in derived composes on template from root", "[chain]")
             <server name="web"><protocol>tcp</protocol></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
     // Single named strain auto-resolves; no selection needed.
 
     auto factory = [&](const std::string &path) -> nucleus::source_handle {
@@ -232,9 +232,9 @@ TEST_CASE("opt-out truncates chain below declaring file", "[chain]")
 
     bool grandparent_accessed = false;
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
@@ -266,9 +266,9 @@ TEST_CASE("depth cap exceeded returns loud error naming the limit", "[chain]")
     const char *b_doc = R"(<cluster inherit="c.xml"><server name="b"><port>2</port></server></cluster>)";
     const char *c_doc = R"(<cluster><server name="c"><port>3</port></server></cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     nucleus::inherit_policy policy;
     policy.depth_cap = 2;
@@ -298,9 +298,9 @@ TEST_CASE("cycle in inheritance chain fails loudly naming the path", "[chain]")
     const char *a_doc = R"(<cluster inherit="b.xml"><server name="a"><port>1</port></server></cluster>)";
     const char *b_doc = R"(<cluster inherit="a.xml"><server name="b"><port>2</port></server></cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
@@ -331,9 +331,9 @@ TEST_CASE("admissibility callback rejection fails naming the parent", "[chain]")
             <server name="web" extend="wide"><port>8080</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     nucleus::inherit_policy policy;
     policy.admissibility = [](nucleus::capability_descriptor) -> std::string {
@@ -368,9 +368,9 @@ TEST_CASE("admissibility reject-all does not block a single-file load", "[chain]
             <server name="web"><port>80</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     nucleus::inherit_policy policy;
     policy.admissibility = [](nucleus::capability_descriptor) -> std::string {
@@ -402,9 +402,9 @@ TEST_CASE("admissibility reject-all fails naming the parent in a two-file chain"
             <server name="web" extend="wide"><port>8080</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     nucleus::inherit_policy policy;
     policy.admissibility = [](nucleus::capability_descriptor) -> std::string {
@@ -441,9 +441,9 @@ TEST_CASE("default admit-all policy allows all parents", "[chain]")
             <server name="web" extend="wide"><port>8080</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
     // No inherit policy -- default admits all parents.
 
     auto factory = [&](const std::string &path) -> nucleus::source_handle {
@@ -475,9 +475,9 @@ TEST_CASE("extend-narrow obeys default scope policy", "[chain]")
             <server name="web" extend="narrow"><protocol>tcp</protocol></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
@@ -511,9 +511,9 @@ TEST_CASE("extend-wide bypasses scope policy", "[chain]")
             <server name="web" extend="wide"><protocol>tcp</protocol></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
@@ -547,9 +547,9 @@ TEST_CASE("extend-without-base fails loudly", "[chain]")
             <server name="web" extend="narrow"><port>80</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
@@ -585,9 +585,9 @@ TEST_CASE("re-open without extend disposition fails loudly", "[chain]")
             <server name="web"><port>8080</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
@@ -618,9 +618,9 @@ TEST_CASE("duplicate primary-key value in one document fails at pull", "[chain]"
             <server name="web"><port>443</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto loaded = load_chain(space, {"doc.xml"},
                              [&](const std::string &) { return xml_of(doc); });
@@ -644,9 +644,9 @@ TEST_CASE("duplicate primary-key across chain layers without extend fails", "[ch
             <server name="web"><port>8080</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
@@ -676,9 +676,9 @@ TEST_CASE("duplicate unique-field value across sibling instances fails", "[chain
             <server name="db" serial="SN001"><port>5432</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster_with_unique(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     // Select "web" so unique enforcement runs before the "multiple strains, no
     // selection" guard would fire.
@@ -705,9 +705,9 @@ TEST_CASE("duplicate unique-field value across chain files fails", "[chain]")
             <server name="db" serial="SN001"><port>5432</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster_with_unique(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
@@ -736,9 +736,9 @@ TEST_CASE("inherit attribute on non-root element fails loudly", "[chain]")
             <server inherit="other.xml"><port>80</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto loaded = load_chain(space, {"doc.xml"},
                              [&](const std::string &) { return xml_of(doc); });
@@ -757,9 +757,9 @@ TEST_CASE("unknown extend value is a loud parse error", "[chain]")
             <server name="web" extend="diagonal"><port>80</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto loaded = load_chain(space, {"doc.xml"},
                              [&](const std::string &) { return xml_of(doc); });
@@ -773,7 +773,7 @@ TEST_CASE("unknown extend value is a loud parse error", "[chain]")
 // duplicate-canonical/re-entry guards from the keyed-instance re-open rules.
 namespace {
 
-void declare_anon_cluster(nucleus::configuration_space_builder &engine)
+void declare_anon_cluster(nucleus::config_space_builder &engine)
 {
     REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
     REQUIRE(engine.register_element(nucleus::element("server", anchor::keyspace("cluster"))));
@@ -795,9 +795,9 @@ TEST_CASE("depth-cap boundary: exactly at the cap loads, one beyond fails", "[ch
     const char *b_doc = R"(<cluster inherit="c.xml"><server><port>2</port></server></cluster>)";
     const char *c_doc = R"(<cluster><server><port>3</port></server></cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_anon_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
@@ -837,9 +837,9 @@ TEST_CASE("three-file cycle fails loudly naming a path on the cycle", "[chain]")
     const char *b_doc = R"(<cluster inherit="c.xml"><server><port>2</port></server></cluster>)";
     const char *c_doc = R"(<cluster inherit="a.xml"><server><port>3</port></server></cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_anon_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
@@ -869,9 +869,9 @@ TEST_CASE("duplicate-canonical path reached two ways resolves deterministically"
     const char *derived_doc =
         R"(<cluster inherit="base.xml"><server><protocol>tcp</protocol></server></cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_anon_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
@@ -900,9 +900,9 @@ TEST_CASE("independent second requested path is not falsely flagged as a cycle",
     const char *first_doc = R"(<cluster><server><port>80</port></server></cluster>)";
     const char *second_doc = R"(<cluster><server><protocol>tcp</protocol></server></cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_anon_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);

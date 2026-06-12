@@ -1,11 +1,11 @@
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
 #include "nucleus/keyspace/key_path.h"
 
-#include "nucleus/configuration_source/source_stack.h"
+#include "nucleus/config_source/source_stack.h"
 #include "nucleus/argv/argv_source.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -25,10 +25,10 @@
 TEST_CASE("recognizer_of answers true for a declared key and false for an unknown one",
           "[recognizer_of]")
 {
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     REQUIRE(engine.register_schema("logging/level"));
     REQUIRE(engine.register_schema("server/host"));
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto rec = nucleus::recognizer_of(space);
 
@@ -50,16 +50,16 @@ TEST_CASE("recognizer_of answers true for a declared key and false for an unknow
 TEST_CASE("argv_source composed with recognizer_of resolves a recognized flag via load",
           "[recognizer_of][argv]")
 {
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     REQUIRE(engine.register_schema("logging/level"));
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     // Explicit composition: the argv_source is constructed and wired by the caller,
     // never instantiated automatically by the space.
     nucleus::argv_source argv(std::vector<std::string>{"--logging-level=debug"});
     argv.recognize_with(nucleus::recognizer_of(space));
 
-    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(argv)}, {});
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(argv)}, {});
     REQUIRE(loaded);
     REQUIRE(loaded.value().get("logging/level") == "debug");
 }
@@ -71,16 +71,16 @@ TEST_CASE("argv_source composed with recognizer_of resolves a recognized flag vi
 TEST_CASE("argv_source with recognizer_of rejects an undeclared flag in strict mode",
           "[recognizer_of][argv]")
 {
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     REQUIRE(engine.register_schema("logging/level"));
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     // The flag maps to "logging/verbosity" which is NOT in the schema.
     nucleus::argv_source argv(std::vector<std::string>{"--logging-verbosity=3"});
     argv.recognize_with(nucleus::recognizer_of(space))
         .policy(nucleus::unknown_key_policy::strict);
 
-    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(argv)}, {});
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(argv)}, {});
     REQUIRE_FALSE(loaded);
     // The error must reference the unrecognized path.
     REQUIRE(loaded.error().message.find("logging/verbosity") != std::string::npos);
@@ -98,7 +98,7 @@ TEST_CASE("argv_source with recognizer_of does not abort on an undeclared flag i
     // without aborting at pull(). When the space has declared elements the
     // schema enforcer would reject the unknown key as undeclared -- that is
     // correct behavior and separate from the lenient/strict source policy.
-    nucleus::configuration_space space = nucleus::configuration_space_builder{}.build();
+    nucleus::config_space space = nucleus::config_space_builder{}.build();
 
     nucleus::argv_source argv(std::vector<std::string>{
         "--logging-level=info",
@@ -108,7 +108,7 @@ TEST_CASE("argv_source with recognizer_of does not abort on an undeclared flag i
     argv.recognize_with(nucleus::recognizer_of(space))
         .policy(nucleus::unknown_key_policy::lenient);
 
-    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(argv)}, {});
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(argv)}, {});
     // Lenient mode: pull() emits both entries without erroring; load proceeds.
     REQUIRE(loaded);
     REQUIRE(loaded.value().get("logging/level") == "info");
@@ -122,11 +122,11 @@ TEST_CASE("argv_source with recognizer_of does not abort on an undeclared flag i
 TEST_CASE("recognizer_of distinguishes multiple declared paths from non-declared ones",
           "[recognizer_of]")
 {
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     REQUIRE(engine.register_schema("db/host"));
     REQUIRE(engine.register_schema("db/port"));
     REQUIRE(engine.register_schema("auth/token"));
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto rec = nucleus::recognizer_of(space);
 

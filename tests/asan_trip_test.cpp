@@ -1,5 +1,5 @@
 // Deliberately-dangling test that proves AddressSanitizer is actually wired and
-// tripping. It is built and registered ONLY in a sanitizer configuration (see
+// tripping. It is built and registered ONLY in a sanitizer config (see
 // tests/CMakeLists.txt), so it never runs in a normal build. CTest asserts the
 // process reports a heap-use-after-free, confirming ASan catches the very class
 // of bug (view-into-freed-buffer) that is the project's #1 memory risk.

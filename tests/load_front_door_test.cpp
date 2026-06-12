@@ -1,11 +1,11 @@
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/converters.h"
 
 #include "nucleus/strain_scope.h"
-#include "nucleus/configuration.h"
+#include "nucleus/config.h"
 
 #include "nucleus/runtime/runtime_source.h"
 
@@ -31,18 +31,18 @@ struct flat_only_source
 {
     [[nodiscard]] nucleus::capability_descriptor capabilities() const { return {}; }
 
-    [[nodiscard]] nucleus::configuration_source_result pull()
+    [[nodiscard]] nucleus::config_source_result pull()
     {
-        return nucleus::configuration_source_batch{};
+        return nucleus::config_source_batch{};
     }
 };
 
 // A space whose schema requires nesting (a keyed container) and optionally uses
 // typed_scalars (a typed leaf). Produces a HARD nesting requirement and a SOFT
 // typed_scalars requirement via derive_capability_requirements.
-[[nodiscard]] nucleus::configuration_space make_nested_typed_space()
+[[nodiscard]] nucleus::config_space make_nested_typed_space()
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("node", anchor::root())));
     REQUIRE(builder.register_element(
         nucleus::primary_key_element("name", anchor::keyspace("node"))));
@@ -53,7 +53,7 @@ struct flat_only_source
 
 // Registers a cluster/node keyed container with primary key "name" and leaf "port",
 // plus a general "app/label" element so scope policies can be distinguished.
-void declare_cluster(nucleus::configuration_space_builder &engine)
+void declare_cluster(nucleus::config_space_builder &engine)
 {
     REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
     REQUIRE(engine.register_element(nucleus::element("node", anchor::keyspace("cluster"))));
@@ -73,7 +73,7 @@ void declare_cluster(nucleus::configuration_space_builder &engine)
 TEST_CASE("load with a two-source stack: last-listed source wins a same-key contest",
           "[load_front_door]")
 {
-    nucleus::configuration_space space = nucleus::configuration_space_builder{}.build();
+    nucleus::config_space space = nucleus::config_space_builder{}.build();
 
     nucleus::runtime_source base;
     base.set("server/host", "base-host").set("server/port", "80");
@@ -81,7 +81,7 @@ TEST_CASE("load with a two-source stack: last-listed source wins a same-key cont
     nucleus::runtime_source overlay;
     overlay.set("server/port", "8080");
 
-    auto loaded = nucleus::load(space, source_stack{base, overlay}, {});
+    auto loaded = nucleus::load_config(space, source_stack{base, overlay}, {});
     REQUIRE(loaded);
 
     // The last-listed (overlay) source wins the contested "server/port".
@@ -97,9 +97,9 @@ TEST_CASE("load with a two-source stack: last-listed source wins a same-key cont
 TEST_CASE("load_options.selection picks the named strain from a keyed container",
           "[load_front_door][knobs]")
 {
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     nucleus::runtime_source src;
     src.set("cluster/node/alpha/name", "alpha")
@@ -111,14 +111,14 @@ TEST_CASE("load_options.selection picks the named strain from a keyed container"
     // Here we explicitly select "alpha".
     load_options opts_alpha;
     opts_alpha.selection = "alpha";
-    auto with_alpha = nucleus::load(space, source_stack{src}, opts_alpha);
+    auto with_alpha = nucleus::load_config(space, source_stack{src}, opts_alpha);
     REQUIRE(with_alpha);
     REQUIRE(with_alpha.value().get("cluster/node/port") == "1000");
 
     // Selecting "beta" gives the other port.
     load_options opts_beta;
     opts_beta.selection = "beta";
-    auto with_beta = nucleus::load(space, source_stack{src}, opts_beta);
+    auto with_beta = nucleus::load_config(space, source_stack{src}, opts_beta);
     REQUIRE(with_beta);
     REQUIRE(with_beta.value().get("cluster/node/port") == "2000");
 }
@@ -130,9 +130,9 @@ TEST_CASE("load_options.selection picks the named strain from a keyed container"
 TEST_CASE("load_options.scope = file_level excludes container entries above the defining layer",
           "[load_front_door][knobs]")
 {
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     // L0 (rank 0): defines the alpha strain with its port; Ld=0.
     // L1 (rank 1): adds a DISTINCT container key (not overriding L0's port) plus a
@@ -147,7 +147,7 @@ TEST_CASE("load_options.scope = file_level excludes container entries above the 
     file_level_opts.selection = "alpha";
     file_level_opts.scope = strain_scope_policy::file_level;
 
-    auto loaded = nucleus::load(space, source_stack{L0, L1}, file_level_opts);
+    auto loaded = nucleus::load_config(space, source_stack{L0, L1}, file_level_opts);
     REQUIRE(loaded);
 
     // Port from L0 (rank 0 = Ld) survives under file_level.
@@ -158,7 +158,7 @@ TEST_CASE("load_options.scope = file_level excludes container entries above the 
     // Default (space_open_container_closed) admits the general entry from L1.
     load_options default_opts;
     default_opts.selection = "alpha";
-    auto with_default = nucleus::load(space, source_stack{L0, L1}, default_opts);
+    auto with_default = nucleus::load_config(space, source_stack{L0, L1}, default_opts);
     REQUIRE(with_default);
     REQUIRE(with_default.value().get("app/label") == "core");
     REQUIRE(with_default.value().get("cluster/node/port") == "9000");
@@ -171,10 +171,10 @@ TEST_CASE("load_options.scope = file_level excludes container entries above the 
 TEST_CASE("load with a flat-only stack fails a schema requiring nesting, naming both parties",
           "[load_front_door][gate]")
 {
-    nucleus::configuration_space space = make_nested_typed_space();
+    nucleus::config_space space = make_nested_typed_space();
 
     // flat_only_source declares no capabilities; the nested schema requires nesting (HARD).
-    auto loaded = nucleus::load(space, source_stack{flat_only_source{}}, {});
+    auto loaded = nucleus::load_config(space, source_stack{flat_only_source{}}, {});
     REQUIRE_FALSE(loaded);
 
     const std::string &msg = loaded.error().message;
@@ -191,7 +191,7 @@ TEST_CASE("load with a flat-only stack fails a schema requiring nesting, naming 
 TEST_CASE("load with a capable stack satisfies the HARD nesting requirement",
           "[load_front_door][gate]")
 {
-    nucleus::configuration_space space = make_nested_typed_space();
+    nucleus::config_space space = make_nested_typed_space();
 
     // runtime_source declares nesting + duplicate_keys + typed_scalars: all requirements met.
     nucleus::runtime_source src;
@@ -200,7 +200,7 @@ TEST_CASE("load with a capable stack satisfies the HARD nesting requirement",
 
     load_options opts;
     opts.selection = "alpha";
-    auto loaded = nucleus::load(space, source_stack{src}, opts);
+    auto loaded = nucleus::load_config(space, source_stack{src}, opts);
     REQUIRE(loaded);
 
     // The preflight must agree: nesting is honored.
@@ -223,7 +223,7 @@ TEST_CASE("load degrades a SOFT-absent optional capability and does not abort",
     // Build a space with only a flat element: the flat schema derives NO capability
     // requirements, so use a nested schema to get the typed_scalars SOFT requirement.
     // The typed leaf is optional (SOFT), so a flat-only stack must degrade, not abort.
-    nucleus::configuration_space space = make_nested_typed_space();
+    nucleus::config_space space = make_nested_typed_space();
 
     // A source that provides nesting (satisfies HARD) but not typed_scalars (SOFT absent).
     struct nesting_no_typed
@@ -233,9 +233,9 @@ TEST_CASE("load degrades a SOFT-absent optional capability and does not abort",
             return nucleus::capability_descriptor{nucleus::capability::nesting};
         }
 
-        [[nodiscard]] nucleus::configuration_source_result pull()
+        [[nodiscard]] nucleus::config_source_result pull()
         {
-            nucleus::configuration_source_batch batch;
+            nucleus::config_source_batch batch;
             batch.entries.push_back(nucleus::make_entry(
                 "node/alpha/name", nucleus::value::owned("alpha"), capabilities()));
             batch.entries.push_back(nucleus::make_entry(
@@ -246,7 +246,7 @@ TEST_CASE("load degrades a SOFT-absent optional capability and does not abort",
 
     load_options opts;
     opts.selection = "alpha";
-    auto loaded = nucleus::load(space, source_stack{nesting_no_typed{}}, opts);
+    auto loaded = nucleus::load_config(space, source_stack{nesting_no_typed{}}, opts);
     // SOFT degradation: the load must not abort.
     REQUIRE(loaded);
 
@@ -264,10 +264,10 @@ TEST_CASE("load degrades a SOFT-absent optional capability and does not abort",
 TEST_CASE("the stack is borrowed: pre-flight then load then load again, one stack",
           "[load][stack]")
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("server", anchor::root())));
     REQUIRE(builder.register_element(nucleus::element("host", anchor::keyspace("server"))));
-    const nucleus::configuration_space space = builder.build();
+    const nucleus::config_space space = builder.build();
 
     nucleus::runtime_source src;
     src.set("server/host", "localhost");
@@ -275,12 +275,12 @@ TEST_CASE("the stack is borrowed: pre-flight then load then load again, one stac
 
     REQUIRE(nucleus::check_capabilities(space, stack, {}));
 
-    auto first = nucleus::load(space, stack, {});
+    auto first = nucleus::load_config(space, stack, {});
     REQUIRE(first);
     REQUIRE(first.value().get("server/host") == "localhost");
 
     // The same stack loads again: nothing was consumed by the first load.
-    auto second = nucleus::load(space, stack, {});
+    auto second = nucleus::load_config(space, stack, {});
     REQUIRE(second);
     REQUIRE(second.value().get("server/host") == "localhost");
 }

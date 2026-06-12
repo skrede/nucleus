@@ -16,7 +16,7 @@ enum class registration_kind : std::uint8_t
 {
     schema,
     tokenizer,
-    configuration_source,
+    config_source,
     converter,
 };
 
@@ -26,7 +26,7 @@ enum class registration_kind : std::uint8_t
     {
         case registration_kind::schema:    return "schema";
         case registration_kind::tokenizer: return "tokenizer";
-        case registration_kind::configuration_source: return "source";
+        case registration_kind::config_source: return "source";
         case registration_kind::converter: return "converter";
     }
     return "unknown";

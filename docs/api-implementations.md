@@ -31,7 +31,7 @@ built when `NUCLEUS_BUILD_SOURCE_XML=ON` (the default).
 ## `xml_source` — the document source
 
 `#include "nucleus/xml/xml_source.h"` · target `nucleus::xml` · satisfies
-[`configuration_source`](api-extending.md#source_concept) plus both optional
+[`config_source`](api-extending.md#source_concept) plus both optional
 affordances (`projects_source`, `inheriting_source`)
 
 The reference document source, backed by pugixml. The xml module is the only
@@ -53,7 +53,7 @@ public:
     static xml_source from(xml_source_options options);
 
     capability_descriptor capabilities() const;
-    configuration_source_result pull();
+    config_source_result pull();
     void apply_projection(const schema_projection &projection);
     inherit_declaration inheritance() const;   // callable after pull()
 };
@@ -128,7 +128,7 @@ env_source &set(std::string path, std::string text);   // fluent
 
 static capability_descriptor descriptor() noexcept;     // empty
 capability_descriptor capabilities() const;              // == descriptor()
-configuration_source_result pull();                      // owned values, no retained buffer
+config_source_result pull();                      // owned values, no retained buffer
 ```
 
 Because its values are owned, `pull()` pins no buffer. This is the template for
@@ -156,7 +156,7 @@ syntactic mapping, then an optional schema-validation pass driven by a recognize
 
 ```cpp
 enum class unknown_key_policy { strict, lenient };
-// key_recognizer = std::function<bool(const key_path &)>  ("nucleus/configuration_source/argv/key_recognizer.h")
+// key_recognizer = std::function<bool(const key_path &)>  ("nucleus/config_source/argv/key_recognizer.h")
 
 argv_source();
 explicit argv_source(std::vector<std::string> args);
@@ -168,7 +168,7 @@ argv_source &log_to(log_sink &sink) noexcept;
 
 static capability_descriptor descriptor() noexcept;        // { nesting, duplicate_keys }
 capability_descriptor capabilities() const;
-configuration_source_result pull();                        // owned values
+config_source_result pull();                        // owned values
 ```
 
 - With no recognizer, every syntactically valid flag is accepted.
@@ -230,7 +230,7 @@ explicit runtime_source(std::vector<std::pair<std::string, std::string>> entries
 runtime_source &set(std::string path, std::string text);   // fluent
 
 capability_descriptor capabilities() const;   // { nesting, duplicate_keys, typed_scalars }
-configuration_source_result pull();            // owned values
+config_source_result pull();            // owned values
 ```
 
 It emits flat `(path → value)` entries exactly like `env_source`, but declares

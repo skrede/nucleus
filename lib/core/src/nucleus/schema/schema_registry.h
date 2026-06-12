@@ -93,7 +93,7 @@ public:
             }
         }
 
-        // A configuration space has exactly ONE primary key: it is the single
+        // A config space has exactly ONE primary key: it is the single
         // slice selector for the whole schema hierarchy (many strains shipped,
         // one resolved through the key). A second identity element ANYWHERE --
         // same container or not -- would make the selector ambiguous, so it is
@@ -106,7 +106,7 @@ public:
             {
                 return unexpected(nucleus::format(
                     "schema element '{}' cannot be a primary key: '{}' is "
-                    "already the configuration space's primary key, and a "
+                    "already the config space's primary key, and a "
                     "space has exactly one",
                     el.name, existing->declared_path().str()));
             }

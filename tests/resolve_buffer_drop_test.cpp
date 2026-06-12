@@ -1,8 +1,8 @@
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/xml/xml_source.h"
 
-#include "nucleus/configuration.h"
+#include "nucleus/config.h"
 
 #include "nucleus/env/env_source.h"
 
@@ -15,9 +15,9 @@
 // The convergence buffer-lifetime checkpoint -- the project's top use-after-free
 // guard. It loads from a stack that INCLUDES an XML document source (whose values
 // are string_views into the pugixml DOM arena), resolves to an immutable
-// configuration, DROPS every source and its retained buffer/document, then reads
+// config, DROPS every source and its retained buffer/document, then reads
 // every value back. Under AddressSanitizer this proves the copy-out at the
-// resolve boundary is complete and no view-node escaped into the configuration.
+// resolve boundary is complete and no view-node escaped into the config.
 
 namespace {
 
@@ -30,10 +30,10 @@ constexpr const char *kDocument = R"(<app>
 
 TEST_CASE("resolved values survive dropping every source buffer", "[resolution][lifetime]")
 {
-    std::optional<nucleus::configuration> config;
+    std::optional<nucleus::config> config;
 
     {
-        nucleus::configuration_space space = nucleus::configuration_space_builder{}.build();
+        nucleus::config_space space = nucleus::config_space_builder{}.build();
 
         // A document source (views into the parser arena) layered beneath an env
         // overlay that overrides one key -- so both a view-backed and an
@@ -44,7 +44,7 @@ TEST_CASE("resolved values survive dropping every source buffer", "[resolution][
         overlay.set("app/server/port", "9090");
 
         // base-document at lower precedence (stack[0]), overlay at higher precedence (stack[1]).
-        auto loaded = nucleus::load(space,
+        auto loaded = nucleus::load_config(space,
             nucleus::source_stack{std::move(doc), std::move(overlay)},
             {});
         REQUIRE(loaded);
@@ -57,7 +57,7 @@ TEST_CASE("resolved values survive dropping every source buffer", "[resolution][
     REQUIRE(config.has_value());
 
     // Read every value AFTER every buffer/document is gone. Under ASan this is the
-    // proof the configuration is self-owning.
+    // proof the config is self-owning.
     REQUIRE(config->get("app/logging/level") == "debug");
     REQUIRE(config->get("app/logging/file") == "/var/log/app.log");
     REQUIRE(config->get("app/server/host") == "0.0.0.0");

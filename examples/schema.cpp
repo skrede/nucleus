@@ -5,7 +5,7 @@
 // child under an already-declared one. Here the resolve fails: `host` is required
 // but no source supplies it.
 
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -16,7 +16,7 @@
 
 int main()
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
         return 1;
     if(!builder.register_element(
@@ -26,13 +26,13 @@ int main()
         nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
                               {"http", "https"})))
         return 1;
-    nucleus::configuration_space space = builder.build();
+    nucleus::config_space space = builder.build();
 
     // A source that supplies `mode` but not the required `host`.
     nucleus::env_source values;
     values.set("server/mode", "http");
 
-    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(values)}, {});
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(values)}, {});
     if(!loaded)
     {
         std::cout << "rejected as expected: " << loaded.error() << '\n';

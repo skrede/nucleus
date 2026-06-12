@@ -14,7 +14,7 @@ namespace nucleus {
 
 // The hierarchical path -> value store every source writes into and every consumer
 // reads from. Build-mutable here; the load copies its values out into the immutable
-// configuration. Hierarchy is structural: children_of() surfaces the immediate
+// config. Hierarchy is structural: children_of() surfaces the immediate
 // sub-segments under a prefix (what schema referential integrity and the CLI surface
 // projection walk). Ordering is deterministic (std::map) for stable diagnostics.
 class keyspace

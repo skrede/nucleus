@@ -1,5 +1,5 @@
-#include "nucleus/configuration.h"
-#include "nucleus/configuration_space.h"
+#include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -17,8 +17,8 @@
 #include <vector>
 #include <sstream>
 
-// System-level round-trip proof: build a configuration in code, emit it, reload it,
-// and ASSERT (not merely print) that the reloaded configuration equals the original.
+// System-level round-trip proof: build a config in code, emit it, reload it,
+// and ASSERT (not merely print) that the reloaded config equals the original.
 //
 // Shape: a runtime_source supplies scalar values; an XML overlay supplies a repeated
 // field (a flat source can carry at most one value per repeated field per layer, so
@@ -40,9 +40,9 @@ source_handle xml_of(const std::string &text)
 }
 
 // Schema: server with host, mode, and a repeated tag leaf.
-configuration_space make_space()
+config_space make_space()
 {
-    configuration_space_builder builder;
+    config_space_builder builder;
     REQUIRE(builder.register_element(element("server", anchor::root())));
     REQUIRE(builder.register_element(element("host", anchor::keyspace("server"))));
     REQUIRE(builder.register_element(
@@ -57,7 +57,7 @@ configuration_space make_space()
 TEST_CASE("round-trip: runtime_source + XML repeated field -> emit -> reload is lossless",
           "[system][round_trip]")
 {
-    const configuration_space space = make_space();
+    const config_space space = make_space();
 
     // The scalar base, built in code.
     runtime_source base;
@@ -75,9 +75,9 @@ TEST_CASE("round-trip: runtime_source + XML repeated field -> emit -> reload is 
     opts.document_paths = {"config.xml"};
     opts.make_document  = make_doc;
 
-    auto first = load(space, source_stack{std::move(base)}, opts);
+    auto first = load_config(space, source_stack{std::move(base)}, opts);
     REQUIRE(first);
-    const configuration &c1 = first.value();
+    const config &c1 = first.value();
 
     // Emit C1 through the XML emitter into an in-memory stream.
     std::ostringstream emitted;
@@ -93,9 +93,9 @@ TEST_CASE("round-trip: runtime_source + XML repeated field -> emit -> reload is 
         return xml_of(emitted_xml);
     };
 
-    auto second = load(space, source_stack{}, reload_opts);
+    auto second = load_config(space, source_stack{}, reload_opts);
     REQUIRE(second);
-    const configuration &c2 = second.value();
+    const config &c2 = second.value();
 
     // ASSERT equivalence -- not merely print.
 
@@ -120,16 +120,16 @@ TEST_CASE("round-trip: runtime_source + XML repeated field -> emit -> reload is 
 TEST_CASE("round-trip: all scalar values survive emit -> reload unchanged",
           "[system][round_trip]")
 {
-    const configuration_space space = make_space();
+    const config_space space = make_space();
 
     runtime_source src;
     src.set("server/host", "edge-node")
        .set("server/mode", "secondary");
 
     // No repeated field -- purely scalar round-trip.
-    auto first = load(space, source_stack{std::move(src)}, {});
+    auto first = load_config(space, source_stack{std::move(src)}, {});
     REQUIRE(first);
-    const configuration &c1 = first.value();
+    const config &c1 = first.value();
 
     std::ostringstream emitted;
     xml::emit_document(c1, emitted);
@@ -142,9 +142,9 @@ TEST_CASE("round-trip: all scalar values survive emit -> reload unchanged",
         return xml_of(xml_text);
     };
 
-    auto second = load(space, source_stack{}, reload_opts);
+    auto second = load_config(space, source_stack{}, reload_opts);
     REQUIRE(second);
-    const configuration &c2 = second.value();
+    const config &c2 = second.value();
 
     // Key sets match.
     REQUIRE(c2.keys() == c1.keys());
@@ -157,22 +157,22 @@ TEST_CASE("round-trip: all scalar values survive emit -> reload unchanged",
 TEST_CASE("round-trip via env emitter: scalar subset reloads its keys",
           "[system][round_trip]")
 {
-    // Round-trip a scalar-only configuration through the env emitter (flat KEY=value
+    // Round-trip a scalar-only config through the env emitter (flat KEY=value
     // format) and reload it via env_source to assert the env format is lossless for
     // scalars. The schema uses flat (root-level) keys so that the capability-flat
     // env_source can satisfy the gate; nested schemas require nesting capability.
-    configuration_space_builder builder;
+    config_space_builder builder;
     REQUIRE(builder.register_element(element("host", anchor::root())));
     REQUIRE(builder.register_element(element("port", anchor::root())));
-    const configuration_space space = builder.build();
+    const config_space space = builder.build();
 
     env_source src;
     src.set("host", "rt-host")
        .set("port", "5050");
 
-    auto first = load(space, source_stack{std::move(src)}, {});
+    auto first = load_config(space, source_stack{std::move(src)}, {});
     REQUIRE(first);
-    const configuration &c1 = first.value();
+    const config &c1 = first.value();
 
     // Emit via env emitter.
     std::ostringstream env_out;
@@ -194,9 +194,9 @@ TEST_CASE("round-trip via env emitter: scalar subset reloads its keys",
         reloaded_env.set(line.substr(0, eq), line.substr(eq + 1));
     }
 
-    auto second = load(space, source_stack{std::move(reloaded_env)}, {});
+    auto second = load_config(space, source_stack{std::move(reloaded_env)}, {});
     REQUIRE(second);
-    const configuration &c2 = second.value();
+    const config &c2 = second.value();
 
     // Scalar values survive the env round-trip.
     REQUIRE(c2.get("host") == c1.get("host"));

@@ -1,11 +1,11 @@
-#ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_CONFIGURATION_SOURCE_H
-#define HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_CONFIGURATION_SOURCE_H
+#ifndef HPP_GUARD_NUCLEUS_CONFIG_SOURCE_CONFIG_SOURCE_H
+#define HPP_GUARD_NUCLEUS_CONFIG_SOURCE_CONFIG_SOURCE_H
 
 #include "nucleus/error.h"
 #include "nucleus/expected.h"
 #include "nucleus/capability.h"
 
-#include "nucleus/configuration_source/inherit_declaration.h"
+#include "nucleus/config_source/inherit_declaration.h"
 
 #include "nucleus/keyspace/entry.h"
 
@@ -49,7 +49,7 @@ private:
 // The product of one pull: the entries a source produced plus the handle that
 // keeps their backing buffer alive. Entries and handle travel together so the
 // lifetime dependency is never separated from the data.
-struct configuration_source_batch
+struct config_source_batch
 {
     std::vector<keyspace_entry> entries;
     std::vector<extend_disposition> dispositions; // empty for flat sources
@@ -57,10 +57,10 @@ struct configuration_source_batch
 };
 
 // The error a pull can report (e.g. a missing file or a malformed document).
-using configuration_source_error = error;
+using config_source_error = error;
 
 // The result of pulling from a source.
-using configuration_source_result = expected<configuration_source_batch, configuration_source_error>;
+using config_source_result = expected<config_source_batch, config_source_error>;
 
 }
 

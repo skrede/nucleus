@@ -1,7 +1,7 @@
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/strain_scope.h"
-#include "nucleus/configuration.h"
+#include "nucleus/config.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -25,7 +25,7 @@ namespace {
 
 // Registers a cluster/server keyed container with primary key "name", leaves
 // "port" and "protocol", plus a general "app/name" element at the root.
-void declare_cluster_with_app(nucleus::configuration_space_builder &engine)
+void declare_cluster_with_app(nucleus::config_space_builder &engine)
 {
     REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
     REQUIRE(engine.register_element(nucleus::element("server", anchor::keyspace("cluster"))));
@@ -62,16 +62,16 @@ TEST_CASE("default policy (space-open container-closed) excludes container entri
     nucleus::runtime_source L0, Lderived, Lcompeting;
     setup_three_layer(L0, Lderived, Lcompeting);
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster_with_app(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     // L0(stack[0]) < Lderived(stack[1]) < Lcompeting(stack[2]); no scope override.
-    auto loaded = nucleus::load(space,
+    auto loaded = nucleus::load_config(space,
         nucleus::source_stack{std::move(L0), std::move(Lderived), std::move(Lcompeting)},
         nucleus::load_options{.selection = "web"});
     REQUIRE(loaded);
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
 
     // web/port=80 is at stack[0]; survives under all policies.
     REQUIRE(config.get("cluster/server/port") == "80");
@@ -94,15 +94,15 @@ TEST_CASE("file_level policy excludes container entries and general entries abov
     nucleus::runtime_source L0, Lderived, Lcompeting;
     setup_three_layer(L0, Lderived, Lcompeting);
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster_with_app(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
-    auto loaded = nucleus::load(space,
+    auto loaded = nucleus::load_config(space,
         nucleus::source_stack{std::move(L0), std::move(Lderived), std::move(Lcompeting)},
         nucleus::load_options{.selection = "web", .scope = strain_scope_policy::file_level});
     REQUIRE(loaded);
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
 
     // web/port=80 is at stack[0]; survives.
     REQUIRE(config.get("cluster/server/port") == "80");
@@ -121,17 +121,17 @@ TEST_CASE("container_open_until_next_strain admits container entries below Ls an
     nucleus::runtime_source L0, Lderived, Lcompeting;
     setup_three_layer(L0, Lderived, Lcompeting);
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster_with_app(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
-    auto loaded = nucleus::load(space,
+    auto loaded = nucleus::load_config(space,
         nucleus::source_stack{std::move(L0), std::move(Lderived), std::move(Lcompeting)},
         nucleus::load_options{
             .selection = "web",
             .scope = strain_scope_policy::container_open_until_next_strain});
     REQUIRE(loaded);
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
 
     // web/port=80 is at stack[0] < Ls=stack[2]; survives.
     REQUIRE(config.get("cluster/server/port") == "80");
@@ -157,17 +157,17 @@ TEST_CASE("container_open_until_next_strain with no competing strain is fully op
       .set("cluster/server/web/port", "80");
     Lderived.set("cluster/server/web/protocol", "tcp");
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster_with_app(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
-    auto loaded = nucleus::load(space,
+    auto loaded = nucleus::load_config(space,
         nucleus::source_stack{std::move(L0), std::move(Lderived)},
         nucleus::load_options{
             .selection = "web",
             .scope = strain_scope_policy::container_open_until_next_strain});
     REQUIRE(loaded);
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
 
     // Ls = unbounded (no competing strain); all container entries compose.
     REQUIRE(config.get("cluster/server/port") == "80");
@@ -188,18 +188,18 @@ TEST_CASE("a competing strain introduced below the defining layer never bounds t
         .set("cluster/server/web/port", "80");
     Lderived.set("cluster/server/web/protocol", "tcp");
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster_with_app(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     // Learly(stack[0]) < Lweb(stack[1]) < Lderived(stack[2]).
-    auto loaded = nucleus::load(space,
+    auto loaded = nucleus::load_config(space,
         nucleus::source_stack{std::move(Learly), std::move(Lweb), std::move(Lderived)},
         nucleus::load_options{
             .selection = "web",
             .scope = strain_scope_policy::container_open_until_next_strain});
     REQUIRE(loaded);
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
 
     // The selected strain survives in full: Ld=stack[1], no competitor above Ld, so
     // Ls is unbounded and the stack[2] derived entry composes too.
@@ -225,19 +225,19 @@ TEST_CASE("Ls is bound by the layer that INTRODUCES the competing strain, not th
     Lbetween.set("cluster/server/web/protocol", "tcp");
     Loverwrite.set("cluster/server/db/port", "5433");
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster_with_app(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     // L0(stack[0]) < Lcompeting(stack[1]) < Lbetween(stack[2]) < Loverwrite(stack[3]).
-    auto loaded = nucleus::load(space,
+    auto loaded = nucleus::load_config(space,
         nucleus::source_stack{std::move(L0), std::move(Lcompeting),
                               std::move(Lbetween), std::move(Loverwrite)},
         nucleus::load_options{
             .selection = "web",
             .scope = strain_scope_policy::container_open_until_next_strain});
     REQUIRE(loaded);
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
 
     // web/port=80 at stack[0] < Ls=stack[1]; survives.
     REQUIRE(config.get("cluster/server/port") == "80");
@@ -258,16 +258,16 @@ TEST_CASE("scope policies apply when the single named strain auto-resolves",
     Lderived.set("cluster/server/web/protocol", "tcp")
             .set("app/name", "core");
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster_with_app(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     // No selection, no scope override -- default space_open_container_closed.
-    auto loaded = nucleus::load(space,
+    auto loaded = nucleus::load_config(space,
         nucleus::source_stack{std::move(L0), std::move(Lderived)},
         {});
     REQUIRE(loaded);
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
 
     REQUIRE(config.get("cluster/server/port") == "80");
     REQUIRE_FALSE(config.contains("cluster/server/protocol"));
@@ -283,16 +283,16 @@ TEST_CASE("file_level applies on auto-resolve and cuts general entries above the
       .set("cluster/server/web/port", "80");
     Lderived.set("app/name", "core");
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster_with_app(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     // No selection: the single named strain auto-resolves with the policy active.
-    auto loaded = nucleus::load(space,
+    auto loaded = nucleus::load_config(space,
         nucleus::source_stack{std::move(L0), std::move(Lderived)},
         nucleus::load_options{.scope = strain_scope_policy::file_level});
     REQUIRE(loaded);
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
 
     // The world as web's layer saw it: the higher-rank general entry is gone.
     REQUIRE(config.get("cluster/server/port") == "80");

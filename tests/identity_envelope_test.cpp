@@ -1,5 +1,5 @@
-#include "nucleus/configuration.h"
-#include "nucleus/configuration_space.h"
+#include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -7,7 +7,7 @@
 #include "nucleus/xml/xml_source.h"
 #include "nucleus/xml/xml_emitter.h"
 
-#include "nucleus/configuration_source/source_stack.h"
+#include "nucleus/config_source/source_stack.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -35,18 +35,18 @@ nucleus::load_options make_opts(std::string xml, std::string_view space_name = {
 }
 
 // Schema with plugin/x declared as a typed element so emit_template can project it.
-nucleus::configuration_space make_plugin_space_typed()
+nucleus::config_space make_plugin_space_typed()
 {
-    configuration_space_builder b;
+    config_space_builder b;
     REQUIRE(b.register_element(element("plugin", anchor::root())));
     REQUIRE(b.register_element(element("x", anchor::keyspace("plugin"))));
     return b.build();
 }
 
 // Schema with plugin/x as a plain schema path (register_schema only).
-nucleus::configuration_space make_plugin_space()
+nucleus::config_space make_plugin_space()
 {
-    configuration_space_builder b;
+    config_space_builder b;
     REQUIRE(b.register_schema("plugin/x"));
     return b.build();
 }
@@ -59,7 +59,7 @@ TEST_CASE("xml_source: root mismatch returns malformed_source naming both names"
     auto space = make_plugin_space();
     auto opts = make_opts("<other><plugin><x>1</x></plugin></other>", "vagus");
 
-    auto result = load(space, source_stack{}, opts);
+    auto result = load_config(space, source_stack{}, opts);
     REQUIRE_FALSE(result);
     REQUIRE(result.error().code == errc::malformed_source);
     const std::string &msg = result.error().message;
@@ -73,7 +73,7 @@ TEST_CASE("xml_source: named-space transparency strips root from key paths",
     auto space = make_plugin_space();
     auto opts = make_opts("<vagus><plugin><x>1</x></plugin></vagus>", "vagus");
 
-    auto result = load(space, source_stack{}, opts);
+    auto result = load_config(space, source_stack{}, opts);
     REQUIRE(result);
     // Key is plugin/x, NOT vagus/plugin/x.
     REQUIRE(result.value().get("plugin/x") == "1");
@@ -83,12 +83,12 @@ TEST_CASE("xml_source: named-space transparency strips root from key paths",
 TEST_CASE("xml_source: unnamed space keeps root name as first key segment",
           "[identity_envelope][xml]")
 {
-    configuration_space_builder b;
+    config_space_builder b;
     REQUIRE(b.register_schema("vagus/plugin/x"));
     auto space = b.build();
     auto opts = make_opts("<vagus><plugin><x>1</x></plugin></vagus>");
 
-    auto result = load(space, source_stack{}, opts);
+    auto result = load_config(space, source_stack{}, opts);
     REQUIRE(result);
     REQUIRE(result.value().get("vagus/plugin/x") == "1");
     REQUIRE_FALSE(result.value().get("plugin/x"));
@@ -98,7 +98,7 @@ TEST_CASE("xml_source: inherit= on transparent root is accepted",
           "[identity_envelope][xml]")
 {
     // inherit= on root is consumed by inheritance(); the source should not reject it.
-    configuration_space_builder b;
+    config_space_builder b;
     REQUIRE(b.register_schema("plugin/x"));
     auto space = b.build();
 
@@ -117,7 +117,7 @@ TEST_CASE("xml_source: inherit= on transparent root is accepted",
         return source_handle(std::move(src));
     };
 
-    auto result = load(space, source_stack{}, opts);
+    auto result = load_config(space, source_stack{}, opts);
     REQUIRE(result);
     // Derived overrides base: x = 1.
     REQUIRE(result.value().get("plugin/x") == "1");
@@ -130,7 +130,7 @@ TEST_CASE("xml_source: inherit= on a non-root child is a malformed_source error"
     // extend= on non-root (no primary key registered here so extend= fires the grammar check).
     auto opts = make_opts("<vagus><plugin inherit=\"base.xml\"><x>1</x></plugin></vagus>", "vagus");
 
-    auto result = load(space, source_stack{}, opts);
+    auto result = load_config(space, source_stack{}, opts);
     REQUIRE_FALSE(result);
     REQUIRE(result.error().code == errc::malformed_source);
     REQUIRE(result.error().message.find("plugin") != std::string::npos);
@@ -154,11 +154,11 @@ TEST_CASE("xml::emit_template with space_name wraps output in a named root eleme
 TEST_CASE("xml::emit_document with space_name wraps the document in a named root element",
           "[identity_envelope][xml][emitter]")
 {
-    configuration_space_builder b;
+    config_space_builder b;
     REQUIRE(b.register_schema("plugin/x"));
     auto space = b.build();
     auto opts = make_opts("<vagus><plugin><x>42</x></plugin></vagus>", "vagus");
-    auto config_result = load(space, source_stack{}, opts);
+    auto config_result = load_config(space, source_stack{}, opts);
     REQUIRE(config_result);
 
     std::ostringstream out;
@@ -185,23 +185,23 @@ TEST_CASE("emit_template + xml_source round-trip with space_name reproduces keys
 
     // The template XML parses without error under the same space_name.
     auto opts = make_opts(tmpl, "vagus");
-    auto result = load(space, source_stack{}, opts);
+    auto result = load_config(space, source_stack{}, opts);
     REQUIRE(result);
     // Template carries no value so get() returns nothing; no error means round-trip succeeds.
     REQUIRE(result.value().get("plugin/x") == std::nullopt);
 }
 
-TEST_CASE("configuration_space::space_name() returns the name set on the builder",
+TEST_CASE("config_space::space_name() returns the name set on the builder",
           "[identity_envelope][space]")
 {
     {
-        configuration_space_builder b;
+        config_space_builder b;
         b.name("mynamespace");
         auto space = b.build();
         REQUIRE(space.space_name() == "mynamespace");
     }
     {
-        configuration_space_builder b;
+        config_space_builder b;
         auto space = b.build();
         REQUIRE(space.space_name().empty());
     }

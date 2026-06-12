@@ -5,7 +5,7 @@
 // so the core never knows a file format. argv outranks the document, so it
 // overrides `mode` while the document's `host` survives.
 
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -20,7 +20,7 @@
 
 int main()
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
         return 1;
     if(!builder.register_element(
@@ -30,7 +30,7 @@ int main()
         nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
                               {"http", "https"})))
         return 1;
-    nucleus::configuration_space space = builder.build();
+    nucleus::config_space space = builder.build();
 
     // Parse from an in-memory string so the example needs no file on disk. The
     // document factory builds the xml_source from an xml_source_options value --
@@ -47,7 +47,7 @@ int main()
     nucleus::argv_source argv(std::vector<std::string>{"--server-mode=https"});
     argv.recognize_with(nucleus::recognizer_of(space));
 
-    auto loaded = nucleus::load(space,
+    auto loaded = nucleus::load_config(space,
         nucleus::source_stack{std::move(argv)},
         nucleus::load_options{.document_paths = {"config.xml"}, .make_document = make});
     if(!loaded)
@@ -56,7 +56,7 @@ int main()
         return 1;
     }
 
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
     for(const std::string &key : config.keys())
         std::cout << key << " = " << config.get(key).value() << '\n';
     return 0;

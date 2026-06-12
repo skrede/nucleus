@@ -1,8 +1,8 @@
-#ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_SOURCE_HANDLE_H
-#define HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_SOURCE_HANDLE_H
+#ifndef HPP_GUARD_NUCLEUS_CONFIG_SOURCE_SOURCE_HANDLE_H
+#define HPP_GUARD_NUCLEUS_CONFIG_SOURCE_SOURCE_HANDLE_H
 
-#include "nucleus/configuration_source/source_concept.h"
-#include "nucleus/configuration_source/configuration_source.h"
+#include "nucleus/config_source/source_concept.h"
+#include "nucleus/config_source/config_source.h"
 
 #include <memory>
 #include <utility>
@@ -15,7 +15,7 @@ class source_handle
 {
 public:
     // Constructs a handle owning a moved-in source. Constrained to concept-satisfying types.
-    template <configuration_source S>
+    template <config_source S>
     explicit source_handle(S s)
         : m_self(std::make_unique<model<S>>(std::move(s)))
     {
@@ -33,7 +33,7 @@ public:
 
     [[nodiscard]] inherit_declaration inheritance() const { return m_self->do_inherit(); }
 
-    [[nodiscard]] configuration_source_result pull() { return m_self->do_pull(); }
+    [[nodiscard]] config_source_result pull() { return m_self->do_pull(); }
 
 private:
     struct concept_t
@@ -42,7 +42,7 @@ private:
         virtual capability_descriptor    do_caps() const         = 0;
         virtual void                     do_project(const schema_projection &) = 0;
         virtual inherit_declaration      do_inherit() const      = 0;
-        virtual configuration_source_result do_pull()            = 0;
+        virtual config_source_result do_pull()            = 0;
     };
 
     template <class S>
@@ -67,7 +67,7 @@ private:
                 return {};
         }
 
-        configuration_source_result do_pull() override { return m_src.pull(); }
+        config_source_result do_pull() override { return m_src.pull(); }
 
         S m_src;
     };

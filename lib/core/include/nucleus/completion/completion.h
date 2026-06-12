@@ -4,7 +4,7 @@
 namespace nucleus {
 
 // nucleus is a library, not a CLI: it does not ship a `completion` subcommand.
-// The host reaches the generator through configuration_space::generate_completion
+// The host reaches the generator through config_space::generate_completion
 // and decides how to surface the returned script (a hidden subcommand, a
 // build-time file, an install hook). This keeps host vocabulary out of the core.
 //

@@ -1,5 +1,5 @@
-#include "nucleus/configuration.h"
-#include "nucleus/configuration_space.h"
+#include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -17,9 +17,9 @@
 // System-level extension of the buffer-drop invariant to the new explicit-stack
 // path with a richer stack (XML document with inheritance chain + env overlay).
 //
-// The configuration is moved out of an inner scope. The entire source_stack, the
+// The config is moved out of an inner scope. The entire source_stack, the
 // space, and the XML arena are then destroyed. Every value is read back afterward.
-// Under AddressSanitizer this proves the configuration is self-owning on the new
+// Under AddressSanitizer this proves the config is self-owning on the new
 // path: the copy-out at the load boundary severed every view from its source.
 
 using namespace nucleus;
@@ -54,20 +54,20 @@ constexpr const char *kDerived =
 
 }
 
-TEST_CASE("configuration outlives dropped source_stack, space, and XML arena on new load path",
+TEST_CASE("config outlives dropped source_stack, space, and XML arena on new load path",
           "[system][disconnect][lifetime]")
 {
-    std::optional<configuration> result;
+    std::optional<config> result;
 
     {
         // --- INNER SCOPE: build, load, then DROP everything ---
 
-        configuration_space_builder builder;
+        config_space_builder builder;
         REQUIRE(builder.register_element(element("server", anchor::root())));
         REQUIRE(builder.register_element(element("host", anchor::keyspace("server"))));
         REQUIRE(builder.register_element(element("mode", anchor::keyspace("server"))));
         REQUIRE(builder.register_element(element("port", anchor::keyspace("server"))));
-        configuration_space space = builder.build();
+        config_space space = builder.build();
 
         // XML document source (views into the pugixml arena) + env overlay.
         // The document chain forms the base; env is a stack source that ranks
@@ -86,7 +86,7 @@ TEST_CASE("configuration outlives dropped source_stack, space, and XML arena on 
         opts.document_paths = {"derived.xml"};
         opts.make_document  = make_doc;
 
-        auto loaded = load(space, source_stack{std::move(overlay)}, opts);
+        auto loaded = load_config(space, source_stack{std::move(overlay)}, opts);
         REQUIRE(loaded);
 
         result = std::move(loaded).value();
@@ -99,7 +99,7 @@ TEST_CASE("configuration outlives dropped source_stack, space, and XML arena on 
     REQUIRE(result.has_value());
 
     // Read EVERY value back after all sources are dropped.
-    // Under ASan this is the proof the configuration is fully self-owning.
+    // Under ASan this is the proof the config is fully self-owning.
     REQUIRE(result->get("server/host") == "base-host");
     REQUIRE(result->get("server/mode") == "primary");
     // The env overlay is a stack source ranked above the document base, so it
@@ -117,14 +117,14 @@ TEST_CASE("configuration outlives dropped source_stack, space, and XML arena on 
     REQUIRE(port_origin != nullptr);
 }
 
-TEST_CASE("configuration outlives a drop of the simplest xml+env stack on the new path",
+TEST_CASE("config outlives a drop of the simplest xml+env stack on the new path",
           "[system][disconnect][lifetime]")
 {
     // Minimal shape: one XML document source + one env overlay, no inheritance chain.
-    std::optional<configuration> result;
+    std::optional<config> result;
 
     {
-        configuration_space space = configuration_space_builder{}.build();
+        config_space space = config_space_builder{}.build();
 
         constexpr const char *kDoc =
             "<app>"
@@ -137,7 +137,7 @@ TEST_CASE("configuration outlives a drop of the simplest xml+env stack on the ne
         env_source overlay;
         overlay.set("app/server/port", "9090");
 
-        auto loaded = load(space,
+        auto loaded = load_config(space,
                            source_stack{std::move(doc), std::move(overlay)},
                            {});
         REQUIRE(loaded);

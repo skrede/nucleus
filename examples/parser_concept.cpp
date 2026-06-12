@@ -1,14 +1,14 @@
 // source_concept: satisfy the source concept with a plain struct -- no inheritance.
 //
-// Any struct with capabilities() and pull() satisfies nucleus::configuration_source.
+// Any struct with capabilities() and pull() satisfies nucleus::config_source.
 // source_handle type-erases it into the engine so a plain-struct source reaches
 // the fold through the same erasure path any other source does.
 
 #include "nucleus/capability.h"
 
-#include "nucleus/configuration_source/source_concept.h"
-#include "nucleus/configuration_source/source_handle.h"
-#include "nucleus/configuration_source/configuration_source.h"
+#include "nucleus/config_source/source_concept.h"
+#include "nucleus/config_source/source_handle.h"
+#include "nucleus/config_source/config_source.h"
 
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
@@ -25,16 +25,16 @@ struct table_parser
         return {nucleus::capability::ordering};
     }
 
-    [[nodiscard]] nucleus::configuration_source_result pull()
+    [[nodiscard]] nucleus::config_source_result pull()
     {
-        nucleus::configuration_source_batch batch;
+        nucleus::config_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(
             "x/y", nucleus::value::owned("from-parser"), capabilities()));
         return batch;
     }
 };
 
-static_assert(nucleus::configuration_source<table_parser>,
+static_assert(nucleus::config_source<table_parser>,
               "table_parser must satisfy the source concept");
 
 }

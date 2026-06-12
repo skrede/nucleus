@@ -1,12 +1,12 @@
-#ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_EXTENSION_REGISTRY_H
-#define HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_EXTENSION_REGISTRY_H
+#ifndef HPP_GUARD_NUCLEUS_CONFIG_SOURCE_EXTENSION_REGISTRY_H
+#define HPP_GUARD_NUCLEUS_CONFIG_SOURCE_EXTENSION_REGISTRY_H
 
 #include "nucleus/error.h"
 #include "nucleus/format.h"
 #include "nucleus/expected.h"
 #include "nucleus/identity.h"
 
-#include "nucleus/configuration_source/source_handle.h"
+#include "nucleus/config_source/source_handle.h"
 
 #include <map>
 #include <memory>

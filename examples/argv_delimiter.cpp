@@ -5,8 +5,8 @@
 // and the completion generator -- so the surface a user sees and the surface the
 // parser accepts can never drift.
 
-#include "nucleus/configuration.h"
-#include "nucleus/configuration_space.h"
+#include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -22,14 +22,14 @@
 int main()
 {
     // Declared elements so the schema projects both flags and template lines.
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
         return 1;
     if(!builder.register_element(nucleus::element("host", nucleus::anchor::keyspace("server"))))
         return 1;
     if(!builder.register_element(nucleus::element("port", nucleus::anchor::keyspace("server"))))
         return 1;
-    const nucleus::configuration_space space = builder.build();
+    const nucleus::config_space space = builder.build();
 
     // parse() validates the text: empty, `=`-containing, and `/`-containing
     // delimiters (other than `/` itself) are rejected.
@@ -48,7 +48,7 @@ int main()
     args.delimit_with(delim.value())
         .recognize_with(nucleus::recognizer_of(space));
 
-    auto loaded = nucleus::load(space, nucleus::source_stack{std::move(args)}, {});
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(args)}, {});
     if(!loaded)
     {
         std::cerr << "load failed: " << loaded.error() << '\n';

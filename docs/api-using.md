@@ -7,15 +7,15 @@ back. None of these requires subclassing. For the seams a host extends, see
 ## Contents
 
 - [The lifecycle at a glance](#lifecycle)
-- [`configuration_space_builder` — registration](#builder)
+- [`config_space_builder` — registration](#builder)
 - [Declaring a schema: `schema_element`, `anchor`, free factories](#schema)
 - [Typed fields: `typed_element<T>`, `register_converter`](#typed)
 - [Keying model: primary key, uniqueness, strains](#keying)
-- [`configuration_space` — the sealed space](#space)
+- [`config_space` — the sealed space](#space)
 - [Composing sources: `source_stack`](#stack)
 - [`load()` and `load_options`](#load)
 - [Capability pre-flight: `check_capabilities`](#preflight)
-- [`configuration` — the resolved result](#configuration)
+- [`config` — the resolved result](#configuration)
 - [Provenance: `origin`](#provenance)
 - [`key_path` — addressing the keyspace](#key_path)
 - [Emitting: templates and documents](#emit)
@@ -30,19 +30,19 @@ back. None of these requires subclassing. For the seams a host extends, see
 ## The lifecycle at a glance
 
 ```
-configuration_space_builder  --register_* / install_tokenizer-->  build()
+config_space_builder  --register_* / install_tokenizer-->  build()
         |
         v
-configuration_space (sealed, immutable, reusable)
+config_space (sealed, immutable, reusable)
         |
         v
-nucleus::load(space, source_stack, load_options)  -->  expected<configuration, error>
+nucleus::load(space, source_stack, load_options)  -->  expected<config, error>
 ```
 
 A builder accepts registrations and `build()` seals it into an immutable
-`configuration_space`. The free function `nucleus::load` folds an explicitly
+`config_space`. The free function `nucleus::load` folds an explicitly
 composed `source_stack` against the sealed space and yields an immutable
-`configuration`. The space is never modified by a load, so one space serves many
+`config`. The space is never modified by a load, so one space serves many
 loads — even concurrently (see [`examples/reusable_space.cpp`](../examples/reusable_space.cpp)).
 The stack is borrowed by the load, not consumed, so one stack serves many loads
 too. Every fallible step reports a typed [`error`](#expected): an `errc` code a
@@ -51,15 +51,15 @@ program branches on plus a verbatim human-readable message.
 ---
 
 <a id="builder"></a>
-## `configuration_space_builder` — registration
+## `config_space_builder` — registration
 
-`#include "nucleus/configuration_space.h"`
+`#include "nucleus/config_space.h"`
 
 The mutable front end. It owns the schema, tokenizer, and converter registries
 plus the host registration policy and the claim/conflict ledger. Move-only.
 
 ```cpp
-configuration_space_builder builder;
+config_space_builder builder;
 
 registration_result register_element(schema_element element, owner_token owner = {});
 registration_result register_schema(std::string key_path, owner_token owner = {});
@@ -77,7 +77,7 @@ std::size_t tokenizer_count() const noexcept;
 std::size_t converter_count() const noexcept;
 std::vector<conflict_report> conflicts() const;
 
-configuration_space build();   // seals; the builder is spent afterwards
+config_space build();   // seals; the builder is spent afterwards
 ```
 
 - `registration_result` is `expected<void, error>`: truthy on success. On
@@ -193,7 +193,7 @@ in the same order. See [`examples/round_trip.cpp`](../examples/round_trip.cpp).
   error, and wrap exactly a `T` in the returned `std::any`.
 - `registered_element<T>(name, at)` declares only the type identity; the
   converter is looked up at load in the builder's converter registry, populated
-  via `configuration_space_builder::register_converter<T>(conv)`. A per-element
+  via `config_space_builder::register_converter<T>(conv)`. A per-element
   converter overrides the registry's.
 - `make_scalar_converter<T>()` is public so a host can compose the built-in
   parsing with extra validation.
@@ -283,9 +283,9 @@ See [`examples/strains.cpp`](../examples/strains.cpp).
 ---
 
 <a id="space"></a>
-## `configuration_space` — the sealed space
+## `config_space` — the sealed space
 
-`#include "nucleus/configuration_space.h"`
+`#include "nucleus/config_space.h"`
 
 The immutable product of `build()`. Its surface is read-only — registration on a
 sealed space is impossible by construction. It is copyable (a deep copy; no
@@ -301,13 +301,13 @@ std::string generate_completion(shell which, std::string_view prog,
                                 const cli_delimiter &delimiter = {},
                                 const key_path &anchor = {}) const;
 std::span<const schema_element> schema_elements() const;  // the declared schema, for emitters/derivation
-configuration_space_builder expand() const;  // a NEW builder seeded with a deep copy of this space
+config_space_builder expand() const;  // a NEW builder seeded with a deep copy of this space
 ```
 
 Two free functions derive from a sealed space:
 
 ```cpp
-key_recognizer recognizer_of(const configuration_space &space);
+key_recognizer recognizer_of(const config_space &space);
 ```
 
 returns the schema-surface predicate an `argv_source` uses to reject undeclared
@@ -319,14 +319,14 @@ flags (the closure borrows the space; keep the space alive). See
 <a id="stack"></a>
 ## Composing sources: `source_stack`
 
-`#include "nucleus/configuration_source/source_stack.h"`
+`#include "nucleus/config_source/source_stack.h"`
 
 The explicit, ordered set of sources handed to `load()`. **Order is
 precedence**: a later-listed source overlays an earlier-listed one. Sources are
 moved in and type-erased into `source_handle`s; the stack owns them.
 
 ```cpp
-template <configuration_source... Ss> explicit source_stack(Ss... sources);
+template <config_source... Ss> explicit source_stack(Ss... sources);
 source_stack &push_back(source_handle h);
 std::span<source_handle> layers() noexcept;
 std::size_t size() const noexcept;
@@ -359,16 +359,16 @@ See [`examples/source_stack.cpp`](../examples/source_stack.cpp).
 <a id="load"></a>
 ## `load()` and `load_options`
 
-`#include "nucleus/configuration_space.h"`
+`#include "nucleus/config_space.h"`
 
 ```cpp
-load_result load(const configuration_space &space,
+load_result load(const config_space &space,
                  source_stack &stack,
                  const load_options &options = {});
-load_result load(const configuration_space &space,
+load_result load(const config_space &space,
                  source_stack &&stack,         // inline composition: source_stack{...}
                  const load_options &options = {});
-// load_result = expected<configuration, error>
+// load_result = expected<config, error>
 
 struct load_options {
     std::optional<std::string>                        selection;   // strain to select
@@ -391,7 +391,7 @@ struct load_options {
    then the stack's sources in stack order above them, so a stack source
    overrides document content;
 4. slices the selected strain, validates against the schema, converts typed
-   paths, and freezes the result into an immutable `configuration`.
+   paths, and freezes the result into an immutable `config`.
 
 The stack is borrowed, not consumed: it stays valid afterward, so the same
 stack can pre-flight via `check_capabilities()` and then load, or load more
@@ -423,10 +423,10 @@ provenance).
 <a id="preflight"></a>
 ## Capability pre-flight: `check_capabilities`
 
-`#include "nucleus/configuration_space.h"`
+`#include "nucleus/config_space.h"`
 
 ```cpp
-gate_result check_capabilities(const configuration_space &space,
+gate_result check_capabilities(const config_space &space,
                                const source_stack &stack,
                                const load_options &options = {});
 ```
@@ -447,10 +447,10 @@ hard capability is satisfied when ANY layer in the stack provides it. See
 
 ---
 
-<a id="configuration"></a>
-## `configuration` — the resolved result
+<a id="config"></a>
+## `config` — the resolved result
 
-`#include "nucleus/configuration.h"`
+`#include "nucleus/config.h"`
 
 The immutable, self-owning output of a load. Every value is copied out into an
 owned string at the load boundary and the source buffers are dropped, so it
@@ -563,8 +563,8 @@ concept — a stateless type with two operations, both writing into a caller-own
 
 ```cpp
 template<typename Emitter>
-concept config_emitter = requires(const Emitter e, const configuration_space &space,
-                                  const configuration &config, std::ostream &out) {
+concept config_emitter = requires(const Emitter e, const config_space &space,
+                                  const config &config, std::ostream &out) {
     { e.emit_template(space, out) } -> std::same_as<void>;
     { e.emit_document(config, out) } -> std::same_as<void>;
 };
@@ -641,7 +641,7 @@ if(!loaded)
         print_available_strains();
     return 1;
 }
-const nucleus::configuration &config = loaded.value();
+const nucleus::config &config = loaded.value();
 ```
 
 ---
@@ -681,7 +681,7 @@ std::vector<std::string> suggest_keys(std::string_view unknown,
 ### `conflict_report`
 
 `#include "nucleus/diagnostics/conflict_report.h"` — returned by
-`configuration_space_builder::conflicts()` (and by the sealed space, which
+`config_space_builder::conflicts()` (and by the sealed space, which
 carries the ledger forward). Two registrations claiming the same key path
 produce one report that names every claimant and refuses to pick a winner;
 adjudication is the host's.
@@ -707,7 +707,7 @@ same flag mapping the CLI surface uses, so completion cannot drift from the CLI.
 
 ```cpp
 enum class shell { bash, zsh };
-std::string configuration_space::generate_completion(shell which, std::string_view prog,
+std::string config_space::generate_completion(shell which, std::string_view prog,
                                                      const cli_delimiter &delimiter = {},
                                                      const key_path &anchor = {}) const;
 ```

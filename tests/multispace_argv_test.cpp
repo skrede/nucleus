@@ -1,11 +1,11 @@
 #include "nucleus/log_sink.h"
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/configuration_source/source_stack.h"
-#include "nucleus/configuration_source/source_handle.h"
+#include "nucleus/config_source/source_stack.h"
+#include "nucleus/config_source/source_handle.h"
 
 #include "nucleus/argv/argv_source.h"
 #include "nucleus/argv/multispace_argv_source.h"
@@ -111,7 +111,7 @@ TEST_CASE("multispace_argv_source: malformed token propagates malformed_source",
 TEST_CASE("multispace_argv_source: recognizer integration rejects undeclared inner key",
           "[multispace_argv][argv]")
 {
-    configuration_space_builder b;
+    config_space_builder b;
     REQUIRE(b.register_schema("z")); // x is NOT registered
     auto space = b.build();
 
@@ -142,7 +142,7 @@ TEST_CASE("multispace_argv_source: lenient policy + log_to passes unknown, emits
     multispace_argv_source src(tokens);
     src.register_space("alpha");
 
-    configuration_space_builder b;
+    config_space_builder b;
     REQUIRE(b.register_schema("known"));
     auto space = b.build();
 

@@ -1,9 +1,9 @@
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/configuration.h"
+#include "nucleus/config.h"
 
 #include "nucleus/xml/xml_source.h"
 
@@ -14,10 +14,10 @@
 #include <optional>
 
 // Instance-distinguished projection and the unified-hierarchy contract: when the
-// schema declares the configuration space's primary key, a document source keeps
+// schema declares the config space's primary key, a document source keeps
 // repeated container instances distinct through resolution (no last-wins
 // collapse), and the resolve boundary collapses the surviving strain onto the
-// declared paths. A key value NEVER appears in a resolved configuration -- not
+// declared paths. A key value NEVER appears in a resolved config -- not
 // as a leaf and not as a path segment -- so the resolved tree is traversable
 // without knowing the key. Several named strains with no selection fail loudly.
 // The shapes here are generic (a cluster of servers) -- no host vocabulary.
@@ -34,7 +34,7 @@ nucleus::source_handle xml_of(const std::string &text)
 
 // A schema where <cluster> contains repeatable <server> instances keyed by the
 // `name` field; each server carries non-key `port` / `protocol` leaves.
-void declare_cluster(nucleus::configuration_space_builder &engine)
+void declare_cluster(nucleus::config_space_builder &engine)
 {
     REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
     REQUIRE(engine.register_element(nucleus::element("server", anchor::keyspace("cluster"))));
@@ -47,14 +47,14 @@ void declare_cluster(nucleus::configuration_space_builder &engine)
 
 // Loads `doc` as the sole document layer against `space`, with an optional strain
 // selection.
-nucleus::load_result load_doc(const nucleus::configuration_space &space, const char *doc,
+nucleus::load_result load_doc(const nucleus::config_space &space, const char *doc,
                               std::optional<std::string> selection = std::nullopt)
 {
     nucleus::load_options opts;
     opts.document_paths = {"doc.xml"};
     opts.make_document = [doc](const std::string &) { return xml_of(doc); };
     opts.selection = std::move(selection);
-    return nucleus::load(space, nucleus::source_stack{}, opts);
+    return nucleus::load_config(space, nucleus::source_stack{}, opts);
 }
 
 }
@@ -67,13 +67,13 @@ TEST_CASE("a single named strain resolves onto the unified hierarchy",
             <server name="web"><port>80</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto loaded = load_doc(space, doc);
     REQUIRE(loaded);
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
 
     // The strain's entries live at the declared paths: the key value names
     // nothing in the resolved tree, so traversal needs no key knowledge.
@@ -93,9 +93,9 @@ TEST_CASE("several named strains with no selection fail loudly",
             <server name="db"><port>5432</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto loaded = load_doc(space, doc);
 
@@ -115,13 +115,13 @@ TEST_CASE("a key carried as a text-leaf child is consumed the same way",
             <server><name>web</name><port>80</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto loaded = load_doc(space, doc);
     REQUIRE(loaded);
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
 
     REQUIRE(config.get("cluster/server/port") == "80");
     REQUIRE_FALSE(config.contains("cluster/server/name"));
@@ -139,13 +139,13 @@ TEST_CASE("a named strain composes on top of anonymous template instances",
             <server name="web"><port>80</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto loaded = load_doc(space, doc);
     REQUIRE(loaded);
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
 
     // Named overrides template; template fields the strain leaves alone survive.
     REQUIRE(config.get("cluster/server/port") == "80");
@@ -153,10 +153,10 @@ TEST_CASE("a named strain composes on top of anonymous template instances",
     REQUIRE_FALSE(config.contains("cluster/server/web/port"));
 }
 
-TEST_CASE("anonymous strains alone collapse into the configuration space",
+TEST_CASE("anonymous strains alone collapse into the config space",
           "[projection][keyed]")
 {
-    // No named strain anywhere: the composed template IS the configuration.
+    // No named strain anywhere: the composed template IS the config.
     // Later template parts override earlier ones in document order.
     const char *doc = R"(
         <cluster>
@@ -164,13 +164,13 @@ TEST_CASE("anonymous strains alone collapse into the configuration space",
             <server><port>8080</port><protocol>tcp</protocol></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto loaded = load_doc(space, doc);
     REQUIRE(loaded);
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
 
     REQUIRE(config.get("cluster/server/port") == "8080");
     REQUIRE(config.get("cluster/server/protocol") == "tcp");
@@ -187,10 +187,10 @@ TEST_CASE("without a declared primary key the structural walk is unchanged",
 
     // No schema at all: projection is empty, so the source walks structurally and
     // the name attribute is an ordinary leaf.
-    nucleus::configuration_space space = nucleus::configuration_space_builder{}.build();
+    nucleus::config_space space = nucleus::config_space_builder{}.build();
     auto loaded = load_doc(space, doc);
     REQUIRE(loaded);
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
 
     REQUIRE(config.get("cluster/server/name") == "web");
     REQUIRE(config.get("cluster/server/port") == "80");

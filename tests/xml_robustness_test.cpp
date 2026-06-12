@@ -2,8 +2,8 @@
 // malformed, or merely unusual must produce loud, accurate errors -- or resolve
 // correctly when the document is valid but exotic (CDATA values).
 
-#include "nucleus/configuration.h"
-#include "nucleus/configuration_space.h"
+#include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -45,12 +45,12 @@ TEST_CASE("a pathologically deep document fails with a depth-cap error, not a cr
 
 TEST_CASE("a CDATA leaf value resolves like plain text", "[xml][robustness]")
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("server", anchor::root())));
     REQUIRE(builder.register_element(nucleus::element("motd", anchor::keyspace("server"))));
-    const nucleus::configuration_space space = builder.build();
+    const nucleus::config_space space = builder.build();
 
-    auto loaded = nucleus::load(space,
+    auto loaded = nucleus::load_config(space,
         nucleus::source_stack{xml_of(
             "<server><motd><![CDATA[a <b> & c]]></motd></server>")},
         {});
@@ -60,17 +60,17 @@ TEST_CASE("a CDATA leaf value resolves like plain text", "[xml][robustness]")
 
 TEST_CASE("a CDATA primary-key child element names its strain", "[xml][robustness]")
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("cluster", anchor::root())));
     REQUIRE(builder.register_element(nucleus::element("server", anchor::keyspace("cluster"))));
     REQUIRE(builder.register_element(
         nucleus::primary_key_element("name", anchor::keyspace("cluster/server"))));
     REQUIRE(builder.register_element(nucleus::element("port", anchor::keyspace("cluster/server"))));
-    const nucleus::configuration_space space = builder.build();
+    const nucleus::config_space space = builder.build();
 
     nucleus::load_options options;
     options.selection = "web";
-    auto loaded = nucleus::load(space,
+    auto loaded = nucleus::load_config(space,
         nucleus::source_stack{xml_of(
             "<cluster><server><name><![CDATA[web]]></name><port>80</port></server>"
             "</cluster>")},

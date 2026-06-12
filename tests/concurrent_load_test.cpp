@@ -1,4 +1,4 @@
-// Concurrent loads on one shared const configuration_space need no synchronization:
+// Concurrent loads on one shared const config_space need no synchronization:
 // load borrows the space's registries by const reference and owns all
 // mutable resolve state on its own stack. N threads call it on the SAME const space
 // with no mutex; all succeed with byte-identical results. ASan cannot see data
@@ -7,12 +7,12 @@
 // genuinely overlapping access windows rather than threads that serialize
 // through their own setup.
 
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/configuration.h"
+#include "nucleus/config.h"
 
 #include "nucleus/runtime/runtime_source.h"
 
@@ -31,11 +31,11 @@ using nucleus::anchor;
 TEST_CASE("N threads load one shared const space lock-free with identical results",
           "[concurrent][load]")
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("server", anchor::root())));
     REQUIRE(builder.register_element(nucleus::element("host", anchor::keyspace("server"))));
     REQUIRE(builder.register_element(nucleus::element("port", anchor::keyspace("server"))));
-    const nucleus::configuration_space space = builder.build();
+    const nucleus::config_space space = builder.build();
 
     constexpr std::size_t thread_count = 8;
     constexpr std::size_t iterations = 64;
@@ -63,7 +63,7 @@ TEST_CASE("N threads load one shared const space lock-free with identical result
             {
                 nucleus::runtime_source src;
                 src.set("server/host", "localhost").set("server/port", "8080");
-                auto loaded = nucleus::load(space,
+                auto loaded = nucleus::load_config(space,
                     nucleus::source_stack{std::move(src)},
                     {});
                 if(!loaded)
@@ -83,7 +83,7 @@ TEST_CASE("N threads load one shared const space lock-free with identical result
     for(std::size_t i = 0; i < thread_count; ++i)
         REQUIRE(ok[i]);
 
-    // Every resolved configuration is byte-identical to the first.
+    // Every resolved config is byte-identical to the first.
     const std::map<std::string, std::string> &expected = results.front();
     REQUIRE(expected.at("server/host") == "localhost");
     REQUIRE(expected.at("server/port") == "8080");

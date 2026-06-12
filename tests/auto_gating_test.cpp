@@ -1,11 +1,11 @@
 #include "nucleus/capability.h"
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/converters.h"
 
-#include "nucleus/configuration_source/configuration_source.h"
+#include "nucleus/config_source/config_source.h"
 #include "nucleus/env/env_source.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -28,9 +28,9 @@ struct capable_source
                                               nucleus::capability::typed_scalars};
     }
 
-    [[nodiscard]] nucleus::configuration_source_result pull()
+    [[nodiscard]] nucleus::config_source_result pull()
     {
-        return nucleus::configuration_source_batch{};
+        return nucleus::config_source_batch{};
     }
 };
 
@@ -38,9 +38,9 @@ struct capable_source
 // `name`) and typed (an int `port` leaf) -- so it derives a HARD nesting
 // requirement and a SOFT typed_scalars one. Authoring order is fixed by attach
 // referential integrity, but the derived requirement set is order-independent.
-[[nodiscard]] nucleus::configuration_space make_nested_typed_space()
+[[nodiscard]] nucleus::config_space make_nested_typed_space()
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("server", nucleus::anchor::root())));
     REQUIRE(builder.register_element(
         nucleus::primary_key_element("name", nucleus::anchor::keyspace("server"))));
@@ -53,11 +53,11 @@ struct capable_source
 
 TEST_CASE("load auto-gates: a flat env stack fails a nested schema loudly", "[auto-gate]")
 {
-    nucleus::configuration_space space = make_nested_typed_space();
+    nucleus::config_space space = make_nested_typed_space();
 
     // An empty env source lacks nesting; it cannot satisfy the HARD nesting requirement.
     nucleus::env_source empty_env;
-    auto loaded = nucleus::load(space,
+    auto loaded = nucleus::load_config(space,
         nucleus::source_stack{std::move(empty_env)},
         {});
     REQUIRE_FALSE(loaded);
@@ -75,7 +75,7 @@ TEST_CASE("load auto-gates: a flat env stack fails a nested schema loudly", "[au
 
 TEST_CASE("a single capable layer satisfies the HARD nesting requirement by union", "[auto-gate]")
 {
-    nucleus::configuration_space space = make_nested_typed_space();
+    nucleus::config_space space = make_nested_typed_space();
 
     // env lacks nesting, but the capable_source provides it: the whole-stack union
     // satisfies the hard requirement, so the pre-flight gate accepts the stack.

@@ -4,7 +4,7 @@
 // two registrations claiming the same path -- naming every claimant and refusing
 // to pick a winner, because adjudication is the host's policy, not the core's.
 
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 #include "nucleus/identity.h"
 
 #include "nucleus/diagnostics/key_suggester.h"
@@ -22,7 +22,7 @@ int main()
         std::cout << "did you mean: " << hit << '\n';
 
     // Two owners claim the same path -> one conflict report, no winner chosen.
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     if(!builder.register_schema("server/port", nucleus::owner_token(std::string("plugin.a"))))
         return 1;
     if(!builder.register_schema("server/port", nucleus::owner_token(std::string("plugin.b"))))

@@ -1,9 +1,9 @@
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/configuration.h"
+#include "nucleus/config.h"
 
 #include "nucleus/xml/xml_source.h"
 
@@ -31,7 +31,7 @@ nucleus::source_handle xml_of(const std::string &text)
 
 // A schema where <cluster> contains repeatable <server> instances keyed by the
 // `name` field; each server carries non-key `port` / `protocol` leaves.
-void declare_cluster(nucleus::configuration_space_builder &engine)
+void declare_cluster(nucleus::config_space_builder &engine)
 {
     REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
     REQUIRE(engine.register_element(nucleus::element("server", anchor::keyspace("cluster"))));
@@ -42,14 +42,14 @@ void declare_cluster(nucleus::configuration_space_builder &engine)
         nucleus::element("protocol", anchor::keyspace("cluster/server"))));
 }
 
-nucleus::load_result load_doc(const nucleus::configuration_space &space, const char *doc,
+nucleus::load_result load_doc(const nucleus::config_space &space, const char *doc,
                               std::optional<std::string> selection = std::nullopt)
 {
     nucleus::load_options opts;
     opts.document_paths = {"doc.xml"};
     opts.make_document = [doc](const std::string &) { return xml_of(doc); };
     opts.selection = std::move(selection);
-    return nucleus::load(space, nucleus::source_stack{}, opts);
+    return nucleus::load_config(space, nucleus::source_stack{}, opts);
 }
 
 }
@@ -63,13 +63,13 @@ TEST_CASE("a selection resolves the matching strain and prunes others",
             <server name="db"><port>5432</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto loaded = load_doc(space, doc, "web");
     REQUIRE(loaded);
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
 
     // Only the web strain survives; its entries live at the declared paths.
     REQUIRE(config.get("cluster/server/port") == "80");
@@ -89,13 +89,13 @@ TEST_CASE("a selection strips the key segment from the resolved path",
             <server name="web"><port>80</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto loaded = load_doc(space, doc, "web");
     REQUIRE(loaded);
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
 
     REQUIRE(config.get("cluster/server/port") == "80");
     // The transient key segment must be absent from the resolved tree.
@@ -111,9 +111,9 @@ TEST_CASE("selecting an unknown strain value fails with available listed",
             <server name="db"><port>5432</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto loaded = load_doc(space, doc, "missing");
     REQUIRE_FALSE(loaded);
@@ -133,11 +133,11 @@ TEST_CASE("selecting when schema has no primary key fails",
         </cluster>)";
 
     // Schema with only plain elements -- no identity / primary_key_element.
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
     REQUIRE(engine.register_element(nucleus::element("server", anchor::keyspace("cluster"))));
     REQUIRE(engine.register_element(nucleus::element("port", anchor::keyspace("cluster/server"))));
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto loaded = load_doc(space, doc, "anything");
     REQUIRE_FALSE(loaded);
@@ -147,20 +147,20 @@ TEST_CASE("selecting when schema has no primary key fails",
 TEST_CASE("anonymous-only content collapses without a selection",
           "[selection][keyed]")
 {
-    // No named strain anywhere -- the composed template is the configuration.
+    // No named strain anywhere -- the composed template is the config.
     // No selection: the anonymous-only path should resolve without error.
     const char *doc = R"(
         <cluster>
             <server><port>8080</port><protocol>tcp</protocol></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto loaded = load_doc(space, doc);
     REQUIRE(loaded);
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
 
     REQUIRE(config.get("cluster/server/port") == "8080");
     REQUIRE(config.get("cluster/server/protocol") == "tcp");
@@ -177,9 +177,9 @@ TEST_CASE("a selection against anonymous-only content fails loudly",
             <server><port>8080</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto loaded = load_doc(space, doc, "web");
     REQUIRE_FALSE(loaded);
@@ -199,9 +199,9 @@ TEST_CASE("a key value shadowing a declared element name is a loud error",
             <server name="port"><port>80</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto loaded = load_doc(space, doc);
     REQUIRE_FALSE(loaded);

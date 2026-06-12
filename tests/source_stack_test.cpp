@@ -1,9 +1,9 @@
 #include "nucleus/capability.h"
 
-#include "nucleus/configuration_source/source_concept.h"
-#include "nucleus/configuration_source/source_handle.h"
-#include "nucleus/configuration_source/source_stack.h"
-#include "nucleus/configuration_source/configuration_source.h"
+#include "nucleus/config_source/source_concept.h"
+#include "nucleus/config_source/source_handle.h"
+#include "nucleus/config_source/source_stack.h"
+#include "nucleus/config_source/config_source.h"
 
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
@@ -22,9 +22,9 @@ struct source_alpha
         return {nucleus::capability::ordering};
     }
 
-    [[nodiscard]] nucleus::configuration_source_result pull()
+    [[nodiscard]] nucleus::config_source_result pull()
     {
-        nucleus::configuration_source_batch batch;
+        nucleus::config_source_batch batch;
         batch.entries.push_back(
             nucleus::make_entry("sentinel", nucleus::value::owned("alpha"), capabilities()));
         return batch;
@@ -38,9 +38,9 @@ struct source_beta
         return {nucleus::capability::nesting};
     }
 
-    [[nodiscard]] nucleus::configuration_source_result pull()
+    [[nodiscard]] nucleus::config_source_result pull()
     {
-        nucleus::configuration_source_batch batch;
+        nucleus::config_source_batch batch;
         batch.entries.push_back(
             nucleus::make_entry("sentinel", nucleus::value::owned("beta"), capabilities()));
         return batch;
@@ -59,9 +59,9 @@ struct source_gamma
         return {nucleus::inherit_declaration::kind::parent_path, "parent.xml"};
     }
 
-    [[nodiscard]] nucleus::configuration_source_result pull()
+    [[nodiscard]] nucleus::config_source_result pull()
     {
-        nucleus::configuration_source_batch batch;
+        nucleus::config_source_batch batch;
         batch.entries.push_back(
             nucleus::make_entry("sentinel", nucleus::value::owned("gamma"), capabilities()));
         return batch;
@@ -75,9 +75,9 @@ struct lower_source
 {
     [[nodiscard]] nucleus::capability_descriptor capabilities() const { return {}; }
 
-    [[nodiscard]] nucleus::configuration_source_result pull()
+    [[nodiscard]] nucleus::config_source_result pull()
     {
-        nucleus::configuration_source_batch batch;
+        nucleus::config_source_batch batch;
         batch.entries.push_back(
             nucleus::make_entry("shared/value", nucleus::value::owned("from-lower"), capabilities()));
         return batch;
@@ -88,9 +88,9 @@ struct higher_source
 {
     [[nodiscard]] nucleus::capability_descriptor capabilities() const { return {}; }
 
-    [[nodiscard]] nucleus::configuration_source_result pull()
+    [[nodiscard]] nucleus::config_source_result pull()
     {
-        nucleus::configuration_source_batch batch;
+        nucleus::config_source_batch batch;
         batch.entries.push_back(
             nucleus::make_entry("shared/value", nucleus::value::owned("from-higher"), capabilities()));
         return batch;

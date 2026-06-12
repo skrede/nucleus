@@ -7,7 +7,7 @@ that satisfy these seams, see [Shipped implementations](api-implementations.md).
 
 ## Contents
 
-- [`configuration_source` — the source concept](#source_concept)
+- [`config_source` — the source concept](#source_concept)
 - [Optional affordances: `projects_source`, `inheriting_source`](#affordances)
 - [`source_handle` / `source_stack` — type erasure and composition](#erasure)
 - [Batches, values, and the `retained_buffer` lifetime contract](#buffer)
@@ -25,19 +25,19 @@ that satisfy these seams, see [Shipped implementations](api-implementations.md).
 ---
 
 <a id="source_concept"></a>
-## `configuration_source` — the source concept
+## `config_source` — the source concept
 
-`#include "nucleus/configuration_source/source_concept.h"`
+`#include "nucleus/config_source/source_concept.h"`
 
 There is no virtual source base class. A source is any plain struct satisfying
 a compile-time concept — declare capabilities and produce a batch:
 
 ```cpp
 template <typename S>
-concept configuration_source =
+concept config_source =
     requires(S s) {
         { s.capabilities() } -> std::convertible_to<capability_descriptor>;
-        { s.pull() }         -> std::convertible_to<configuration_source_result>;
+        { s.pull() }         -> std::convertible_to<config_source_result>;
     };
 ```
 
@@ -49,23 +49,23 @@ struct table_source
         return {nucleus::capability::nesting};
     }
 
-    nucleus::configuration_source_result pull()
+    nucleus::config_source_result pull()
     {
-        nucleus::configuration_source_batch batch;
+        nucleus::config_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(
             "service/name", nucleus::value::owned("edge"), capabilities()));
         return batch;
     }
 };
-static_assert(nucleus::configuration_source<table_source>);
+static_assert(nucleus::config_source<table_source>);
 ```
 
 - **`capabilities()`** — declare which structural affordances this source
   provides (see [`capability_descriptor`](#capability)). Be honest: a source
   that claims an affordance it lacks defeats graceful degradation.
 - **`pull()`** — produce one batch of entries, or a typed error naming why it
-  failed (`configuration_source_result` is
-  `expected<configuration_source_batch, error>`; use `errc::unreadable_source`
+  failed (`config_source_result` is
+  `expected<config_source_batch, error>`; use `errc::unreadable_source`
   for an input that cannot be read and `errc::malformed_source` for one that
   cannot be parsed). The core never silently drops a source.
 
@@ -80,7 +80,7 @@ folded by `load`) and [`examples/parser_concept.cpp`](../examples/parser_concept
 <a id="affordances"></a>
 ## Optional affordances: `projects_source`, `inheriting_source`
 
-`#include "nucleus/configuration_source/source_concept.h"`
+`#include "nucleus/config_source/source_concept.h"`
 
 Two further concepts are **detected, never required**. A source opts in simply
 by having the member; the type-erased handle dispatches to it when present and
@@ -90,13 +90,13 @@ no-ops when absent:
 // A source that accepts a schema-derived projection before pull().
 template <typename S>
 concept projects_source =
-    configuration_source<S> &&
+    config_source<S> &&
     requires(S s, const schema_projection & p) { s.apply_projection(p); };
 
 // A source that declares an inheritance chain parent after pull().
 template <typename S>
 concept inheriting_source =
-    configuration_source<S> &&
+    config_source<S> &&
     requires(const S s) {
         { s.inheritance() } -> std::convertible_to<inherit_declaration>;
     };
@@ -118,18 +118,18 @@ The shipped `xml_source` models both; `env_source`, `argv_source`, and
 <a id="erasure"></a>
 ## `source_handle` / `source_stack` — type erasure and composition
 
-`#include "nucleus/configuration_source/source_handle.h"` and `source_stack.h`
+`#include "nucleus/config_source/source_handle.h"` and `source_stack.h`
 
 `source_handle` is a move-only value type that erases any concept-satisfying
 source behind a small manual vtable; the optional affordances are detected with
 `if constexpr` at erasure time, so a source pays only for what it has.
 
 ```cpp
-template <configuration_source S> explicit source_handle(S s);
+template <config_source S> explicit source_handle(S s);
 capability_descriptor capabilities() const;
 void apply_projection(const schema_projection &p);   // no-op if the source does not project
 inherit_declaration inheritance() const;             // inherit_default if not inheriting
-configuration_source_result pull();
+config_source_result pull();
 ```
 
 `source_stack` composes handles in precedence order (later = higher); the
@@ -143,10 +143,10 @@ inheritance chain walker.
 <a id="buffer"></a>
 ## Batches, values, and the `retained_buffer` lifetime contract
 
-`#include "nucleus/configuration_source/configuration_source.h"`
+`#include "nucleus/config_source/config_source.h"`
 
 ```cpp
-struct configuration_source_batch {
+struct config_source_batch {
     std::vector<keyspace_entry> entries;
     std::vector<extend_disposition> dispositions;  // empty for flat sources
     retained_buffer buffer;    // pins any backing memory the entries view into
@@ -226,7 +226,7 @@ genuinely cannot carry the schema's shape
 <a id="feature_gate"></a>
 ## `feature_gate` — capability gating
 
-`#include "nucleus/configuration_source/feature_gate.h"`
+`#include "nucleus/config_source/feature_gate.h"`
 
 The primitives behind the automatic gate. A requirement is a capability plus a
 strength; gating intersects requirements with declared capabilities, applying
@@ -268,7 +268,7 @@ gate a single source directly.
 <a id="inheritance"></a>
 ## Inheritance: `inherit_declaration`, `inherit_policy`, `extend_disposition`
 
-`#include "nucleus/configuration_source/inherit_declaration.h"`
+`#include "nucleus/config_source/inherit_declaration.h"`
 
 These three types form the seam through which a document source declares
 ancestry and a host controls chain walking. The core never interprets file
@@ -313,7 +313,7 @@ struct inherit_policy {
 
 ### `extend_disposition`
 
-A re-open declaration carried in `configuration_source_batch::dispositions`. A
+A re-open declaration carried in `config_source_batch::dispositions`. A
 derived document that re-opens a named instance from a base document declares
 the instance's container path and primary-key value alongside the strength:
 
@@ -365,7 +365,7 @@ tokenizer build() &&;   // consumes the builder
 ```
 
 ```cpp
-nucleus::configuration_space_builder engine;
+nucleus::config_space_builder engine;
 
 nucleus::tokenizer_builder builder("greet");
 builder.set_wildcard([](std::string_view who) -> nucleus::token_result {
@@ -373,7 +373,7 @@ builder.set_wildcard([](std::string_view who) -> nucleus::token_result {
 });
 if(!engine.install_tokenizer(std::move(builder).build()))
     return 1;
-nucleus::configuration_space space = engine.build();
+nucleus::config_space space = engine.build();
 
 // A value "${greet.world}" now resolves to "hello world" at load.
 ```
@@ -390,7 +390,7 @@ in [`tests/resolution_test.cpp`](../tests/resolution_test.cpp).
 <a id="converters"></a>
 ## Custom converters: `register_converter`
 
-`#include "nucleus/configuration_space.h"` (the registration) and
+`#include "nucleus/config_space.h"` (the registration) and
 `"nucleus/schema/converters.h"` (the element factories)
 
 A converter is `std::function<expected<std::any, std::string>(std::string_view)>`:
@@ -438,7 +438,7 @@ commits. The default policy accepts everything — the core imposes no reservati
 or namespacing rules of its own.
 
 ```cpp
-enum class registration_kind : std::uint8_t { schema, tokenizer, configuration_source, converter };
+enum class registration_kind : std::uint8_t { schema, tokenizer, config_source, converter };
 struct registration_request { registration_kind kind; owner_token owner; };
 
 class policy_verdict {
@@ -457,7 +457,7 @@ public:
 ```
 
 Install it with
-`configuration_space_builder::set_registration_policy(std::make_shared<...>())`.
+`config_space_builder::set_registration_policy(std::make_shared<...>())`.
 The verdict traffics in a plain reason string; a rejection's `reason()` is
 surfaced verbatim as the `message` of the `registration_result` error, with
 code `errc::rejected_registration` attached by the engine. See
@@ -501,7 +501,7 @@ precedence order. Neither type decides filename conventions.
 
 ### `extension_registry`
 
-`#include "nucleus/configuration_source/extension_registry.h"`
+`#include "nucleus/config_source/extension_registry.h"`
 
 ```cpp
 using parser_factory = std::function<source_handle(const std::string &path)>;
@@ -518,7 +518,7 @@ with `errc::rejected_registration` and a message naming the conflicting owners.
 
 ### `discovery`
 
-`#include "nucleus/configuration_source/discovery.h"`
+`#include "nucleus/config_source/discovery.h"`
 
 ```cpp
 struct discovered_source { std::string path; std::string extension; };
@@ -544,7 +544,7 @@ stays consistent with it.
 
 ### `path_text`
 
-`#include "nucleus/configuration_source/path_text.h"` — the one filesystem-path
+`#include "nucleus/config_source/path_text.h"` — the one filesystem-path
 → text conversion, stable across platforms (forward slashes, UTF-8).
 
 ```cpp
@@ -601,12 +601,12 @@ A compiled module keeps its implementation (and any third-party parser) under
 `lib/<fmt>/src`, reachable only from inside the module.
 
 **Model the input contract.** Make the source a plain struct satisfying
-[`configuration_source`](#source_concept) (plus `apply_projection` /
+[`config_source`](#source_concept) (plus `apply_projection` /
 `inheritance` if it is a document format), honoring the
 [`retained_buffer`](#buffer) contract for any view-values.
 
-**Model the output contract.** Provide `emit_template(const configuration_space&,
-std::ostream&)` and `emit_document(const configuration&, std::ostream&)` as free
+**Model the output contract.** Provide `emit_template(const config_space&,
+std::ostream&)` and `emit_document(const config&, std::ostream&)` as free
 functions in a `nucleus::<fmt>` namespace, plus a stateless `struct emitter`
 whose members forward to them so the type satisfies
 [`config_emitter`](api-using.md#emit). No third-party type appears in the public

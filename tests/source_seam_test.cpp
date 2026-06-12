@@ -1,8 +1,8 @@
 #include "nucleus/capability.h"
 
-#include "nucleus/configuration_source/source_concept.h"
-#include "nucleus/configuration_source/source_handle.h"
-#include "nucleus/configuration_source/configuration_source.h"
+#include "nucleus/config_source/source_concept.h"
+#include "nucleus/config_source/source_handle.h"
+#include "nucleus/config_source/config_source.h"
 
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
@@ -24,16 +24,16 @@ struct handwritten_source
         return {nucleus::capability::nesting};
     }
 
-    [[nodiscard]] nucleus::configuration_source_result pull()
+    [[nodiscard]] nucleus::config_source_result pull()
     {
-        nucleus::configuration_source_batch batch;
+        nucleus::config_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(
             "a/b", nucleus::value::owned("from-handwritten"), capabilities()));
         return batch;
     }
 };
 
-static_assert(nucleus::configuration_source<handwritten_source>,
+static_assert(nucleus::config_source<handwritten_source>,
               "handwritten_source must satisfy the source concept");
 
 // A second plain struct source: a different author, different capabilities and
@@ -46,16 +46,16 @@ struct ordering_source
         return {nucleus::capability::ordering};
     }
 
-    [[nodiscard]] nucleus::configuration_source_result pull()
+    [[nodiscard]] nucleus::config_source_result pull()
     {
-        nucleus::configuration_source_batch batch;
+        nucleus::config_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(
             "x/y", nucleus::value::owned("from-ordering"), capabilities()));
         return batch;
     }
 };
 
-static_assert(nucleus::configuration_source<ordering_source>,
+static_assert(nucleus::config_source<ordering_source>,
               "ordering_source must satisfy the source concept");
 
 // Drives any erased source through source_handle -- it cannot see whether the

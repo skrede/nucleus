@@ -5,12 +5,12 @@
 // the engine the same way argv, env, or xml does. This one emits owned values, so
 // it pins no buffer (retained_buffer::none()).
 
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/capability.h"
 
-#include "nucleus/configuration_source/source_handle.h"
-#include "nucleus/configuration_source/configuration_source.h"
+#include "nucleus/config_source/source_handle.h"
+#include "nucleus/config_source/config_source.h"
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
 
@@ -28,9 +28,9 @@ struct table_source
         return {nucleus::capability::nesting};
     }
 
-    [[nodiscard]] nucleus::configuration_source_result pull()
+    [[nodiscard]] nucleus::config_source_result pull()
     {
-        nucleus::configuration_source_batch batch;
+        nucleus::config_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(
             "service/name", nucleus::value::owned("edge"), capabilities()));
         batch.entries.push_back(nucleus::make_entry(
@@ -43,11 +43,11 @@ struct table_source
 
 int main()
 {
-    nucleus::configuration_space space = nucleus::configuration_space_builder{}.build();
+    nucleus::config_space space = nucleus::config_space_builder{}.build();
 
     // A custom source that satisfies the source concept is moved directly into a
     // source_handle and layered through the explicit stack.
-    auto loaded = nucleus::load(space,
+    auto loaded = nucleus::load_config(space,
         nucleus::source_stack{nucleus::source_handle(table_source{})},
         {});
     if(!loaded)
@@ -56,7 +56,7 @@ int main()
         return 1;
     }
 
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
     for(const std::string &key : config.keys())
         std::cout << key << " = " << config.get(key).value() << '\n';
     return 0;

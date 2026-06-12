@@ -42,11 +42,11 @@ derives what it requires, and a source stack that cannot satisfy it fails
 loudly before folding.
 
 * **Two-phase lifecycle** \
-A `configuration_space_builder` accepts registrations (`register_*` /
+A `config_space_builder` accepts registrations (`register_*` /
 `install_tokenizer`) until `build()` seals it into an immutable
-`configuration_space`. The free function `nucleus::load(space, stack, options)`
+`config_space`. The free function `nucleus::load(space, stack, options)`
 folds a source stack against the sealed space and yields an immutable, freely
-thread-readable `configuration`. Registration after `build()` is a
+thread-readable `config`. Registration after `build()` is a
 state-machine error; the space can be reused across many loads, and the source
 stack is borrowed (never consumed), so one stack can pre-flight and load
 repeatedly.
@@ -147,13 +147,13 @@ The schema is the authority: it decides which flags exist, so `--server-port` is
 declared and resolves, while an undeclared flag would fail the load.
 
 ```cpp
-nucleus::configuration_space_builder builder;
+nucleus::config_space_builder builder;
 if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
     return 1;
 if(!builder.register_element(
     nucleus::element("port", nucleus::anchor::keyspace("server"))))
     return 1;
-nucleus::configuration_space space = builder.build();
+nucleus::config_space space = builder.build();
 
 nucleus::argv_source argv(std::vector<std::string>{"--server-port=8080"});
 argv.recognize_with(nucleus::recognizer_of(space));
@@ -165,7 +165,7 @@ if(!loaded)
     return 1;
 }
 
-const nucleus::configuration &config = loaded.value();
+const nucleus::config &config = loaded.value();
 std::cout << "server/port = " << config.get("server/port").value() << '\n';
 ```
 
@@ -176,7 +176,7 @@ server/port = 8080
 ### Tokens
 
 Values carrying `${...}` expressions are expanded at load by the core tokenizers,
-which every `configuration_space` installs automatically. A token nested inside
+which every `config_space` installs automatically. A token nested inside
 another resolves inner-first.
 
 ```cpp
@@ -224,14 +224,14 @@ library, not a CLI, so it ships no `completion` subcommand &mdash; it returns th
 script as a string and the host decides how to surface it.
 
 ```cpp
-nucleus::configuration_space_builder builder;
+nucleus::config_space_builder builder;
 if(!builder.register_element(nucleus::element("logging", nucleus::anchor::root())))
     return 1;
 if(!builder.register_element(nucleus::enum_element(
     "level", nucleus::anchor::keyspace("logging"),
     {"debug", "info", "warn", "error"})))
     return 1;
-nucleus::configuration_space space = builder.build();
+nucleus::config_space space = builder.build();
 
 std::cout << space.generate_completion(nucleus::shell::bash, "mytool");
 ```
@@ -265,7 +265,7 @@ The scope is still deliberately narrow.
 * **Completion** is static, for **bash and zsh** only. There is no dynamic
   (runtime) completion and no fish support; both are future single-file additions
   through the same emission seam.
-* **No mutation or merge** of a resolved `configuration`. The resolved value is
+* **No mutation or merge** of a resolved `config`. The resolved value is
   read-only (it can be emitted back out as XML, env, or argv text); producing a
   new configuration as a value (clone, transfer, diff) is future work.
 * **Document inheritance** (`inherit=` chains) is implemented by the XML module

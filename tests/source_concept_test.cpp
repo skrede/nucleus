@@ -1,8 +1,8 @@
 #include "nucleus/capability.h"
 
-#include "nucleus/configuration_source/source_concept.h"
-#include "nucleus/configuration_source/source_handle.h"
-#include "nucleus/configuration_source/configuration_source.h"
+#include "nucleus/config_source/source_concept.h"
+#include "nucleus/config_source/source_handle.h"
+#include "nucleus/config_source/config_source.h"
 
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
@@ -18,7 +18,7 @@ namespace {
 struct minimal_source
 {
     [[nodiscard]] nucleus::capability_descriptor capabilities() const { return {}; }
-    [[nodiscard]] nucleus::configuration_source_result pull() { return nucleus::configuration_source_batch{}; }
+    [[nodiscard]] nucleus::config_source_result pull() { return nucleus::config_source_batch{}; }
 };
 
 // Flat stub: capabilities() + pull() only. No optional ops.
@@ -29,9 +29,9 @@ struct flat_stub
         return {nucleus::capability::nesting};
     }
 
-    [[nodiscard]] nucleus::configuration_source_result pull()
+    [[nodiscard]] nucleus::config_source_result pull()
     {
-        nucleus::configuration_source_batch batch;
+        nucleus::config_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(
             "flat/key", nucleus::value::owned("flat-value"), capabilities()));
         return batch;
@@ -50,9 +50,9 @@ struct projecting_stub
 
     void apply_projection(const nucleus::schema_projection &) { ++projection_count; }
 
-    [[nodiscard]] nucleus::configuration_source_result pull()
+    [[nodiscard]] nucleus::config_source_result pull()
     {
-        return nucleus::configuration_source_batch{};
+        return nucleus::config_source_batch{};
     }
 };
 
@@ -73,25 +73,25 @@ struct full_stub
         return {nucleus::inherit_declaration::kind::parent_path, "sentinel.xml"};
     }
 
-    [[nodiscard]] nucleus::configuration_source_result pull()
+    [[nodiscard]] nucleus::config_source_result pull()
     {
-        nucleus::configuration_source_batch batch;
+        nucleus::config_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(
             "full/key", nucleus::value::owned("full-value"), capabilities()));
         return batch;
     }
 };
 
-// ----- configuration_source: positive proofs -----
+// ----- config_source: positive proofs -----
 
-static_assert(nucleus::configuration_source<minimal_source>,
-              "a struct with only capabilities()+pull() must satisfy configuration_source");
-static_assert(nucleus::configuration_source<flat_stub>,
-              "flat_stub must satisfy configuration_source");
-static_assert(nucleus::configuration_source<projecting_stub>,
-              "projecting_stub must satisfy configuration_source");
-static_assert(nucleus::configuration_source<full_stub>,
-              "full_stub must satisfy configuration_source");
+static_assert(nucleus::config_source<minimal_source>,
+              "a struct with only capabilities()+pull() must satisfy config_source");
+static_assert(nucleus::config_source<flat_stub>,
+              "flat_stub must satisfy config_source");
+static_assert(nucleus::config_source<projecting_stub>,
+              "projecting_stub must satisfy config_source");
+static_assert(nucleus::config_source<full_stub>,
+              "full_stub must satisfy config_source");
 
 // ----- projects_source: present only when apply_projection() is declared -----
 

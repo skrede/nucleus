@@ -1,7 +1,7 @@
-#ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_SOURCE_CONCEPT_H
-#define HPP_GUARD_NUCLEUS_CONFIGURATION_SOURCE_SOURCE_CONCEPT_H
+#ifndef HPP_GUARD_NUCLEUS_CONFIG_SOURCE_SOURCE_CONCEPT_H
+#define HPP_GUARD_NUCLEUS_CONFIG_SOURCE_SOURCE_CONCEPT_H
 
-#include "nucleus/configuration_source/configuration_source.h"
+#include "nucleus/config_source/config_source.h"
 
 #include <concepts>
 
@@ -14,22 +14,22 @@ namespace nucleus {
 // retained_buffer. Resolution copies values out and drops the batch only then; a source
 // that returns views without pinning the arena would dangle the instant the batch is released.
 template <typename S>
-concept configuration_source =
+concept config_source =
     requires(S s) {
         { s.capabilities() } -> std::convertible_to<capability_descriptor>;
-        { s.pull() }         -> std::convertible_to<configuration_source_result>;
+        { s.pull() }         -> std::convertible_to<config_source_result>;
     };
 
 // Detected (never required): a source that accepts a schema-derived projection before pull().
 template <typename S>
 concept projects_source =
-    configuration_source<S> &&
+    config_source<S> &&
     requires(S s, const schema_projection & p) { s.apply_projection(p); };
 
 // Detected (never required): a source that declares an inheritance chain parent after pull().
 template <typename S>
 concept inheriting_source =
-    configuration_source<S> &&
+    config_source<S> &&
     requires(const S s) {
         { s.inheritance() } -> std::convertible_to<inherit_declaration>;
     };

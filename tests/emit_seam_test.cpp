@@ -1,6 +1,6 @@
 #include "nucleus/config_emitter.h"
-#include "nucleus/configuration.h"
-#include "nucleus/configuration_space.h"
+#include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -21,7 +21,7 @@
 
 // The config_emitter seam is genuinely multi-format: env and args are honest FLAT
 // KEY= sources, while xml is a tree format -- and all three project the SAME space
-// (template) and configuration (document). The format is what differs, not the data.
+// (template) and config (document). The format is what differs, not the data.
 
 // Compile-time proof: each stateless emitter models the core concept.
 static_assert(nucleus::config_emitter<nucleus::env::emitter>);
@@ -30,9 +30,9 @@ static_assert(nucleus::config_emitter<nucleus::xml::emitter>);
 
 namespace {
 
-[[nodiscard]] nucleus::configuration_space make_server_space()
+[[nodiscard]] nucleus::config_space make_server_space()
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("server", nucleus::anchor::root())));
     REQUIRE(builder.register_element(
         nucleus::primary_key_element("name", nucleus::anchor::keyspace("server"))));
@@ -43,14 +43,14 @@ namespace {
     return builder.build();
 }
 
-// A configuration carrying a scalar and a repeated collection, built directly so the
+// A config carrying a scalar and a repeated collection, built directly so the
 // document emitters can be proven without a source dependency.
-[[nodiscard]] nucleus::configuration make_server_config()
+[[nodiscard]] nucleus::config make_server_config()
 {
     std::map<std::string, std::string> values{{"server/host", "localhost"}};
     std::map<std::string, std::vector<std::string>> collections{
         {"server/tag", {"alpha", "beta"}}};
-    return nucleus::configuration(std::move(values), std::move(collections), nucleus::provenance{});
+    return nucleus::config(std::move(values), std::move(collections), nucleus::provenance{});
 }
 
 [[nodiscard]] std::size_t count_occurrences(const std::string &text, const std::string &needle)
@@ -66,7 +66,7 @@ namespace {
 
 TEST_CASE("env and args project a schema into flat KEY= templates", "[emit][seam]")
 {
-    const nucleus::configuration_space space = make_server_space();
+    const nucleus::config_space space = make_server_space();
 
     std::ostringstream env_out;
     nucleus::env::emit_template(space, env_out);
@@ -105,7 +105,7 @@ TEST_CASE("env and args project a schema into flat KEY= templates", "[emit][seam
 
 TEST_CASE("an anchored argv document renders keys relative to the anchor", "[emit][seam]")
 {
-    const nucleus::configuration config = make_server_config();
+    const nucleus::config config = make_server_config();
 
     std::ostringstream out;
     nucleus::argv::emit_document(config, out, {},
@@ -118,7 +118,7 @@ TEST_CASE("an anchored argv document renders keys relative to the anchor", "[emi
 
 TEST_CASE("env and args emit one flat line per resolved value", "[emit][seam]")
 {
-    const nucleus::configuration config = make_server_config();
+    const nucleus::config config = make_server_config();
 
     std::ostringstream env_out;
     nucleus::env::emit_document(config, env_out);
@@ -137,7 +137,7 @@ TEST_CASE("env and args emit one flat line per resolved value", "[emit][seam]")
 
 TEST_CASE("xml projects the SAME space into nested tree markup", "[emit][seam]")
 {
-    const nucleus::configuration_space space = make_server_space();
+    const nucleus::config_space space = make_server_space();
 
     std::ostringstream xml_out;
     nucleus::xml::emit_template(space, xml_out);

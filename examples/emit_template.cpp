@@ -7,7 +7,7 @@
 // the caller's stream. This example links the xml module (nucleus::xml); its
 // header under nucleus/xml/ arrives via that link, pugixml stays private.
 
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -19,7 +19,7 @@
 
 int main()
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
 
     // A `server` container primary-keyed by `name`, a unique-named `profile`, and a
     // constrained `mode` leaf.
@@ -36,7 +36,7 @@ int main()
         std::vector<std::string>{"primary", "secondary"})))
         return 1;
 
-    nucleus::configuration_space space = builder.build();
+    nucleus::config_space space = builder.build();
     nucleus::xml::emit_template(space, std::cout);
     return 0;
 }

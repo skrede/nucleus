@@ -1,5 +1,5 @@
-#ifndef HPP_GUARD_NUCLEUS_CONFIGURATION_H
-#define HPP_GUARD_NUCLEUS_CONFIGURATION_H
+#ifndef HPP_GUARD_NUCLEUS_CONFIG_H
+#define HPP_GUARD_NUCLEUS_CONFIG_H
 
 #include "nucleus/error.h"
 #include "nucleus/expected.h"
@@ -23,17 +23,17 @@ namespace nucleus {
 // no view into any dropped buffer, outlives every source, and is freely thread-safe
 // to read (const reads only). Provenance travels with the values -- recorded in the
 // same fold step -- so get() and provenance_of() can never disagree about a key.
-class configuration
+class config
 {
 public:
-    configuration() = default;
+    config() = default;
 
-    configuration(std::map<std::string, std::string> values, provenance origins)
+    config(std::map<std::string, std::string> values, provenance origins)
         : m_values(std::move(values)), m_provenance(std::move(origins))
     {
     }
 
-    configuration(std::map<std::string, std::string> values,
+    config(std::map<std::string, std::string> values,
                   std::map<std::string, std::vector<std::string>> collections,
                   provenance origins)
         : m_values(std::move(values)),
@@ -45,7 +45,7 @@ public:
     // Extended constructor carrying the typed parallel maps produced by the
     // convert() pass. The existing two-arg and three-arg constructors are
     // unchanged; this form is called by freeze() after convert() runs.
-    configuration(std::map<std::string, std::string> values,
+    config(std::map<std::string, std::string> values,
                   std::map<std::string, std::vector<std::string>> collections,
                   std::map<std::string, std::any> typed,
                   std::map<std::string, std::vector<std::any>> typed_collections,

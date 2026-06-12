@@ -6,7 +6,7 @@
 #include "nucleus/log_sink.h"
 #include "nucleus/capability.h"
 
-#include "nucleus/configuration_source/configuration_source.h"
+#include "nucleus/config_source/config_source.h"
 
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
@@ -14,7 +14,7 @@
 
 #include "nucleus/argv/argv_source.h"
 #include "nucleus/argv/cli_surface.h"
-#include "nucleus/configuration_source/argv/key_recognizer.h"
+#include "nucleus/config_source/argv/key_recognizer.h"
 
 #include <string>
 #include <vector>
@@ -23,7 +23,7 @@
 
 namespace nucleus {
 
-// Partitions one argv token vector across named configuration spaces by the flag's
+// Partitions one argv token vector across named config spaces by the flag's
 // first path segment. Every flag MUST begin with a registered space name as its
 // first segment (e.g. --alpha-x=1 for space "alpha" with delimiter "-"); a flag
 // whose first segment names NO registered space is a loud pull error. Flags
@@ -44,7 +44,7 @@ public:
     }
 
     // A lightweight view of this source projected to one registered space.
-    // Satisfies the configuration_source concept by duck typing. Holds a back-pointer
+    // Satisfies the config_source concept by duck typing. Holds a back-pointer
     // to the owner (the owner must outlive the view) plus per-view options.
     class space_view
     {
@@ -95,16 +95,16 @@ public:
 
         [[nodiscard]] capability_descriptor capabilities() const { return descriptor(); }
 
-        [[nodiscard]] configuration_source_result pull()
+        [[nodiscard]] config_source_result pull()
         {
-            configuration_source_batch batch;
+            config_source_batch batch;
             batch.entries.reserve(m_owner->m_args.size());
 
             for(const std::string &token : m_owner->m_args)
             {
                 auto mapped = normalize_arg(token, m_delimiter);
                 if(!mapped)
-                    return unexpected(configuration_source_error{
+                    return unexpected(config_source_error{
                         errc::malformed_source, std::move(mapped).error()});
 
                 const key_path &path = mapped.value().key;
@@ -114,7 +114,7 @@ public:
                 {
                     if(!path.empty() && is_registered_space(path.front()))
                         continue; // bare space name -- belongs to this or another space, skip
-                    return unexpected(configuration_source_error{errc::schema_violation,
+                    return unexpected(config_source_error{errc::schema_violation,
                         nucleus::format(
                             "unaddressed CLI flag '{}': first segment '{}' is not a "
                             "registered space name; registered spaces: {}",
@@ -136,7 +136,7 @@ public:
                     if(!recognized)
                     {
                         if(m_policy == unknown_key_policy::strict)
-                            return unexpected(configuration_source_error{
+                            return unexpected(config_source_error{
                                 errc::schema_violation, nucleus::format(
                                     "unknown CLI flag '{}' maps to undeclared key '{}'",
                                     token, stripped.str())});
@@ -156,7 +156,7 @@ public:
                 }
                 else
                 {
-                    return unexpected(configuration_source_error{errc::schema_violation,
+                    return unexpected(config_source_error{errc::schema_violation,
                         nucleus::format(
                             "unaddressed CLI flag '{}': first segment '{}' is not a "
                             "registered space name; registered spaces: {}",

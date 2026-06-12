@@ -12,7 +12,7 @@
 
 namespace nucleus {
 
-// The hierarchical key path -- the spine. A configuration is one keyspace
+// The hierarchical key path -- the spine. A config is one keyspace
 // addressed by `/`-separated FQN-style paths (a/b/c). This value-type interprets
 // the flat `/`-separated string the source seam already emits (keyspace_entry's
 // path); it does NOT introduce a second path representation. It carries the

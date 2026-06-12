@@ -7,14 +7,14 @@
 #include "nucleus/log_sink.h"
 #include "nucleus/capability.h"
 
-#include "nucleus/configuration_source/configuration_source.h"
+#include "nucleus/config_source/config_source.h"
 
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
 #include "nucleus/keyspace/key_path.h"
 
 #include "nucleus/argv/cli_surface.h"
-#include "nucleus/configuration_source/argv/key_recognizer.h"
+#include "nucleus/config_source/argv/key_recognizer.h"
 
 #include <string>
 #include <vector>
@@ -115,16 +115,16 @@ public:
         return descriptor();
     }
 
-    [[nodiscard]] configuration_source_result pull()
+    [[nodiscard]] config_source_result pull()
     {
-        configuration_source_batch batch;
+        config_source_batch batch;
         batch.entries.reserve(m_args.size());
 
         for(const std::string &token : m_args)
         {
             auto mapped = normalize_arg(token, m_delimiter);
             if(!mapped)
-                return unexpected(configuration_source_error{
+                return unexpected(config_source_error{
                     errc::malformed_source, std::move(mapped).error()});
 
             key_path path = std::move(mapped.value().key);
@@ -136,7 +136,7 @@ public:
             {
                 if(m_policy == unknown_key_policy::strict)
                 {
-                    return unexpected(configuration_source_error{
+                    return unexpected(config_source_error{
                         errc::schema_violation, nucleus::format(
                             "unknown CLI flag '{}' maps to undeclared key '{}'",
                             token, path.str())});

@@ -70,7 +70,7 @@ TEST_CASE("identity alone imposes no presence obligation", "[enforcer]")
     REQUIRE(schema_enforcer::validate(reg, ks));
 
     // So does an anonymous strain -- fields without the key collapse into the
-    // configuration space; the primary key is a selector, not an obligation.
+    // config space; the primary key is a selector, not an obligation.
     ks.set(path_of("node/role"), nucleus::value::owned("primary"));
     REQUIRE(schema_enforcer::validate(reg, ks));
 }

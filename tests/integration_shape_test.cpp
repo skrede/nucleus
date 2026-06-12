@@ -16,8 +16,8 @@
 //   - Three loud-error paths: no-selection, unknown selection, duplicate unique value
 
 #include "nucleus/strain_scope.h"
-#include "nucleus/configuration.h"
-#include "nucleus/configuration_space.h"
+#include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -52,7 +52,7 @@ std::string filename_of(const std::string &path)
 
 // Registers cluster/server keyed by "name" (pkey), leaves port/protocol,
 // unique serial, plus a general app/name for scope-policy boundary tests.
-void declare_cluster_with_unique(nucleus::configuration_space_builder &engine)
+void declare_cluster_with_unique(nucleus::config_space_builder &engine)
 {
     REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
     REQUIRE(engine.register_element(nucleus::element("server", anchor::keyspace("cluster"))));
@@ -68,7 +68,7 @@ void declare_cluster_with_unique(nucleus::configuration_space_builder &engine)
 }
 
 // Loads a document chain against `space` carrying per-load selection and scope.
-nucleus::load_result load_chain(const nucleus::configuration_space &space,
+nucleus::load_result load_chain(const nucleus::config_space &space,
                                 std::vector<std::string> paths,
                                 std::function<nucleus::source_handle(const std::string &)> factory,
                                 std::optional<std::string> selection = std::nullopt,
@@ -79,7 +79,7 @@ nucleus::load_result load_chain(const nucleus::configuration_space &space,
     opts.make_document = std::move(factory);
     opts.selection = std::move(selection);
     opts.scope = scope;
-    return nucleus::load(space, nucleus::source_stack{}, opts);
+    return nucleus::load_config(space, nucleus::source_stack{}, opts);
 }
 
 // ---------------------------------------------------------------------------
@@ -158,14 +158,14 @@ auto make_tc4_factory()
 TEST_CASE("integration: select primary resolves unified keyspace with template composition",
           "[integration][keyed]")
 {
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster_with_unique(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto loaded = load_chain(space, {"leaf.xml"}, make_main_factory(), "primary");
     REQUIRE(loaded);
 
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
 
     // Wide extend from mid wins over root's 8080.
     REQUIRE(config.get("cluster/server/port") == "443");
@@ -205,9 +205,9 @@ TEST_CASE("integration: auto-resolve single named strain succeeds without select
         return nucleus::source_handle(nucleus::env_source{});
     };
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster_with_unique(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
     // No selection -- single named strain auto-resolves.
 
     auto loaded = load_chain(space, {"derived2.xml"}, factory);
@@ -242,9 +242,9 @@ TEST_CASE("integration: file_level scope policy excludes derived-layer entries",
         return nucleus::source_handle(nucleus::env_source{});
     };
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster_with_unique(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto loaded = load_chain(space, {"derived3.xml"}, factory, "primary",
                              strain_scope_policy::file_level);
@@ -266,9 +266,9 @@ TEST_CASE("integration: scope-policy contrast for primary's derived entry",
 {
     SECTION("container_open_until_next_strain admits primary's extend up to Ls")
     {
-        nucleus::configuration_space_builder engine;
+        nucleus::config_space_builder engine;
         declare_cluster_with_unique(engine);
-        nucleus::configuration_space space = engine.build();
+        nucleus::config_space space = engine.build();
 
         auto loaded = load_chain(space, {"yang_tc4.xml"}, make_tc4_factory(), "primary",
                                  strain_scope_policy::container_open_until_next_strain);
@@ -282,9 +282,9 @@ TEST_CASE("integration: scope-policy contrast for primary's derived entry",
 
     SECTION("space_open_container_closed excludes primary's derived entry")
     {
-        nucleus::configuration_space_builder engine;
+        nucleus::config_space_builder engine;
         declare_cluster_with_unique(engine);
-        nucleus::configuration_space space = engine.build();
+        nucleus::config_space space = engine.build();
 
         auto loaded = load_chain(space, {"yang_tc4.xml"}, make_tc4_factory(), "primary",
                                  strain_scope_policy::space_open_container_closed);
@@ -322,9 +322,9 @@ TEST_CASE("integration: opt-out terminates the chain by declaration",
         return nucleus::source_handle(nucleus::env_source{});
     };
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster_with_unique(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto loaded = load_chain(space, {"leaf5.xml"}, factory, "primary");
     REQUIRE(loaded);
@@ -358,9 +358,9 @@ TEST_CASE("integration: multiple strains with no selection is a loud error",
         return nucleus::source_handle(nucleus::env_source{});
     };
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster_with_unique(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
     // No selection -- multiple strains without selection must be a loud error.
 
     auto loaded = load_chain(space, {"derived6.xml"}, factory);
@@ -393,9 +393,9 @@ TEST_CASE("integration: select with unknown key value is a loud error",
         return nucleus::source_handle(nucleus::env_source{});
     };
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster_with_unique(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     auto loaded = load_chain(space, {"derived7.xml"}, factory, "ghost");
     REQUIRE_FALSE(loaded);
@@ -414,9 +414,9 @@ TEST_CASE("integration: duplicate unique field value across strains is a loud er
             <server name="secondary" serial="SN001"><port>22</port></server>
         </cluster>)";
 
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_cluster_with_unique(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     // Select "primary" so the unique check runs before the multiple-strains-no-selection
     // guard, which would fire first otherwise.

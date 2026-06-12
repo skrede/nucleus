@@ -32,7 +32,7 @@ Use `argv_source` when the process owns a single logical configuration namespace
 and every flag is unambiguously scoped by its path alone.
 
 Use `multispace_argv_source` when flags from two or more independently-sealed
-`configuration_space` objects share a single argv vector and need explicit
+`config_space` objects share a single argv vector and need explicit
 disambiguation. The first segment is the *space identity*: it is validated at
 the source boundary and stripped before the key enters the keyspace, so each
 space's schema operates on its own plain key paths.

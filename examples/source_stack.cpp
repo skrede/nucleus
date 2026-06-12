@@ -1,12 +1,12 @@
 // source_stack: compose exactly the sources you want, in precedence order.
 // The last source listed in the stack wins when multiple sources supply the same key.
 
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/configuration.h"
+#include "nucleus/config.h"
 
 #include "nucleus/env/env_source.h"
 #include "nucleus/argv/argv_source.h"
@@ -18,7 +18,7 @@
 int main()
 {
     // Schema: a server container with host, port, and mode.
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
         return 1;
     if(!builder.register_element(nucleus::element("host", nucleus::anchor::keyspace("server"))))
@@ -29,7 +29,7 @@ int main()
         nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
                               std::vector<std::string>{"primary", "secondary"})))
         return 1;
-    const nucleus::configuration_space space = builder.build();
+    const nucleus::config_space space = builder.build();
 
     // Layer 0 (lowest precedence): programmatic defaults.
     nucleus::runtime_source defaults;
@@ -47,7 +47,7 @@ int main()
     argv.recognize_with(nucleus::recognizer_of(space));
 
     // Explicit variadic composition: stack order is precedence order, last listed wins.
-    auto loaded = nucleus::load(space,
+    auto loaded = nucleus::load_config(space,
         nucleus::source_stack{std::move(defaults), std::move(env), std::move(argv)},
         {});
     if(!loaded)
@@ -56,10 +56,10 @@ int main()
         return 1;
     }
 
-    const nucleus::configuration &config = loaded.value();
+    const nucleus::config &config = loaded.value();
 
     // Print each resolved value and the source layer that supplied it.
-    std::cout << "resolved configuration (last-listed source wins):\n";
+    std::cout << "resolved config (last-listed source wins):\n";
     for(const std::string &key : config.keys())
     {
         const nucleus::origin *from = config.provenance_of(key);

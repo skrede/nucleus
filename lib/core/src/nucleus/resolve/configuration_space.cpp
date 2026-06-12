@@ -1,6 +1,6 @@
 #include "nucleus/error.h"
 #include "nucleus/format.h"
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 #include "nucleus/registration_policy.h"
 
 #include "nucleus/completion/completion_generator.h"
@@ -39,7 +39,7 @@ namespace nucleus {
 // plain maps, so a member-wise copy is a deep copy. The policy is a shared_ptr to
 // host-owned behavior (not mutable state that can diverge), so sharing it across a
 // base and its expand()-derived builder is intentional -- NO shared_ptr links the
-// configuration_space objects themselves.
+// config_space objects themselves.
 struct space_core
 {
     // The generic core tokenizers are MECHANISM, not policy: ${env.*} and
@@ -101,7 +101,7 @@ struct space_core
 };
 
 // The mutable builder's state: the shared core plus the spent flag.
-class configuration_space_builder::impl : public space_core
+class config_space_builder::impl : public space_core
 {
 public:
     bool built = false;
@@ -109,7 +109,7 @@ public:
 
 // The sealed space's state: the shared core, default-constructed (core tokenizers
 // installed) or copied from a builder's core by build().
-class configuration_space::impl : public space_core
+class config_space::impl : public space_core
 {
 public:
     impl() = default;
@@ -194,22 +194,22 @@ assemble_handles(const space_core &state,
 
 }
 
-// --- configuration_space_builder -------------------------------------------
+// --- config_space_builder -------------------------------------------
 
-configuration_space_builder::configuration_space_builder()
+config_space_builder::config_space_builder()
     : m_impl(std::make_unique<impl>())
 {
 }
 
-configuration_space_builder::~configuration_space_builder() = default;
+config_space_builder::~config_space_builder() = default;
 
-configuration_space_builder::configuration_space_builder(configuration_space_builder &&) noexcept = default;
+config_space_builder::config_space_builder(config_space_builder &&) noexcept = default;
 
-configuration_space_builder &
-configuration_space_builder::operator=(configuration_space_builder &&) noexcept = default;
+config_space_builder &
+config_space_builder::operator=(config_space_builder &&) noexcept = default;
 
 registration_result
-configuration_space_builder::set_registration_policy(std::shared_ptr<registration_policy> policy)
+config_space_builder::set_registration_policy(std::shared_ptr<registration_policy> policy)
 {
     if(auto guard = reject_if_built(m_impl->built, "set_registration_policy"); !guard)
         return guard;
@@ -218,7 +218,7 @@ configuration_space_builder::set_registration_policy(std::shared_ptr<registratio
     return registration_ok();
 }
 
-registration_result configuration_space_builder::register_schema(std::string key_path, owner_token owner)
+registration_result config_space_builder::register_schema(std::string key_path, owner_token owner)
 {
     if(auto guard = reject_if_built(m_impl->built, "register_schema"); !guard)
         return guard;
@@ -229,7 +229,7 @@ registration_result configuration_space_builder::register_schema(std::string key
     return registration_ok();
 }
 
-registration_result configuration_space_builder::register_element(schema_element element, owner_token owner)
+registration_result config_space_builder::register_element(schema_element element, owner_token owner)
 {
     if(auto guard = reject_if_built(m_impl->built, "register_element"); !guard)
         return guard;
@@ -245,7 +245,7 @@ registration_result configuration_space_builder::register_element(schema_element
     return registration_ok();
 }
 
-registration_result configuration_space_builder::register_tokenizer(std::string name, owner_token owner)
+registration_result config_space_builder::register_tokenizer(std::string name, owner_token owner)
 {
     if(auto guard = reject_if_built(m_impl->built, "register_tokenizer"); !guard)
         return guard;
@@ -255,7 +255,7 @@ registration_result configuration_space_builder::register_tokenizer(std::string 
     return registration_ok();
 }
 
-registration_result configuration_space_builder::install_tokenizer(tokenizer tok, owner_token owner)
+registration_result config_space_builder::install_tokenizer(tokenizer tok, owner_token owner)
 {
     if(auto guard = reject_if_built(m_impl->built, "install_tokenizer"); !guard)
         return guard;
@@ -265,7 +265,7 @@ registration_result configuration_space_builder::install_tokenizer(tokenizer tok
     return registration_ok();
 }
 
-registration_result configuration_space_builder::register_converter(
+registration_result config_space_builder::register_converter(
     std::type_index id,
     std::function<expected<std::any, std::string>(std::string_view)> conv,
     owner_token owner)
@@ -278,66 +278,66 @@ registration_result configuration_space_builder::register_converter(
     return registration_ok();
 }
 
-configuration_space_builder &configuration_space_builder::name(std::string space_name)
+config_space_builder &config_space_builder::name(std::string space_name)
 {
     m_impl->name = std::move(space_name);
     return *this;
 }
 
-std::size_t configuration_space_builder::schema_count() const noexcept { return m_impl->schema.size(); }
+std::size_t config_space_builder::schema_count() const noexcept { return m_impl->schema.size(); }
 
-std::size_t configuration_space_builder::tokenizer_count() const noexcept { return m_impl->tokenizer.size(); }
+std::size_t config_space_builder::tokenizer_count() const noexcept { return m_impl->tokenizer.size(); }
 
-std::size_t configuration_space_builder::converter_count() const noexcept { return m_impl->converters.size(); }
+std::size_t config_space_builder::converter_count() const noexcept { return m_impl->converters.size(); }
 
-std::vector<conflict_report> configuration_space_builder::conflicts() const { return m_impl->conflicts(); }
+std::vector<conflict_report> config_space_builder::conflicts() const { return m_impl->conflicts(); }
 
-configuration_space configuration_space_builder::build()
+config_space config_space_builder::build()
 {
     // Infallible: copy the core (deep copy of the three registries + ledger; the
     // policy shared_ptr is shared host-owned behavior) into the sealed product and
     // mark the builder spent. After this, every mutating call is a loud error.
     m_impl->built = true;
-    auto sealed = std::make_unique<configuration_space::impl>(
+    auto sealed = std::make_unique<config_space::impl>(
         static_cast<const space_core &>(*m_impl));
-    return configuration_space(std::move(sealed));
+    return config_space(std::move(sealed));
 }
 
-// --- configuration_space (sealed) ------------------------------------------
+// --- config_space (sealed) ------------------------------------------
 
-configuration_space::configuration_space() : m_impl(std::make_unique<impl>()) {}
+config_space::config_space() : m_impl(std::make_unique<impl>()) {}
 
-configuration_space::configuration_space(std::unique_ptr<impl> sealed) : m_impl(std::move(sealed)) {}
+config_space::config_space(std::unique_ptr<impl> sealed) : m_impl(std::move(sealed)) {}
 
-configuration_space::~configuration_space() = default;
+config_space::~config_space() = default;
 
-configuration_space::configuration_space(const configuration_space &other)
+config_space::config_space(const config_space &other)
     : m_impl(other.m_impl ? std::make_unique<impl>(*other.m_impl) : nullptr)
 {
 }
 
-configuration_space &configuration_space::operator=(const configuration_space &other)
+config_space &config_space::operator=(const config_space &other)
 {
     if(this != &other)
         m_impl = other.m_impl ? std::make_unique<impl>(*other.m_impl) : nullptr;
     return *this;
 }
 
-configuration_space::configuration_space(configuration_space &&) noexcept = default;
+config_space::config_space(config_space &&) noexcept = default;
 
-configuration_space &configuration_space::operator=(configuration_space &&) noexcept = default;
+config_space &config_space::operator=(config_space &&) noexcept = default;
 
-std::size_t configuration_space::schema_count() const noexcept { return m_impl->schema.size(); }
+std::size_t config_space::schema_count() const noexcept { return m_impl->schema.size(); }
 
-std::size_t configuration_space::tokenizer_count() const noexcept { return m_impl->tokenizer.size(); }
+std::size_t config_space::tokenizer_count() const noexcept { return m_impl->tokenizer.size(); }
 
-std::size_t configuration_space::converter_count() const noexcept { return m_impl->converters.size(); }
+std::size_t config_space::converter_count() const noexcept { return m_impl->converters.size(); }
 
-std::vector<conflict_report> configuration_space::conflicts() const { return m_impl->conflicts(); }
+std::vector<conflict_report> config_space::conflicts() const { return m_impl->conflicts(); }
 
-std::string_view configuration_space::space_name() const noexcept { return m_impl->name; }
+std::string_view config_space::space_name() const noexcept { return m_impl->name; }
 
-std::string configuration_space::generate_completion(shell which, std::string_view prog,
+std::string config_space::generate_completion(shell which, std::string_view prog,
                                                      const cli_delimiter &delimiter,
                                                      const key_path &anchor,
                                                      std::string_view space_name) const
@@ -347,20 +347,20 @@ std::string configuration_space::generate_completion(shell which, std::string_vi
     return nucleus::generate_completion(which, m_impl->schema, prog, delimiter, anchor, space_name);
 }
 
-std::span<const schema_element> configuration_space::schema_elements() const
+std::span<const schema_element> config_space::schema_elements() const
 {
     // Project the sealed schema's declared elements as a read-only view; the
     // registry stays encapsulated and no format knowledge enters core.
     return m_impl->schema.elements();
 }
 
-configuration_space_builder configuration_space::expand() const
+config_space_builder config_space::expand() const
 {
     // Deep copy: all three registries + ledger are value-copied into a fresh builder
     // (the policy shared_ptr is shared host-owned behavior). NO shared_ptr links the
     // base and the derived builder, so building or mutating one never affects the
     // other.
-    configuration_space_builder builder;
+    config_space_builder builder;
     static_cast<space_core &>(*builder.m_impl) = static_cast<const space_core &>(*m_impl);
     builder.m_impl->built = false;
     return builder;
@@ -368,7 +368,7 @@ configuration_space_builder configuration_space::expand() const
 
 // --- recognizer_of ----------------------------------------------------------
 
-key_recognizer recognizer_of(const configuration_space &space)
+key_recognizer recognizer_of(const config_space &space)
 {
     // Captures the space's schema registry by pointer; the recognizer is valid
     // for as long as the space outlives it.
@@ -378,7 +378,7 @@ key_recognizer recognizer_of(const configuration_space &space)
 
 // --- load(space, source_stack, load_options) --------------------------------
 
-load_result load(const configuration_space &space,
+load_result load_config(const config_space &space,
                  source_stack &stack,
                  const load_options &options)
 {
@@ -407,16 +407,16 @@ load_result load(const configuration_space &space,
     return ctx.freeze();
 }
 
-load_result load(const configuration_space &space,
+load_result load_config(const config_space &space,
                  source_stack &&stack,
                  const load_options &options)
 {
-    return load(space, stack, options);
+    return load_config(space, stack, options);
 }
 
 // --- check_capabilities(space, source_stack, load_options) ------------------
 
-gate_result check_capabilities(const configuration_space &space,
+gate_result check_capabilities(const config_space &space,
                                 const source_stack &stack,
                                 const load_options &options)
 {

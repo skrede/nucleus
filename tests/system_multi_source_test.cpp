@@ -1,6 +1,6 @@
-#include "nucleus/configuration.h"
-#include "nucleus/configuration_space.h"
-#include "nucleus/configuration_source/inherit_declaration.h"
+#include "nucleus/config.h"
+#include "nucleus/config_space.h"
+#include "nucleus/config_source/inherit_declaration.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -49,9 +49,9 @@ source_handle xml_of(const std::string &text)
 }
 
 // Schema: a server container with host, mode, and port leaves.
-configuration_space make_space()
+config_space make_space()
 {
-    configuration_space_builder builder;
+    config_space_builder builder;
     REQUIRE(builder.register_element(element("server", anchor::root())));
     REQUIRE(builder.register_element(element("host", anchor::keyspace("server"))));
     REQUIRE(builder.register_element(
@@ -79,7 +79,7 @@ constexpr const char *kDerivedDoc =
 TEST_CASE("multi-source system load: values, provenance, and cross-source precedence",
           "[system][multi_source]")
 {
-    const configuration_space space = make_space();
+    const config_space space = make_space();
 
     // env sets all three keys (lowest precedence in the source_stack).
     env_source env;
@@ -104,11 +104,11 @@ TEST_CASE("multi-source system load: values, provenance, and cross-source preced
     opts.document_paths = {"derived.xml"};
     opts.make_document  = make_doc;
 
-    auto loaded = load(space,
+    auto loaded = load_config(space,
                        source_stack{std::move(env), std::move(argv)},
                        opts);
     REQUIRE(loaded);
-    const configuration &config = loaded.value();
+    const config &config = loaded.value();
 
     // (a) Values from all three sources are resolved.
 
@@ -154,11 +154,11 @@ TEST_CASE("multi-source system: env base shows through when document does not ov
 {
     // Simpler shape: env sets a key; the XML document does NOT set it; env value
     // survives because the document provides no competing entry.
-    configuration_space_builder builder;
+    config_space_builder builder;
     REQUIRE(builder.register_element(element("server", anchor::root())));
     REQUIRE(builder.register_element(element("host", anchor::keyspace("server"))));
     REQUIRE(builder.register_element(element("mode", anchor::keyspace("server"))));
-    const configuration_space space = builder.build();
+    const config_space space = builder.build();
 
     env_source env;
     env.set("server/host", "env-only-host");
@@ -173,7 +173,7 @@ TEST_CASE("multi-source system: env base shows through when document does not ov
     opts.document_paths = {"doc.xml"};
     opts.make_document  = make_doc;
 
-    auto loaded = load(space, source_stack{std::move(env)}, opts);
+    auto loaded = load_config(space, source_stack{std::move(env)}, opts);
     REQUIRE(loaded);
 
     // env value for host survives -- document did not contest it.
@@ -194,9 +194,9 @@ TEST_CASE("multi-source system: argv overrides env for a contested key",
     // the same key; argv is listed last (index 1) and must win.
     // The schema uses a flat (root-level) key so that both env_source and argv_source
     // can satisfy the capability gate (neither declares nesting capability).
-    configuration_space_builder builder;
+    config_space_builder builder;
     REQUIRE(builder.register_element(element("port", anchor::root())));
-    const configuration_space space = builder.build();
+    const config_space space = builder.build();
 
     env_source env;
     env.set("port", "7000");
@@ -204,7 +204,7 @@ TEST_CASE("multi-source system: argv overrides env for a contested key",
     argv_source argv(std::vector<std::string>{"--port=9999"});
     argv.recognize_with(recognizer_of(space));
 
-    auto loaded = load(space, source_stack{std::move(env), std::move(argv)}, {});
+    auto loaded = load_config(space, source_stack{std::move(env), std::move(argv)}, {});
     REQUIRE(loaded);
 
     // argv (stack[1]) wins over env (stack[0]).

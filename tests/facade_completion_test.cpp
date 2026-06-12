@@ -1,4 +1,4 @@
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/completion/completion.h"
 
@@ -12,7 +12,7 @@
 #include <string>
 
 // Completion reached THROUGH the public facade only: a host builds its schema via
-// register_element/enum_element and calls configuration_space::generate_completion,
+// register_element/enum_element and calls config_space::generate_completion,
 // never touching the internal schema registry. This proves the host-reachable path
 // is wired end-to-end -- the gap that the free generator alone left open.
 
@@ -25,7 +25,7 @@ nucleus::key_path path_of(const char *text) { return nucleus::key_path::parse(te
 TEST_CASE("the facade generates a bash completion script from the registered schema",
           "[facade][completion]")
 {
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
     REQUIRE(engine.register_element(nucleus::enum_element(
         "level", nucleus::anchor::keyspace(path_of("logging")),
@@ -33,7 +33,7 @@ TEST_CASE("the facade generates a bash completion script from the registered sch
     REQUIRE(engine.register_element(nucleus::element("plexus", nucleus::anchor::root())));
     REQUIRE(engine.register_element(
         nucleus::element("port", nucleus::anchor::keyspace(path_of("plexus")))));
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     const std::string bash = space.generate_completion(nucleus::shell::bash, "mytool");
 
@@ -49,12 +49,12 @@ TEST_CASE("the facade generates a bash completion script from the registered sch
 TEST_CASE("the facade generates a zsh completion script from the registered schema",
           "[facade][completion]")
 {
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
     REQUIRE(engine.register_element(nucleus::enum_element(
         "level", nucleus::anchor::keyspace(path_of("logging")),
         {"debug", "info", "warn", "error"})));
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
     const std::string zsh = space.generate_completion(nucleus::shell::zsh, "mytool");
 

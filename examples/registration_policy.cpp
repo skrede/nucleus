@@ -4,7 +4,7 @@
 // policy in the host. A host installs a registration_policy whose review() can
 // reject a registration with a reason the facade surfaces verbatim.
 
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 #include "nucleus/registration_policy.h"
 
 #include <memory>
@@ -29,7 +29,7 @@ public:
 
 int main()
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     if(!builder.set_registration_policy(std::make_shared<reserve_tokenizers>()))
         return 1;
 

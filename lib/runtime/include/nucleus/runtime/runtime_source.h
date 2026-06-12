@@ -3,7 +3,7 @@
 
 #include "nucleus/capability.h"
 
-#include "nucleus/configuration_source/configuration_source.h"
+#include "nucleus/config_source/config_source.h"
 
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
@@ -14,7 +14,7 @@
 
 namespace nucleus {
 
-// A first-class programmatic in-memory source: a host builds a configuration directly
+// A first-class programmatic in-memory source: a host builds a config directly
 // via .set(path, value) with no document at all (embedding code, generated config,
 // tests). It emits flat (path -> value) entries, and DECLARES full structural
 // capabilities (nesting, duplicate_keys, typed_scalars), because a host-built source
@@ -47,9 +47,9 @@ public:
                                      capability::typed_scalars};
     }
 
-    [[nodiscard]] configuration_source_result pull()
+    [[nodiscard]] config_source_result pull()
     {
-        configuration_source_batch batch;
+        config_source_batch batch;
         batch.entries.reserve(m_entries.size());
         for(const auto &[path, text] : m_entries)
             batch.entries.push_back(make_entry(path, value::owned(text), capabilities()));

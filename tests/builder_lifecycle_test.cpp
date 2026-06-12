@@ -1,9 +1,9 @@
 // Builder lifecycle: build() is infallible and seals into an immutable
-// configuration_space whose counts reflect the registrations; after build() every
+// config_space whose counts reflect the registrations; after build() every
 // mutating call on the spent builder is a LOUD state-machine error (never a silent
 // no-op).
 
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -20,7 +20,7 @@ using nucleus::anchor;
 
 TEST_CASE("build() is infallible and seals counts into the space", "[builder][lifecycle]")
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     const std::size_t builtin_tokenizers = builder.tokenizer_count();
     REQUIRE(builtin_tokenizers >= 2);
 
@@ -30,7 +30,7 @@ TEST_CASE("build() is infallible and seals counts into the space", "[builder][li
     REQUIRE(builder.register_tokenizer("custom"));
     REQUIRE(builder.register_converter<int>(nucleus::make_scalar_converter<int>()));
 
-    nucleus::configuration_space space = builder.build();
+    nucleus::config_space space = builder.build();
 
     // The sealed space carries exactly what was registered.
     REQUIRE(space.schema_count() == 2);
@@ -41,9 +41,9 @@ TEST_CASE("build() is infallible and seals counts into the space", "[builder][li
 TEST_CASE("registering on an already-built builder is a loud state-machine error",
           "[builder][lifecycle]")
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("server", anchor::root())));
-    nucleus::configuration_space space = builder.build();
+    nucleus::config_space space = builder.build();
     (void)space;
 
     // Every mutating call returns an unexpected naming the attempted operation --

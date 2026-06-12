@@ -35,7 +35,7 @@ struct origin
 
 // The provenance map: key path -> winning origin, written in the SAME fold step that
 // sets the value so the two cannot diverge. Like the keyspace it is built mutable
-// during the load and copied out into the immutable configuration.
+// during the load and copied out into the immutable config.
 class provenance
 {
 public:

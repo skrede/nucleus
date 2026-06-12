@@ -1,8 +1,8 @@
 #ifndef HPP_GUARD_NUCLEUS_XML_XML_SOURCE_H
 #define HPP_GUARD_NUCLEUS_XML_XML_SOURCE_H
 
-#include "nucleus/configuration_source/configuration_source.h"
-#include "nucleus/configuration_source/inherit_declaration.h"
+#include "nucleus/config_source/config_source.h"
+#include "nucleus/config_source/inherit_declaration.h"
 
 #include "nucleus/schema/projection.h"
 
@@ -57,7 +57,7 @@ struct xml_source_options
 //
 // This is the ONLY place pugixml is reachable; nothing of pugixml appears in the
 // interface, so the core never sees it. Plain struct satisfying the source concept
-// by duck typing (configuration_source + projects_source + inheriting_source).
+// by duck typing (config_source + projects_source + inheriting_source).
 class xml_source final
 {
 public:
@@ -72,7 +72,7 @@ public:
 
     [[nodiscard]] capability_descriptor capabilities() const;
 
-    [[nodiscard]] configuration_source_result pull();
+    [[nodiscard]] config_source_result pull();
 
     // Sets the expected root element name for named-space envelope validation.
     // When non-empty, pull() validates the root element name and strips it from

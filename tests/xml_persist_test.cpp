@@ -1,5 +1,5 @@
-#include "nucleus/configuration.h"
-#include "nucleus/configuration_space.h"
+#include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -16,7 +16,7 @@
 #include <sstream>
 #include <filesystem>
 
-// Round-trip proof: a configuration loaded from XML, persisted via the stream-based
+// Round-trip proof: a config loaded from XML, persisted via the stream-based
 // emit_document inside the xml module, and re-loaded yields the same keys and values
 // -- including repeated collections (no last-wins loss). A nested, primary-key-free
 // schema keeps the resolved keyspace stable across the round-trip. The test owns
@@ -32,7 +32,7 @@ nucleus::source_handle xml_of(const std::string &text)
         nucleus::xml_source::from(nucleus::xml_source_options::of_string(text)));
 }
 
-void declare_server(nucleus::configuration_space_builder &engine)
+void declare_server(nucleus::config_space_builder &engine)
 {
     REQUIRE(engine.register_element(nucleus::element("server", anchor::root())));
     REQUIRE(engine.register_element(nucleus::element("host", anchor::keyspace("server"))));
@@ -56,22 +56,22 @@ const char *const kDocument =
 
 }
 
-TEST_CASE("a resolved configuration round-trips through XML persistence", "[persist]")
+TEST_CASE("a resolved config round-trips through XML persistence", "[persist]")
 {
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_server(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
-    auto first = nucleus::load(space, nucleus::source_stack{}, document_options(kDocument));
+    auto first = nucleus::load_config(space, nucleus::source_stack{}, document_options(kDocument));
     REQUIRE(first);
-    const nucleus::configuration &original = first.value();
+    const nucleus::config &original = first.value();
 
     std::ostringstream serialized;
     nucleus::xml::emit_document(original, serialized);
 
-    auto second = nucleus::load(space, nucleus::source_stack{}, document_options(serialized.str()));
+    auto second = nucleus::load_config(space, nucleus::source_stack{}, document_options(serialized.str()));
     REQUIRE(second);
-    const nucleus::configuration &reloaded = second.value();
+    const nucleus::config &reloaded = second.value();
 
     // Same keys, same scalar values, same repeated collections.
     REQUIRE(reloaded.keys() == original.keys());
@@ -83,13 +83,13 @@ TEST_CASE("a resolved configuration round-trips through XML persistence", "[pers
     REQUIRE(reloaded.get_all("server/tag") == std::vector<std::string>{"alpha", "beta"});
 }
 
-TEST_CASE("emit_document to a file persists a configuration that re-reads identically", "[persist]")
+TEST_CASE("emit_document to a file persists a config that re-reads identically", "[persist]")
 {
-    nucleus::configuration_space_builder engine;
+    nucleus::config_space_builder engine;
     declare_server(engine);
-    nucleus::configuration_space space = engine.build();
+    nucleus::config_space space = engine.build();
 
-    auto first = nucleus::load(space, nucleus::source_stack{}, document_options(kDocument));
+    auto first = nucleus::load_config(space, nucleus::source_stack{}, document_options(kDocument));
     REQUIRE(first);
 
     // The test owns persistence: emit into a file stream it opens, then re-read it.
@@ -106,7 +106,7 @@ TEST_CASE("emit_document to a file persists a configuration that re-reads identi
     in.close();
     std::filesystem::remove(path);
 
-    auto second = nucleus::load(space, nucleus::source_stack{}, document_options(buffer.str()));
+    auto second = nucleus::load_config(space, nucleus::source_stack{}, document_options(buffer.str()));
     REQUIRE(second);
     REQUIRE(second.value().keys() == first.value().keys());
     REQUIRE(second.value().get_all("server/tag")

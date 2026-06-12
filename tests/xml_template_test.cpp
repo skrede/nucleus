@@ -1,4 +1,4 @@
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -18,7 +18,7 @@
 
 namespace {
 
-[[nodiscard]] std::string template_of(const nucleus::configuration_space &space)
+[[nodiscard]] std::string template_of(const nucleus::config_space &space)
 {
     std::ostringstream oss;
     nucleus::xml::emit_template(space, oss);
@@ -29,9 +29,9 @@ namespace {
 
 namespace {
 
-[[nodiscard]] nucleus::configuration_space make_server_space()
+[[nodiscard]] nucleus::config_space make_server_space()
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("server", nucleus::anchor::root())));
     REQUIRE(builder.register_element(
         nucleus::primary_key_element("name", nucleus::anchor::keyspace("server"))));
@@ -47,7 +47,7 @@ namespace {
 
 TEST_CASE("emit_template nests declared fields under their anchor element", "[template]")
 {
-    nucleus::configuration_space space = make_server_space();
+    nucleus::config_space space = make_server_space();
     const std::string xml = template_of(space);
 
     // The container element is present and closed (well-formed nesting).
@@ -65,7 +65,7 @@ TEST_CASE("emit_template nests declared fields under their anchor element", "[te
 
 TEST_CASE("emit_template annotates a constrained field with its allowed values", "[template]")
 {
-    nucleus::configuration_space space = make_server_space();
+    nucleus::config_space space = make_server_space();
     const std::string xml = template_of(space);
 
     // The constrained field carries its allowed-value annotation.
@@ -78,11 +78,11 @@ TEST_CASE("emit_template annotates a constrained field with its allowed values",
 
 TEST_CASE("emit_template leaves an unconstrained field unannotated", "[template]")
 {
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("server", nucleus::anchor::root())));
     REQUIRE(builder.register_element(
         nucleus::element("host", nucleus::anchor::keyspace("server"))));
-    nucleus::configuration_space space = builder.build();
+    nucleus::config_space space = builder.build();
 
     const std::string xml = template_of(space);
     REQUIRE(xml.find("allowed=") == std::string::npos);

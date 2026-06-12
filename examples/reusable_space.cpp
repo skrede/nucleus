@@ -1,12 +1,12 @@
 // reusable_space: the space is the authority on layout, reused across many source stacks.
-// Each load yields a disconnected configuration; the space itself is never modified.
+// Each load yields a disconnected config; the space itself is never modified.
 
-#include "nucleus/configuration_space.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/configuration.h"
+#include "nucleus/config.h"
 
 #include "nucleus/runtime/runtime_source.h"
 
@@ -16,7 +16,7 @@
 int main()
 {
     // One sealed space: the shared authority on layout for every profile.
-    nucleus::configuration_space_builder builder;
+    nucleus::config_space_builder builder;
     if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
         return 1;
     if(!builder.register_element(nucleus::element("host", nucleus::anchor::keyspace("server"))))
@@ -27,7 +27,7 @@ int main()
         nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
                               std::vector<std::string>{"primary", "secondary"})))
         return 1;
-    const nucleus::configuration_space space = builder.build();
+    const nucleus::config_space space = builder.build();
 
     // Primary profile stack: its own source, its own values.
     nucleus::runtime_source primary_src;
@@ -42,8 +42,8 @@ int main()
                  .set("server/mode", "secondary");
 
     // Two loads from the same space -- stacks are swapped, not the space.
-    auto loaded_primary   = nucleus::load(space, nucleus::source_stack{std::move(primary_src)},   {});
-    auto loaded_secondary = nucleus::load(space, nucleus::source_stack{std::move(secondary_src)}, {});
+    auto loaded_primary   = nucleus::load_config(space, nucleus::source_stack{std::move(primary_src)},   {});
+    auto loaded_secondary = nucleus::load_config(space, nucleus::source_stack{std::move(secondary_src)}, {});
 
     if(!loaded_primary)
     {
@@ -58,8 +58,8 @@ int main()
 
     // Both configurations are disconnected and simultaneously readable.
     // The stacks that produced them are already gone.
-    const nucleus::configuration primary   = std::move(loaded_primary).value();
-    const nucleus::configuration secondary = std::move(loaded_secondary).value();
+    const nucleus::config primary   = std::move(loaded_primary).value();
+    const nucleus::config secondary = std::move(loaded_secondary).value();
 
     std::cout << "primary profile:\n";
     for(const std::string &key : primary.keys())

@@ -6,7 +6,7 @@
 #include "nucleus/expected.h"
 
 #include "nucleus/strain_scope.h"
-#include "nucleus/configuration.h"
+#include "nucleus/config.h"
 
 #include "nucleus/keyspace/keyspace.h"
 #include "nucleus/keyspace/provenance.h"
@@ -15,8 +15,8 @@
 #include "nucleus/schema/schema_registry.h"
 #include "nucleus/schema/converter_registry.h"
 
-#include "nucleus/configuration_source/inherit_declaration.h"
-#include "nucleus/configuration_source/source_handle.h"
+#include "nucleus/config_source/inherit_declaration.h"
+#include "nucleus/config_source/source_handle.h"
 
 #include "nucleus/diagnostics/key_suggester.h"
 
@@ -60,7 +60,7 @@ using resolve_fold_error = error;
 // Beyond the borrowed registries it holds the transient working state of one
 // resolve: the building keyspace, the provenance map, and the retained source
 // buffers that pin every view-value until copy-out. None of this outlives the
-// call; freeze() copies values out into a self-owning configuration and the
+// call; freeze() copies values out into a self-owning config and the
 // context (and with it every buffer) is destroyed.
 class resolution_context
 {
@@ -73,7 +73,7 @@ public:
     }
 
     // Borrowed by CONST reference and read-only, so concurrent loads on one shared
-    // const configuration_space share nothing mutable and need no synchronization.
+    // const config_space share nothing mutable and need no synchronization.
     [[nodiscard]] const schema_registry &schema() const noexcept { return m_schema; }
     [[nodiscard]] const tokenizer_registry &tokenizer() const noexcept { return m_tokenizer; }
     // Borrowed (never owned), like the other siblings; read by convert() to supply
@@ -125,13 +125,13 @@ public:
         for(layered_handle *lh : ordered)
         {
             lh->handle->apply_projection(projection);
-            configuration_source_result pulled = lh->handle->pull();
+            config_source_result pulled = lh->handle->pull();
             if(!pulled)
                 return unexpected(error{pulled.error().code,
                                         nucleus::format("source '{}': {}",
                                             lh->label, pulled.error().message)});
 
-            configuration_source_batch &batch = pulled.value();
+            config_source_batch &batch = pulled.value();
 
             std::set<std::string> seen_repeated_this_layer;
 
@@ -210,7 +210,7 @@ public:
     }
 
     // Collapses keyed-container instances into the ONE unified hierarchy the
-    // resolved configuration promises. A primary-key value is internal to
+    // resolved config promises. A primary-key value is internal to
     // resolution -- a transient path segment keeping instances distinct through
     // the fold -- and must NEVER survive into the frozen keyspace: a key value
     // as a resolved segment would make the tree untraversable without knowing
@@ -324,7 +324,7 @@ public:
                 }
                 return unexpected(error{errc::invalid_selection, nucleus::format(
                     "container '{}' holds {} primary-keyed instances ({}) and "
-                    "no instance is selected: a configuration space resolves "
+                    "no instance is selected: a config space resolves "
                     "exactly one",
                     container.str(), strains.size(), keys)});
             }
@@ -671,11 +671,11 @@ public:
 
     // Copies every building value OUT into an owned snapshot and pairs it with the
     // provenance recorded alongside it, producing the immutable, self-owning
-    // configuration. After this returns the context (and every retained buffer)
-    // may be dropped: the configuration holds no view into any of them. The
+    // config. After this returns the context (and every retained buffer)
+    // may be dropped: the config holds no view into any of them. The
     // collection branch is checked FIRST: find() returns nullptr for repeated
     // paths, so only find_collection() can reach them.
-    [[nodiscard]] configuration freeze() const
+    [[nodiscard]] config freeze() const
     {
         std::map<std::string, std::string> owned;
         std::map<std::string, std::vector<std::string>> collections;
@@ -694,7 +694,7 @@ public:
                 owned.emplace(path.str(), std::string(v->text()));
             }
         }
-        return configuration(std::move(owned), std::move(collections),
+        return config(std::move(owned), std::move(collections),
                              m_typed, m_typed_collections, m_provenance);
     }
 
