@@ -155,3 +155,42 @@ TEST_CASE("a config space has exactly one primary key", "[schema][unique]")
     REQUIRE(reg.attach(
         nucleus::unique_element("serial", anchor::keyspace(path_of("cluster/server")))));
 }
+
+TEST_CASE("D-10: digit-led element name rejected at attach", "[schema_registry][digit_led]")
+{
+    schema_registry reg;
+
+    // Names starting with a digit are rejected: CLI flag disambiguation requires names
+    // that are invertible from flag text, and digits at the front break that rule.
+    auto r0 = reg.attach(nucleus::element("0tag", anchor::root()));
+    REQUIRE_FALSE(r0);
+    REQUIRE(r0.error().find("digit-led name") != std::string::npos);
+
+    auto r1 = reg.attach(nucleus::element("1robot", anchor::root()));
+    REQUIRE_FALSE(r1);
+    REQUIRE(r1.error().find("digit-led name") != std::string::npos);
+
+    // A digit anywhere except the front is fine.
+    REQUIRE(reg.attach(nucleus::element("tag", anchor::root())));
+    REQUIRE(reg.attach(nucleus::element("t0ag", anchor::keyspace(path_of("tag")))));
+}
+
+TEST_CASE("D-18: primary key inside repeated container rejected at attach",
+          "[schema_registry][repeated_pkey]")
+{
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::repeated_element("link", anchor::root())));
+
+    // A primary key nested under a repeated container is rejected: keyed selection
+    // has no clean per-instance meaning inside a repeated (ordinal) container.
+    auto bad = reg.attach(
+        nucleus::identity_element("id", anchor::keyspace(path_of("link"))));
+    REQUIRE_FALSE(bad);
+    REQUIRE(bad.error().find("primary key inside repeated container") != std::string::npos);
+
+    // Other fields under the same repeated container are perfectly admissible.
+    REQUIRE(reg.attach(
+        nucleus::required_element("mass", anchor::keyspace(path_of("link")))));
+    REQUIRE(reg.attach(
+        nucleus::element("length", anchor::keyspace(path_of("link")))));
+}
