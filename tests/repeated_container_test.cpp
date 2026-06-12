@@ -623,3 +623,40 @@ TEST_CASE("D-21: get_all_as gathers typed double values across three instances",
     REQUIRE(result.has_value());
     REQUIRE(*result == std::vector<double>{1.5, 2.0, 3.0});
 }
+
+// ---------------------------------------------------------------------------
+// WR-01: index_required error message reports distinct instance count, not entry count
+// ---------------------------------------------------------------------------
+
+TEST_CASE("get_as index_required reports instance count not entry count",
+          "[repeated_container][WR01][get_as]")
+{
+    // Schema: cluster -> node (repeated) -> port + weight (two fields per instance).
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(engine.register_element(
+        nucleus::repeated_element("node", anchor::keyspace("cluster"))));
+    REQUIRE(engine.register_element(
+        nucleus::element("port",   anchor::keyspace("cluster/node"))));
+    REQUIRE(engine.register_element(
+        nucleus::element("weight", anchor::keyspace("cluster/node"))));
+    nucleus::config_space space = engine.build();
+
+    // Two instances, each with two fields -> 4 indexed entries in m_values.
+    auto src = xml_of(
+        "<cluster>"
+        "<node><port>80</port><weight>1</weight></node>"
+        "<node><port>90</port><weight>2</weight></node>"
+        "</cluster>");
+    auto loaded = nucleus::load_config(space,
+        nucleus::source_stack{std::move(src)}, {});
+    REQUIRE(loaded);
+    const nucleus::config &cfg = loaded.value();
+
+    // get_as on the container path must report 2 instances, not 4 entries.
+    auto result = cfg.get_as<std::string>("cluster/node");
+    REQUIRE_FALSE(result.has_value());
+    REQUIRE(result.error().code == nucleus::errc::index_required);
+    // The message must say "2 instance(s)", not "4 instance(s)".
+    REQUIRE(result.error().message.find("2 instance") != std::string::npos);
+}

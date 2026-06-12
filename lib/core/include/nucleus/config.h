@@ -11,6 +11,7 @@
 
 #include <any>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 #include <cstddef>
@@ -155,15 +156,27 @@ public:
             // Detect unindexed path crossing a repeated container (D-21 loud error).
             if(auto container = crossing_repeated_container(key); container)
             {
-                std::size_t count = 0;
-                const std::string prefix = *container + "[";
-                for(const auto &[k, _] : m_values)
-                    if(k.starts_with(prefix))
-                        ++count;
+                // Count distinct ordinals at the container -- one per instance,
+                // not one per field entry.
+                std::set<std::size_t> ordinals;
+                const std::string bracket_prefix = *container + "[";
+                for(const auto &[k, ignored] : m_values)
+                {
+                    if(!k.starts_with(bracket_prefix))
+                        continue;
+                    std::string_view rem(k.data() + container->size(),
+                                        k.size() - container->size());
+                    auto close = rem.find(']');
+                    if(close == std::string_view::npos)
+                        continue;
+                    ordinals.insert(key_path::ordinal_of(
+                        *container + std::string(rem.substr(0, close + 1))));
+                }
                 return unexpected(error{errc::index_required,
                     nucleus::format(
                         "path '{}' crosses repeated container '{}' "
-                        "-- index required, {} instance(s)", key, *container, count)});
+                        "-- index required, {} instance(s)",
+                        key, *container, ordinals.size())});
             }
             return unexpected(error{errc::absent_key,
                         std::string("path '") + key + "' is absent"});
