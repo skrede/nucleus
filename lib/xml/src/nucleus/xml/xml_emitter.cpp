@@ -10,7 +10,6 @@
 
 #include <pugixml.hpp>
 
-#include <set>
 #include <string>
 #include <vector>
 #include <ostream>
@@ -103,6 +102,29 @@ void emit_node(const tree_node &n, std::ostream &out, std::size_t depth)
     return parent.append_child(name.c_str());
 }
 
+// Finds or appends the Nth child of `parent` with `name` (zero-based ordinal).
+// Keys are sorted so ordinals ascend; when ordinal == existing count, a new sibling
+// is appended; otherwise the last existing child with that name is returned (still
+// within the same ordinal group, additional fields of the same instance).
+[[nodiscard]] pugi::xml_node indexed_child(pugi::xml_node parent,
+                                            const std::string &name,
+                                            std::size_t ordinal)
+{
+    std::size_t count = 0;
+    pugi::xml_node last;
+    for(pugi::xml_node c = parent.first_child(); c; c = c.next_sibling())
+    {
+        if(std::string(c.name()) == name)
+        {
+            last = c;
+            ++count;
+        }
+    }
+    if(count == ordinal)
+        return parent.append_child(name.c_str());
+    return last; // still within the same ordinal group
+}
+
 }
 
 // Projects the sealed schema into a well-formed XML TEMPLATE: one element per
@@ -156,9 +178,9 @@ void emit_template(const config_space &space, std::ostream &out,
 // Projects a resolved config into a populated XML document: each '/'-separated
 // key splits into element segments, intermediate segments are shared parent nodes,
 // and the leaf is appended once per value so a repeated path persists ALL its values.
-// Indexed scalar keys (e.g. "server/tag[0]") are emitted via their canonical path
-// ("server/tag") to produce valid XML element names; all indexed instances of the
-// same canonical path are emitted together in ordinal order.
+// Indexed scalar keys (e.g. "cluster/node[0]/port") produce N sibling elements for
+// the repeated container (e.g. two <node> siblings in ordinal order). Bracket
+// suffixes never appear in the output element names.
 // A malformed key is skipped (never thrown), consistent with the read path.
 // When space_name is non-empty, all top-level elements are re-parented under a new
 // wrapper element named space_name for symmetric round-trip with with_space_name().
@@ -166,32 +188,10 @@ void emit_document(const config &config, std::ostream &out,
                    std::string_view space_name)
 {
     pugi::xml_document doc;
-    // Track canonical keys already emitted to avoid duplicate XML output when
-    // multiple indexed scalars share the same canonical path.
-    std::set<std::string> emitted_canonical;
+
     for(const std::string &key : config.keys())
     {
-        // Compute canonical key (strips [N] ordinal suffixes from all segments).
-        std::string canonical;
-        {
-            std::size_t start = 0;
-            for(std::size_t i = 0; i <= key.size(); ++i)
-            {
-                if(i == key.size() || key[i] == key_path::separator)
-                {
-                    std::string_view seg(key.data() + start, i - start);
-                    if(!canonical.empty())
-                        canonical.push_back(key_path::separator);
-                    canonical.append(key_path::base_name(seg));
-                    start = i + 1;
-                }
-            }
-        }
-
-        if(!emitted_canonical.insert(canonical).second)
-            continue; // already emitted all values for this canonical path
-
-        auto parsed = key_path::parse(canonical);
+        auto parsed = key_path::parse(key);
         if(!parsed)
             continue;
 
@@ -199,17 +199,36 @@ void emit_document(const config &config, std::ostream &out,
         if(segments.empty())
             continue;
 
-        // Descend (creating/reusing) through every segment but the leaf; the first
-        // segment is the document root element.
+        // Descend through every segment but the leaf. For indexed segments (e.g.
+        // "node[0]") use the base name as the element name and place/reuse the
+        // correct ordinal sibling; for plain segments reuse or create normally.
         pugi::xml_node node = doc;
         for(std::size_t i = 0; i + 1 < segments.size(); ++i)
-            node = child_or_append(node, segments[i]);
-
-        // Append one XML leaf element per value (repeated leaves produce siblings).
-        const std::string &leaf = segments.back();
-        for(const std::string &value : config.get_all(canonical))
         {
-            pugi::xml_node leaf_node = node.append_child(leaf.c_str());
+            const std::string &seg = segments[i];
+            if(key_path::is_indexed_segment(seg))
+            {
+                const std::string name = std::string(key_path::base_name(seg));
+                node = indexed_child(node, name, key_path::ordinal_of(seg));
+            }
+            else
+            {
+                node = child_or_append(node, seg);
+            }
+        }
+
+        // Emit the leaf. Indexed leaves (rare) strip the bracket suffix.
+        // For plain repeated leaves the key is already canonical; get_all() gathers
+        // all instances. For indexed-scalar keys (already a single instance) get()
+        // returns exactly that instance's value directly.
+        const std::string &leaf_seg = segments.back();
+        const std::string leaf_name = key_path::is_indexed_segment(leaf_seg)
+            ? std::string(key_path::base_name(leaf_seg))
+            : leaf_seg;
+
+        for(const std::string &value : config.get_all(key))
+        {
+            pugi::xml_node leaf_node = node.append_child(leaf_name.c_str());
             leaf_node.append_child(pugi::node_pcdata).set_value(value.c_str());
         }
     }
