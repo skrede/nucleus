@@ -390,3 +390,32 @@ TEST_CASE("argv ordinal == count is out of range -- cannot append",
     REQUIRE(loaded.error().message.find("out of range") != std::string::npos);
     REQUIRE(loaded.error().message.find("2") != std::string::npos);
 }
+
+TEST_CASE("argv lower-rank than document with valid ordinal 0 succeeds (WR-03)",
+          "[argv][repeated_container][D11][WR03]")
+{
+    // argv has a LOWER rank than the XML document (it appears first in the stack).
+    // With the old eager check, m_building is empty when argv is processed, so
+    // instance_count = 0 and ordinal 0 is incorrectly rejected.
+    const nucleus::config_space space = make_cluster_space();
+
+    argv_source argv(std::vector<std::string>{"--cluster-node-0-endpoint-port=999"});
+    argv.recognize_with(nucleus::recognizer_of(space));
+
+    auto xml = xml_of_cluster(
+        "<cluster>"
+        "<node><endpoint><port>80</port></endpoint></node>"
+        "<node><endpoint><port>443</port></endpoint></node>"
+        "</cluster>");
+
+    // argv (lower rank) is listed first, xml (higher rank) second.
+    // The load must succeed: ordinal 0 is valid (2 instances: 0 and 1).
+    // xml wins because it has higher rank, so port stays 80, not 999.
+    auto loaded = nucleus::load_config(
+        space,
+        nucleus::source_stack{std::move(argv), std::move(xml)},
+        {});
+    REQUIRE(loaded);
+    // XML wins (higher rank), port for node[0] is still 80.
+    REQUIRE(loaded.value().get("cluster/node[0]/endpoint/port") == "80");
+}

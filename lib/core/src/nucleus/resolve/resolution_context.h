@@ -132,6 +132,19 @@ public:
         const std::set<std::string> repeated_container_prefixes =
             m_schema.repeated_container_paths();
 
+        // Deferred D-11 checks: CLI plain-ordinal overrides deferred until after
+        // all layers fold so the document layer is present in m_building regardless
+        // of its rank relative to the argv layer.
+        struct pending_cli_ordinal
+        {
+            std::size_t     ordinal;
+            std::string     container_prefix;
+            key_path        rebracketed;
+            value           val;
+            origin          prov;
+        };
+        std::vector<pending_cli_ordinal> deferred_cli_overrides;
+
         for(layered_handle *lh : ordered)
         {
             lh->handle->apply_projection(projection);
@@ -220,50 +233,39 @@ public:
                             for(char c : seg) v = v * 10 + static_cast<std::size_t>(c - '0');
                             return v;
                         }();
-                        // Count existing instances in m_building for this container.
-                        const std::string bracket_prefix = prefix + "[";
-                        std::size_t instance_count = 0;
-                        for(const key_path &bp : m_building.paths())
-                        {
-                            const std::string bps = bp.str();
-                            if(bps.compare(0, bracket_prefix.size(), bracket_prefix) != 0)
-                                continue;
-                            // Extract the ordinal from "prefix[N]/..."; track max+1.
-                            const auto lb = bps.find('[', prefix.size());
-                            const auto rb = bps.find(']', lb);
-                            if(lb == std::string::npos || rb == std::string::npos)
-                                continue;
-                            const std::size_t slot = [&]() {
-                                std::size_t v = 0;
-                                for(std::size_t k = lb + 1; k < rb; ++k)
-                                    v = v * 10 + static_cast<std::size_t>(bps[k] - '0');
-                                return v;
-                            }();
-                            if(slot + 1 > instance_count)
-                                instance_count = slot + 1;
-                        }
-                        // D-11: ordinal must be strictly less than instance count.
-                        if(ordinal >= instance_count)
-                            return unexpected(error{errc::schema_violation, nucleus::format(
-                                "argv ordinal {} for '{}' is out of range: "
-                                "{} instance(s) exist; out of range",
-                                ordinal, prefix, instance_count)});
                         // Re-bracket: "prefix/N/rest" -> "prefix[N]/rest".
-                        std::string rebracketed = prefix + "[" + std::to_string(ordinal) + "]";
+                        std::string rebracketed_str = prefix + "[" + std::to_string(ordinal) + "]";
                         for(std::size_t j = i + 1; j < segs.size(); ++j)
                         {
-                            rebracketed += key_path::separator;
-                            rebracketed += segs[j];
+                            rebracketed_str += key_path::separator;
+                            rebracketed_str += segs[j];
                         }
-                        auto kp = key_path::parse(rebracketed);
+                        auto kp = key_path::parse(rebracketed_str);
                         if(!kp)
                             return unexpected(error{errc::malformed_source, std::move(kp).error()});
-                        return std::optional<key_path>{std::move(kp).value()};
+                        // Defer storage and D-11 check until all layers are folded
+                        // so the document source is in m_building regardless of rank.
+                        deferred_cli_overrides.push_back(
+                            {ordinal, prefix, std::move(kp).value(),
+                             value::owned(std::move(expanded).value()),
+                             origin{lh->rank, lh->label, lh->owner, lh->inheritance_layer}});
+                        // Signal "deferred": return a non-empty optional wrapping the
+                        // zero-segment key_path as a sentinel (empty path cannot appear
+                        // as a real indexed result, so the has_value() check below
+                        // disambiguates via a separate cli_deferred_this_entry flag).
+                        return std::optional<key_path>{key_path{}};
                     }
                     return std::optional<key_path>{std::nullopt};
                 }();
                 if(!plain_ordinal_rebracketed)
                     return unexpected(std::move(plain_ordinal_rebracketed).error());
+
+                const bool cli_deferred_this_entry =
+                    plain_ordinal_rebracketed.value().has_value()
+                    && plain_ordinal_rebracketed.value().value().empty();
+
+                if(cli_deferred_this_entry)
+                    continue; // storage and D-11 check deferred to post-fold pass
 
                 if(plain_ordinal_rebracketed.value().has_value())
                 {
@@ -399,6 +401,42 @@ public:
                 m_dispositions.push_back(d);
 
             m_buffers.push_back(std::move(batch.buffer));
+        }
+
+        // D-11 post-fold: validate and store all deferred CLI plain-ordinal overrides
+        // now that all document layers are present in m_building.
+        for(pending_cli_ordinal &override : deferred_cli_overrides)
+        {
+            const std::string bracket_prefix = override.container_prefix + "[";
+            std::size_t instance_count = 0;
+            for(const key_path &bp : m_building.paths())
+            {
+                const std::string bps = bp.str();
+                if(bps.compare(0, bracket_prefix.size(), bracket_prefix) != 0)
+                    continue;
+                const auto lb = bps.find('[', override.container_prefix.size());
+                const auto rb = bps.find(']', lb);
+                if(lb == std::string::npos || rb == std::string::npos)
+                    continue;
+                std::size_t slot = 0;
+                for(std::size_t k = lb + 1; k < rb; ++k)
+                    slot = slot * 10 + static_cast<std::size_t>(bps[k] - '0');
+                if(slot + 1 > instance_count)
+                    instance_count = slot + 1;
+            }
+            if(override.ordinal >= instance_count)
+                return unexpected(error{errc::schema_violation, nucleus::format(
+                    "argv ordinal {} for '{}' is out of range: "
+                    "{} instance(s) exist; out of range",
+                    override.ordinal, override.container_prefix, instance_count)});
+            // Ordinal is valid; store only if no higher-rank entry already exists
+            // at this path (rank-precedence: higher-rank wins even over deferred entries).
+            const origin *existing = m_provenance.of(override.rebracketed.str());
+            if(existing == nullptr || existing->rank < override.prov.rank)
+            {
+                m_building.set(override.rebracketed, override.val);
+                m_provenance.record(override.rebracketed.str(), override.prov);
+            }
         }
 
         return {};
