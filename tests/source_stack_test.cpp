@@ -17,12 +17,12 @@ namespace {
 // Each labelled stub emits a unique sentinel key so insertion-order dispatch is verifiable.
 struct source_alpha
 {
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const
+    nucleus::capability_descriptor capabilities() const
     {
         return {nucleus::capability::ordering};
     }
 
-    [[nodiscard]] nucleus::config_source_result pull()
+    nucleus::config_source_result pull()
     {
         nucleus::config_source_batch batch;
         batch.entries.push_back(
@@ -33,12 +33,12 @@ struct source_alpha
 
 struct source_beta
 {
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const
+    nucleus::capability_descriptor capabilities() const
     {
         return {nucleus::capability::nesting};
     }
 
-    [[nodiscard]] nucleus::config_source_result pull()
+    nucleus::config_source_result pull()
     {
         nucleus::config_source_batch batch;
         batch.entries.push_back(
@@ -49,17 +49,17 @@ struct source_beta
 
 struct source_gamma
 {
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const
+    nucleus::capability_descriptor capabilities() const
     {
         return {nucleus::capability::nesting, nucleus::capability::typed_scalars};
     }
 
-    [[nodiscard]] nucleus::inherit_declaration inheritance() const
+    nucleus::inherit_declaration inheritance() const
     {
         return {nucleus::inherit_declaration::kind::parent_path, "parent.xml"};
     }
 
-    [[nodiscard]] nucleus::config_source_result pull()
+    nucleus::config_source_result pull()
     {
         nucleus::config_source_batch batch;
         batch.entries.push_back(
@@ -73,9 +73,9 @@ struct source_gamma
 // last (higher index = higher rank = last-listed-wins).
 struct lower_source
 {
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const { return {}; }
+    nucleus::capability_descriptor capabilities() const { return {}; }
 
-    [[nodiscard]] nucleus::config_source_result pull()
+    nucleus::config_source_result pull()
     {
         nucleus::config_source_batch batch;
         batch.entries.push_back(
@@ -86,9 +86,9 @@ struct lower_source
 
 struct higher_source
 {
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const { return {}; }
+    nucleus::capability_descriptor capabilities() const { return {}; }
 
-    [[nodiscard]] nucleus::config_source_result pull()
+    nucleus::config_source_result pull()
     {
         nucleus::config_source_batch batch;
         batch.entries.push_back(

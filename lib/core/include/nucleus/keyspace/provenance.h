@@ -64,7 +64,7 @@ public:
         m_collection_origins.erase(key);
     }
 
-    [[nodiscard]] const origin *of(const std::string &key) const
+    const origin *of(const std::string &key) const
     {
         auto it = m_origins.find(key);
         return it == m_origins.end() ? nullptr : &it->second;
@@ -72,7 +72,7 @@ public:
 
     // The rank of the layer that FIRST set `key`, regardless of later
     // overwrites; nullptr when the key was never recorded.
-    [[nodiscard]] const std::size_t *first_rank_of(const std::string &key) const
+    const std::size_t *first_rank_of(const std::string &key) const
     {
         auto it = m_first_ranks.find(key);
         return it == m_first_ranks.end() ? nullptr : &it->second;
@@ -82,7 +82,7 @@ public:
     // the key was never recorded by an inheritance-chain entry. Flat sources
     // never populate this, so a flat-only key returns nullptr -- the signal the
     // slice step uses to exempt flat content from the inheritance re-open checks.
-    [[nodiscard]] const std::size_t *first_inheritance_layer_of(const std::string &key) const
+    const std::size_t *first_inheritance_layer_of(const std::string &key) const
     {
         auto it = m_first_inheritance_layers.find(key);
         return it == m_first_inheritance_layers.end() ? nullptr : &it->second;
@@ -107,7 +107,7 @@ public:
 
     // The per-element origins for a repeated-path collection, or nullptr when
     // none are recorded. Distinct from of(), which covers scalar origins only.
-    [[nodiscard]] const std::vector<origin> *
+    const std::vector<origin> *
     collection_origins_of(const std::string &key) const
     {
         auto it = m_collection_origins.find(key);
@@ -116,11 +116,11 @@ public:
 
     // scalar origin count; collection_origins_of() is the separate surface for
     // repeated paths.
-    [[nodiscard]] std::size_t size() const noexcept { return m_origins.size(); }
+    std::size_t size() const noexcept { return m_origins.size(); }
 
     // Returns the scalar winning-origins map. For repeated paths, scalar origins
     // are absent -- use collection_origins_of() instead.
-    [[nodiscard]] const std::map<std::string, origin> &all() const noexcept
+    const std::map<std::string, origin> &all() const noexcept
     {
         return m_origins;
     }

@@ -246,7 +246,7 @@ namespace {
 
 // A nested schema with a repeated leaf: the shape that derives HARD nesting and
 // HARD duplicate_keys -- the requirements argv must satisfy on its own.
-[[nodiscard]] nucleus::config_space make_nested_space()
+nucleus::config_space make_nested_space()
 {
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(
@@ -299,7 +299,7 @@ nucleus::xml_source xml_of_cluster(const std::string &text)
 
 // Schema: cluster -> node (repeated container) -> endpoint (container) -> port (leaf).
 // Mirrors the schema from the plan (D-09/D-11).
-[[nodiscard]] nucleus::config_space make_cluster_space()
+nucleus::config_space make_cluster_space()
 {
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(

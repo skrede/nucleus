@@ -19,7 +19,7 @@ namespace nucleus::detail {
 // A flat source has no nesting: the anchor path becomes the key. An element is a
 // leaf iff no other declared element is anchored beneath it; container elements
 // carry no value of their own and so produce no line.
-[[nodiscard]] inline bool is_flat_leaf(const schema_element &el,
+inline bool is_flat_leaf(const schema_element &el,
                                        std::span<const schema_element> all)
 {
     const std::string prefix = el.declared_path().str() + key_path::separator;
@@ -36,7 +36,7 @@ namespace nucleus::detail {
 // false for a key not strictly under the anchor -- such a key is not addressable
 // in an anchored flat grammar, so the caller skips it. An empty anchor keeps
 // every key absolute.
-[[nodiscard]] inline bool strip_flat_anchor(std::string_view &key,
+inline bool strip_flat_anchor(std::string_view &key,
                                             std::string_view anchor)
 {
     if(anchor.empty())
@@ -52,7 +52,7 @@ namespace nucleus::detail {
 // so a flat format can speak its own delimiter (argv flags) over the same paths.
 // Indexed segments (e.g. "node[0]") are stripped to their base name ("node") so
 // repeated instances render at the same canonical key (e.g. "cluster/node/port").
-[[nodiscard]] inline std::string render_flat_key(std::string_view key,
+inline std::string render_flat_key(std::string_view key,
                                                  std::string_view key_separator)
 {
     std::string out;

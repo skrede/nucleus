@@ -18,7 +18,7 @@ struct registration
 };
 
 template <typename Spec>
-[[nodiscard]] registration<Spec> make_registration(Spec spec, owner_token owner)
+registration<Spec> make_registration(Spec spec, owner_token owner)
 {
     return registration<Spec>{std::move(spec), std::move(owner)};
 }

@@ -88,14 +88,14 @@ public:
             return *this;
         }
 
-        [[nodiscard]] static capability_descriptor descriptor() noexcept
+        static capability_descriptor descriptor() noexcept
         {
             return capability_descriptor{capability::nesting, capability::duplicate_keys};
         }
 
-        [[nodiscard]] capability_descriptor capabilities() const { return descriptor(); }
+        capability_descriptor capabilities() const { return descriptor(); }
 
-        [[nodiscard]] config_source_result pull()
+        config_source_result pull()
         {
             config_source_batch batch;
             batch.entries.reserve(m_owner->m_args.size());
@@ -168,7 +168,7 @@ public:
         }
 
     private:
-        [[nodiscard]] bool is_registered_space(const std::string &segment) const
+        bool is_registered_space(const std::string &segment) const
         {
             for(const std::string &s : m_spaces)
                 if(s == segment)
@@ -176,7 +176,7 @@ public:
             return false;
         }
 
-        [[nodiscard]] std::string comma_list() const
+        std::string comma_list() const
         {
             std::string out;
             for(std::size_t i = 0; i < m_spaces.size(); ++i)
@@ -200,7 +200,7 @@ public:
 
     // Returns a space_view for the named space. Throws std::invalid_argument when
     // `name` has not been registered (programming error, not a runtime pull failure).
-    [[nodiscard]] space_view for_space(std::string_view name)
+    space_view for_space(std::string_view name)
     {
         for(const std::string &s : m_spaces)
             if(s == name)

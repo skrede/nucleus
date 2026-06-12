@@ -25,7 +25,7 @@ namespace {
 // can pick up the allowed_values of the typed element that declares it. surface()
 // includes path-tagged registrations that have no typed element; those carry no
 // values and simply complete by name.
-[[nodiscard]] std::map<std::string, std::vector<std::string>>
+std::map<std::string, std::vector<std::string>>
 value_sets(const schema_registry &schema)
 {
     std::map<std::string, std::vector<std::string>> out;
@@ -40,7 +40,7 @@ value_sets(const schema_registry &schema)
 // Constructs the wildcard flag for a path that crosses `container` at depth
 // `container_depth` (number of segments in the container path). The wildcard
 // replaces the ordinal position: --prefix-*-suffix under `delimiter`.
-[[nodiscard]] std::string wildcard_flag(const key_path &effective,
+std::string wildcard_flag(const key_path &effective,
                                         std::size_t container_depth,
                                         const cli_delimiter &delimiter)
 {
@@ -69,7 +69,7 @@ value_sets(const schema_registry &schema)
 // is emitted with '*' at the container ordinal position.
 // When space_name is non-empty, it is prepended as the leading segment before
 // applying flag_of(), so the completion entries match the multispace_argv_source grammar.
-[[nodiscard]] completion_model project(const schema_registry &schema,
+completion_model project(const schema_registry &schema,
                                        std::string_view prog,
                                        const cli_delimiter &delimiter,
                                        const key_path &anchor,

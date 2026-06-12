@@ -70,9 +70,9 @@ public:
         m_entries.push_back(make_registration(std::move(spec), std::move(owner)));
     }
 
-    [[nodiscard]] std::size_t size() const noexcept { return m_entries.size(); }
+    std::size_t size() const noexcept { return m_entries.size(); }
 
-    [[nodiscard]] const std::vector<registration<schema_spec>> &entries() const noexcept
+    const std::vector<registration<schema_spec>> &entries() const noexcept
     {
         return m_entries;
     }
@@ -166,7 +166,7 @@ public:
         return {};
     }
 
-    [[nodiscard]] const std::vector<schema_element> &elements() const noexcept
+    const std::vector<schema_element> &elements() const noexcept
     {
         return m_elements;
     }
@@ -177,7 +177,7 @@ public:
     // the schema so the source need never see the registry -- the fold hands it
     // across at resolve time. Empty when no primary keys are declared, leaving a
     // source's structural walk unchanged.
-    [[nodiscard]] schema_projection projection() const
+    schema_projection projection() const
     {
         schema_projection proj;
         for(const schema_element &el : m_elements)
@@ -192,7 +192,7 @@ public:
 
     // Whether a path is a declared element -- the document/CLI target test. The
     // schema is the authority: an undeclared path is not a valid target.
-    [[nodiscard]] bool recognizes(const key_path &path) const
+    bool recognizes(const key_path &path) const
     {
         return m_defined.find(path.str()) != m_defined.end();
     }
@@ -201,7 +201,7 @@ public:
     // segment following a repeated container prefix stands for an ordinal index.
     // "--cluster-node-0-endpoint-port=90" maps to "cluster/node/0/endpoint/port";
     // that is recognized here as equivalent to "cluster/node/endpoint/port".
-    [[nodiscard]] bool recognizes_with_ordinal(const key_path &path) const
+    bool recognizes_with_ordinal(const key_path &path) const
     {
         if(recognizes(path))
             return true; // already a declared path
@@ -232,7 +232,7 @@ public:
     // into it) and is dropped; every other segment is kept. `a/b/<key>/c` with
     // `a/b` keyed therefore canonicalizes to the declared `a/b/c`. The slice
     // step uses this to re-lay a strain's entries onto the unified hierarchy.
-    [[nodiscard]] std::string canonical_text(const key_path &path) const
+    std::string canonical_text(const key_path &path) const
     {
         std::string canonical;
         for(const std::string &segment : path.segments())
@@ -265,7 +265,7 @@ public:
     // segment (one that is not itself a declared node). The identity presence
     // check accepts such a path -- the key's value survives structurally as the
     // instance's segment, not as a leaf.
-    [[nodiscard]] bool keyed_instance_path(const key_path &container,
+    bool keyed_instance_path(const key_path &container,
                                            const key_path &path) const
     {
         if(path.size() <= container.size() || !keyed_container(container.str()))
@@ -291,7 +291,7 @@ public:
     // "port" under a container declaring a "port" leaf). Such an instance can
     // never be bucketed or selected, so the slice step reports it loudly instead
     // of letting validation fail later with an unrelated unknown-key suggestion.
-    [[nodiscard]] bool key_value_collision(const key_path &container,
+    bool key_value_collision(const key_path &container,
                                            const key_path &path) const
     {
         if(path.size() <= container.size() + 1 || !keyed_container(container.str()))
@@ -332,7 +332,7 @@ public:
     // Text-keyed variant of recognizes() for callers (diagnostics) that already
     // hold a path as a string and want to tell an unknown-path violation apart
     // from a required/identity one without re-parsing.
-    [[nodiscard]] bool recognizes_text(const std::string &path) const
+    bool recognizes_text(const std::string &path) const
     {
         return m_defined.find(path) != m_defined.end();
     }
@@ -340,7 +340,7 @@ public:
     // The schema-projected surface: every declared element path, in canonical
     // order. The CLI surface and the document structure are both this set, which
     // is why a schema change moves both at once.
-    [[nodiscard]] std::vector<key_path> surface() const
+    std::vector<key_path> surface() const
     {
         std::vector<key_path> out;
         out.reserve(m_defined.size());
@@ -354,7 +354,7 @@ public:
 
     // Returns paths of repeated elements that are containers (at least one other
     // element is anchored under them). Used by projection() and the fold.
-    [[nodiscard]] std::set<std::string> repeated_container_paths() const
+    std::set<std::string> repeated_container_paths() const
     {
         std::set<std::string> containers;
         for(const schema_element &el : m_elements)
@@ -379,12 +379,12 @@ private:
     // one (the intermediate keyspace nodes an element implies). This lets an
     // element anchor under either a leaf or an intermediate keyspace that an
     // earlier element established.
-    [[nodiscard]] bool is_defined_node(const key_path &node) const
+    bool is_defined_node(const key_path &node) const
     {
         return node.empty() || is_defined_text(node.str());
     }
 
-    [[nodiscard]] bool is_defined_text(const std::string &at) const
+    bool is_defined_text(const std::string &at) const
     {
         const std::string below = at + key_path::separator;
         return std::ranges::any_of(m_defined, [&](const std::string &defined) {
@@ -394,7 +394,7 @@ private:
 
     // Whether a container path has a declared primary key -- the test that makes
     // a path segment under it eligible to be a transient key value.
-    [[nodiscard]] bool keyed_container(const std::string &container) const
+    bool keyed_container(const std::string &container) const
     {
         return std::ranges::any_of(m_elements, [&](const schema_element &el) {
             return el.identity && el.container().str() == container;

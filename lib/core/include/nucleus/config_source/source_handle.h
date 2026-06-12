@@ -27,13 +27,13 @@ public:
     source_handle(const source_handle &)            = delete;
     source_handle & operator=(const source_handle &) = delete;
 
-    [[nodiscard]] capability_descriptor capabilities() const { return m_self->do_caps(); }
+    capability_descriptor capabilities() const { return m_self->do_caps(); }
 
     void apply_projection(const schema_projection & p) { m_self->do_project(p); }
 
-    [[nodiscard]] inherit_declaration inheritance() const { return m_self->do_inherit(); }
+    inherit_declaration inheritance() const { return m_self->do_inherit(); }
 
-    [[nodiscard]] config_source_result pull() { return m_self->do_pull(); }
+    config_source_result pull() { return m_self->do_pull(); }
 
 private:
     struct concept_t

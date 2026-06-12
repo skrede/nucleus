@@ -15,7 +15,7 @@ namespace nucleus {
 // unknown key is missing_field; a known key with no file frame on the stack is
 // out_of_scope_context. Host-specific frame categories are NOT handled here;
 // they are reached through their own ${category.<name>} dispatch.
-[[nodiscard]] token_result resolve_scope_key(std::string_view key,
+token_result resolve_scope_key(std::string_view key,
                                              std::span<const scope_frame> frames);
 
 // Resolves the config-location path categories that derive from the innermost
@@ -27,11 +27,11 @@ namespace nucleus {
 // sibling/relative paths. Returns out_of_scope_context with no file frame and
 // missing_field for an unknown key under a known category. `category` is one of
 // "file", "dir", "self"; the caller routes only those here.
-[[nodiscard]] token_result resolve_location_key(std::string_view category,
+token_result resolve_location_key(std::string_view category,
                                                 std::string_view key,
                                                 std::span<const scope_frame> frames);
 
-[[nodiscard]] bool is_location_category(std::string_view category) noexcept;
+bool is_location_category(std::string_view category) noexcept;
 
 }
 

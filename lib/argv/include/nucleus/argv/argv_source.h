@@ -104,18 +104,18 @@ public:
         return *this;
     }
 
-    [[nodiscard]] static capability_descriptor descriptor() noexcept
+    static capability_descriptor descriptor() noexcept
     {
         return capability_descriptor{capability::nesting,
                                      capability::duplicate_keys};
     }
 
-    [[nodiscard]] capability_descriptor capabilities() const
+    capability_descriptor capabilities() const
     {
         return descriptor();
     }
 
-    [[nodiscard]] config_source_result pull()
+    config_source_result pull()
     {
         config_source_batch batch;
         batch.entries.reserve(m_args.size());

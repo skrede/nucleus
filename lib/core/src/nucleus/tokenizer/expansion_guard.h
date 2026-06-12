@@ -79,7 +79,7 @@ public:
     // Pushes `label` onto the active chain. Fails with cyclic_reference when the
     // label is already live (naming the ordered cycle) or depth_exceeded when the
     // chain would grow past the cap. On success returns a popping guard.
-    [[nodiscard]] expected<scope, resolve_error> enter(std::string label)
+    expected<scope, resolve_error> enter(std::string label)
     {
         auto first = std::find(m_chain.begin(), m_chain.end(), label);
         if(first != m_chain.end())
@@ -98,7 +98,7 @@ public:
         return scope(this);
     }
 
-    [[nodiscard]] std::size_t depth() const noexcept { return m_chain.size(); }
+    std::size_t depth() const noexcept { return m_chain.size(); }
 
 private:
     std::vector<std::string> m_chain;

@@ -98,7 +98,7 @@ public:
     // the declaring source, so index 0 is the deepest ancestor and the last entry
     // is the requested file itself. The factory and projection are the same ones
     // used by the load() caller. Errors propagate immediately on the first failure.
-    [[nodiscard]] static expected<std::vector<chain_entry>, error>
+    static expected<std::vector<chain_entry>, error>
     expand(const std::vector<std::string> &requested_paths,
            const factory_fn &make,
            const schema_projection &projection,
@@ -121,7 +121,7 @@ private:
         , m_admissibility(policy.admissibility)
     {}
 
-    [[nodiscard]] expected<depth_guard, error> push_depth()
+    expected<depth_guard, error> push_depth()
     {
         if(m_depth >= m_cap)
             return unexpected(error{errc::invalid_inheritance, nucleus::format(
@@ -132,7 +132,7 @@ private:
         return depth_guard(this);
     }
 
-    [[nodiscard]] expected<path_guard, error> push_path(
+    expected<path_guard, error> push_path(
         const std::filesystem::path &absolute)
     {
         std::string key = absolute.generic_string();
@@ -150,7 +150,7 @@ private:
     // is_parent is false for the top-level requested source and true for every
     // recursive call that follows an inherit= declaration; the admissibility
     // callback is invoked only when is_parent is true.
-    [[nodiscard]] expected<void, error>
+    expected<void, error>
     expand_one(const std::string &path,
                const factory_fn &make,
                const schema_projection &projection,

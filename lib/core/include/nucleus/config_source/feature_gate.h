@@ -72,7 +72,7 @@ using gate_result = expected<gated_features, gate_error>;
 // This is the mechanism that makes the capability descriptor load-bearing: a
 // test can prove behavior CHANGES with the descriptor, which a stub "supports
 // everything" descriptor never could.
-[[nodiscard]] inline gate_result gate_features(std::string_view consumer,
+inline gate_result gate_features(std::string_view consumer,
                                                std::string_view source_name,
                                                const capability_descriptor &caps,
                                                const std::vector<feature_requirement> &required,
@@ -109,7 +109,7 @@ using gate_result = expected<gated_features, gate_error>;
 // shortfall the error names the consumer, the capability, and EVERY layer label
 // (none provide it). A SOFT shortfall degrades observably (warn + recorded note)
 // and resolution proceeds. An empty stack with a HARD requirement is still loud.
-[[nodiscard]] inline gate_result gate_stack(std::string_view consumer,
+inline gate_result gate_stack(std::string_view consumer,
         const std::vector<std::pair<std::string, capability_descriptor>> &layers,
         const std::vector<feature_requirement> &required,
         log_sink &log)

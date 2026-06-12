@@ -61,7 +61,7 @@ struct dual_entry_source
     std::string path;
     explicit dual_entry_source(std::string p) : path(std::move(p)) {}
 
-    [[nodiscard]] nucleus::config_source_result pull()
+    nucleus::config_source_result pull()
     {
         nucleus::config_source_batch batch;
         nucleus::capability_descriptor no_caps{};
@@ -70,7 +70,7 @@ struct dual_entry_source
         return batch;
     }
 
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const
+    nucleus::capability_descriptor capabilities() const
     {
         return {};
     }

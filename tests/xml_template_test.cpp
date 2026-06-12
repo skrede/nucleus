@@ -18,7 +18,7 @@
 
 namespace {
 
-[[nodiscard]] std::string template_of(const nucleus::config_space &space)
+std::string template_of(const nucleus::config_space &space)
 {
     std::ostringstream oss;
     nucleus::xml::emit_template(space, oss);
@@ -29,7 +29,7 @@ namespace {
 
 namespace {
 
-[[nodiscard]] nucleus::config_space make_server_space()
+nucleus::config_space make_server_space()
 {
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("server", nucleus::anchor::root())));

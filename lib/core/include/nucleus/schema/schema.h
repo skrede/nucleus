@@ -65,7 +65,7 @@ struct schema_element
     // True when this element is its parent container's primary key OR is declared
     // unique -- i.e. its value must be distinct across sibling instances. A
     // primary key is uniqueness-bearing even without the `unique` flag set.
-    [[nodiscard]] bool enforces_uniqueness() const noexcept
+    bool enforces_uniqueness() const noexcept
     {
         return identity || unique;
     }
@@ -73,7 +73,7 @@ struct schema_element
     // The full keyspace path this element declares: the anchor's path extended by
     // the element's name. A root element declares a single-segment top-level
     // path; a nested element declares the anchor path + name.
-    [[nodiscard]] key_path declared_path() const
+    key_path declared_path() const
     {
         return at.under().child(name);
     }
@@ -81,7 +81,7 @@ struct schema_element
     // The container this element is a field of: its parent path. For a primary
     // key or a unique field this is the repeatable container whose instances the
     // field distinguishes. Empty for a root-anchored element.
-    [[nodiscard]] key_path container() const
+    key_path container() const
     {
         return at.under();
     }
@@ -89,7 +89,7 @@ struct schema_element
 
 // Fluent helpers so a host declares schema elements readably without naming the
 // boolean axes positionally.
-[[nodiscard]] inline schema_element element(std::string name, anchor at)
+inline schema_element element(std::string name, anchor at)
 {
     schema_element e;
     e.name = std::move(name);
@@ -97,7 +97,7 @@ struct schema_element
     return e;
 }
 
-[[nodiscard]] inline schema_element required_element(std::string name, anchor at)
+inline schema_element required_element(std::string name, anchor at)
 {
     schema_element e = element(std::move(name), std::move(at));
     e.required = true;
@@ -108,21 +108,21 @@ struct schema_element
 // schema hierarchy (exactly one per config space). A key VALUE must not shadow
 // a declared sibling element's name (the load rejects the collision loudly).
 // `primary_key_element` is an alias for hosts that think in primary-key terms.
-[[nodiscard]] inline schema_element identity_element(std::string name, anchor at)
+inline schema_element identity_element(std::string name, anchor at)
 {
     schema_element e = element(std::move(name), std::move(at));
     e.identity = true;
     return e;
 }
 
-[[nodiscard]] inline schema_element primary_key_element(std::string name, anchor at)
+inline schema_element primary_key_element(std::string name, anchor at)
 {
     return identity_element(std::move(name), std::move(at));
 }
 
 // A field whose value must be distinct across sibling instances of its parent
 // container, without being the selector. Many such fields may exist per container.
-[[nodiscard]] inline schema_element unique_element(std::string name, anchor at)
+inline schema_element unique_element(std::string name, anchor at)
 {
     schema_element e = element(std::move(name), std::move(at));
     e.unique = true;
@@ -131,7 +131,7 @@ struct schema_element
 
 // An element that keeps N sibling instances in ordinal (document) order.
 // For a leaf, instances are scalars; for a container, instances are indexed subtrees.
-[[nodiscard]] inline schema_element repeated_element(std::string name, anchor at)
+inline schema_element repeated_element(std::string name, anchor at)
 {
     schema_element e = element(std::move(name), std::move(at));
     e.repeated = true;
@@ -141,7 +141,7 @@ struct schema_element
 // An element whose value is constrained to a closed set. The values are both the
 // validation allow-list (a resolved value outside the set is rejected) and the
 // candidate list the projected shell completion offers for this flag.
-[[nodiscard]] inline schema_element enum_element(std::string name, anchor at,
+inline schema_element enum_element(std::string name, anchor at,
                                                  std::vector<std::string> values)
 {
     schema_element e = element(std::move(name), std::move(at));

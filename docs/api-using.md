@@ -84,8 +84,7 @@ config_space build();   // seals; the builder is spent afterwards
 - `registration_result` is `expected<void, error>`: truthy on success. On
   failure the code is `errc::rejected_registration` (the registration policy's
   reason, verbatim, in `message`) or `errc::sealed_builder`.
-- `expected` is `[[nodiscard]]`, so silently dropping a registration result is a
-  compiler warning — check each one, `if(!builder.register_element(...)) ...`.
+- Check each registration result: `if(!builder.register_element(...)) ...`.
 - Every registration carries an opaque `owner_token` and is first offered to the
   [registration policy](api-extending.md#registration_policy).
 - After `build()`, every `register_*` / `install_*` call is a loud state-machine
@@ -773,9 +772,8 @@ numeric ordinal order. See
 `expected<T, E>` is the fallible-return vocabulary used across the public API.
 It mirrors `std::expected` (C++23); a future migration points the aliases at
 the standard type and edits nothing else. Truthy when it holds a value;
-construct the error alternative with `nucleus::unexpected(e)`. The type is
-`[[nodiscard]]`, so discarding any result — a load, a registration — is a
-compiler warning.
+construct the error alternative with `nucleus::unexpected(e)`. Check every
+result — a load, a registration — rather than discarding it.
 
 Every public result channel carries `nucleus::error` as its `E`:
 

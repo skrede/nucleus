@@ -17,7 +17,7 @@ namespace nucleus {
 // Resolution entry point for the simple, frame-less case: expand every ${...} in
 // `value` against the registered tokenizers, with no lexical scope. Suitable for
 // values whose source has no file location and no host frames.
-[[nodiscard]] inline token_result resolve_tokens(std::string_view value,
+inline token_result resolve_tokens(std::string_view value,
                                                  const tokenizer_registry &registry)
 {
     resolver_scope scope(registry);
@@ -31,7 +31,7 @@ namespace nucleus {
 // values. For richer lexical scopes (host frame categories, function param
 // frames) construct a resolver_scope directly and push frames before
 // resolve_all.
-[[nodiscard]] inline token_result resolve_tokens(std::string_view value,
+inline token_result resolve_tokens(std::string_view value,
                                                  const tokenizer_registry &registry,
                                                  std::filesystem::path source_location)
 {

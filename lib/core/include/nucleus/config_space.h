@@ -49,7 +49,7 @@ enum class shell;
 // post-build state-machine misuse (errc::sealed_builder).
 using registration_result = expected<void, error>;
 
-[[nodiscard]] inline registration_result registration_ok()
+inline registration_result registration_ok()
 {
     return registration_result();
 }
@@ -126,14 +126,14 @@ public:
         return register_converter(std::type_index(typeid(T)), std::move(conv), std::move(owner));
     }
 
-    [[nodiscard]] std::size_t schema_count() const noexcept;
-    [[nodiscard]] std::size_t tokenizer_count() const noexcept;
-    [[nodiscard]] std::size_t converter_count() const noexcept;
+    std::size_t schema_count() const noexcept;
+    std::size_t tokenizer_count() const noexcept;
+    std::size_t converter_count() const noexcept;
 
     // Key-path collisions detected during registration: each report names the key
     // and every claimant (location + owner token) WITHOUT choosing a winner. The
     // host adjudicates. Empty when none occurred.
-    [[nodiscard]] std::vector<conflict_report> conflicts() const;
+    std::vector<conflict_report> conflicts() const;
 
     // Sets the space name -- the identity each source format validates at its boundary
     // (document root element, env prefix, argv first segment). Empty = unnamed.
@@ -144,7 +144,7 @@ public:
     // sealed product and marks the builder spent. After build(), every register_* /
     // install_* / set_registration_policy is a LOUD state-machine error, never a
     // silent no-op.
-    [[nodiscard]] config_space build();
+    config_space build();
 
 private:
     friend class config_space;
@@ -170,34 +170,34 @@ public:
     config_space(config_space &&) noexcept;
     config_space &operator=(config_space &&) noexcept;
 
-    [[nodiscard]] std::size_t schema_count() const noexcept;
-    [[nodiscard]] std::size_t tokenizer_count() const noexcept;
-    [[nodiscard]] std::size_t converter_count() const noexcept;
+    std::size_t schema_count() const noexcept;
+    std::size_t tokenizer_count() const noexcept;
+    std::size_t converter_count() const noexcept;
 
     // The name set via config_space_builder::name(); empty for unnamed spaces.
-    [[nodiscard]] std::string_view space_name() const noexcept;
+    std::string_view space_name() const noexcept;
 
     // Key-path collisions recorded during the originating builder's registrations.
-    [[nodiscard]] std::vector<conflict_report> conflicts() const;
+    std::vector<conflict_report> conflicts() const;
 
     // Generates a completion script for `which`, projected from the sealed schema
     // and bound to `prog`. Flags render under `delimiter` and relative to `anchor`,
     // which must match the argv_source grammar. When space_name is non-empty, every
     // completion entry is prefixed with the space name, matching multispace_argv_source.
-    [[nodiscard]] std::string generate_completion(shell which, std::string_view prog,
+    std::string generate_completion(shell which, std::string_view prog,
                                                   const cli_delimiter &delimiter = {},
                                                   const key_path &anchor = {},
                                                   std::string_view space_name = {}) const;
 
     // The declared schema elements, the neutral data a format emitter projects into
     // a template. A pure read of the sealed schema; the registry stays encapsulated.
-    [[nodiscard]] std::span<const schema_element> schema_elements() const;
+    std::span<const schema_element> schema_elements() const;
 
     // Returns a NEW builder pre-populated with a DEEP COPY of this sealed space's
     // three registries + policy + claim/conflict ledger. Base and derived are fully
     // independent: building or mutating one never affects the other, and no
     // shared_ptr base pointer links them.
-    [[nodiscard]] config_space_builder expand() const;
+    config_space_builder expand() const;
 
 private:
     friend class config_space_builder;
@@ -216,13 +216,13 @@ private:
 // The stack is BORROWED, not consumed: it stays valid afterward, so the same
 // stack can pre-flight via check_capabilities() and then load_config, or load_config
 // more than once (sources are pulled again; a document source reuses its cached parse).
-[[nodiscard]] load_result load_config(const config_space &space,
+load_result load_config(const config_space &space,
                                source_stack &stack,
                                const load_options &options = {});
 
 // Convenience overload for inline composition: load_config(space, source_stack{...}).
 // The temporary lives for the full call; nothing dangles.
-[[nodiscard]] load_result load_config(const config_space &space,
+load_result load_config(const config_space &space,
                                source_stack &&stack,
                                const load_options &options = {});
 
@@ -230,14 +230,14 @@ private:
 // only -- no pull, no fold -- so the stack is borrowed const and stays intact
 // for the load_config() that follows it. Consistent with load_config() over the same
 // stack+options.
-[[nodiscard]] gate_result check_capabilities(const config_space &space,
+gate_result check_capabilities(const config_space &space,
                                              const source_stack &stack,
                                              const load_options &options = {});
 
 // Derives a key recognizer from the sealed space's schema surface. The returned
 // closure is valid for as long as the space outlives it; it captures the space by
 // reference. Used to wire argv_source schema-coupled recognition at compose time.
-[[nodiscard]] key_recognizer recognizer_of(const config_space &space);
+key_recognizer recognizer_of(const config_space &space);
 
 }
 

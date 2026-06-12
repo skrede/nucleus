@@ -20,12 +20,12 @@ namespace {
 // No base class, no virtuals -- just the two members the concept requires.
 struct table_parser
 {
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const
+    nucleus::capability_descriptor capabilities() const
     {
         return {nucleus::capability::ordering};
     }
 
-    [[nodiscard]] nucleus::config_source_result pull()
+    nucleus::config_source_result pull()
     {
         nucleus::config_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(

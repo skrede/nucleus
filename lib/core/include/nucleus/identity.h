@@ -32,7 +32,7 @@ public:
     {
     }
 
-    [[nodiscard]] bool has_value() const noexcept { return m_payload != nullptr; }
+    bool has_value() const noexcept { return m_payload != nullptr; }
 
     friend bool operator==(const owner_token &a, const owner_token &b) noexcept
     {
@@ -56,8 +56,8 @@ private:
     struct concept_base
     {
         virtual ~concept_base() = default;
-        [[nodiscard]] virtual const std::type_info &type() const noexcept = 0;
-        [[nodiscard]] virtual bool equals(const concept_base &other) const noexcept = 0;
+        virtual const std::type_info &type() const noexcept = 0;
+        virtual bool equals(const concept_base &other) const noexcept = 0;
     };
 
     template <typename T>
@@ -65,9 +65,9 @@ private:
     {
         explicit model(T value) : held(std::move(value)) {}
 
-        [[nodiscard]] const std::type_info &type() const noexcept override { return typeid(T); }
+        const std::type_info &type() const noexcept override { return typeid(T); }
 
-        [[nodiscard]] bool equals(const concept_base &other) const noexcept override
+        bool equals(const concept_base &other) const noexcept override
         {
             if(other.type() != typeid(T))
                 return false;

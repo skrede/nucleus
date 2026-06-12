@@ -18,7 +18,7 @@
 namespace nucleus {
 
 template <typename... Args>
-[[nodiscard]] std::string format(std::format_string<Args...> spec, Args &&...args)
+std::string format(std::format_string<Args...> spec, Args &&...args)
 {
     return std::format(spec, std::forward<Args>(args)...);
 }
@@ -34,7 +34,7 @@ template <typename... Args>
 namespace nucleus {
 
 template <typename... Args>
-[[nodiscard]] std::string format(fmt::format_string<Args...> spec, Args &&...args)
+std::string format(fmt::format_string<Args...> spec, Args &&...args)
 {
     return fmt::format(spec, std::forward<Args>(args)...);
 }

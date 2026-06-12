@@ -20,7 +20,7 @@ namespace nucleus {
 // requirement) and emitted in a stable order so callers and tests are
 // deterministic. Takes the declared elements directly (the host reaches them via
 // config_space::schema_elements()), not the registry that owns them.
-[[nodiscard]] inline std::vector<feature_requirement>
+inline std::vector<feature_requirement>
 derive_capability_requirements(std::span<const schema_element> elements)
 {
     bool needs_nesting = false;

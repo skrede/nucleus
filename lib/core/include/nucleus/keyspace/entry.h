@@ -23,7 +23,7 @@ struct keyspace_entry
     capability_descriptor capabilities;
 };
 
-[[nodiscard]] inline keyspace_entry make_entry(std::string path,
+inline keyspace_entry make_entry(std::string path,
                                                nucleus::value value,
                                                capability_descriptor capabilities)
 {

@@ -20,7 +20,7 @@ class shell_emitter
 public:
     virtual ~shell_emitter() = default;
 
-    [[nodiscard]] virtual std::string emit(const completion_model &model) const = 0;
+    virtual std::string emit(const completion_model &model) const = 0;
 };
 
 }

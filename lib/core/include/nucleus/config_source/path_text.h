@@ -16,7 +16,7 @@ namespace nucleus {
 // discovery results stable across platforms, every path->text conversion routes
 // through here: generic_u8string() gives forward-slash separators and a stable
 // UTF-8 encoding on every platform, which we hold as a plain std::string.
-[[nodiscard]] inline std::string path_to_text(const std::filesystem::path &p)
+inline std::string path_to_text(const std::filesystem::path &p)
 {
     const std::u8string u8 = p.generic_u8string();
     return std::string(u8.begin(), u8.end());

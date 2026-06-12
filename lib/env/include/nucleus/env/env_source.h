@@ -49,18 +49,18 @@ public:
         return *this;
     }
 
-    [[nodiscard]] static capability_descriptor descriptor() noexcept
+    static capability_descriptor descriptor() noexcept
     {
         // Deliberately empty: env supports none of the structural affordances.
         return capability_descriptor{};
     }
 
-    [[nodiscard]] capability_descriptor capabilities() const
+    capability_descriptor capabilities() const
     {
         return descriptor();
     }
 
-    [[nodiscard]] config_source_result pull()
+    config_source_result pull()
     {
         config_source_batch batch;
         batch.entries.reserve(m_entries.size());

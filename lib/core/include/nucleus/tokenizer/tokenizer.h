@@ -76,10 +76,10 @@ public:
     tokenizer(tokenizer &&) noexcept = default;
     tokenizer &operator=(tokenizer &&) noexcept = default;
 
-    [[nodiscard]] std::string_view category() const noexcept { return m_category; }
+    std::string_view category() const noexcept { return m_category; }
 
-    [[nodiscard]] token_result resolve_field(std::string_view name) const;
-    [[nodiscard]] token_result resolve_function(std::string_view name,
+    token_result resolve_field(std::string_view name) const;
+    token_result resolve_function(std::string_view name,
                                                 std::span<const std::string> args) const;
 
 private:

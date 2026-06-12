@@ -19,12 +19,12 @@ namespace {
 // Flat source: only capabilities() + pull(). No projection, no inheritance.
 struct flat_source
 {
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const
+    nucleus::capability_descriptor capabilities() const
     {
         return {nucleus::capability::nesting};
     }
 
-    [[nodiscard]] nucleus::config_source_result pull()
+    nucleus::config_source_result pull()
     {
         nucleus::config_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(
@@ -38,19 +38,19 @@ struct full_source
 {
     bool projection_applied = false;
 
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const
+    nucleus::capability_descriptor capabilities() const
     {
         return {nucleus::capability::nesting, nucleus::capability::typed_scalars};
     }
 
     void apply_projection(const nucleus::schema_projection &) { projection_applied = true; }
 
-    [[nodiscard]] nucleus::inherit_declaration inheritance() const
+    nucleus::inherit_declaration inheritance() const
     {
         return {nucleus::inherit_declaration::kind::parent_path, "parent.xml"};
     }
 
-    [[nodiscard]] nucleus::config_source_result pull()
+    nucleus::config_source_result pull()
     {
         nucleus::config_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(

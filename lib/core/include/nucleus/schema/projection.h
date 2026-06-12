@@ -30,7 +30,7 @@ public:
 
     // The primary-key field name for a container path, or nullptr when the
     // container is not keyed (the source should fall back to its structural walk).
-    [[nodiscard]] const std::string *key_of(std::string_view container_path) const
+    const std::string *key_of(std::string_view container_path) const
     {
         auto it = m_keys.find(std::string(container_path));
         return it == m_keys.end() ? nullptr : &it->second;
@@ -44,14 +44,14 @@ public:
     }
 
     // True when container_path has been declared as a repeated container.
-    [[nodiscard]] bool is_repeated_container(std::string_view container_path) const
+    bool is_repeated_container(std::string_view container_path) const
     {
         return m_repeated_containers.find(std::string(container_path))
                != m_repeated_containers.end();
     }
 
-    [[nodiscard]] bool empty() const noexcept { return m_keys.empty() && m_repeated_containers.empty(); }
-    [[nodiscard]] std::size_t size() const noexcept { return m_keys.size(); }
+    bool empty() const noexcept { return m_keys.empty() && m_repeated_containers.empty(); }
+    std::size_t size() const noexcept { return m_keys.size(); }
 
 private:
     std::map<std::string, std::string> m_keys;

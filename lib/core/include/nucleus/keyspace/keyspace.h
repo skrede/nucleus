@@ -38,7 +38,7 @@ public:
         m_collections.erase(path.str());
     }
 
-    [[nodiscard]] bool contains(const key_path &path) const
+    bool contains(const key_path &path) const
     {
         if(m_values.find(path.str()) != m_values.end())
             return true;
@@ -48,7 +48,7 @@ public:
 
     // The value at a leaf path, or nullptr if none is set there. Returns nullptr
     // for repeated paths (which hold a collection, not a scalar).
-    [[nodiscard]] const value *find(const key_path &path) const
+    const value *find(const key_path &path) const
     {
         auto it = m_values.find(path.str());
         return it == m_values.end() ? nullptr : &it->second;
@@ -78,24 +78,24 @@ public:
     }
 
     // The collection at a repeated path, or nullptr if none is set there.
-    [[nodiscard]] const std::vector<value> *find_collection(const key_path &path) const
+    const std::vector<value> *find_collection(const key_path &path) const
     {
         auto it = m_collections.find(path.str());
         return it == m_collections.end() ? nullptr : &it->second;
     }
 
     // Whether the path holds a collection (as opposed to a scalar or nothing).
-    [[nodiscard]] bool is_collection(const key_path &path) const
+    bool is_collection(const key_path &path) const
     {
         return m_collections.find(path.str()) != m_collections.end();
     }
 
-    [[nodiscard]] std::size_t size() const noexcept
+    std::size_t size() const noexcept
     {
         return m_values.size() + m_collections.size();
     }
 
-    [[nodiscard]] bool empty() const noexcept
+    bool empty() const noexcept
     {
         return m_values.empty() && m_collections.empty();
     }
@@ -103,7 +103,7 @@ public:
     // Every leaf path that carries a value or a collection, in canonical order.
     // Both maps are std::map (sorted), so a two-iterator merge walk produces a
     // sorted, deduplicated result.
-    [[nodiscard]] std::vector<key_path> paths() const
+    std::vector<key_path> paths() const
     {
         std::vector<key_path> out;
         out.reserve(m_values.size() + m_collections.size());
@@ -126,7 +126,7 @@ public:
 
     // Whether any leaf value or collection exists at or below the given prefix
     // node. An empty prefix asks whether the keyspace has any values at all.
-    [[nodiscard]] bool has_node(const key_path &prefix) const
+    bool has_node(const key_path &prefix) const
     {
         if(prefix.empty())
             return !m_values.empty() || !m_collections.empty();
@@ -150,7 +150,7 @@ public:
     // prefix yields the top-level segments. This is the structural step the
     // schema surface and CLI projection walk. Covers both scalar and collection
     // paths.
-    [[nodiscard]] std::vector<std::string> children_of(const key_path &prefix) const
+    std::vector<std::string> children_of(const key_path &prefix) const
     {
         const std::size_t depth = prefix.size();
         const std::string below = prefix.empty() ? std::string()

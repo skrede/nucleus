@@ -82,14 +82,14 @@ public:
         return extension_result();
     }
 
-    [[nodiscard]] bool claims(std::string_view extension) const
+    bool claims(std::string_view extension) const
     {
         return m_parsers.find(normalize(extension)) != m_parsers.end();
     }
 
     // Builds a source handle for `path` if its extension is claimed; nullopt otherwise.
     // The extension is the final dot-suffix of the path's last segment.
-    [[nodiscard]] std::optional<source_handle> open(const std::string &path) const
+    std::optional<source_handle> open(const std::string &path) const
     {
         auto it = m_parsers.find(extension_of(path));
         if(it == m_parsers.end())
@@ -100,7 +100,7 @@ public:
     // The set of extensions currently claimed, in canonical form. Discovery reads
     // this to build its candidate set -- it never enumerates arbitrary extensions
     // of its own, only the ones a host registered here.
-    [[nodiscard]] std::vector<std::string> extensions() const
+    std::vector<std::string> extensions() const
     {
         std::vector<std::string> keys;
         keys.reserve(m_parsers.size());
@@ -109,12 +109,12 @@ public:
         return keys;
     }
 
-    [[nodiscard]] std::size_t size() const noexcept { return m_parsers.size(); }
+    std::size_t size() const noexcept { return m_parsers.size(); }
 
     // Normalizes an extension to a leading-dot, lower-effort canonical form. An
     // empty string maps to "" (no extension). Exposed so discovery shares the
     // exact same normalization.
-    [[nodiscard]] static std::string normalize(std::string_view extension)
+    static std::string normalize(std::string_view extension)
     {
         if(extension.empty())
             return std::string{};
@@ -129,7 +129,7 @@ public:
 
     // The extension of a path: the substring from the last '.' in the final path
     // segment. No dot (or a leading-dot dotfile) yields "".
-    [[nodiscard]] static std::string extension_of(std::string_view path)
+    static std::string extension_of(std::string_view path)
     {
         std::size_t slash = path.find_last_of("/\\");
         std::string_view name = slash == std::string_view::npos

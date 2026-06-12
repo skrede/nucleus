@@ -35,12 +35,12 @@ struct xml_source_options
     input_kind  kind = input_kind::string;
     std::string data;  // XML text when kind==string; file path when kind==file
 
-    [[nodiscard]] static xml_source_options of_string(std::string text)
+    static xml_source_options of_string(std::string text)
     {
         return xml_source_options{input_kind::string, std::move(text)};
     }
 
-    [[nodiscard]] static xml_source_options of_file(std::string path)
+    static xml_source_options of_file(std::string path)
     {
         return xml_source_options{input_kind::file, std::move(path)};
     }
@@ -63,16 +63,16 @@ class xml_source final
 public:
     // Builds an xml_source from a value-semantics options struct: parse from an
     // in-memory string or from a file path read at pull time.
-    [[nodiscard]] static xml_source from(xml_source_options options)
+    static xml_source from(xml_source_options options)
     {
         const kind k = options.kind == xml_source_options::input_kind::file
                            ? kind::file : kind::string;
         return xml_source(k, std::move(options.data));
     }
 
-    [[nodiscard]] capability_descriptor capabilities() const;
+    capability_descriptor capabilities() const;
 
-    [[nodiscard]] config_source_result pull();
+    config_source_result pull();
 
     // Sets the expected root element name for named-space envelope validation.
     // When non-empty, pull() validates the root element name and strips it from
@@ -94,7 +94,7 @@ public:
     // Returns the inheritance declaration read from the document root's inherit=
     // attribute. Callable after pull(); returns inherit_default when pull() has
     // not been called yet or the document root has no inherit= attribute.
-    [[nodiscard]] inherit_declaration inheritance() const;
+    inherit_declaration inheritance() const;
 
 private:
     enum class kind

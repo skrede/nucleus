@@ -80,7 +80,7 @@ struct fp_parse_result
 #if defined(__cpp_lib_to_chars) && !defined(NUCLEUS_FORCE_FP_FROM_CHARS_FALLBACK)
 
 template<typename Float>
-[[nodiscard]] inline fp_parse_result fp_from_chars(std::string_view sv, Float &out)
+inline fp_parse_result fp_from_chars(std::string_view sv, Float &out)
 {
     auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), out);
     return {ptr, ec};
@@ -89,7 +89,7 @@ template<typename Float>
 #else
 
 template<typename Float>
-[[nodiscard]] inline fp_parse_result fp_from_chars(std::string_view sv, Float &out)
+inline fp_parse_result fp_from_chars(std::string_view sv, Float &out)
 {
     // from_chars rejects leading whitespace and a leading '+'; strtof/strtod
     // accept both. Reject them up front -- reported as zero characters consumed
@@ -142,7 +142,7 @@ template<typename Float>
 namespace detail {
 
 template<typename T>
-[[nodiscard]] inline expected<std::any, std::string>
+inline expected<std::any, std::string>
 classify_numeric_parse(std::string_view sv, const char *ptr, std::errc ec, T out)
 {
     if(ec == std::errc{})
@@ -172,7 +172,7 @@ classify_numeric_parse(std::string_view sv, const char *ptr, std::errc ec, T out
 // the std::integral branch because both satisfy the concept yet have their own
 // vocabularies (true/false/1/0; exactly one byte).
 template<typename T>
-[[nodiscard]] std::function<expected<std::any, std::string>(std::string_view)>
+std::function<expected<std::any, std::string>(std::string_view)>
 make_scalar_converter()
 {
     if constexpr(std::is_same_v<T, bool>)
@@ -236,7 +236,7 @@ make_scalar_converter()
 // typed_element<T>(name, at, conv) -- attaches a converter and type identity to
 // a schema_element. The returned element is otherwise identical to element(name, at).
 template<typename T>
-[[nodiscard]] schema_element typed_element(std::string name, anchor at,
+schema_element typed_element(std::string name, anchor at,
     std::function<expected<std::any, std::string>(std::string_view)> conv)
 {
     schema_element el;
@@ -251,7 +251,7 @@ template<typename T>
 // converter for T. Only instantiable for types that have a make_scalar_converter
 // specialization (the set listed in the header comment).
 template<typename T>
-[[nodiscard]] schema_element typed_element(std::string name, anchor at)
+schema_element typed_element(std::string name, anchor at)
 {
     return typed_element<T>(std::move(name), std::move(at), make_scalar_converter<T>());
 }
@@ -260,7 +260,7 @@ template<typename T>
 // repeated collection AND typed: every occurrence is kept in document/fold order
 // and each is converted to T. Exactly typed_element<T> plus el.repeated = true.
 template<typename T>
-[[nodiscard]] schema_element repeated_typed_element(std::string name, anchor at,
+schema_element repeated_typed_element(std::string name, anchor at,
     std::function<expected<std::any, std::string>(std::string_view)> conv)
 {
     schema_element el = typed_element<T>(std::move(name), std::move(at), std::move(conv));
@@ -272,7 +272,7 @@ template<typename T>
 // repeated collection converted by the built-in scalar converter for T. Only
 // instantiable for types with a make_scalar_converter specialization.
 template<typename T>
-[[nodiscard]] schema_element repeated_typed_element(std::string name, anchor at)
+schema_element repeated_typed_element(std::string name, anchor at)
 {
     return repeated_typed_element<T>(std::move(name), std::move(at), make_scalar_converter<T>());
 }
@@ -282,7 +282,7 @@ template<typename T>
 // the config_space's converter registry (keyed by this type_identity); a
 // per-element converter is left empty so the registry's converter applies.
 template<typename T>
-[[nodiscard]] schema_element registered_element(std::string name, anchor at)
+schema_element registered_element(std::string name, anchor at)
 {
     schema_element el;
     el.name = std::move(name);

@@ -9,7 +9,7 @@ namespace nucleus {
 // <name> at resolve time, or fails with missing_field when it is unset. A
 // wildcard category -- any variable name is valid input rather than a fixed
 // enumeration -- so it reads std::getenv per lookup with no caching.
-[[nodiscard]] tokenizer make_env_tokenizer();
+tokenizer make_env_tokenizer();
 
 // The string tokenizer: pure string operations over already-resolved arguments.
 //   ${string.upper(s)}        -> s upcased (ASCII)
@@ -20,7 +20,7 @@ namespace nucleus {
 //   ${string.substr(s,pos,n)} -> n bytes of s from byte offset pos
 //   ${string.concat(a,b,...)} -> the arguments joined with no separator
 //   ${string.length(s)}       -> the byte length of s as a decimal string
-[[nodiscard]] tokenizer make_string_tokenizer();
+tokenizer make_string_tokenizer();
 
 }
 

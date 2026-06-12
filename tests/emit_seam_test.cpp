@@ -30,7 +30,7 @@ static_assert(nucleus::config_emitter<nucleus::xml::emitter>);
 
 namespace {
 
-[[nodiscard]] nucleus::config_space make_server_space()
+nucleus::config_space make_server_space()
 {
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("server", nucleus::anchor::root())));
@@ -46,7 +46,7 @@ namespace {
 // A config carrying a scalar and a repeated collection, built directly so the
 // document emitters can be proven without a source dependency.
 // Repeated values are stored as indexed scalars per the unified storage model.
-[[nodiscard]] nucleus::config make_server_config()
+nucleus::config make_server_config()
 {
     std::map<std::string, std::string> values{
         {"server/host", "localhost"},
@@ -55,7 +55,7 @@ namespace {
     return nucleus::config(std::move(values), nucleus::provenance{});
 }
 
-[[nodiscard]] std::size_t count_occurrences(const std::string &text, const std::string &needle)
+std::size_t count_occurrences(const std::string &text, const std::string &needle)
 {
     std::size_t count = 0;
     for(std::size_t pos = text.find(needle); pos != std::string::npos;

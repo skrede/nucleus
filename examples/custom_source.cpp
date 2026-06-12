@@ -23,12 +23,12 @@ namespace {
 // backing buffer and no retained_buffer is needed.
 struct table_source
 {
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const
+    nucleus::capability_descriptor capabilities() const
     {
         return {nucleus::capability::nesting};
     }
 
-    [[nodiscard]] nucleus::config_source_result pull()
+    nucleus::config_source_result pull()
     {
         nucleus::config_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(

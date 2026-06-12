@@ -19,23 +19,23 @@ class value
 {
 public:
     // A view into a retained, externally-owned buffer. Zero-copy.
-    [[nodiscard]] static value view(std::string_view text) noexcept
+    static value view(std::string_view text) noexcept
     {
         return value(view_tag{}, text);
     }
 
     // An owned value the source built itself. Self-contained.
-    [[nodiscard]] static value owned(std::string text)
+    static value owned(std::string text)
     {
         return value(owned_tag{}, std::move(text));
     }
 
-    [[nodiscard]] bool is_view() const noexcept { return m_data.index() == 0; }
-    [[nodiscard]] bool is_owned() const noexcept { return m_data.index() == 1; }
+    bool is_view() const noexcept { return m_data.index() == 0; }
+    bool is_owned() const noexcept { return m_data.index() == 1; }
 
     // The text of the value regardless of ownership. For a view this aliases the
     // retained buffer and is only valid while that buffer is alive.
-    [[nodiscard]] std::string_view text() const noexcept
+    std::string_view text() const noexcept
     {
         if(is_view())
             return std::get<0>(m_data);
@@ -44,7 +44,7 @@ public:
 
     // Severs any buffer dependency: an owned copy of the text. This is the copy-out
     // at the load boundary so the result outlives every source buffer.
-    [[nodiscard]] value to_owned() const { return owned(std::string(text())); }
+    value to_owned() const { return owned(std::string(text())); }
 
 private:
     struct view_tag {};

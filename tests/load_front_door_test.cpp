@@ -29,9 +29,9 @@ namespace {
 // are all absent. Used to prove a hard-unmet requirement aborts the load.
 struct flat_only_source
 {
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const { return {}; }
+    nucleus::capability_descriptor capabilities() const { return {}; }
 
-    [[nodiscard]] nucleus::config_source_result pull()
+    nucleus::config_source_result pull()
     {
         return nucleus::config_source_batch{};
     }
@@ -40,7 +40,7 @@ struct flat_only_source
 // A space whose schema requires nesting (a keyed container) and optionally uses
 // typed_scalars (a typed leaf). Produces a HARD nesting requirement and a SOFT
 // typed_scalars requirement via derive_capability_requirements.
-[[nodiscard]] nucleus::config_space make_nested_typed_space()
+nucleus::config_space make_nested_typed_space()
 {
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("node", anchor::root())));
@@ -228,12 +228,12 @@ TEST_CASE("load degrades a SOFT-absent optional capability and does not abort",
     // A source that provides nesting (satisfies HARD) but not typed_scalars (SOFT absent).
     struct nesting_no_typed
     {
-        [[nodiscard]] nucleus::capability_descriptor capabilities() const
+        nucleus::capability_descriptor capabilities() const
         {
             return nucleus::capability_descriptor{nucleus::capability::nesting};
         }
 
-        [[nodiscard]] nucleus::config_source_result pull()
+        nucleus::config_source_result pull()
         {
             nucleus::config_source_batch batch;
             batch.entries.push_back(nucleus::make_entry(

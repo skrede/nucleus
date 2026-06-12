@@ -41,7 +41,7 @@ public:
     // Entry point for the walk API (D-13). Returns a root-anchored cursor backed by
     // this immutable config. The cursor holds a const pointer to *this; the config
     // must outlive all cursors derived from it.
-    [[nodiscard]] config_node root() const noexcept
+    config_node root() const noexcept
     {
         return config_node{this, std::string{}};
     }
@@ -67,7 +67,7 @@ public:
     // container (D-21 legacy untyped surface). Use get_as() for the typed loud error
     // naming the container and instance count, or get("path[N]") / get_all() for
     // indexed access.
-    [[nodiscard]] std::optional<std::string> get(const std::string &key) const
+    std::optional<std::string> get(const std::string &key) const
     {
         auto it = m_values.find(key);
         if(it != m_values.end())
@@ -79,7 +79,7 @@ public:
     // indexed instances (cluster/node[0]/port, cluster/node[1]/port, ...) whose
     // canonical form matches, sorted by numeric ordinal. For single-value paths
     // returns a one-element vector; for absent paths returns an empty vector.
-    [[nodiscard]] std::vector<std::string> get_all(const std::string &key) const
+    std::vector<std::string> get_all(const std::string &key) const
     {
         // Direct single-value hit (non-repeated path).
         auto direct = m_values.find(key);
@@ -121,7 +121,7 @@ public:
         return out;
     }
 
-    [[nodiscard]] bool contains(const std::string &key) const
+    bool contains(const std::string &key) const
     {
         return m_values.find(key) != m_values.end();
     }
@@ -129,7 +129,7 @@ public:
     // "Why is this value X?" -- the winning source's origin for a scalar key, or
     // nullptr. For indexed paths (e.g. "cluster/node[0]/port"), returns the origin
     // for that specific indexed path.
-    [[nodiscard]] const origin *provenance_of(const std::string &key) const
+    const origin *provenance_of(const std::string &key) const
     {
         return m_provenance.of(key);
     }
@@ -145,7 +145,7 @@ public:
     //                              type_index equality; no widening or coercion)
     // Note: any_cast<T> produces a copy of the stored value.
     template<typename T>
-    [[nodiscard]] expected<T, error> get_as(const std::string &key) const
+    expected<T, error> get_as(const std::string &key) const
     {
         auto it = m_typed.find(key);
         if(it == m_typed.end())
@@ -190,7 +190,7 @@ public:
 
     // Returns all typed elements for a repeated path, gathered in numeric ordinal order.
     template<typename T>
-    [[nodiscard]] expected<std::vector<T>, error> get_all_as(const std::string &key) const
+    expected<std::vector<T>, error> get_all_as(const std::string &key) const
     {
         // Gather all typed indexed entries whose canonical path matches `key`.
         std::vector<std::pair<std::size_t, T>> typed_indexed;
@@ -236,12 +236,12 @@ public:
                     std::string("path '") + key + "' is absent"});
     }
 
-    [[nodiscard]] std::size_t size() const noexcept { return m_values.size(); }
+    std::size_t size() const noexcept { return m_values.size(); }
 
-    [[nodiscard]] bool empty() const noexcept { return m_values.empty(); }
+    bool empty() const noexcept { return m_values.empty(); }
 
     // Every key carrying a value, in canonical order (sorted by string key).
-    [[nodiscard]] std::vector<std::string> keys() const
+    std::vector<std::string> keys() const
     {
         std::vector<std::string> out;
         out.reserve(m_values.size());
@@ -258,7 +258,7 @@ private:
     //       m_values has "prefix[N]/suffix" where canonical("prefix[N]/suffix") == key.
     // This powers the D-21 index_required error in get_as() and the nullopt contract
     // in get() (get() is unchanged -- both absent and crossing already return nullopt).
-    [[nodiscard]] std::optional<std::string> crossing_repeated_container(
+    std::optional<std::string> crossing_repeated_container(
         const std::string &key) const
     {
         // Case (a): key is the container itself (e.g. "cluster/node").
@@ -353,7 +353,7 @@ private:
 
 namespace nucleus {
 
-[[nodiscard]] inline config_node config_node::operator[](std::size_t index) const
+inline config_node config_node::operator[](std::size_t index) const
 {
     if(!m_config || kind() != node_kind::repeated)
         return config_node{};
@@ -363,7 +363,7 @@ namespace nucleus {
     return config_node{m_config, m_path + "[" + std::to_string(index) + "]"};
 }
 
-[[nodiscard]] inline bool config_node::exists() const noexcept
+inline bool config_node::exists() const noexcept
 {
     if(!m_config)
         return false;
@@ -383,7 +383,7 @@ namespace nucleus {
     return false;
 }
 
-[[nodiscard]] inline node_kind config_node::kind() const noexcept
+inline node_kind config_node::kind() const noexcept
 {
     if(!m_config || !exists())
         return node_kind::scalar;
@@ -401,7 +401,7 @@ namespace nucleus {
     return node_kind::scalar;
 }
 
-[[nodiscard]] inline std::size_t config_node::count() const noexcept
+inline std::size_t config_node::count() const noexcept
 {
     if(!m_config || !exists())
         return 0;
@@ -410,7 +410,7 @@ namespace nucleus {
     return distinct_ordinals().size();
 }
 
-[[nodiscard]] inline std::vector<config_node> config_node::children() const
+inline std::vector<config_node> config_node::children() const
 {
     if(!m_config || !exists())
         return {};
@@ -462,7 +462,7 @@ namespace nucleus {
     return {};
 }
 
-[[nodiscard]] inline std::optional<std::string> config_node::value() const
+inline std::optional<std::string> config_node::value() const
 {
     if(!m_config)
         return std::nullopt;
@@ -470,7 +470,7 @@ namespace nucleus {
 }
 
 template<typename T>
-[[nodiscard]] inline expected<T, error> config_node::as() const
+inline expected<T, error> config_node::as() const
 {
     if(!m_config)
         return unexpected(error{errc::absent_key,
@@ -488,7 +488,7 @@ template<typename T>
     return m_config->get_as<T>(m_path);
 }
 
-[[nodiscard]] inline std::vector<std::size_t> config_node::distinct_ordinals() const
+inline std::vector<std::size_t> config_node::distinct_ordinals() const
 {
     const std::string indexed_prefix = m_path + "[";
     std::set<std::size_t> ordinal_set;

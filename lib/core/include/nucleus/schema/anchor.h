@@ -18,11 +18,11 @@ class anchor
 public:
     // The top of the keyspace. An element anchored here introduces its own name
     // as a new top-level keyspace.
-    [[nodiscard]] static anchor root() { return anchor(key_path{}); }
+    static anchor root() { return anchor(key_path{}); }
 
     // A position under an already-defined keyspace path. The path is the FQN of
     // the node the element attaches under (e.g. "plexus" or "plexus/udp").
-    [[nodiscard]] static anchor keyspace(key_path under)
+    static anchor keyspace(key_path under)
     {
         return anchor(std::move(under));
     }
@@ -30,17 +30,17 @@ public:
     // Convenience: build a keyspace anchor from a `/`-separated string. Malformed
     // strings collapse to the root anchor; hosts that need validation parse the
     // path themselves and pass it to keyspace(key_path).
-    [[nodiscard]] static anchor keyspace(const std::string &under)
+    static anchor keyspace(const std::string &under)
     {
         if(auto parsed = key_path::parse(under); parsed)
             return anchor(std::move(parsed).value());
         return root();
     }
 
-    [[nodiscard]] bool is_root() const noexcept { return m_under.empty(); }
+    bool is_root() const noexcept { return m_under.empty(); }
 
     // The path this anchor attaches under. Empty for the root anchor.
-    [[nodiscard]] const key_path &under() const noexcept { return m_under; }
+    const key_path &under() const noexcept { return m_under; }
 
 private:
     explicit anchor(key_path under) : m_under(std::move(under)) {}

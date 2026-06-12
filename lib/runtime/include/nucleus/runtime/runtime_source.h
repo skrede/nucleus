@@ -40,14 +40,14 @@ public:
         return *this;
     }
 
-    [[nodiscard]] capability_descriptor capabilities() const
+    capability_descriptor capabilities() const
     {
         return capability_descriptor{capability::nesting,
                                      capability::duplicate_keys,
                                      capability::typed_scalars};
     }
 
-    [[nodiscard]] config_source_result pull()
+    config_source_result pull()
     {
         config_source_batch batch;
         batch.entries.reserve(m_entries.size());

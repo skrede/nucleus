@@ -24,7 +24,7 @@ namespace nucleus {
 class zsh_emitter final : public shell_emitter
 {
 public:
-    [[nodiscard]] std::string emit(const completion_model &model) const override
+    std::string emit(const completion_model &model) const override
     {
         std::string out;
         out += "#compdef " + model.prog + "\n";
@@ -47,7 +47,7 @@ public:
 private:
     // One `_arguments` spec for an option. With values it carries the `=` form and
     // a `(...)` value group; without, it is a bare presence flag.
-    [[nodiscard]] static std::string spec_for(const completion_option &opt)
+    static std::string spec_for(const completion_option &opt)
     {
         const std::string desc = brackets(opt.description);
         if(opt.values.empty())
@@ -64,7 +64,7 @@ private:
     }
 
     // Backslash-escape the characters that terminate a `[...]` description.
-    [[nodiscard]] static std::string brackets(const std::string &text)
+    static std::string brackets(const std::string &text)
     {
         std::string out;
         for(char c : text)
@@ -78,7 +78,7 @@ private:
 
     // Backslash-escape the characters that have meaning inside a `(...)` value
     // group: the group delimiters and the whitespace that separates members.
-    [[nodiscard]] static std::string paren(const std::string &text)
+    static std::string paren(const std::string &text)
     {
         std::string out;
         for(char c : text)
@@ -93,7 +93,7 @@ private:
     // zsh single-quote escaping: a single quote cannot appear inside '...', so we
     // close, emit an escaped quote, and reopen -- the same idiom every POSIX shell
     // accepts.
-    [[nodiscard]] static std::string single_quote(const std::string &text)
+    static std::string single_quote(const std::string &text)
     {
         std::string out = "'";
         for(char c : text)
@@ -107,7 +107,7 @@ private:
         return out;
     }
 
-    [[nodiscard]] static std::string sanitize_ident(const std::string &text)
+    static std::string sanitize_ident(const std::string &text)
     {
         std::string out;
         out.reserve(text.size());

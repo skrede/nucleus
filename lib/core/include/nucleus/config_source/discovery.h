@@ -38,7 +38,7 @@ public:
     // Finds existing candidate files for `base_name` across `search_paths`,
     // restricted to the extensions the registry understands. Order: outer loop
     // over search_paths (host precedence), inner loop over claimed extensions.
-    [[nodiscard]] static std::vector<discovered_source>
+    static std::vector<discovered_source>
     find(std::string_view base_name,
          const std::vector<std::filesystem::path> &search_paths,
          const extension_registry &registry)
@@ -60,7 +60,7 @@ public:
 
     // Builds source handles for every discovered candidate using the registry's
     // parser factories. The returned handles are ready to fold, in discovery order.
-    [[nodiscard]] static std::vector<source_handle>
+    static std::vector<source_handle>
     open_all(std::string_view base_name,
              const std::vector<std::filesystem::path> &search_paths,
              const extension_registry &registry)

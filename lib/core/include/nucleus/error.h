@@ -30,7 +30,7 @@ enum class errc
     mismatched_type,
 };
 
-[[nodiscard]] constexpr std::string_view to_string(errc code) noexcept
+constexpr std::string_view to_string(errc code) noexcept
 {
     switch(code)
     {
@@ -62,10 +62,10 @@ struct error
     errc        code;
     std::string message;
 
-    [[nodiscard]] friend bool operator==(const error &, const error &) = default;
+    friend bool operator==(const error &, const error &) = default;
 };
 
-[[nodiscard]] inline std::string to_string(const error &e)
+inline std::string to_string(const error &e)
 {
     std::string out(to_string(e.code));
     out += ": ";

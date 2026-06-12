@@ -18,7 +18,7 @@ enum class log_level : std::uint8_t
     error,
 };
 
-[[nodiscard]] constexpr std::string_view to_string(log_level level) noexcept
+constexpr std::string_view to_string(log_level level) noexcept
 {
     switch(level)
     {

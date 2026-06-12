@@ -64,7 +64,7 @@ public:
     // identity field was consumed (its value named the instance, then the
     // transient segment was stripped), so it is satisfied without appearing as a
     // leaf. Callers validating a raw keyspace pass nothing.
-    [[nodiscard]] static schema_validation
+    static schema_validation
     validate(const schema_registry &schema, const keyspace &resolved,
              const std::vector<std::string> &keyed_satisfied = {})
     {

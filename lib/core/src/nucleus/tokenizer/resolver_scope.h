@@ -76,28 +76,28 @@ public:
 
     // Pushes the generic core file frame carrying the value's source location.
     // Activates the ${scope.file_*} keys for the bracketed resolution.
-    [[nodiscard]] frame_guard push_file_frame(std::filesystem::path file);
+    frame_guard push_file_frame(std::filesystem::path file);
 
     // Pushes a host-named generic frame category whose bindings answer
     // ${category.<name>} directly. THIS is the mechanism a host uses to register
     // additional, vocabulary-specific scope frame categories without the core
     // ever learning the vocabulary. Innermost-first: a later push of the same
     // category shadows an earlier one.
-    [[nodiscard]] frame_guard push_scope_frame(std::string category,
+    frame_guard push_scope_frame(std::string category,
                                                std::unordered_map<std::string, std::string> bindings);
 
     // Pushes a param frame carrying function-invocation arguments keyed by
     // parameter name, reached through the reserved "args" category.
-    [[nodiscard]] frame_guard push_param_frame(std::unordered_map<std::string, std::string> params);
+    frame_guard push_param_frame(std::unordered_map<std::string, std::string> params);
 
     // Resolves every ${...} in `input` recursively to a fixpoint and splices the
     // results back into the surrounding text. Returns the fully expanded string,
     // or the first resolution error encountered (a malformed token, an unknown
     // reference, or a cycle/depth halt).
-    [[nodiscard]] token_result resolve_all(std::string_view input);
+    token_result resolve_all(std::string_view input);
 
     // Resolves one whole ${...} token (the input must be a single token).
-    [[nodiscard]] token_result resolve_one(std::string_view token);
+    token_result resolve_one(std::string_view token);
 
 private:
     const tokenizer_registry &m_registry;
@@ -106,10 +106,10 @@ private:
 
     void pop_frame() noexcept;
 
-    [[nodiscard]] token_result dispatch_field(std::string_view category, std::string_view name);
-    [[nodiscard]] token_result dispatch_function(std::string_view category, std::string_view name,
+    token_result dispatch_field(std::string_view category, std::string_view name);
+    token_result dispatch_function(std::string_view category, std::string_view name,
                                                  std::span<const std::string> args);
-    [[nodiscard]] token_result lookup_frame_binding(std::string_view category,
+    token_result lookup_frame_binding(std::string_view category,
                                                     std::string_view name) const;
 };
 

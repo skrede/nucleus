@@ -39,7 +39,7 @@ public:
         return *this;
     }
 
-    [[nodiscard]] tokenizer build() &&
+    tokenizer build() &&
     {
         return tokenizer(std::move(m_category), std::move(m_fields),
                          std::move(m_functions), std::move(m_wildcard));

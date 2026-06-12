@@ -32,12 +32,12 @@ public:
         m_entries.push_back(make_registration(std::move(tok), std::move(owner)));
     }
 
-    [[nodiscard]] std::size_t size() const noexcept { return m_entries.size(); }
+    std::size_t size() const noexcept { return m_entries.size(); }
 
     // Returns the tokenizer registered for `category`, or nullptr. Last
     // registration wins on a duplicate category, so a host override shadows an
     // earlier built-in for the same category name.
-    [[nodiscard]] const tokenizer *find(std::string_view category) const noexcept
+    const tokenizer *find(std::string_view category) const noexcept
     {
         for(auto it = m_entries.rbegin(); it != m_entries.rend(); ++it)
             if(it->spec.category() == category)
@@ -45,7 +45,7 @@ public:
         return nullptr;
     }
 
-    [[nodiscard]] const std::vector<registration<tokenizer>> &entries() const noexcept
+    const std::vector<registration<tokenizer>> &entries() const noexcept
     {
         return m_entries;
     }

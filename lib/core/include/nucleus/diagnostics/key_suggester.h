@@ -27,7 +27,7 @@ namespace nucleus {
 
 // Three character classes for the substitution-weight rule. Anything outside
 // them (notably `_`) falls to the cross-class weight.
-[[nodiscard]] constexpr int key_char_class(char c) noexcept
+constexpr int key_char_class(char c) noexcept
 {
     if(c >= 'a' && c <= 'z') return 1;
     if(c >= '0' && c <= '9') return 2;
@@ -36,7 +36,7 @@ namespace nucleus {
 }
 
 // The weighted edit distance between two key strings.
-[[nodiscard]] inline double weighted_levenshtein(std::string_view a, std::string_view b)
+inline double weighted_levenshtein(std::string_view a, std::string_view b)
 {
     const std::size_t m = a.size();
     const std::size_t n = b.size();
@@ -65,7 +65,7 @@ namespace nucleus {
 // The up-to-`limit` nearest known keys to `unknown`, closest first. Ties break
 // lexicographically so the suggestion order is deterministic. An empty candidate
 // set or a zero limit yields no suggestions.
-[[nodiscard]] inline std::vector<std::string> suggest_keys(
+inline std::vector<std::string> suggest_keys(
     std::string_view unknown,
     std::span<const std::string> known,
     std::size_t limit = 3)

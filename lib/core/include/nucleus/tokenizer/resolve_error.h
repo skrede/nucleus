@@ -40,7 +40,7 @@ struct resolve_error
     }
 };
 
-[[nodiscard]] inline const char *to_string(resolve_errc code) noexcept
+inline const char *to_string(resolve_errc code) noexcept
 {
     switch(code)
     {

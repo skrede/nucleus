@@ -25,7 +25,7 @@ class cli_delimiter
 public:
     cli_delimiter() = default; // the conventional `-`
 
-    [[nodiscard]] static expected<cli_delimiter, std::string> parse(std::string_view text)
+    static expected<cli_delimiter, std::string> parse(std::string_view text)
     {
         if(text.empty())
             return unexpected(std::string("CLI delimiter is empty"));
@@ -38,10 +38,10 @@ public:
         return cli_delimiter(std::string(text));
     }
 
-    [[nodiscard]] const std::string &str() const noexcept { return m_text; }
+    const std::string &str() const noexcept { return m_text; }
 
     // True for the `/` delimiter, where flag body and key path are one string.
-    [[nodiscard]] bool is_separator() const noexcept
+    bool is_separator() const noexcept
     {
         return m_text.size() == 1 && m_text.front() == key_path::separator;
     }
@@ -65,7 +65,7 @@ private:
 // lossless inverse of the segmentation -- the bijection made explicit and the basis
 // for the schema-projected flag surface and tab completion. Core's bijection
 // authority.
-[[nodiscard]] inline std::string flag_of(const key_path &path,
+inline std::string flag_of(const key_path &path,
                                          const cli_delimiter &delimiter = {})
 {
     std::string flag = "--";

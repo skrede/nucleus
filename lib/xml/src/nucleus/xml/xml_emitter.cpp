@@ -29,7 +29,7 @@ namespace {
 // Escapes the five XML metacharacters in embedded text/attribute content. Element
 // names are host-authored identifiers and are emitted verbatim; only the allowed-
 // value annotation carries arbitrary content, so it is escaped here.
-[[nodiscard]] std::string escape(std::string_view text)
+std::string escape(std::string_view text)
 {
     std::string out;
     out.reserve(text.size());
@@ -57,7 +57,7 @@ struct tree_node
     std::vector<tree_node> children;
 };
 
-[[nodiscard]] tree_node &child_of(std::vector<tree_node> &level, const std::string &name)
+tree_node &child_of(std::vector<tree_node> &level, const std::string &name)
 {
     for(tree_node &n : level)
         if(n.name == name)
@@ -96,7 +96,7 @@ void emit_node(const tree_node &n, std::ostream &out, std::size_t depth)
 // Reuses an existing direct child element by name or appends a new one, so siblings
 // of one parent share their parent node, reconstructing the nesting hierarchy from
 // the flat '/'-separated keys.
-[[nodiscard]] pugi::xml_node child_or_append(pugi::xml_node parent, const std::string &name)
+pugi::xml_node child_or_append(pugi::xml_node parent, const std::string &name)
 {
     pugi::xml_node existing = parent.child(name.c_str());
     if(existing)
@@ -108,7 +108,7 @@ void emit_node(const tree_node &n, std::ostream &out, std::size_t depth)
 // Keys are sorted so ordinals ascend; when ordinal == existing count, a new sibling
 // is appended; otherwise the last existing child with that name is returned (still
 // within the same ordinal group, additional fields of the same instance).
-[[nodiscard]] pugi::xml_node indexed_child(pugi::xml_node parent,
+pugi::xml_node indexed_child(pugi::xml_node parent,
                                             const std::string &name,
                                             std::size_t ordinal)
 {

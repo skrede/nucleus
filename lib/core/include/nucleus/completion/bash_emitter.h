@@ -32,7 +32,7 @@ namespace nucleus {
 class bash_emitter final : public shell_emitter
 {
 public:
-    [[nodiscard]] std::string emit(const completion_model &model) const override
+    std::string emit(const completion_model &model) const override
     {
         const std::string fn = "_" + sanitize_ident(model.prog) + "_complete";
         std::string all_flags = join_flags(model.options);
@@ -88,7 +88,7 @@ public:
 
 private:
     // bash single-quote escaping: close the quote, emit an escaped quote, reopen.
-    [[nodiscard]] static std::string single_quote(const std::string &text)
+    static std::string single_quote(const std::string &text)
     {
         std::string out = "'";
         for(char c : text)
@@ -103,7 +103,7 @@ private:
     }
 
     // A safe shell identifier for the function name (non-alnum -> '_').
-    [[nodiscard]] static std::string sanitize_ident(const std::string &text)
+    static std::string sanitize_ident(const std::string &text)
     {
         std::string out;
         out.reserve(text.size());
@@ -116,7 +116,7 @@ private:
         return out;
     }
 
-    [[nodiscard]] static std::string join_flags(
+    static std::string join_flags(
         const std::vector<completion_option> &options)
     {
         std::string out;
@@ -129,7 +129,7 @@ private:
         return out;
     }
 
-    [[nodiscard]] static std::string join_values(
+    static std::string join_values(
         const std::vector<std::string> &values)
     {
         std::string out;

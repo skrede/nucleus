@@ -29,7 +29,7 @@ enum class capability : std::uint8_t
     ordering,
 };
 
-[[nodiscard]] constexpr std::string_view to_string(capability cap) noexcept
+constexpr std::string_view to_string(capability cap) noexcept
 {
     switch(cap)
     {
@@ -60,12 +60,12 @@ public:
             m_flags[index(cap)] = true;
     }
 
-    [[nodiscard]] constexpr bool supports(capability cap) const noexcept
+    constexpr bool supports(capability cap) const noexcept
     {
         return m_flags[index(cap)];
     }
 
-    [[nodiscard]] constexpr capability_descriptor &with(capability cap) noexcept
+    constexpr capability_descriptor &with(capability cap) noexcept
     {
         m_flags[index(cap)] = true;
         return *this;

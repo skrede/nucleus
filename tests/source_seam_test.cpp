@@ -19,12 +19,12 @@ namespace {
 // no virtuals.
 struct handwritten_source
 {
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const
+    nucleus::capability_descriptor capabilities() const
     {
         return {nucleus::capability::nesting};
     }
 
-    [[nodiscard]] nucleus::config_source_result pull()
+    nucleus::config_source_result pull()
     {
         nucleus::config_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(
@@ -41,12 +41,12 @@ static_assert(nucleus::config_source<handwritten_source>,
 // which is what proves the seam is real rather than a single-source stub.
 struct ordering_source
 {
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const
+    nucleus::capability_descriptor capabilities() const
     {
         return {nucleus::capability::ordering};
     }
 
-    [[nodiscard]] nucleus::config_source_result pull()
+    nucleus::config_source_result pull()
     {
         nucleus::config_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(

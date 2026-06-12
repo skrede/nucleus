@@ -21,14 +21,14 @@ namespace {
 // Plain struct satisfying the source concept by duck typing.
 struct capable_source
 {
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const
+    nucleus::capability_descriptor capabilities() const
     {
         return nucleus::capability_descriptor{nucleus::capability::nesting,
                                               nucleus::capability::duplicate_keys,
                                               nucleus::capability::typed_scalars};
     }
 
-    [[nodiscard]] nucleus::config_source_result pull()
+    nucleus::config_source_result pull()
     {
         return nucleus::config_source_batch{};
     }
@@ -38,7 +38,7 @@ struct capable_source
 // `name`) and typed (an int `port` leaf) -- so it derives a HARD nesting
 // requirement and a SOFT typed_scalars one. Authoring order is fixed by attach
 // referential integrity, but the derived requirement set is order-independent.
-[[nodiscard]] nucleus::config_space make_nested_typed_space()
+nucleus::config_space make_nested_typed_space()
 {
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("server", nucleus::anchor::root())));

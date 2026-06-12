@@ -84,8 +84,7 @@ A comment that says what the next line already says is noise: delete it.
   `nucleus::expected`; failures carry `nucleus::error` — an `errc` code naming
   the failure class plus the verbatim human-readable reason. New failure paths
   attach the correct `errc`.
-* `expected` is `[[nodiscard]]`: every result is checked, including in tests
-  and examples.
+* Every `expected` result is checked, including in tests and examples.
 * Errors are loud and named. Never degrade silently, never swallow a failure,
   never report a misleading class (a syntax error is not a range error).
   Host-supplied callables (converters, registration policies) traffic in plain

@@ -20,7 +20,7 @@ enum class registration_kind : std::uint8_t
     converter,
 };
 
-[[nodiscard]] constexpr std::string_view to_string(registration_kind kind) noexcept
+constexpr std::string_view to_string(registration_kind kind) noexcept
 {
     switch(kind)
     {
@@ -47,15 +47,15 @@ struct registration_request
 class policy_verdict
 {
 public:
-    [[nodiscard]] static policy_verdict accept() { return policy_verdict{true, {}}; }
+    static policy_verdict accept() { return policy_verdict{true, {}}; }
 
-    [[nodiscard]] static policy_verdict reject(std::string reason)
+    static policy_verdict reject(std::string reason)
     {
         return policy_verdict{false, std::move(reason)};
     }
 
-    [[nodiscard]] bool accepted() const noexcept { return m_accepted; }
-    [[nodiscard]] const std::string &reason() const noexcept { return m_reason; }
+    bool accepted() const noexcept { return m_accepted; }
+    const std::string &reason() const noexcept { return m_reason; }
 
 private:
     policy_verdict(bool accepted, std::string reason)

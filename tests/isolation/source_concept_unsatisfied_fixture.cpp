@@ -11,7 +11,7 @@ namespace {
 // Structurally incomplete: provides capabilities() but omits the required pull().
 struct missing_pull
 {
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const { return {}; }
+    nucleus::capability_descriptor capabilities() const { return {}; }
 };
 
 // This static_assert is FALSE for missing_pull, triggering a compile error.

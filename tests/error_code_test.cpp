@@ -36,9 +36,9 @@ nucleus::xml_source xml_of(const std::string &text)
 // be satisfied and the gate must abort with unmet_capability.
 struct flat_only_source
 {
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const { return {}; }
+    nucleus::capability_descriptor capabilities() const { return {}; }
 
-    [[nodiscard]] nucleus::config_source_result pull()
+    nucleus::config_source_result pull()
     {
         return nucleus::config_source_batch{};
     }

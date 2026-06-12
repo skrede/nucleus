@@ -32,15 +32,15 @@ public:
     template <typename T>
     explicit retained_buffer(std::shared_ptr<T> held) : m_held(std::move(held)) {}
 
-    [[nodiscard]] static retained_buffer none() noexcept { return retained_buffer{}; }
+    static retained_buffer none() noexcept { return retained_buffer{}; }
 
     template <typename T, typename... Args>
-    [[nodiscard]] static retained_buffer owning(Args &&...args)
+    static retained_buffer owning(Args &&...args)
     {
         return retained_buffer(std::make_shared<T>(std::forward<Args>(args)...));
     }
 
-    [[nodiscard]] bool pins_anything() const noexcept { return m_held != nullptr; }
+    bool pins_anything() const noexcept { return m_held != nullptr; }
 
 private:
     std::shared_ptr<void> m_held;

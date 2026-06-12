@@ -48,7 +48,7 @@ using cli_normalize_result = expected<cli_assignment, std::string>;
 // Normalizes a single argv token into a (key path -> value) assignment, applying
 // the rules above. Reports an error for tokens that are not `--` flags or that
 // have an empty/ malformed key.
-[[nodiscard]] inline cli_normalize_result normalize_arg(std::string_view raw,
+inline cli_normalize_result normalize_arg(std::string_view raw,
                                                         const cli_delimiter &delimiter = {})
 {
     if(!raw.starts_with("--"))

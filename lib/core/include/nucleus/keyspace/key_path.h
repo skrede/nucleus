@@ -40,7 +40,7 @@ public:
     // Parses a `/`-separated FQN string into segments. Leading/trailing
     // separators and empty (`a//b`) segments are rejected so a path always has a
     // canonical, round-trippable form.
-    [[nodiscard]] static expected<key_path, std::string> parse(std::string_view text)
+    static expected<key_path, std::string> parse(std::string_view text)
     {
         if(text.empty())
             return unexpected(std::string("key path is empty"));
@@ -66,20 +66,20 @@ public:
         return key_path(std::move(segments));
     }
 
-    [[nodiscard]] bool empty() const noexcept { return m_segments.empty(); }
-    [[nodiscard]] std::size_t size() const noexcept { return m_segments.size(); }
+    bool empty() const noexcept { return m_segments.empty(); }
+    std::size_t size() const noexcept { return m_segments.size(); }
 
-    [[nodiscard]] const std::vector<std::string> &segments() const noexcept
+    const std::vector<std::string> &segments() const noexcept
     {
         return m_segments;
     }
 
-    [[nodiscard]] const std::string &front() const { return m_segments.front(); }
-    [[nodiscard]] const std::string &leaf() const { return m_segments.back(); }
+    const std::string &front() const { return m_segments.front(); }
+    const std::string &leaf() const { return m_segments.back(); }
 
     // The path one level up (a/b/c -> a/b). An empty path or a single-segment
     // path has an empty parent.
-    [[nodiscard]] key_path parent() const
+    key_path parent() const
     {
         if(m_segments.size() <= 1)
             return key_path{};
@@ -88,7 +88,7 @@ public:
     }
 
     // Extends this path with one more segment (a/b + c -> a/b/c).
-    [[nodiscard]] key_path child(std::string segment) const
+    key_path child(std::string segment) const
     {
         std::vector<std::string> next = m_segments;
         next.push_back(std::move(segment));
@@ -96,7 +96,7 @@ public:
     }
 
     // This path extended by every segment of `tail` (a/b join c/d -> a/b/c/d).
-    [[nodiscard]] key_path join(const key_path &tail) const
+    key_path join(const key_path &tail) const
     {
         std::vector<std::string> next = m_segments;
         next.insert(next.end(), tail.m_segments.begin(), tail.m_segments.end());
@@ -105,7 +105,7 @@ public:
 
     // True when `prefix` is this path's leading segments (a/b/c starts with a/b,
     // with itself, and with the empty path).
-    [[nodiscard]] bool starts_with(const key_path &prefix) const noexcept
+    bool starts_with(const key_path &prefix) const noexcept
     {
         if(prefix.m_segments.size() > m_segments.size())
             return false;
@@ -115,7 +115,7 @@ public:
 
     // The remainder after `prefix` (a/b/c relative to a -> b/c; relative to
     // itself -> empty). Precondition: starts_with(prefix).
-    [[nodiscard]] key_path relative_to(const key_path &prefix) const
+    key_path relative_to(const key_path &prefix) const
     {
         return key_path(std::vector<std::string>(
             m_segments.begin() + static_cast<std::ptrdiff_t>(prefix.m_segments.size()),
@@ -125,7 +125,7 @@ public:
     // True iff seg is a bracket-indexed token: non-empty base, `[`, one or more
     // decimal digits (no leading zeros, max 18 digits), `]`.
     // E.g. "node[0]" -> true, "node[]" -> false, "[0]" -> false.
-    [[nodiscard]] static bool is_indexed_segment(std::string_view seg) noexcept
+    static bool is_indexed_segment(std::string_view seg) noexcept
     {
         auto lb = seg.find('[');
         if(lb == std::string_view::npos || lb == 0)
@@ -146,7 +146,7 @@ public:
 
     // The base name of a segment (everything before `[`), or the whole segment
     // when there is no bracket. Returns a view into the caller's `seg`. No allocation.
-    [[nodiscard]] static std::string_view base_name(std::string_view seg) noexcept
+    static std::string_view base_name(std::string_view seg) noexcept
     {
         auto lb = seg.find('[');
         return lb == std::string_view::npos ? seg : seg.substr(0, lb);
@@ -154,7 +154,7 @@ public:
 
     // Parses the decimal ordinal from a bracket-indexed segment. Precondition:
     // is_indexed_segment(seg). Result is the integer between `[` and `]`.
-    [[nodiscard]] static std::size_t ordinal_of(std::string_view seg) noexcept
+    static std::size_t ordinal_of(std::string_view seg) noexcept
     {
         auto lb = seg.find('[');
         auto digits = seg.substr(lb + 1, seg.size() - lb - 2);
@@ -166,7 +166,7 @@ public:
 
     // The canonical `/`-joined string -- the same shape the source seam emits, so
     // a key_path round-trips through keyspace_entry::path.
-    [[nodiscard]] std::string str() const
+    std::string str() const
     {
         std::string out;
         for(std::size_t i = 0; i < m_segments.size(); ++i)

@@ -47,7 +47,7 @@ schema_registry fixture()
 // deterministically: a Git-Bash may well be installed, but handing it a native
 // temp-file path crosses an unverified path-translation boundary -- the bash
 // completion contract this smoke test exercises is a POSIX one.
-[[nodiscard]] bool bash_available()
+bool bash_available()
 {
 #ifdef _WIN32
     return false;
@@ -58,7 +58,7 @@ schema_registry fixture()
 
 // Runs a bash script and returns its stdout. The script is written to a temp file
 // and executed; the harness captures the single line of output via popen.
-[[nodiscard]] std::string run_bash(const std::string &script)
+std::string run_bash(const std::string &script)
 {
     namespace fs = std::filesystem;
     const fs::path file = fs::temp_directory_path() / "nucleus_completion_smoke.sh";

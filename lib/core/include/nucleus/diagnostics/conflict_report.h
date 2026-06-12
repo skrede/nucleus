@@ -37,19 +37,19 @@ public:
         return *this;
     }
 
-    [[nodiscard]] const std::string &key_path() const noexcept { return m_key; }
+    const std::string &key_path() const noexcept { return m_key; }
 
-    [[nodiscard]] const std::vector<claimant> &claimants() const noexcept
+    const std::vector<claimant> &claimants() const noexcept
     {
         return m_claimants;
     }
 
-    [[nodiscard]] std::size_t size() const noexcept { return m_claimants.size(); }
+    std::size_t size() const noexcept { return m_claimants.size(); }
 
     // A non-adjudicating, human-readable rendering: it names the colliding key and
     // every claimant's location, explicitly stating that no winner is chosen. The
     // host decides what to do; the engine only reports.
-    [[nodiscard]] std::string describe() const
+    std::string describe() const
     {
         std::string out = nucleus::format(
             "key '{}' is claimed by {} registrations:", m_key, m_claimants.size());

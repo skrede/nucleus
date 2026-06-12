@@ -65,7 +65,7 @@ public:
     {}
 
     // Navigate to a named child. Never fails; use exists() to test reachability.
-    [[nodiscard]] config_node operator[](std::string_view name) const
+    config_node operator[](std::string_view name) const
     {
         if(!m_config)
             return config_node{};
@@ -77,34 +77,34 @@ public:
 
     // Navigate to the Nth instance of a repeated node. Returns a null-view
     // (m_config == nullptr) when this node is not repeated or the index is absent.
-    [[nodiscard]] config_node operator[](std::size_t index) const;
+    config_node operator[](std::size_t index) const;
 
     // True when the node corresponds to a path that exists in the config.
-    [[nodiscard]] bool exists() const noexcept;
+    bool exists() const noexcept;
 
     // Structural classification of this node.
-    [[nodiscard]] node_kind kind() const noexcept;
+    node_kind kind() const noexcept;
 
     // Number of instances for a repeated node; 1 for scalars/containers; 0 for absent.
-    [[nodiscard]] std::size_t count() const noexcept;
+    std::size_t count() const noexcept;
 
     // Direct children of this node, in ordinal (repeated) or canonical (container) order.
     // For repeated nodes: one config_node per distinct ordinal, sorted numerically.
     // For container nodes: one config_node per distinct immediate child name.
     // For scalars / absent nodes: empty.
-    [[nodiscard]] std::vector<config_node> children() const;
+    std::vector<config_node> children() const;
 
     // The key path that identifies this node in the resolved keyspace.
-    [[nodiscard]] std::string_view path() const noexcept { return m_path; }
+    std::string_view path() const noexcept { return m_path; }
 
     // The raw string value for a scalar node, or nullopt for containers/absent.
-    [[nodiscard]] std::optional<std::string> value() const;
+    std::optional<std::string> value() const;
 
     // The typed value at this scalar path. Delegates to config::get_as<T>().
     // Returns errc::absent_key carrying the full attempted path when this node
     // is invalid (null-view) or the path is absent.
     template<typename T>
-    [[nodiscard]] expected<T, error> as() const;
+    expected<T, error> as() const;
 
     // Pre-order depth-first visit. Calls fn(*this); if fn returns false, stops.
     // Otherwise recurses into children() in ordinal/canonical order.
@@ -130,7 +130,7 @@ public:
 
 private:
     // Returns distinct ordinal values for this repeated node, sorted numerically.
-    [[nodiscard]] std::vector<std::size_t> distinct_ordinals() const;
+    std::vector<std::size_t> distinct_ordinals() const;
 
     const config *m_config = nullptr;
     std::string   m_path;

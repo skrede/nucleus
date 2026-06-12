@@ -17,19 +17,19 @@ namespace {
 // Minimal struct: only the two required members. Proves any satisfying struct is accepted.
 struct minimal_source
 {
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const { return {}; }
-    [[nodiscard]] nucleus::config_source_result pull() { return nucleus::config_source_batch{}; }
+    nucleus::capability_descriptor capabilities() const { return {}; }
+    nucleus::config_source_result pull() { return nucleus::config_source_batch{}; }
 };
 
 // Flat stub: capabilities() + pull() only. No optional ops.
 struct flat_stub
 {
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const
+    nucleus::capability_descriptor capabilities() const
     {
         return {nucleus::capability::nesting};
     }
 
-    [[nodiscard]] nucleus::config_source_result pull()
+    nucleus::config_source_result pull()
     {
         nucleus::config_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(
@@ -43,14 +43,14 @@ struct projecting_stub
 {
     int projection_count = 0;
 
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const
+    nucleus::capability_descriptor capabilities() const
     {
         return {nucleus::capability::nesting};
     }
 
     void apply_projection(const nucleus::schema_projection &) { ++projection_count; }
 
-    [[nodiscard]] nucleus::config_source_result pull()
+    nucleus::config_source_result pull()
     {
         return nucleus::config_source_batch{};
     }
@@ -61,19 +61,19 @@ struct full_stub
 {
     int projection_count = 0;
 
-    [[nodiscard]] nucleus::capability_descriptor capabilities() const
+    nucleus::capability_descriptor capabilities() const
     {
         return {nucleus::capability::nesting, nucleus::capability::typed_scalars};
     }
 
     void apply_projection(const nucleus::schema_projection &) { ++projection_count; }
 
-    [[nodiscard]] nucleus::inherit_declaration inheritance() const
+    nucleus::inherit_declaration inheritance() const
     {
         return {nucleus::inherit_declaration::kind::parent_path, "sentinel.xml"};
     }
 
-    [[nodiscard]] nucleus::config_source_result pull()
+    nucleus::config_source_result pull()
     {
         nucleus::config_source_batch batch;
         batch.entries.push_back(nucleus::make_entry(

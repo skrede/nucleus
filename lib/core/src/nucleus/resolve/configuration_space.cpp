@@ -79,7 +79,7 @@ struct space_core
         m_conflicts.insert_or_assign(key_path, std::move(report));
     }
 
-    [[nodiscard]] std::vector<conflict_report> conflicts() const
+    std::vector<conflict_report> conflicts() const
     {
         std::vector<conflict_report> out;
         out.reserve(m_conflicts.size());
@@ -121,7 +121,7 @@ namespace {
 // The state-machine guard: mutating the builder is only legal until build() seals
 // it. An attempt after build() is rejected with a reason naming the operation that
 // was actually attempted -- the lifecycle enforced, not merely documented.
-[[nodiscard]] registration_result reject_if_built(bool built, std::string_view what)
+registration_result reject_if_built(bool built, std::string_view what)
 {
     if(built)
         return unexpected(error{errc::sealed_builder, nucleus::format(
@@ -139,7 +139,7 @@ namespace {
 // (equal to the chain index), which the slice step keys its re-open rules on.
 // `entries` is an out-parameter the caller owns: the chain sources must outlive
 // the fold. Returns the assembled handles or a chain-expansion error.
-[[nodiscard]] expected<std::vector<resolution_context::layered_handle>, error>
+expected<std::vector<resolution_context::layered_handle>, error>
 assemble_handles(const space_core &state,
                  source_stack &stack,
                  const load_options &options,
@@ -180,7 +180,7 @@ assemble_handles(const space_core &state,
 
 // Gate for the handle-based fold path. Reads capabilities from each
 // layered_handle without pulling; consistent with the gate for the pointer-based path.
-[[nodiscard]] gate_result gate_assembled_handles(
+gate_result gate_assembled_handles(
     const schema_registry &schema,
     std::span<resolution_context::layered_handle> layers,
     log_sink &log)

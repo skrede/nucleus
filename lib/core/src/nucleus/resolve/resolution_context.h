@@ -74,14 +74,14 @@ public:
 
     // Borrowed by CONST reference and read-only, so concurrent loads on one shared
     // const config_space share nothing mutable and need no synchronization.
-    [[nodiscard]] const schema_registry &schema() const noexcept { return m_schema; }
-    [[nodiscard]] const tokenizer_registry &tokenizer() const noexcept { return m_tokenizer; }
+    const schema_registry &schema() const noexcept { return m_schema; }
+    const tokenizer_registry &tokenizer() const noexcept { return m_tokenizer; }
     // Borrowed (never owned), like the other siblings; read by convert() to supply
     // a converter for a typed element that carries no per-element converter.
-    [[nodiscard]] const converter_registry &converters() const noexcept { return m_converters; }
+    const converter_registry &converters() const noexcept { return m_converters; }
 
-    [[nodiscard]] keyspace &building() noexcept { return m_building; }
-    [[nodiscard]] provenance &origins() noexcept { return m_provenance; }
+    keyspace &building() noexcept { return m_building; }
+    provenance &origins() noexcept { return m_provenance; }
 
     // One entry in the handle-based fold: the erased source, its ascending rank
     // (cross-source precedence), a human-readable label for provenance, and an
@@ -106,7 +106,7 @@ public:
     // indexed scalars in m_building. "config/tag" with duplicate entries becomes
     // "config/tag[0]", "config/tag[1]" etc. "cluster/node[0]/port" from a
     // document source is stored directly. No collection maps used.
-    [[nodiscard]] expected<void, resolve_fold_error>
+    expected<void, resolve_fold_error>
     fold(std::span<layered_handle> layers)
     {
         std::vector<layered_handle *> ordered;
@@ -462,7 +462,7 @@ public:
     //
     // The scope policy applies whenever a strain resolves -- explicitly selected
     // or auto-resolved -- so the two paths cannot diverge for the same strain.
-    [[nodiscard]] expected<void, resolve_fold_error>
+    expected<void, resolve_fold_error>
     slice(const std::optional<std::string> &selection = std::nullopt,
           strain_scope_policy policy = strain_scope_policy::space_open_container_closed)
     {
@@ -797,7 +797,7 @@ public:
     // content gate (an empty schema is not a claim that nothing is allowed). An
     // undeclared key is reported with its nearest declared neighbor so a typo is
     // actionable; missing required fields are reported by the enforcer.
-    [[nodiscard]] expected<void, resolve_fold_error> validate()
+    expected<void, resolve_fold_error> validate()
     {
         if(m_schema.surface().empty())
             return {};
@@ -831,7 +831,7 @@ public:
     // effective converter and converts corresponding paths in the building keyspace.
     // Repeated elements store per-instance typed values keyed by indexed path
     // (e.g. "cluster/node[0]/port"). Must run after validate() and before freeze().
-    [[nodiscard]] expected<void, resolve_fold_error> convert()
+    expected<void, resolve_fold_error> convert()
     {
         for(const schema_element &el : m_schema.elements())
         {
@@ -907,7 +907,7 @@ public:
     // Copies every building value OUT into an owned snapshot and pairs it with the
     // provenance recorded alongside it, producing the immutable, self-owning config.
     // All repeated paths are indexed scalars in m_building; no collection branch needed.
-    [[nodiscard]] config freeze() const
+    config freeze() const
     {
         std::map<std::string, std::string> owned;
         for(const key_path &path : m_building.paths())
@@ -1029,7 +1029,7 @@ private:
     // Computes the unified relay path for a keyed+possibly-indexed path:
     // strips key-value segments (transient primary-key values) but preserves
     // ordinal segments (indexed repeated leaves keep their [N] suffix).
-    [[nodiscard]] std::string relay_canonical(const key_path &path) const
+    std::string relay_canonical(const key_path &path) const
     {
         std::string canonical;
         for(std::size_t i = 0; i < path.segments().size(); ++i)

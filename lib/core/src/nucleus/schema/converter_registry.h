@@ -46,13 +46,13 @@ public:
     }
 
     // The stored converter for `id`, or nullptr when none is registered.
-    [[nodiscard]] const converter *find(std::type_index id) const
+    const converter *find(std::type_index id) const
     {
         auto it = m_converters.find(id);
         return it == m_converters.end() ? nullptr : &it->second;
     }
 
-    [[nodiscard]] std::size_t size() const noexcept { return m_converters.size(); }
+    std::size_t size() const noexcept { return m_converters.size(); }
 
 private:
     std::map<std::type_index, converter> m_converters;
