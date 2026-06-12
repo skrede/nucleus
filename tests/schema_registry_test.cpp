@@ -175,6 +175,48 @@ TEST_CASE("D-10: digit-led element name rejected at attach", "[schema_registry][
     REQUIRE(reg.attach(nucleus::element("t0ag", anchor::keyspace(path_of("tag")))));
 }
 
+TEST_CASE("canonical_text strips indexed segments", "[schema_registry][canonical_text][indexed]")
+{
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::element("cluster", anchor::root())));
+    REQUIRE(reg.attach(nucleus::repeated_element("node", anchor::keyspace("cluster"))));
+    REQUIRE(reg.attach(nucleus::element("port", anchor::keyspace("cluster/node"))));
+    REQUIRE(reg.attach(nucleus::element("endpoint", anchor::keyspace("cluster/node"))));
+
+    REQUIRE(reg.attach(nucleus::element("config", anchor::root())));
+    REQUIRE(reg.attach(nucleus::repeated_element("tags", anchor::keyspace("config"))));
+
+    SECTION("indexed container child -> stripped canonical")
+    {
+        auto p = key_path::parse("cluster/node[0]/port").value();
+        REQUIRE(reg.canonical_text(p) == "cluster/node/port");
+    }
+
+    SECTION("deeper indexed child -> all ordinal segments stripped")
+    {
+        auto p = key_path::parse("cluster/node[1]/endpoint").value();
+        REQUIRE(reg.canonical_text(p) == "cluster/node/endpoint");
+    }
+
+    SECTION("repeated leaf indexed path -> base-name canonical")
+    {
+        auto p = key_path::parse("config/tags[0]").value();
+        REQUIRE(reg.canonical_text(p) == "config/tags");
+    }
+
+    SECTION("container-level indexed path -> container canonical")
+    {
+        auto p = key_path::parse("cluster/node[0]").value();
+        REQUIRE(reg.canonical_text(p) == "cluster/node");
+    }
+
+    SECTION("non-indexed path unchanged")
+    {
+        auto p = key_path::parse("cluster/node/port").value();
+        REQUIRE(reg.canonical_text(p) == "cluster/node/port");
+    }
+}
+
 TEST_CASE("D-18: primary key inside repeated container rejected at attach",
           "[schema_registry][repeated_pkey]")
 {

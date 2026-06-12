@@ -210,6 +210,17 @@ public:
                 extended += key_path::separator;
             extended += segment;
 
+            // Strip ordinal suffix from indexed segments before any other check.
+            if(key_path::is_indexed_segment(segment))
+            {
+                std::string base = canonical;
+                if(!base.empty())
+                    base += key_path::separator;
+                base += std::string(key_path::base_name(segment));
+                canonical = std::move(base);
+                continue;
+            }
+
             if(keyed_container(canonical) && !is_defined_text(extended))
                 continue;
             canonical = std::move(extended);
