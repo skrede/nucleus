@@ -415,3 +415,211 @@ TEST_CASE("get_all_as gathers typed values across indexed instances",
     REQUIRE(result.has_value());
     REQUIRE(*result == std::vector<double>{80.0, 90.0});
 }
+
+// ---------------------------------------------------------------------------
+// D-04: repeated is orthogonal to identity/unique
+// ---------------------------------------------------------------------------
+
+TEST_CASE("D-04: repeated element with no identity or unique attaches and loads",
+          "[repeated_container][D04]")
+{
+    SECTION("repeated container with no identity/unique succeeds")
+    {
+        // A repeated element with no identity/unique declaration attaches successfully.
+        nucleus::config_space_builder engine;
+        REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+        REQUIRE(engine.register_element(
+            nucleus::repeated_element("node", anchor::keyspace("cluster"))));
+        REQUIRE(engine.register_element(
+            nucleus::element("port", anchor::keyspace("cluster/node"))));
+        nucleus::config_space space = engine.build();
+
+        auto src = xml_of("<cluster><node><port>80</port></node></cluster>");
+        auto loaded = nucleus::load_config(space,
+            nucleus::source_stack{std::move(src)}, {});
+        REQUIRE(loaded);
+        REQUIRE(loaded.value().get("cluster/node[0]/port") == "80");
+    }
+
+    SECTION("repeated element coexists with primary key in a different container")
+    {
+        // A repeated element in one container and an identity element in a
+        // DIFFERENT container coexist without conflict.
+        nucleus::config_space_builder engine;
+        // Container A: cluster/node (repeated)
+        REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+        REQUIRE(engine.register_element(
+            nucleus::repeated_element("node", anchor::keyspace("cluster"))));
+        REQUIRE(engine.register_element(
+            nucleus::element("port", anchor::keyspace("cluster/node"))));
+        // Container B: registry/server (keyed by name) -- primary key, different container.
+        REQUIRE(engine.register_element(nucleus::element("registry", anchor::root())));
+        REQUIRE(engine.register_element(
+            nucleus::element("server", anchor::keyspace("registry"))));
+        REQUIRE(engine.register_element(
+            nucleus::primary_key_element("name", anchor::keyspace("registry/server"))));
+        // Both registrations must succeed: no conflict between the two containers.
+        nucleus::config_space space = engine.build();
+
+        auto src = xml_of(
+            "<cluster><node><port>80</port></node></cluster>");
+        auto loaded = nucleus::load_config(space,
+            nucleus::source_stack{std::move(src)}, {});
+        REQUIRE(loaded);
+        REQUIRE(loaded.value().get("cluster/node[0]/port") == "80");
+    }
+
+    SECTION("repeated + unique combination is rejected at attach")
+    {
+        // unique requires a single comparable value; that is incompatible with
+        // repeated (a collection). The registry must reject this at attach time.
+        nucleus::schema_registry reg;
+        REQUIRE(reg.attach(nucleus::element("cluster", anchor::root())));
+        nucleus::schema_element el = nucleus::repeated_element("tag", anchor::keyspace("cluster"));
+        el.unique = true;
+        auto result = reg.attach(std::move(el));
+        REQUIRE_FALSE(result);
+        REQUIRE(result.error().find("unique") != std::string::npos);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// D-17: repeated container inside a keyed container -- ordinals survive slice
+// ---------------------------------------------------------------------------
+
+TEST_CASE("D-17: repeated container inside keyed container -- ordinals survive slice",
+          "[repeated_container][D17]")
+{
+    // Schema: cluster -> server (keyed by name) -> route (repeated) -> port.
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(engine.register_element(
+        nucleus::element("server", anchor::keyspace("cluster"))));
+    REQUIRE(engine.register_element(
+        nucleus::primary_key_element("name", anchor::keyspace("cluster/server"))));
+    REQUIRE(engine.register_element(
+        nucleus::repeated_element("route", anchor::keyspace("cluster/server"))));
+    REQUIRE(engine.register_element(
+        nucleus::element("port", anchor::keyspace("cluster/server/route"))));
+    nucleus::config_space space = engine.build();
+
+    auto src = xml_of(
+        "<cluster>"
+        "<server name=\"primary\">"
+        "<route><port>80</port></route>"
+        "<route><port>443</port></route>"
+        "</server>"
+        "</cluster>");
+
+    nucleus::load_options opts;
+    opts.selection = "primary";
+    auto loaded = nucleus::load_config(space,
+        nucleus::source_stack{std::move(src)}, opts);
+    REQUIRE(loaded);
+    const nucleus::config &cfg = loaded.value();
+
+    // Ordinal segments must survive slice(): the key "primary" is stripped but
+    // route[0] and route[1] remain at their declared positions.
+    REQUIRE(cfg.get("cluster/server/route[0]/port") == "80");
+    REQUIRE(cfg.get("cluster/server/route[1]/port") == "443");
+
+    // Non-selected strain data must be absent.
+    REQUIRE_FALSE(cfg.contains("cluster/server/primary/route"));
+}
+
+// ---------------------------------------------------------------------------
+// D-19: extend= targeting repeated container via inheritance chain
+// ---------------------------------------------------------------------------
+
+TEST_CASE("D-19: extend= on repeated container via document inheritance is a layering violation",
+          "[repeated_container][D19]")
+{
+    // Two XML documents in an inheritance chain: base declares cluster/node
+    // instances; the derived document applies extend= to a node element inside
+    // the repeated container. The fold must return layering_violation.
+    nucleus::config_space_builder engine;
+    declare_cluster_node_schema(engine);
+    nucleus::config_space space = engine.build();
+
+    const char *base_doc =
+        "<cluster>"
+        "<node><port>80</port></node>"
+        "</cluster>";
+    const char *derived_doc =
+        "<cluster>"
+        "<node extend=\"narrow\"><port>90</port></node>"
+        "</cluster>";
+
+    nucleus::load_options opts;
+    opts.document_paths = {"base.xml", "derived.xml"};
+    opts.make_document = [&](const std::string &path) -> nucleus::source_handle {
+        if(path == "base.xml")
+            return nucleus::source_handle(xml_of(base_doc));
+        return nucleus::source_handle(xml_of(derived_doc));
+    };
+
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{}, opts);
+    REQUIRE_FALSE(loaded);
+    REQUIRE(loaded.error().code == nucleus::errc::layering_violation);
+    // Message must name the offending repeated container path.
+    REQUIRE(loaded.error().message.find("cluster/node") != std::string::npos);
+}
+
+// ---------------------------------------------------------------------------
+// D-21: get_all gathers across instances with floating-point values
+// ---------------------------------------------------------------------------
+
+TEST_CASE("D-21: get_all gathers across three repeated instances in ordinal order",
+          "[repeated_container][D21][gather]")
+{
+    // Three-node schema; XML with port values 1.5, 2.0, 3.0 (as text scalars).
+    nucleus::config_space_builder engine;
+    declare_cluster_node_schema(engine);
+    nucleus::config_space space = engine.build();
+
+    auto src = xml_of(
+        "<cluster>"
+        "<node><port>1.5</port></node>"
+        "<node><port>2.0</port></node>"
+        "<node><port>3.0</port></node>"
+        "</cluster>");
+    auto loaded = nucleus::load_config(space,
+        nucleus::source_stack{std::move(src)}, {});
+    REQUIRE(loaded);
+    const nucleus::config &cfg = loaded.value();
+
+    // get_all returns values in ordinal order.
+    auto ports = cfg.get_all("cluster/node/port");
+    REQUIRE(ports == std::vector<std::string>{"1.5", "2.0", "3.0"});
+
+    // get() on the container path (no scalar at unindexed crossing) returns nullopt.
+    REQUIRE(cfg.get("cluster/node") == std::nullopt);
+}
+
+TEST_CASE("D-21: get_all_as gathers typed double values across three instances",
+          "[repeated_container][D21][gather][typed]")
+{
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(engine.register_element(
+        nucleus::repeated_element("node", anchor::keyspace("cluster"))));
+    nucleus::schema_element port_el =
+        nucleus::typed_element<double>("port", anchor::keyspace("cluster/node"));
+    REQUIRE(engine.register_element(std::move(port_el)));
+    nucleus::config_space space = engine.build();
+
+    auto src = xml_of(
+        "<cluster>"
+        "<node><port>1.5</port></node>"
+        "<node><port>2.0</port></node>"
+        "<node><port>3.0</port></node>"
+        "</cluster>");
+    auto loaded = nucleus::load_config(space,
+        nucleus::source_stack{std::move(src)}, {});
+    REQUIRE(loaded);
+    const nucleus::config &cfg = loaded.value();
+
+    auto result = cfg.get_all_as<double>("cluster/node/port");
+    REQUIRE(result.has_value());
+    REQUIRE(*result == std::vector<double>{1.5, 2.0, 3.0});
+}
