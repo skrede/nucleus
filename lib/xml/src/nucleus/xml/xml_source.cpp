@@ -8,6 +8,7 @@
 #include "nucleus/schema/projection.h"
 
 #include "nucleus/keyspace/entry.h"
+#include "nucleus/keyspace/key_path.h"
 #include "nucleus/keyspace/value.h"
 
 #include <pugixml.hpp>
@@ -23,6 +24,27 @@ namespace nucleus {
 using xml::document_arena;
 
 namespace {
+
+// Strips ordinal suffixes from all segments of a path so an indexed path like
+// "cluster/node[0]/route" maps back to its declared form "cluster/node/route".
+// Used to look up paths in the schema_projection which stores declared (unindexed) paths.
+std::string declared_path(std::string_view path)
+{
+    std::string result;
+    std::size_t start = 0;
+    for(std::size_t i = 0; i <= path.size(); ++i)
+    {
+        if(i == path.size() || path[i] == key_path::separator)
+        {
+            std::string_view seg = path.substr(start, i - start);
+            if(!result.empty())
+                result.push_back(key_path::separator);
+            result.append(key_path::base_name(seg));
+            start = i + 1;
+        }
+    }
+    return result;
+}
 
 // Joins a parent path and a child segment with the keyspace separator. The empty
 // parent (document root) yields the bare segment.
@@ -128,6 +150,7 @@ walk(const pugi::xml_node &node, std::string_view path,
      const capability_descriptor &caps, const schema_projection &proj,
      config_source_batch &batch, std::string_view skip,
      std::map<std::string, std::set<std::string>> &seen_keys,
+     std::map<std::string, std::size_t> &ordinal_counters,
      bool is_root, std::size_t depth)
 {
     if(depth > max_element_depth)
@@ -232,14 +255,30 @@ walk(const pugi::xml_node &node, std::string_view path,
                 }
 
                 if(auto r = walk(child, join(child_path, key_val), caps, proj,
-                                 batch, *key, seen_keys, false, depth + 1); !r)
+                                 batch, *key, seen_keys, ordinal_counters,
+                                 false, depth + 1); !r)
                     return r;
                 continue;
             }
         }
 
+        // Repeated container: assign a zero-based ordinal per sibling occurrence
+        // in document order. Strips ordinal suffixes from child_path for the
+        // projection lookup since the schema stores declared (unindexed) paths.
+        if(proj.is_repeated_container(declared_path(child_path)))
+        {
+            std::size_t &ordinal = ordinal_counters[child_path];
+            std::string indexed_path =
+                child_path + "[" + std::to_string(ordinal++) + "]";
+            if(auto r = walk(child, indexed_path, caps, proj, batch,
+                             {}, seen_keys, ordinal_counters,
+                             false, depth + 1); !r)
+                return r;
+            continue;
+        }
+
         if(auto r = walk(child, child_path, caps, proj, batch, {}, seen_keys,
-                         false, depth + 1); !r)
+                         ordinal_counters, false, depth + 1); !r)
             return r;
     }
 
@@ -293,6 +332,7 @@ config_source_result xml_source::pull()
 
     config_source_batch batch;
     std::map<std::string, std::set<std::string>> seen_keys;
+    std::map<std::string, std::size_t> ordinal_counters;
 
     if(!m_space_name.empty())
     {
@@ -314,7 +354,7 @@ config_source_result xml_source::pull()
             if(child.type() != pugi::node_element)
                 continue;
             if(auto r = walk(child, std::string_view(child.name()), capabilities(), m_projection,
-                             batch, {}, seen_keys, false, 1); !r)
+                             batch, {}, seen_keys, ordinal_counters, false, 1); !r)
                 return unexpected(r.error());
         }
     }
@@ -322,7 +362,7 @@ config_source_result xml_source::pull()
     {
         // Unnamed space: root element name is the first key segment (unchanged behavior).
         if(auto r = walk(root, std::string_view(root.name()), capabilities(), m_projection,
-                         batch, {}, seen_keys, true, 0); !r)
+                         batch, {}, seen_keys, ordinal_counters, true, 0); !r)
             return unexpected(r.error());
     }
 
