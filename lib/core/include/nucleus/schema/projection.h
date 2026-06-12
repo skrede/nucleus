@@ -2,6 +2,7 @@
 #define HPP_GUARD_NUCLEUS_SCHEMA_PROJECTION_H
 
 #include <map>
+#include <set>
 #include <string>
 #include <cstddef>
 #include <utility>
@@ -35,11 +36,26 @@ public:
         return it == m_keys.end() ? nullptr : &it->second;
     }
 
+    // Marks a container path as repeated; a source's walk assigns ordinals to
+    // sibling elements at this path.
+    void set_repeated_container(std::string container_path)
+    {
+        m_repeated_containers.insert(std::move(container_path));
+    }
+
+    // True when container_path has been declared as a repeated container.
+    [[nodiscard]] bool is_repeated_container(std::string_view container_path) const
+    {
+        return m_repeated_containers.find(std::string(container_path))
+               != m_repeated_containers.end();
+    }
+
     [[nodiscard]] bool empty() const noexcept { return m_keys.empty(); }
     [[nodiscard]] std::size_t size() const noexcept { return m_keys.size(); }
 
 private:
     std::map<std::string, std::string> m_keys;
+    std::set<std::string> m_repeated_containers;
 };
 
 }

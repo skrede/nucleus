@@ -170,9 +170,10 @@ public:
 
     // The projection a source consults to render repeatable keyed containers: for
     // every primary-key element, its parent container path mapped to the key
-    // field name. Built from the schema so the source need never see the registry
-    // -- the fold hands it across at resolve time. Empty when no primary keys are
-    // declared, leaving a source's structural walk unchanged.
+    // field name; and for every repeated container, its declared path. Built from
+    // the schema so the source need never see the registry -- the fold hands it
+    // across at resolve time. Empty when no primary keys are declared, leaving a
+    // source's structural walk unchanged.
     [[nodiscard]] schema_projection projection() const
     {
         schema_projection proj;
@@ -181,6 +182,8 @@ public:
             if(el.identity)
                 proj.set_key(el.container().str(), el.name);
         }
+        for(const std::string &path : repeated_container_paths())
+            proj.set_repeated_container(path);
         return proj;
     }
 
@@ -307,6 +310,28 @@ public:
     }
 
 private:
+    // Returns paths of repeated elements that are containers (at least one other
+    // element is anchored under them). Used by projection() and the fold.
+    [[nodiscard]] std::set<std::string> repeated_container_paths() const
+    {
+        std::set<std::string> containers;
+        for(const schema_element &el : m_elements)
+        {
+            if(!el.repeated)
+                continue;
+            const std::string dp = el.declared_path().str();
+            for(const schema_element &child : m_elements)
+            {
+                if(child.container().str() == dp)
+                {
+                    containers.insert(dp);
+                    break;
+                }
+            }
+        }
+        return containers;
+    }
+
     // A node is "defined" if it is itself a declared element path or a prefix of
     // one (the intermediate keyspace nodes an element implies). This lets an
     // element anchor under either a leaf or an intermediate keyspace that an
