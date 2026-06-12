@@ -79,3 +79,56 @@ TEST_CASE("key_path relative_to strips a leading prefix", "[key_path]")
     REQUIRE(path.relative_to(key_path{}) == path);
     REQUIRE(path.relative_to(path).empty());
 }
+
+TEST_CASE("indexed segment helpers", "[key_path][indexed]")
+{
+    SECTION("is_indexed_segment accepts well-formed bracket notation")
+    {
+        REQUIRE(key_path::is_indexed_segment("node[0]"));
+        REQUIRE(key_path::is_indexed_segment("node[12]"));
+        REQUIRE(key_path::is_indexed_segment("node[42]"));
+    }
+
+    SECTION("is_indexed_segment rejects ill-formed variants")
+    {
+        REQUIRE_FALSE(key_path::is_indexed_segment("node"));
+        REQUIRE_FALSE(key_path::is_indexed_segment("node[]"));   // empty digits
+        REQUIRE_FALSE(key_path::is_indexed_segment("[0]"));      // empty base name
+        REQUIRE_FALSE(key_path::is_indexed_segment("node[0x1]")); // non-decimal digit
+    }
+
+    SECTION("base_name extracts the part before the bracket")
+    {
+        REQUIRE(key_path::base_name("node[0]") == "node");
+        REQUIRE(key_path::base_name("node") == "node");  // non-indexed: unchanged
+    }
+
+    SECTION("ordinal_of parses the decimal index")
+    {
+        REQUIRE(key_path::ordinal_of("node[0]") == 0);
+        REQUIRE(key_path::ordinal_of("node[7]") == 7);
+        REQUIRE(key_path::ordinal_of("node[42]") == 42);
+    }
+
+    SECTION("parse accepts indexed segments as a whole segment token")
+    {
+        auto result = key_path::parse("cluster/node[0]/port");
+        REQUIRE(result);
+        REQUIRE(result.value().segments().size() == 3);
+        REQUIRE(result.value().segments()[0] == "cluster");
+        REQUIRE(result.value().segments()[1] == "node[0]");
+        REQUIRE(result.value().segments()[2] == "port");
+        REQUIRE(result.value().str() == "cluster/node[0]/port");
+    }
+
+    SECTION("parse rejects malformed bracket notation")
+    {
+        auto bad_alpha = key_path::parse("cluster/node[bad]/port");
+        REQUIRE_FALSE(bad_alpha);
+        REQUIRE(bad_alpha.error().find("malformed indexed segment") != std::string::npos);
+
+        auto empty_idx = key_path::parse("cluster/node[]/port");
+        REQUIRE_FALSE(empty_idx);
+        REQUIRE(empty_idx.error().find("malformed indexed segment") != std::string::npos);
+    }
+}

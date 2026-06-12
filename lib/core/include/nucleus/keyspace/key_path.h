@@ -55,6 +55,11 @@ public:
                     return unexpected(std::string("key path '") + std::string(text)
                                 + "' has an empty segment");
                 segments.emplace_back(text.substr(start, i - start));
+                // Reject segments that contain `[` but are not valid bracket-index form.
+                if(segments.back().find('[') != std::string::npos
+                   && !is_indexed_segment(segments.back()))
+                    return unexpected(std::string("key path '") + std::string(text)
+                                + "' has a malformed indexed segment '" + segments.back() + "'");
                 start = i + 1;
             }
         }
@@ -115,6 +120,44 @@ public:
         return key_path(std::vector<std::string>(
             m_segments.begin() + static_cast<std::ptrdiff_t>(prefix.m_segments.size()),
             m_segments.end()));
+    }
+
+    // True iff seg is a bracket-indexed token: non-empty base, `[`, one or more
+    // decimal digits, `]`. E.g. "node[0]" -> true, "node[]" -> false, "[0]" -> false.
+    [[nodiscard]] static bool is_indexed_segment(std::string_view seg) noexcept
+    {
+        auto lb = seg.find('[');
+        if(lb == std::string_view::npos || lb == 0)
+            return false;
+        if(seg.back() != ']')
+            return false;
+        auto digits = seg.substr(lb + 1, seg.size() - lb - 2);
+        if(digits.empty())
+            return false;
+        for(char c : digits)
+            if(c < '0' || c > '9')
+                return false;
+        return true;
+    }
+
+    // The base name of a segment (everything before `[`), or the whole segment
+    // when there is no bracket. Returns a view into the caller's `seg`. No allocation.
+    [[nodiscard]] static std::string_view base_name(std::string_view seg) noexcept
+    {
+        auto lb = seg.find('[');
+        return lb == std::string_view::npos ? seg : seg.substr(0, lb);
+    }
+
+    // Parses the decimal ordinal from a bracket-indexed segment. Precondition:
+    // is_indexed_segment(seg). Result is the integer between `[` and `]`.
+    [[nodiscard]] static std::size_t ordinal_of(std::string_view seg) noexcept
+    {
+        auto lb = seg.find('[');
+        auto digits = seg.substr(lb + 1, seg.size() - lb - 2);
+        std::size_t value = 0;
+        for(char c : digits)
+            value = value * 10 + static_cast<std::size_t>(c - '0');
+        return value;
     }
 
     // The canonical `/`-joined string -- the same shape the source seam emits, so
