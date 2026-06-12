@@ -50,7 +50,7 @@ public:
                != m_repeated_containers.end();
     }
 
-    [[nodiscard]] bool empty() const noexcept { return m_keys.empty(); }
+    [[nodiscard]] bool empty() const noexcept { return m_keys.empty() && m_repeated_containers.empty(); }
     [[nodiscard]] std::size_t size() const noexcept { return m_keys.size(); }
 
 private:
