@@ -173,3 +173,51 @@ TEST_CASE("a value containing a quote cannot break out of the bash literal",
     // The single quote is escaped via the close/escape/reopen idiom.
     REQUIRE(bash.find("'a'\\''b'") != std::string::npos);
 }
+
+// D-12: project() emits a wildcard entry for paths that cross a repeated container.
+// The wildcard flag substitutes a '*' at the repeated-container position so the bash
+// and zsh completion scripts can complete after any typed ordinal (e.g. --cluster-node-2-).
+namespace {
+
+schema_registry repeated_cluster_registry()
+{
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::element("cluster", anchor::root())));
+    REQUIRE(reg.attach(nucleus::repeated_element("node", anchor::keyspace(path_of("cluster")))));
+    REQUIRE(reg.attach(nucleus::element("endpoint", anchor::keyspace(path_of("cluster/node")))));
+    REQUIRE(reg.attach(nucleus::element("port", anchor::keyspace(path_of("cluster/node/endpoint")))));
+    return reg;
+}
+
+} // namespace
+
+TEST_CASE("completion emits wildcard flag for path crossing a repeated container",
+          "[completion][repeated_container][D12]")
+{
+    const schema_registry reg = repeated_cluster_registry();
+    const std::string bash = generate_completion(shell::bash, reg, "myapp");
+
+    // Standard non-wildcard flag must still appear.
+    REQUIRE(bash.find("--cluster-node-endpoint-port") != std::string::npos);
+
+    // Wildcard flag: the repeated container segment followed by '*'.
+    REQUIRE(bash.find("--cluster-node-*-endpoint-port") != std::string::npos);
+}
+
+TEST_CASE("completion wildcard entry appears in zsh script for repeated container",
+          "[completion][repeated_container][D12]")
+{
+    const schema_registry reg = repeated_cluster_registry();
+    const std::string zsh = generate_completion(shell::zsh, reg, "myapp");
+
+    REQUIRE(zsh.find("--cluster-node-endpoint-port") != std::string::npos);
+    REQUIRE(zsh.find("--cluster-node-*-endpoint-port") != std::string::npos);
+}
+
+TEST_CASE("completion wildcard does not appear for non-repeated schema",
+          "[completion][repeated_container][D12]")
+{
+    const std::string bash = generate_completion(shell::bash, fixture(), "myapp");
+    // fixture() has no repeated container -- no wildcard should be present.
+    REQUIRE(bash.find("-*-") == std::string::npos);
+}
