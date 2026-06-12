@@ -19,6 +19,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <map>
 #include <string>
 #include <vector>
 #include <algorithm>
@@ -439,4 +440,95 @@ TEST_CASE("config_node deep navigation reaches scalar value", "[config_node][nav
     auto v = port.as<std::string>();
     REQUIRE(v);
     REQUIRE(*v == "9090");
+}
+
+// ---------------------------------------------------------------------------
+// D-16 integration: visit() pre-order and walker enter/leave over loaded config
+// ---------------------------------------------------------------------------
+
+TEST_CASE("config_node visit -- depth-first pre-order over loaded config",
+          "[config_node][visit][D16]")
+{
+    // Two-node cluster config loaded via load_config.
+    const nucleus::config cfg = load_two_nodes("80", "443");
+
+    std::vector<std::string> visited;
+    cfg.root().visit([&](const nucleus::config_node &n) {
+        visited.push_back(std::string(n.path()));
+        return true;
+    });
+
+    // Pre-order: root first, then cluster, then cluster/node (repeated),
+    // then node[0] and its children, then node[1] and its children.
+    REQUIRE_FALSE(visited.empty());
+    REQUIRE(visited[0].empty()); // root has empty path
+
+    // node[0] must appear in the visited list before node[1].
+    auto pos0 = std::find(visited.begin(), visited.end(), "cluster/node[0]");
+    auto pos1 = std::find(visited.begin(), visited.end(), "cluster/node[1]");
+    REQUIRE(pos0 != visited.end());
+    REQUIRE(pos1 != visited.end());
+    REQUIRE(std::distance(pos0, pos1) > 0); // node[0] comes before node[1]
+
+    // node[0]/port must be visited before node[1].
+    auto pos0_port = std::find(visited.begin(), visited.end(), "cluster/node[0]/port");
+    REQUIRE(pos0_port != visited.end());
+    // node[0]/port must precede node[1] (entire node[0] subtree before node[1]).
+    REQUIRE(std::distance(pos0_port, pos1) > 0);
+}
+
+TEST_CASE("config_node visit -- returning false stops the walk over loaded config",
+          "[config_node][visit][D16]")
+{
+    const nucleus::config cfg = load_two_nodes("80", "443");
+
+    std::size_t count = 0;
+    cfg.root()["cluster"]["node"].visit([&](const nucleus::config_node &) {
+        ++count;
+        return false; // stop after first node visited
+    });
+
+    REQUIRE(count == 1);
+}
+
+TEST_CASE("config_node walker -- enter/leave order over loaded config",
+          "[config_node][walker][D16]")
+{
+    const nucleus::config cfg = load_two_nodes("80", "443");
+
+    recording_walker walker;
+    cfg.root()["cluster"]["node"].walk(walker);
+
+    // Each enter must have a corresponding leave (balanced depth counter).
+    REQUIRE_FALSE(walker.events.empty());
+    int depth = 0;
+    for(const auto &ev : walker.events)
+    {
+        if(ev.enter)
+            ++depth;
+        else
+        {
+            REQUIRE(depth > 0);
+            --depth;
+        }
+    }
+    REQUIRE(depth == 0); // every enter matched by a leave
+
+    // Enter for each node must precede its leave (LIFO nesting).
+    // For every enter event, the corresponding leave must come after.
+    std::map<std::string, std::size_t> enter_idx;
+    for(std::size_t i = 0; i < walker.events.size(); ++i)
+    {
+        const auto &ev = walker.events[i];
+        if(ev.enter)
+        {
+            enter_idx[ev.path] = i;
+        }
+        else
+        {
+            auto it = enter_idx.find(ev.path);
+            REQUIRE(it != enter_idx.end());
+            REQUIRE(it->second < i); // enter preceded the leave
+        }
+    }
 }

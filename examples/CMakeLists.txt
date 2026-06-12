@@ -13,7 +13,7 @@ function(nucleus_add_example name)
 endfunction()
 
 # Getting started.
-nucleus_add_example(quickstart nucleus::argv)
+nucleus_add_example(quickstart nucleus::argv nucleus::runtime)
 nucleus_add_example(schema nucleus::env)
 
 # Sources: the built-in flat sources and the seam a host extends.
