@@ -25,23 +25,51 @@ using xml::document_arena;
 
 namespace {
 
-// Strips ordinal suffixes from all segments of a path so an indexed path like
-// "cluster/node[0]/route" maps back to its declared form "cluster/node/route".
-// Used to look up paths in the schema_projection which stores declared (unindexed) paths.
-std::string declared_path(std::string_view path)
+// Computes the declared (schema-registered) path from a walk-time path that may
+// contain both ordinal suffixes ("node[0]") and transient key-value segments
+// inserted by the keyed-instance walk (e.g. "primary" in "cluster/server/primary/route").
+// Strips ordinal suffixes from every segment AND skips key-value segments:
+// a segment is a key value when the previous declared segment is a keyed container.
+// After skipping a key value, the key container remains the current context so
+// subsequent segments are appended under it (key values are purely transient).
+std::string declared_path(std::string_view path, const schema_projection &proj)
 {
-    std::string result;
+    std::vector<std::string_view> raw_segs;
     std::size_t start = 0;
     for(std::size_t i = 0; i <= path.size(); ++i)
     {
         if(i == path.size() || path[i] == key_path::separator)
         {
-            std::string_view seg = path.substr(start, i - start);
-            if(!result.empty())
-                result.push_back(key_path::separator);
-            result.append(key_path::base_name(seg));
+            raw_segs.push_back(path.substr(start, i - start));
             start = i + 1;
         }
+    }
+
+    std::string result;
+    std::string current;  // declared path built so far (for projection key lookups)
+    bool skip_next = false; // true when the immediately next segment is a key value
+    for(std::string_view seg : raw_segs)
+    {
+        if(skip_next)
+        {
+            // This segment is the key value; discard it. current stays unchanged
+            // so subsequent segments attach directly under the keyed container.
+            skip_next = false;
+            continue;
+        }
+
+        const std::string_view base = key_path::base_name(seg); // strips "[N]" suffix
+        if(!result.empty())
+            result.push_back(key_path::separator);
+        result.append(base);
+
+        if(!current.empty())
+            current.push_back(key_path::separator);
+        current.append(base);
+
+        // If the declared path we just added is a keyed container, the immediately
+        // following segment is its key value and must be skipped.
+        skip_next = (proj.key_of(current) != nullptr);
     }
     return result;
 }
@@ -263,19 +291,20 @@ walk(const pugi::xml_node &node, std::string_view path,
         }
 
         // Repeated container: assign a zero-based ordinal per sibling occurrence
-        // in document order. Strips ordinal suffixes from child_path for the
-        // projection lookup since the schema stores declared (unindexed) paths.
+        // in document order. Strips ordinal suffixes and key-value segments from
+        // child_path for the projection lookup since the schema stores declared paths.
         // extend= on a repeated container is recorded as a disposition (the fold
         // will reject it as a layering_violation); it must not surface as an
         // attribute entry in the keyspace.
-        if(proj.is_repeated_container(declared_path(child_path)))
+        if(proj.is_repeated_container(declared_path(child_path, proj)))
         {
             static constexpr std::string_view kExtend = "extend";
             if(pugi::xml_attribute ext_attr = child.attribute(kExtend.data()))
             {
-                // Record a sentinel disposition so fold() can emit layering_violation.
+                // Record a sentinel disposition using the declared path (key segments
+                // stripped) so fold() can match it against repeated_container_prefixes.
                 batch.dispositions.push_back(
-                    {child_path, {}, extend_strength::narrow});
+                    {declared_path(child_path, proj), {}, extend_strength::narrow});
                 (void)ext_attr; // value ignored; fold rejects all extend= on repeated
             }
             std::size_t &ordinal = ordinal_counters[child_path];
