@@ -10,6 +10,7 @@
 
 #include <pugixml.hpp>
 
+#include <set>
 #include <string>
 #include <vector>
 #include <ostream>
@@ -155,6 +156,9 @@ void emit_template(const config_space &space, std::ostream &out,
 // Projects a resolved config into a populated XML document: each '/'-separated
 // key splits into element segments, intermediate segments are shared parent nodes,
 // and the leaf is appended once per value so a repeated path persists ALL its values.
+// Indexed scalar keys (e.g. "server/tag[0]") are emitted via their canonical path
+// ("server/tag") to produce valid XML element names; all indexed instances of the
+// same canonical path are emitted together in ordinal order.
 // A malformed key is skipped (never thrown), consistent with the read path.
 // When space_name is non-empty, all top-level elements are re-parented under a new
 // wrapper element named space_name for symmetric round-trip with with_space_name().
@@ -162,9 +166,32 @@ void emit_document(const config &config, std::ostream &out,
                    std::string_view space_name)
 {
     pugi::xml_document doc;
+    // Track canonical keys already emitted to avoid duplicate XML output when
+    // multiple indexed scalars share the same canonical path.
+    std::set<std::string> emitted_canonical;
     for(const std::string &key : config.keys())
     {
-        auto parsed = key_path::parse(key);
+        // Compute canonical key (strips [N] ordinal suffixes from all segments).
+        std::string canonical;
+        {
+            std::size_t start = 0;
+            for(std::size_t i = 0; i <= key.size(); ++i)
+            {
+                if(i == key.size() || key[i] == key_path::separator)
+                {
+                    std::string_view seg(key.data() + start, i - start);
+                    if(!canonical.empty())
+                        canonical.push_back(key_path::separator);
+                    canonical.append(key_path::base_name(seg));
+                    start = i + 1;
+                }
+            }
+        }
+
+        if(!emitted_canonical.insert(canonical).second)
+            continue; // already emitted all values for this canonical path
+
+        auto parsed = key_path::parse(canonical);
         if(!parsed)
             continue;
 
@@ -178,9 +205,9 @@ void emit_document(const config &config, std::ostream &out,
         for(std::size_t i = 0; i + 1 < segments.size(); ++i)
             node = child_or_append(node, segments[i]);
 
-        // The leaf is appended once per value -- pugixml escapes the text on save.
+        // Append one XML leaf element per value (repeated leaves produce siblings).
         const std::string &leaf = segments.back();
-        for(const std::string &value : config.get_all(key))
+        for(const std::string &value : config.get_all(canonical))
         {
             pugi::xml_node leaf_node = node.append_child(leaf.c_str());
             leaf_node.append_child(pugi::node_pcdata).set_value(value.c_str());

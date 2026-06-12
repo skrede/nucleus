@@ -78,39 +78,18 @@ inline std::function<nucleus::source_handle(const std::string &)> file_factory(s
 }
 
 // Serializes a resolved config to one deterministic line per key, in the
-// already-sorted keys() order. A scalar key emits `key = value [layer]`; a
-// repeated path emits one indexed line per element, `key[i] = value [layer]`,
-// each carrying its own per-element layer. Every line ends with a newline.
+// already-sorted keys() order. Each key emits `key = value [layer]`.
+// Indexed scalar keys (e.g. "cluster/server/tag[0]") appear as-is per the
+// unified storage model where all repeated instances are indexed scalars.
 inline std::string serialize(const nucleus::config &config)
 {
     std::string out;
     for(const std::string &key : config.keys())
     {
-        const std::vector<std::string> values = config.get_all(key);
-        const std::vector<nucleus::origin> *col = config.collection_provenance_of(key);
-        if(col != nullptr)
-        {
-            // Repeated path: one line per element with its own layer label.
-            for(std::size_t i = 0; i < values.size(); ++i)
-            {
-                const std::string layer =
-                    i < col->size() ? (*col)[i].layer : std::string("unknown layer");
-                out += key;
-                out += "[";
-                out += std::to_string(i);
-                out += "] = ";
-                out += values[i];
-                out += " [";
-                out += layer;
-                out += "]\n";
-            }
-            continue;
-        }
-
-        // Scalar path: a single line with the winning origin's layer label.
         const nucleus::origin *orig = config.provenance_of(key);
         const std::string layer = orig != nullptr ? orig->layer : std::string("unknown layer");
-        const std::string val = values.empty() ? std::string() : values.front();
+        const auto val_opt = config.get(key);
+        const std::string val = val_opt.has_value() ? val_opt.value() : std::string();
         out += key;
         out += " = ";
         out += val;

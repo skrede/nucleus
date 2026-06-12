@@ -101,6 +101,11 @@ public:
     // The caller assigns ascending ranks for cross-source precedence; the
     // stable_sort folds low rank first. Each handle is pulled exactly once per
     // load; the project->pull->inherit lifecycle contract holds unchanged.
+    //
+    // Unified storage: ALL repeated paths (leaves and containers) are stored as
+    // indexed scalars in m_building. "config/tag" with duplicate entries becomes
+    // "config/tag[0]", "config/tag[1]" etc. "cluster/node[0]/port" from a
+    // document source is stored directly. No collection maps used.
     [[nodiscard]] expected<void, resolve_fold_error>
     fold(std::span<layered_handle> layers)
     {
@@ -122,6 +127,11 @@ public:
                 repeated_paths.insert(el.declared_path().str());
         }
 
+        // Repeated container prefixes: declared paths of repeated elements that
+        // have child elements. Used for wholesale-replace and extend= guard.
+        const std::set<std::string> repeated_container_prefixes =
+            m_schema.repeated_container_paths();
+
         for(layered_handle *lh : ordered)
         {
             lh->handle->apply_projection(projection);
@@ -133,7 +143,26 @@ public:
 
             config_source_batch &batch = pulled.value();
 
-            std::set<std::string> seen_repeated_this_layer;
+            // D-19: extend= targeting a repeated container is not supported.
+            for(const extend_disposition &d : batch.dispositions)
+            {
+                if(repeated_container_prefixes.count(d.container_path))
+                    return unexpected(error{errc::layering_violation,
+                        nucleus::format(
+                            "extend= targeting repeated container '{}' is not "
+                            "supported: repeated containers replace wholesale "
+                            "across layers",
+                            d.container_path)});
+            }
+
+            // Per-layer counters for repeated leaves arriving as plain paths
+            // (duplicate_keys sources like runtime_source or tree sources with flat
+            // repeated leaves). Keyed by canonical path.
+            std::map<std::string, std::size_t> leaf_ordinal_counters;
+
+            // Tracks which container prefixes have had their wholesale-replace
+            // sweep done in this layer.
+            std::set<std::string> swept_containers_this_layer;
 
             for(keyspace_entry &entry : batch.entries)
             {
@@ -143,15 +172,84 @@ public:
                         "source '{}': token resolution failed for key '{}': {}",
                         lh->label, entry.path, expanded.error().message)});
 
-                auto path = key_path::parse(entry.path);
-                if(!path)
+                auto path_res = key_path::parse(entry.path);
+                if(!path_res)
                     continue;
+                key_path path = std::move(path_res).value();
 
-                const std::string canonical_path = m_schema.canonical_text(path.value());
-                if(repeated_paths.count(canonical_path))
+                const std::string canonical_path = m_schema.canonical_text(path);
+
+                // Determine if this entry is an already-indexed path from a
+                // document source (e.g. "cluster/node[0]/port" from a tree source).
+                const bool is_already_indexed = [&]() {
+                    for(const std::string &seg : path.segments())
+                        if(key_path::is_indexed_segment(seg))
+                            return true;
+                    return false;
+                }();
+
+                if(is_already_indexed)
                 {
+                    // Case B: already-indexed path (from a tree source's ordinal emission).
+                    // Find the container prefix (the declared repeated container path).
+                    std::string container_prefix;
+                    for(const std::string &prefix : repeated_container_prefixes)
+                    {
+                        // The canonical of this path must start with prefix + separator.
+                        const std::string p_slash = prefix + key_path::separator;
+                        if(canonical_path == prefix
+                           || canonical_path.compare(0, p_slash.size(), p_slash) == 0)
+                        {
+                            container_prefix = prefix;
+                            break;
+                        }
+                    }
+                    // Also handle repeated leaves with indexed paths (config/tags[0]).
+                    if(container_prefix.empty() && repeated_paths.count(canonical_path))
+                        container_prefix = canonical_path;
+
+                    if(!container_prefix.empty()
+                       && !swept_containers_this_layer.count(container_prefix))
+                    {
+                        // D-06 wholesale-replace: on first entry from a new layer
+                        // touching this container, remove all existing entries.
+                        swept_containers_this_layer.insert(container_prefix);
+                        const std::string cp_slash =
+                            container_prefix + key_path::separator;
+                        const std::vector<key_path> snapshot = m_building.paths();
+                        for(const key_path &existing : snapshot)
+                        {
+                            const std::string es = existing.str();
+                            // Remove entries that belong to this container:
+                            // either their canonical starts with the prefix or equals it.
+                            const std::string ec = m_schema.canonical_text(existing);
+                            const bool under =
+                                ec == container_prefix
+                                || ec.compare(0, cp_slash.size(), cp_slash) == 0;
+                            if(under)
+                            {
+                                m_building.remove(existing);
+                                m_provenance.forget(es);
+                            }
+                        }
+                    }
+
+                    m_building.set(path, value::owned(std::move(expanded).value()));
+                    m_provenance.record(entry.path,
+                                        origin{lh->rank, lh->label, lh->owner,
+                                               lh->inheritance_layer});
+                }
+                else if(repeated_paths.count(canonical_path))
+                {
+                    // Case A: plain repeated-leaf entry arriving as a plain path
+                    // (from duplicate_keys sources like runtime_source or tree sources).
+                    // Track ordinals by ACTUAL path for per-strain independence;
+                    // wholesale-replace by CANONICAL path so all prior-layer entries
+                    // for this repeated field are evicted on first new-layer access.
+                    const std::string &actual_path_str = entry.path;
+
                     if(!entry.capabilities.supports(capability::duplicate_keys)
-                       && seen_repeated_this_layer.count(entry.path) != 0)
+                       && leaf_ordinal_counters.count(actual_path_str) != 0)
                     {
                         return unexpected(error{errc::layering_violation,
                             nucleus::format(
@@ -162,38 +260,47 @@ public:
                                 lh->label, entry.path)});
                     }
 
-                    const bool is_first_in_layer =
-                        (seen_repeated_this_layer.count(entry.path) == 0);
-                    seen_repeated_this_layer.insert(entry.path);
+                    // Cross-layer wholesale-replace: on first touch of this canonical
+                    // repeated path in this layer, sweep existing flat (non-keyed)
+                    // entries whose canonical form matches. Keyed entries (paths that
+                    // contain transient key-value segments) are intentionally left in
+                    // the building keyspace so slice() can still find and relay the
+                    // strain; relay_strain handles displacement via its rank check.
+                    if(!swept_containers_this_layer.count(canonical_path))
+                    {
+                        swept_containers_this_layer.insert(canonical_path);
+                        const std::string cp_bracket = canonical_path + "[";
+                        const std::vector<key_path> snapshot = m_building.paths();
+                        for(const key_path &existing : snapshot)
+                        {
+                            const std::string es = existing.str();
+                            // Only sweep flat entries: those that ARE the canonical path
+                            // or are directly-indexed versions of it (canonical_path[N]).
+                            if(es != canonical_path
+                               && es.compare(0, cp_bracket.size(), cp_bracket) != 0)
+                                continue;
+                            m_building.remove(existing);
+                            m_provenance.forget(es);
+                        }
+                    }
 
-                    if(is_first_in_layer)
-                    {
-                        std::vector<value> init;
-                        init.push_back(value::owned(std::move(expanded).value()));
-                        m_building.replace_collection(path.value(), std::move(init));
-                        std::vector<origin> col_origins;
-                        col_origins.push_back(
-                            origin{lh->rank, lh->label, lh->owner, lh->inheritance_layer});
-                        m_provenance.record_collection(path.value().str(),
-                                                       std::move(col_origins));
-                    }
-                    else
-                    {
-                        m_building.append(path.value(),
-                                          value::owned(std::move(expanded).value()));
-                        const std::vector<origin> *existing =
-                            m_provenance.collection_origins_of(path.value().str());
-                        std::vector<origin> updated =
-                            existing ? *existing : std::vector<origin>{};
-                        updated.push_back(
-                            origin{lh->rank, lh->label, lh->owner, lh->inheritance_layer});
-                        m_provenance.record_collection(path.value().str(),
-                                                       std::move(updated));
-                    }
+                    const std::size_t ordinal = leaf_ordinal_counters[actual_path_str]++;
+                    // Store with ordinal appended to the ACTUAL path (not canonical),
+                    // preserving any key segment for relay_strain to find.
+                    const std::string indexed_path =
+                        actual_path_str + "[" + std::to_string(ordinal) + "]";
+                    auto indexed_kp = key_path::parse(indexed_path);
+                    if(!indexed_kp)
+                        continue;
+                    m_building.set(indexed_kp.value(),
+                                   value::owned(std::move(expanded).value()));
+                    m_provenance.record(indexed_path,
+                                        origin{lh->rank, lh->label, lh->owner,
+                                               lh->inheritance_layer});
                 }
                 else
                 {
-                    m_building.set(path.value(), value::owned(std::move(expanded).value()));
+                    m_building.set(path, value::owned(std::move(expanded).value()));
                     m_provenance.record(entry.path,
                                         origin{lh->rank, lh->label, lh->owner,
                                                lh->inheritance_layer});
@@ -266,6 +373,12 @@ public:
             std::map<std::string, std::vector<key_path>> strains;
             for(const key_path &path : m_building.paths())
             {
+                // Skip paths where the segment after the container is an ordinal
+                // index -- those are flat-source repeated leaves, not keyed instances.
+                if(path.size() > container.size()
+                   && key_path::is_indexed_segment(path.segments()[container.size()]))
+                    continue;
+
                 if(m_schema.keyed_instance_path(container, path))
                     strains[path.segments()[container.size()]].push_back(path);
                 else if(m_schema.key_value_collision(container, path))
@@ -589,15 +702,9 @@ public:
     }
 
     // Runs the typed conversion pass: for every typed schema element, resolves the
-    // effective converter -- the element's own per-element converter if present,
-    // otherwise the converter the borrowed converter_registry holds for the
-    // element's type_identity -- and converts the corresponding path in the
-    // post-slice building keyspace. A typed element with neither a per-element nor
-    // a registry converter is left unconverted (absence, not error). Absent typed
-    // paths are silently skipped (absence is orthogonal to required-ness, which
-    // validate() enforces). A conversion failure fails the resolve with the path,
-    // the converter's reason, and the winning layer label from provenance. Must
-    // run after validate() and before freeze().
+    // effective converter and converts corresponding paths in the building keyspace.
+    // Repeated elements store per-instance typed values keyed by indexed path
+    // (e.g. "cluster/node[0]/port"). Must run after validate() and before freeze().
     [[nodiscard]] expected<void, resolve_fold_error> convert()
     {
         for(const schema_element &el : m_schema.elements())
@@ -605,8 +712,6 @@ public:
             if(!el.type_identity.has_value())
                 continue;
 
-            // The element's own converter wins; otherwise the registry's converter
-            // for the element's type. Neither resolved leaves the element untyped.
             const converter_registry::converter *conv =
                 el.converter ? &el.converter
                              : m_converters.find(el.type_identity.value());
@@ -614,44 +719,41 @@ public:
                 continue;
 
             const std::string path_str = el.declared_path().str();
-            const auto kp_opt = key_path::parse(path_str);
-            if(!kp_opt)
-                continue;
-            const key_path &kp = kp_opt.value();
 
             if(el.repeated)
             {
-                const std::vector<value> *col = m_building.find_collection(kp);
-                if(col == nullptr)
-                    continue;
-
-                std::vector<std::any> typed_col;
-                typed_col.reserve(col->size());
-                for(std::size_t i = 0; i < col->size(); ++i)
+                // Enumerate all indexed scalar paths whose canonical form matches
+                // the declared path; convert each one independently.
+                for(const key_path &kp : m_building.paths())
                 {
-                    auto res = (*conv)((*col)[i].text());
+                    if(m_schema.canonical_text(kp) != path_str)
+                        continue;
+                    const value *v = m_building.find(kp);
+                    if(v == nullptr)
+                        continue;
+                    auto res = (*conv)(v->text());
                     if(!res)
                     {
                         std::string layer_label = "unknown layer";
-                        const std::vector<origin> *co =
-                            m_provenance.collection_origins_of(path_str);
-                        if(co != nullptr && i < co->size())
-                            layer_label = (*co)[i].layer;
+                        const origin *orig = m_provenance.of(kp.str());
+                        if(orig != nullptr)
+                            layer_label = orig->layer;
                         return unexpected(error{errc::failed_conversion,
                             nucleus::format(
-                                "conversion failed for '{}' element [{}]: {} (layer: {})",
-                                path_str, i, res.error(), layer_label)});
+                                "conversion failed for '{}': {} (layer: {})",
+                                kp.str(), res.error(), layer_label)});
                     }
-                    typed_col.push_back(std::move(res).value());
+                    m_typed.emplace(kp.str(), std::move(res).value());
                 }
-                m_typed_collections.emplace(path_str, std::move(typed_col));
             }
             else
             {
-                const value *v = m_building.find(kp);
+                const auto kp_opt = key_path::parse(path_str);
+                if(!kp_opt)
+                    continue;
+                const value *v = m_building.find(kp_opt.value());
                 if(v == nullptr)
                     continue;
-
                 auto res = (*conv)(v->text());
                 if(!res)
                 {
@@ -670,71 +772,42 @@ public:
     }
 
     // Copies every building value OUT into an owned snapshot and pairs it with the
-    // provenance recorded alongside it, producing the immutable, self-owning
-    // config. After this returns the context (and every retained buffer)
-    // may be dropped: the config holds no view into any of them. The
-    // collection branch is checked FIRST: find() returns nullptr for repeated
-    // paths, so only find_collection() can reach them.
+    // provenance recorded alongside it, producing the immutable, self-owning config.
+    // All repeated paths are indexed scalars in m_building; no collection branch needed.
     [[nodiscard]] config freeze() const
     {
         std::map<std::string, std::string> owned;
-        std::map<std::string, std::vector<std::string>> collections;
         for(const key_path &path : m_building.paths())
         {
-            if(const std::vector<value> *col = m_building.find_collection(path))
-            {
-                std::vector<std::string> out;
-                out.reserve(col->size());
-                for(const value &v : *col)
-                    out.push_back(std::string(v.text()));
-                collections.emplace(path.str(), std::move(out));
-            }
-            else if(const value *v = m_building.find(path))
-            {
+            if(const value *v = m_building.find(path))
                 owned.emplace(path.str(), std::string(v->text()));
-            }
         }
-        return config(std::move(owned), std::move(collections),
-                             m_typed, m_typed_collections, m_provenance);
+        return config(std::move(owned), m_typed, m_provenance);
     }
 
 private:
-    // Re-lays one strain's keyed entries onto the unified (key-stripped) paths,
-    // applying the policy's rank-bounded filter to each entry's WINNING rank:
-    // file_level and space_open_container_closed freeze the strain's keyed
-    // entries at the defining layer Ld; container_open_until_next_strain admits
-    // them up to but excluding Ls. An entry already at the unified path with a
-    // higher winning rank (a flat override such as argv) displaces the keyed
-    // value -- it composes by plain rank precedence, outside the bounds.
+    // Re-lays one strain's keyed entries onto the unified (key-stripped) paths.
+    // All repeated-path entries are indexed scalars; no collection branch needed.
+    // Ordinal segments in the keyed path are preserved; only key-value segments
+    // (transient instance selectors) are stripped.
     //
-    // When wide_extend=true the rank filter is bypassed entirely: the chosen
-    // strain was declared with extend-wide, which is explicit consent to compose
-    // all its entries regardless of the active scope policy.
-    //
-    // Repeated (collection) leaves under the keyed container are relayed
-    // atomically: find_collection() is checked before find() so collections are
-    // never silently dropped.
+    // Flat-override wins wholesale: for a repeated path, if any existing indexed
+    // entry at the unified canonical base has a higher rank than the keyed entry
+    // being relayed, the entire repeated collection from the keyed source is
+    // displaced (not just the individual slot). This ensures a flat override at
+    // higher rank replaces the whole collection, not just [0].
     void relay_strain(const std::vector<key_path> &keyed_paths,
                       strain_scope_policy policy, std::size_t Ld, std::size_t Ls,
                       bool wide_extend = false)
     {
+        // Canonical bases of repeated paths that are fully displaced by a
+        // higher-rank flat override. Populated on first relay attempt per base.
+        std::set<std::string> displaced_bases;
+
         for(const key_path &keyed : keyed_paths)
         {
             const origin *from = m_provenance.of(keyed.str());
             std::size_t entry_rank = from != nullptr ? from->rank : 0;
-            if(from == nullptr)
-            {
-                // Repeated leaf: scalar provenance is absent; derive rank from the
-                // collection's winning layer instead.
-                const std::vector<origin> *col_orig =
-                    m_provenance.collection_origins_of(keyed.str());
-                if(col_orig != nullptr && !col_orig->empty())
-                    entry_rank = col_orig->front().rank;
-                // If col_orig is null or empty, entry_rank stays 0, treating the
-                // entry as introduced at the base layer. The exclusion filter will
-                // not fire (0 <= Ld always) and the relay branch below will find no
-                // data to relay -- a no-op, which is the safe default.
-            }
             const bool excluded = !wide_extend && (
                 policy == strain_scope_policy::container_open_until_next_strain
                     ? entry_rank >= Ls
@@ -746,81 +819,116 @@ private:
                 continue;
             }
 
-            auto unified = key_path::parse(m_schema.canonical_text(keyed));
+            // Compute the unified path: strip key segments but PRESERVE ordinal
+            // segments so indexed repeated-leaf instances keep their ordinals.
+            const std::string unified_str = relay_canonical(keyed);
+            auto unified = key_path::parse(unified_str);
             if(!unified)
                 continue;
 
-            if(!m_building.find(unified.value()))
+            const value *v = m_building.find(keyed);
+            if(v == nullptr)
             {
-                if(const std::vector<value> *col = m_building.find_collection(keyed))
+                // Nothing to relay (path exists in bucket but no value).
+                m_building.remove(keyed);
+                m_provenance.forget(keyed.str());
+                continue;
+            }
+
+            // For indexed unified paths, check whether the canonical base (the
+            // repeated field without the ordinal) is already wholly displaced by
+            // a higher-rank override. A higher-rank entry at ANY indexed slot of
+            // the same canonical base means the flat source replaced the entire
+            // collection, so no relay entry should be written.
+            const bool unified_is_indexed = [&]() {
+                for(const auto &seg : unified.value().segments())
+                    if(key_path::is_indexed_segment(seg))
+                        return true;
+                return false;
+            }();
+            if(unified_is_indexed)
+            {
+                // Canonical base: strip ordinals from all segments.
+                const std::string canonical_base = m_schema.canonical_text(unified.value());
+                if(displaced_bases.count(canonical_base))
                 {
-                    // Repeated leaf: relay to the unified path. If a collection is
-                    // already there (from a flat source fold), check rank so a
-                    // higher-rank flat source's collection is not silently discarded.
-                    const std::vector<origin> *existing_co =
-                        m_provenance.collection_origins_of(unified.value().str());
-                    const std::size_t existing_rank =
-                        (existing_co != nullptr && !existing_co->empty())
-                            ? existing_co->front().rank : 0;
-                    if(existing_rank > entry_rank)
+                    // Already determined the whole base is displaced; skip.
+                    m_building.remove(keyed);
+                    m_provenance.forget(keyed.str());
+                    continue;
+                }
+                // Check: is any existing entry for the canonical base at higher rank?
+                bool base_displaced = false;
+                for(const key_path &bp : m_building.paths())
+                {
+                    if(m_schema.canonical_text(bp) != canonical_base)
+                        continue;
+                    const origin *bpfrom = m_provenance.of(bp.str());
+                    if(bpfrom != nullptr && bpfrom->rank > entry_rank)
                     {
-                        // Unified path already has a higher-rank collection; keyed
-                        // collection is displaced -- drop it, keep the existing.
-                    }
-                    else
-                    {
-                        m_building.replace_collection(unified.value(),
-                                                      std::vector<value>(*col));
-                        if(const std::vector<origin> *co =
-                               m_provenance.collection_origins_of(keyed.str()))
-                            m_provenance.record_collection(unified.value().str(), *co);
+                        base_displaced = true;
+                        break;
                     }
                 }
-                else if(const value *v = m_building.find(keyed))
+                if(base_displaced)
                 {
-                    // Scalar relay: unchanged.
-                    m_building.set(unified.value(), *v);
-                    if(from != nullptr)
-                        m_provenance.record(unified.value().str(), *from);
+                    displaced_bases.insert(canonical_base);
+                    m_building.remove(keyed);
+                    m_provenance.forget(keyed.str());
+                    continue;
                 }
             }
-            else
+
+            // Check if the unified path is already occupied by a higher-rank value.
+            const origin *at = m_provenance.of(unified_str);
+            const bool displaced = at != nullptr && at->rank > entry_rank;
+            if(!displaced)
             {
-                // A scalar already occupies the unified path; check displacement.
-                const origin *at = m_provenance.of(unified.value().str());
-
-                // For a collection leaf, scalar provenance (from) is absent; use
-                // the collection's winning rank for the displacement comparison so
-                // a lower-rank flat scalar cannot silence a higher-rank collection.
-                const std::size_t effective_rank =
-                    from != nullptr ? from->rank : entry_rank;
-                const bool displaced =
-                    at != nullptr && at->rank > effective_rank;
-
-                if(!displaced)
-                {
-                    if(const std::vector<value> *col =
-                           m_building.find_collection(keyed))
-                    {
-                        // Collection wins: replace the scalar at the unified path.
-                        m_building.replace_collection(unified.value(),
-                                                      std::vector<value>(*col));
-                        if(const std::vector<origin> *co =
-                               m_provenance.collection_origins_of(keyed.str()))
-                            m_provenance.record_collection(
-                                unified.value().str(), *co);
-                    }
-                    else if(const value *v = m_building.find(keyed))
-                    {
-                        m_building.set(unified.value(), *v);
-                        if(from != nullptr)
-                            m_provenance.record(unified.value().str(), *from);
-                    }
-                }
+                m_building.set(unified.value(), *v);
+                if(from != nullptr)
+                    m_provenance.record(unified_str, *from);
             }
             m_building.remove(keyed);
             m_provenance.forget(keyed.str());
         }
+    }
+
+    // Computes the unified relay path for a keyed+possibly-indexed path:
+    // strips key-value segments (transient primary-key values) but preserves
+    // ordinal segments (indexed repeated leaves keep their [N] suffix).
+    [[nodiscard]] std::string relay_canonical(const key_path &path) const
+    {
+        std::string canonical;
+        for(std::size_t i = 0; i < path.segments().size(); ++i)
+        {
+            const std::string &segment = path.segments()[i];
+            std::string extended = canonical;
+            if(!extended.empty())
+                extended += key_path::separator;
+            extended += segment;
+
+            // Indexed segments (e.g. "tags[0]"): keep as-is (preserve ordinal).
+            if(key_path::is_indexed_segment(segment))
+            {
+                canonical = std::move(extended);
+                continue;
+            }
+
+            // Key-value segment: the schema says this extended path is a keyed
+            // instance path one level past the keyed container. Skip the key value.
+            const auto canonical_kp = key_path::parse(canonical);
+            if(canonical_kp.has_value())
+            {
+                // Build a fake "extended" key_path to check keyed_instance_path.
+                const auto ext_kp = key_path::parse(extended);
+                if(ext_kp.has_value()
+                   && m_schema.keyed_instance_path(canonical_kp.value(), ext_kp.value()))
+                    continue;
+            }
+
+            canonical = std::move(extended);
+        }
+        return canonical;
     }
 
     const schema_registry &m_schema;
@@ -829,9 +937,9 @@ private:
 
     keyspace m_building;
     provenance m_provenance;
-    // Typed parallel maps populated by convert() -- scalar and repeated paths.
-    std::map<std::string, std::any>              m_typed;
-    std::map<std::string, std::vector<std::any>> m_typed_collections;
+    // Typed values populated by convert(). All repeated-path instances are keyed
+    // by their full indexed path string (e.g. "cluster/node[0]/port").
+    std::map<std::string, std::any> m_typed;
     std::vector<retained_buffer> m_buffers;
     // Containers whose single primary-keyed instance was sliced onto the unified
     // hierarchy -- evidence for the enforcer that their identity is satisfied

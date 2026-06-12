@@ -144,8 +144,9 @@ TEST_CASE("a value at an undeclared path is rejected", "[enforcer]")
     REQUIRE(violation_mentions(v.error(), "not declared by the schema"));
 }
 
-TEST_CASE("a repeated element rejects a collection value outside the allowed set", "[enforcer]")
+TEST_CASE("a repeated element rejects an indexed value outside the allowed set", "[enforcer]")
 {
+    // After unified fold, repeated elements are stored as indexed scalars.
     schema_registry reg;
     REQUIRE(reg.attach(nucleus::element("logging", anchor::root())));
     auto level = nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
@@ -154,17 +155,16 @@ TEST_CASE("a repeated element rejects a collection value outside the allowed set
     REQUIRE(reg.attach(std::move(level)));
 
     keyspace ks;
-    ks.append(path_of("logging/level"), nucleus::value::owned("info"));
-    ks.append(path_of("logging/level"), nucleus::value::owned("warm"));
+    ks.set(path_of("logging/level[0]"), nucleus::value::owned("info"));
+    ks.set(path_of("logging/level[1]"), nucleus::value::owned("warm"));
 
     auto v = schema_enforcer::validate(reg, ks);
     REQUIRE_FALSE(v);
-    REQUIRE(violation_mentions(v.error(),
-                               "collection value 'warm' is not one of the allowed values"));
+    REQUIRE(violation_mentions(v.error(), "'warm' is not one of the allowed values"));
     REQUIRE(violation_mentions(v.error(), "did you mean 'warn'?"));
 }
 
-TEST_CASE("a repeated element accepts a collection of admissible values", "[enforcer]")
+TEST_CASE("a repeated element accepts indexed values within the allowed set", "[enforcer]")
 {
     schema_registry reg;
     REQUIRE(reg.attach(nucleus::element("logging", anchor::root())));
@@ -174,8 +174,8 @@ TEST_CASE("a repeated element accepts a collection of admissible values", "[enfo
     REQUIRE(reg.attach(std::move(level)));
 
     keyspace ks;
-    ks.append(path_of("logging/level"), nucleus::value::owned("info"));
-    ks.append(path_of("logging/level"), nucleus::value::owned("error"));
+    ks.set(path_of("logging/level[0]"), nucleus::value::owned("info"));
+    ks.set(path_of("logging/level[1]"), nucleus::value::owned("error"));
 
     REQUIRE(schema_enforcer::validate(reg, ks));
 }

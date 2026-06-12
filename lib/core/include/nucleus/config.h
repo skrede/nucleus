@@ -4,6 +4,7 @@
 #include "nucleus/error.h"
 #include "nucleus/expected.h"
 
+#include "nucleus/keyspace/key_path.h"
 #include "nucleus/keyspace/provenance.h"
 
 #include <any>
@@ -23,6 +24,12 @@ namespace nucleus {
 // no view into any dropped buffer, outlives every source, and is freely thread-safe
 // to read (const reads only). Provenance travels with the values -- recorded in the
 // same fold step -- so get() and provenance_of() can never disagree about a key.
+//
+// Repeated paths (both repeated containers and repeated leaves) are stored as
+// indexed scalars in m_values: "config/tags[0]"="a", "config/tags[1]"="b",
+// "cluster/node[0]/port"="80", "cluster/node[1]/port"="90". get_all() gathers
+// them by scanning for keys whose canonical form matches and sorting by numeric
+// ordinal -- not by lexicographic map order, which breaks for ordinals >= 10.
 class config
 {
 public:
@@ -33,82 +40,85 @@ public:
     {
     }
 
+    // Extended constructor carrying the typed parallel map produced by convert().
     config(std::map<std::string, std::string> values,
-                  std::map<std::string, std::vector<std::string>> collections,
-                  provenance origins)
+           std::map<std::string, std::any> typed,
+           provenance origins)
         : m_values(std::move(values)),
-          m_collections(std::move(collections)),
-          m_provenance(std::move(origins))
-    {
-    }
-
-    // Extended constructor carrying the typed parallel maps produced by the
-    // convert() pass. The existing two-arg and three-arg constructors are
-    // unchanged; this form is called by freeze() after convert() runs.
-    config(std::map<std::string, std::string> values,
-                  std::map<std::string, std::vector<std::string>> collections,
-                  std::map<std::string, std::any> typed,
-                  std::map<std::string, std::vector<std::any>> typed_collections,
-                  provenance origins)
-        : m_values(std::move(values)),
-          m_collections(std::move(collections)),
           m_typed(std::move(typed)),
-          m_typed_collections(std::move(typed_collections)),
           m_provenance(std::move(origins))
     {
     }
 
     // The owned value at a key, or nullopt if the key carries no value. The
     // returned string is a copy -- no buffer dependency survives into it.
-    // For repeated paths (where get_all() returns a collection), returns the
-    // LAST element by precedence order.
+    // For repeated paths, returns nullopt for unindexed paths; use get_all()
+    // or get("path[N]") for direct indexed access.
     [[nodiscard]] std::optional<std::string> get(const std::string &key) const
     {
         auto it = m_values.find(key);
         if(it != m_values.end())
             return it->second;
-        auto cit = m_collections.find(key);
-        if(cit != m_collections.end() && !cit->second.empty())
-            return cit->second.back();
         return std::nullopt;
     }
 
-    // All values at a key. For repeated paths returns the full ordered collection;
-    // for single-value paths returns a one-element vector; for absent paths returns
-    // an empty vector.
+    // All values at a key. For repeated paths (cluster/node/port), gathers all
+    // indexed instances (cluster/node[0]/port, cluster/node[1]/port, ...) whose
+    // canonical form matches, sorted by numeric ordinal. For single-value paths
+    // returns a one-element vector; for absent paths returns an empty vector.
     [[nodiscard]] std::vector<std::string> get_all(const std::string &key) const
     {
-        auto cit = m_collections.find(key);
-        if(cit != m_collections.end())
-            return cit->second;
-        auto it = m_values.find(key);
-        if(it != m_values.end())
-            return {it->second};
-        return {};
+        // Direct single-value hit (non-repeated path).
+        auto direct = m_values.find(key);
+        if(direct != m_values.end())
+            return {direct->second};
+
+        // Gather indexed instances whose canonical form matches the key.
+        // Collect (ordinal, value) pairs; sort by numeric ordinal for correct
+        // ordering when ordinal >= 10 (lexicographic map order is wrong there).
+        std::vector<std::pair<std::size_t, std::string>> indexed;
+        for(const auto &[k, v] : m_values)
+        {
+            // Fast pre-filter: key must start with the base name of a segment in k.
+            // Canonical form strips indexed segments; check if it equals `key`.
+            // To avoid calling schema here, we compute canonical inline:
+            // strip [N] suffixes from each segment and compare.
+            const std::string canonical = canonical_of(k);
+            if(canonical != key)
+                continue;
+
+            // Extract the ordinal from the first indexed segment in k
+            // that was stripped in the canonical path.
+            const std::size_t ordinal = first_ordinal_of(k);
+            indexed.emplace_back(ordinal, v);
+        }
+
+        if(indexed.empty())
+            return {};
+
+        std::stable_sort(indexed.begin(), indexed.end(),
+                         [](const auto &a, const auto &b) {
+                             return a.first < b.first;
+                         });
+
+        std::vector<std::string> out;
+        out.reserve(indexed.size());
+        for(auto &[ord, val] : indexed)
+            out.push_back(std::move(val));
+        return out;
     }
 
     [[nodiscard]] bool contains(const std::string &key) const
     {
-        if(m_values.find(key) != m_values.end())
-            return true;
-        auto cit = m_collections.find(key);
-        return cit != m_collections.end() && !cit->second.empty();
+        return m_values.find(key) != m_values.end();
     }
 
     // "Why is this value X?" -- the winning source's origin for a scalar key, or
-    // nullptr. For repeated paths (collections), returns nullptr; use
-    // collection_provenance_of() instead.
+    // nullptr. For indexed paths (e.g. "cluster/node[0]/port"), returns the origin
+    // for that specific indexed path.
     [[nodiscard]] const origin *provenance_of(const std::string &key) const
     {
         return m_provenance.of(key);
-    }
-
-    // The per-element origins for a repeated-path collection, or nullptr when
-    // the key is absent or carries a scalar.
-    [[nodiscard]] const std::vector<origin> *
-    collection_provenance_of(const std::string &key) const
-    {
-        return m_provenance.collection_origins_of(key);
     }
 
     // Returns the typed value at `key` converted by the registered converter.
@@ -125,10 +135,6 @@ public:
         auto it = m_typed.find(key);
         if(it == m_typed.end())
         {
-            if(m_typed_collections.find(key) != m_typed_collections.end())
-                return unexpected(error{errc::mismatched_type,
-                            std::string("path '") + key
-                            + "' holds a typed collection; use get_all_as<T>()"});
             if(contains(key))
                 return unexpected(error{errc::missing_converter,
                             std::string("path '") + key + "' declares no type converter"});
@@ -142,70 +148,113 @@ public:
         return std::any_cast<T>(it->second);
     }
 
-    // Returns all typed elements for a repeated path.
-    // Same error distinctions as get_as<T>.
+    // Returns all typed elements for a repeated path, gathered in numeric ordinal order.
     template<typename T>
     [[nodiscard]] expected<std::vector<T>, error> get_all_as(const std::string &key) const
     {
-        auto it = m_typed_collections.find(key);
-        if(it == m_typed_collections.end())
+        // Gather all typed indexed entries whose canonical path matches `key`.
+        std::vector<std::pair<std::size_t, T>> typed_indexed;
+        for(const auto &[k, v] : m_typed)
         {
-            if(m_typed.find(key) != m_typed.end())
+            if(canonical_of(k) != key)
+                continue;
+            if(v.type() != typeid(T))
                 return unexpected(error{errc::mismatched_type,
-                            std::string("path '") + key
-                            + "' holds a single typed value; use get_as<T>()"});
-            if(contains(key))
-                return unexpected(error{errc::missing_converter,
-                            std::string("path '") + key + "' declares no type converter"});
-            return unexpected(error{errc::absent_key,
-                        std::string("path '") + key + "' is absent"});
+                            std::string("type mismatch for path '") + k
+                            + "': stored element type does not match requested type"});
+            typed_indexed.emplace_back(first_ordinal_of(k), std::any_cast<T>(v));
         }
-        std::vector<T> out;
-        out.reserve(it->second.size());
-        for(const std::any &a : it->second)
+
+        if(!typed_indexed.empty())
         {
-            if(a.type() != typeid(T))
+            std::stable_sort(typed_indexed.begin(), typed_indexed.end(),
+                             [](const auto &a, const auto &b) {
+                                 return a.first < b.first;
+                             });
+            std::vector<T> out;
+            out.reserve(typed_indexed.size());
+            for(auto &[ord, val] : typed_indexed)
+                out.push_back(std::move(val));
+            return out;
+        }
+
+        // Single typed value at the exact key.
+        auto it = m_typed.find(key);
+        if(it != m_typed.end())
+        {
+            if(it->second.type() != typeid(T))
                 return unexpected(error{errc::mismatched_type,
                             std::string("type mismatch for path '") + key
                             + "': stored element type does not match requested type"});
-            out.push_back(std::any_cast<T>(a));
+            return std::vector<T>{std::any_cast<T>(it->second)};
         }
-        return out;
+
+        if(contains(key))
+            return unexpected(error{errc::missing_converter,
+                        std::string("path '") + key + "' declares no type converter"});
+        return unexpected(error{errc::absent_key,
+                    std::string("path '") + key + "' is absent"});
     }
 
-    [[nodiscard]] std::size_t size() const noexcept
-    {
-        return m_values.size() + m_collections.size();
-    }
+    [[nodiscard]] std::size_t size() const noexcept { return m_values.size(); }
 
-    [[nodiscard]] bool empty() const noexcept
-    {
-        return m_values.empty() && m_collections.empty();
-    }
+    [[nodiscard]] bool empty() const noexcept { return m_values.empty(); }
 
-    // Every key carrying a value or collection, in canonical order. Each repeated
-    // path appears exactly once.
+    // Every key carrying a value, in canonical order (sorted by string key).
     [[nodiscard]] std::vector<std::string> keys() const
     {
         std::vector<std::string> out;
-        out.reserve(m_values.size() + m_collections.size());
+        out.reserve(m_values.size());
         for(const auto &[key, _] : m_values)
             out.push_back(key);
-        for(const auto &[key, _] : m_collections)
-            out.push_back(key);
-        std::sort(out.begin(), out.end());
         return out;
     }
 
 private:
+    // Computes the canonical form of a key by stripping [N] ordinal suffixes from
+    // every segment. "cluster/node[0]/port" -> "cluster/node/port".
+    // Used by get_all() and get_all_as() without accessing the schema registry.
+    static std::string canonical_of(const std::string &key)
+    {
+        std::string result;
+        std::size_t start = 0;
+        for(std::size_t i = 0; i <= key.size(); ++i)
+        {
+            if(i == key.size() || key[i] == key_path::separator)
+            {
+                std::string_view seg(key.data() + start, i - start);
+                if(!result.empty())
+                    result.push_back(key_path::separator);
+                result.append(key_path::base_name(seg));
+                start = i + 1;
+            }
+        }
+        return result;
+    }
+
+    // Returns the ordinal of the first indexed segment in a key path.
+    // "cluster/node[0]/port" -> 0; "config/tags[2]" -> 2.
+    // Returns 0 when no indexed segment exists (non-repeated paths sort first).
+    static std::size_t first_ordinal_of(const std::string &key)
+    {
+        std::size_t start = 0;
+        for(std::size_t i = 0; i <= key.size(); ++i)
+        {
+            if(i == key.size() || key[i] == key_path::separator)
+            {
+                std::string_view seg(key.data() + start, i - start);
+                if(key_path::is_indexed_segment(seg))
+                    return key_path::ordinal_of(seg);
+                start = i + 1;
+            }
+        }
+        return 0;
+    }
+
     std::map<std::string, std::string> m_values;
-    // Parallel map for resolved collections from repeated-path schema elements.
-    std::map<std::string, std::vector<std::string>> m_collections;
-    // Parallel maps for typed values produced by the convert() pass.
-    // m_typed holds scalar typed values; m_typed_collections holds per-element
-    // typed values for repeated paths.
-    std::map<std::string, std::any>              m_typed;
-    std::map<std::string, std::vector<std::any>> m_typed_collections;
+    // Typed values produced by the convert() pass. Indexed paths are keyed by
+    // their full indexed path string (e.g. "cluster/node[0]/port").
+    std::map<std::string, std::any> m_typed;
     provenance m_provenance;
 };
 

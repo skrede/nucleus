@@ -45,12 +45,14 @@ namespace {
 
 // A config carrying a scalar and a repeated collection, built directly so the
 // document emitters can be proven without a source dependency.
+// Repeated values are stored as indexed scalars per the unified storage model.
 [[nodiscard]] nucleus::config make_server_config()
 {
-    std::map<std::string, std::string> values{{"server/host", "localhost"}};
-    std::map<std::string, std::vector<std::string>> collections{
-        {"server/tag", {"alpha", "beta"}}};
-    return nucleus::config(std::move(values), std::move(collections), nucleus::provenance{});
+    std::map<std::string, std::string> values{
+        {"server/host", "localhost"},
+        {"server/tag[0]", "alpha"},
+        {"server/tag[1]", "beta"}};
+    return nucleus::config(std::move(values), nucleus::provenance{});
 }
 
 [[nodiscard]] std::size_t count_occurrences(const std::string &text, const std::string &needle)

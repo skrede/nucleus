@@ -604,7 +604,7 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
         REQUIRE(r.error().message.find("type mismatch") != std::string::npos);
     }
 
-    SECTION("get_as on a repeated typed path returns 'use get_all_as' message")
+    SECTION("get_as on a repeated typed path returns absent for plain path")
     {
         nucleus::config_space_builder engine;
         REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
@@ -616,11 +616,15 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
         auto loaded = resolve_one(engine, std::move(src));
         REQUIRE(loaded);
 
-        // The path carries a typed collection; get_as is the wrong accessor.
-        auto r = loaded.value().get_as<int32_t>("cfg/nums");
-        REQUIRE(!r);
-        INFO("error: " << r.error());
-        REQUIRE(r.error().message.find("get_all_as") != std::string::npos);
+        // Repeated values are indexed scalars; plain path is absent, indexed paths work.
+        auto r_plain = loaded.value().get_as<int32_t>("cfg/nums");
+        REQUIRE(!r_plain);
+        REQUIRE(r_plain.error().code == nucleus::errc::absent_key);
+
+        // Indexed paths carry the typed value.
+        auto r0 = loaded.value().get_as<int32_t>("cfg/nums[0]");
+        REQUIRE(r0);
+        REQUIRE(r0.value() == 1);
     }
 }
 
@@ -629,7 +633,7 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
 // ---------------------------------------------------------------------------
 TEST_CASE("get_all_as error distinctions", "[typed][accessor][errors]")
 {
-    SECTION("get_all_as on a scalar typed path returns 'use get_as' message")
+    SECTION("get_all_as on a scalar typed path succeeds as one-element vector")
     {
         nucleus::config_space_builder engine;
         REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
@@ -640,11 +644,10 @@ TEST_CASE("get_all_as error distinctions", "[typed][accessor][errors]")
         auto loaded = resolve_one(engine, std::move(src));
         REQUIRE(loaded);
 
-        // The path carries a scalar typed value; get_all_as is the wrong accessor.
+        // get_all_as works uniformly on scalar and repeated paths alike.
         auto r = loaded.value().get_all_as<int32_t>("cfg/val");
-        REQUIRE(!r);
-        INFO("error: " << r.error());
-        REQUIRE(r.error().message.find("get_as") != std::string::npos);
+        REQUIRE(r);
+        REQUIRE(r.value() == std::vector<int32_t>{42});
     }
 }
 

@@ -265,13 +265,26 @@ walk(const pugi::xml_node &node, std::string_view path,
         // Repeated container: assign a zero-based ordinal per sibling occurrence
         // in document order. Strips ordinal suffixes from child_path for the
         // projection lookup since the schema stores declared (unindexed) paths.
+        // extend= on a repeated container is recorded as a disposition (the fold
+        // will reject it as a layering_violation); it must not surface as an
+        // attribute entry in the keyspace.
         if(proj.is_repeated_container(declared_path(child_path)))
         {
+            static constexpr std::string_view kExtend = "extend";
+            if(pugi::xml_attribute ext_attr = child.attribute(kExtend.data()))
+            {
+                // Record a sentinel disposition so fold() can emit layering_violation.
+                batch.dispositions.push_back(
+                    {child_path, {}, extend_strength::narrow});
+                (void)ext_attr; // value ignored; fold rejects all extend= on repeated
+            }
             std::size_t &ordinal = ordinal_counters[child_path];
             std::string indexed_path =
                 child_path + "[" + std::to_string(ordinal++) + "]";
+            // Pass "extend" as skip so the recursive walk suppresses the grammar
+            // attribute rather than treating it as an unknown entry.
             if(auto r = walk(child, indexed_path, caps, proj, batch,
-                             {}, seen_keys, ordinal_counters,
+                             kExtend, seen_keys, ordinal_counters,
                              false, depth + 1); !r)
                 return r;
             continue;

@@ -320,7 +320,6 @@ public:
         return out;
     }
 
-private:
     // Returns paths of repeated elements that are containers (at least one other
     // element is anchored under them). Used by projection() and the fold.
     [[nodiscard]] std::set<std::string> repeated_container_paths() const
@@ -343,6 +342,7 @@ private:
         return containers;
     }
 
+private:
     // A node is "defined" if it is itself a declared element path or a prefix of
     // one (the intermediate keyspace nodes an element implies). This lets an
     // element anchor under either a leaf or an intermediate keyspace that an

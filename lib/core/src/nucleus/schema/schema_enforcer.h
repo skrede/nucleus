@@ -71,9 +71,12 @@ public:
         std::vector<schema_violation> violations;
 
         // Unknown-path check: the schema is the authority over what may exist.
+        // Indexed paths (cluster/node[0]/port) are validated against their canonical
+        // form (cluster/node/port) so repeated-container instances pass the gate.
         for(const key_path &path : resolved.paths())
         {
-            if(!schema.recognizes(path))
+            const std::string canonical = schema.canonical_text(path);
+            if(!schema.recognizes_text(canonical))
             {
                 violations.push_back(schema_violation{
                     path.str(),
@@ -85,61 +88,44 @@ public:
         // Required check: walked per declared element. A sliced strain satisfies
         // a required identity element structurally -- its key value named the
         // instance and was consumed, so no literal leaf can exist.
+        // For repeated elements, any indexed instance path satisfies presence.
         for(const schema_element &el : schema.elements())
         {
             const key_path declared = el.declared_path();
-            const bool present = resolved.contains(declared);
+            const std::string declared_str = declared.str();
             const bool keyed_ok = el.identity
                 && std::ranges::find(keyed_satisfied, el.container().str())
                        != keyed_satisfied.end();
 
+            // Check presence: direct (scalar/collection at declared path) or
+            // via any indexed instance path whose canonical matches.
+            bool present = resolved.contains(declared);
+            if(!present && el.repeated)
+            {
+                for(const key_path &kp : resolved.paths())
+                {
+                    if(schema.canonical_text(kp) == declared_str)
+                    {
+                        present = true;
+                        break;
+                    }
+                }
+            }
+
             if(el.required && !present && !keyed_ok)
             {
                 violations.push_back(schema_violation{
-                    declared.str(),
+                    declared_str,
                     nucleus::format("required field '{}' is missing",
-                                      declared.str())});
+                                      declared_str)});
             }
 
             // Closed-value check: a present value must be one of the declared
             // allowed values. An unconstrained element (empty set) skips this.
-            // For repeated elements, the check applies to EACH collection value.
-            if(!el.allowed_values.empty() && resolved.contains(declared))
+            // For repeated elements, the check applies to each indexed instance value.
+            if(!el.allowed_values.empty())
             {
-                if(el.repeated)
-                {
-                    const std::vector<value> *col = resolved.find_collection(declared);
-                    if(col)
-                    {
-                        for(const value &v : *col)
-                        {
-                            const std::string actual(v.text());
-                            const bool admissible = std::any_of(
-                                el.allowed_values.begin(), el.allowed_values.end(),
-                                [&](const std::string &a) { return a == actual; });
-                            if(!admissible)
-                            {
-                                std::string reason = nucleus::format(
-                                    "field '{}' collection value '{}' is not one "
-                                    "of the allowed values",
-                                    declared.str(), actual);
-                                const std::span<const std::string> candidates(
-                                    el.allowed_values.data(),
-                                    el.allowed_values.size());
-                                auto nearest = suggest_keys(actual, candidates, 1);
-                                if(!nearest.empty())
-                                    reason += nucleus::format(
-                                        " (did you mean '{}'?)", nearest.front());
-                                violations.push_back(schema_violation{
-                                    declared.str(), std::move(reason)});
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    const value *v = resolved.find(declared);
-                    const std::string actual(v ? v->text() : std::string_view{});
+                auto check_value = [&](const std::string &actual) {
                     const bool admissible = std::any_of(
                         el.allowed_values.begin(), el.allowed_values.end(),
                         [&](const std::string &a) { return a == actual; });
@@ -147,16 +133,40 @@ public:
                     {
                         std::string reason = nucleus::format(
                             "field '{}' value '{}' is not one of the allowed values",
-                            declared.str(), actual);
+                            declared_str, actual);
                         const std::span<const std::string> candidates(
                             el.allowed_values.data(), el.allowed_values.size());
                         auto nearest = suggest_keys(actual, candidates, 1);
                         if(!nearest.empty())
                             reason += nucleus::format(" (did you mean '{}'?)",
                                                       nearest.front());
-                        violations.push_back(schema_violation{declared.str(),
+                        violations.push_back(schema_violation{declared_str,
                                                               std::move(reason)});
                     }
+                };
+
+                if(el.repeated)
+                {
+                    // Check each indexed instance scalar.
+                    for(const key_path &kp : resolved.paths())
+                    {
+                        if(schema.canonical_text(kp) != declared_str)
+                            continue;
+                        if(const value *v = resolved.find(kp))
+                            check_value(std::string(v->text()));
+                        else if(const std::vector<value> *col =
+                                    resolved.find_collection(kp))
+                        {
+                            for(const value &v : *col)
+                                check_value(std::string(v.text()));
+                        }
+                    }
+                }
+                else if(present)
+                {
+                    const value *v = resolved.find(declared);
+                    if(v)
+                        check_value(std::string(v->text()));
                 }
             }
         }

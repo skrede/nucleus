@@ -115,7 +115,7 @@ TEST_CASE("cross-layer replace -- higher rank replaces lower collection wholesal
     REQUIRE(config.get_all("config/tag") == std::vector<std::string>{"p"});
 }
 
-TEST_CASE("get() on repeated path returns last value", "[repeated][accessor]")
+TEST_CASE("get() on indexed repeated path returns that element", "[repeated][accessor]")
 {
     nucleus::config_space_builder engine;
     declare_tags_schema(engine);
@@ -128,8 +128,12 @@ TEST_CASE("get() on repeated path returns last value", "[repeated][accessor]")
     REQUIRE(loaded);
     const nucleus::config &config = loaded.value();
 
-    // get() on a repeated path returns the last element.
-    REQUIRE(config.get("config/tag") == "c");
+    // Repeated values are stored as indexed scalars; get() by indexed key.
+    REQUIRE(config.get("config/tag[0]") == "a");
+    REQUIRE(config.get("config/tag[1]") == "b");
+    REQUIRE(config.get("config/tag[2]") == "c");
+    // Plain (unindexed) repeated path is absent in the new indexed-scalar model.
+    REQUIRE_FALSE(config.get("config/tag").has_value());
 }
 
 TEST_CASE("get_all() on single-value path returns one-element vector", "[repeated][accessor]")
@@ -166,7 +170,7 @@ TEST_CASE("get_all() on absent path returns empty vector", "[repeated][accessor]
     REQUIRE(config.get_all("nonexistent") == std::vector<std::string>{});
 }
 
-TEST_CASE("keys() returns repeated path exactly once", "[repeated][accessor]")
+TEST_CASE("keys() returns one entry per indexed scalar instance", "[repeated][accessor]")
 {
     nucleus::config_space_builder engine;
     REQUIRE(engine.register_element(nucleus::element("config", anchor::root())));
@@ -181,13 +185,17 @@ TEST_CASE("keys() returns repeated path exactly once", "[repeated][accessor]")
     REQUIRE(loaded);
     const nucleus::config &config = loaded.value();
 
+    // In the indexed-scalar model, each repeated instance is its own key.
+    // 2 tag instances + 1 other = 3 keys total.
     const std::vector<std::string> k = config.keys();
-    REQUIRE(k.size() == 2);
+    REQUIRE(k.size() == 3);
 
-    const bool has_other = std::find(k.begin(), k.end(), "config/other") != k.end();
-    const bool has_tag   = std::find(k.begin(), k.end(), "config/tag")   != k.end();
+    const bool has_other  = std::find(k.begin(), k.end(), "config/other")   != k.end();
+    const bool has_tag0   = std::find(k.begin(), k.end(), "config/tag[0]")  != k.end();
+    const bool has_tag1   = std::find(k.begin(), k.end(), "config/tag[1]")  != k.end();
     REQUIRE(has_other);
-    REQUIRE(has_tag);
+    REQUIRE(has_tag0);
+    REQUIRE(has_tag1);
 }
 
 TEST_CASE("repeated path with required flag satisfies required check", "[repeated][required]")

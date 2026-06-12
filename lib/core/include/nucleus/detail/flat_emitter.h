@@ -50,17 +50,27 @@ namespace nucleus::detail {
 
 // Renders a '/'-joined key with `key_separator` standing in for every separator,
 // so a flat format can speak its own delimiter (argv flags) over the same paths.
+// Indexed segments (e.g. "node[0]") are stripped to their base name ("node") so
+// repeated instances render at the same canonical key (e.g. "cluster/node/port").
 [[nodiscard]] inline std::string render_flat_key(std::string_view key,
                                                  std::string_view key_separator)
 {
     std::string out;
     out.reserve(key.size());
-    for(char c : key)
+    std::size_t start = 0;
+    bool first_seg = true;
+    for(std::size_t i = 0; i <= key.size(); ++i)
     {
-        if(c == key_path::separator)
-            out.append(key_separator);
-        else
-            out.push_back(c);
+        if(i == key.size() || key[i] == key_path::separator)
+        {
+            std::string_view seg = key.substr(start, i - start);
+            std::string_view base = key_path::base_name(seg);
+            if(!first_seg)
+                out.append(key_separator);
+            out.append(base);
+            first_seg = false;
+            start = i + 1;
+        }
     }
     return out;
 }
