@@ -194,6 +194,35 @@ public:
         return m_defined.find(path.str()) != m_defined.end();
     }
 
+    // Recognizes a CLI plain-ordinal path (D-09): a path where a digit-only
+    // segment following a repeated container prefix stands for an ordinal index.
+    // "--cluster-node-0-endpoint-port=90" maps to "cluster/node/0/endpoint/port";
+    // that is recognized here as equivalent to "cluster/node/endpoint/port".
+    [[nodiscard]] bool recognizes_with_ordinal(const key_path &path) const
+    {
+        if(recognizes(path))
+            return true; // already a declared path
+        // Walk segments: when a digit-only segment follows a repeated container,
+        // skip it (treat as ordinal). Rebuild and test the collapsed path.
+        const std::set<std::string> repeated_containers = repeated_container_paths();
+        std::string collapsed;
+        for(const std::string &seg : path.segments())
+        {
+            const bool all_digits = !seg.empty() && std::ranges::all_of(
+                seg, [](char c) { return c >= '0' && c <= '9'; });
+            if(all_digits && repeated_containers.count(collapsed))
+            {
+                // Skip the ordinal segment -- it selects an instance of the
+                // repeated container; the declared path does not include it.
+                continue;
+            }
+            if(!collapsed.empty())
+                collapsed += key_path::separator;
+            collapsed += seg;
+        }
+        return collapsed != path.str() && is_defined_text(collapsed);
+    }
+
     // Strips transient key segments from a resolved path: walking root-down, a
     // segment directly under a keyed container that does not extend a declared
     // node is an instance's key value (the projection consumed the key field

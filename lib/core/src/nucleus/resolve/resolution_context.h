@@ -188,7 +188,95 @@ public:
                     return false;
                 }();
 
-                if(is_already_indexed)
+                // Detect a CLI plain-ordinal path (D-09): a digit-only segment
+                // following a repeated container prefix is an ordinal index from
+                // "--cluster-node-0-endpoint-port=90" -> "cluster/node/0/endpoint/port".
+                // Re-bracket to "cluster/node[0]/endpoint/port" and enforce D-11
+                // (override-only: ordinal must be < existing instance count).
+                const auto plain_ordinal_rebracketed = [&]()
+                    -> expected<std::optional<key_path>, resolve_fold_error>
+                {
+                    const std::vector<std::string> &segs = path.segments();
+                    for(std::size_t i = 1; i < segs.size(); ++i)
+                    {
+                        // Plain digit-only segment (e.g. "0", "42") -- not bracket form.
+                        const std::string &seg = segs[i];
+                        const bool all_digits = std::ranges::all_of(
+                            seg, [](char c){ return c >= '0' && c <= '9'; });
+                        if(!all_digits)
+                            continue;
+                        // Build the prefix path up to (not including) the digit segment.
+                        std::string prefix;
+                        for(std::size_t j = 0; j < i; ++j)
+                        {
+                            if(j) prefix += key_path::separator;
+                            prefix += segs[j];
+                        }
+                        if(!repeated_container_prefixes.count(prefix))
+                            continue;
+                        // Found: "prefix/N/..." is a CLI ordinal path.
+                        const std::size_t ordinal = [&]() {
+                            std::size_t v = 0;
+                            for(char c : seg) v = v * 10 + static_cast<std::size_t>(c - '0');
+                            return v;
+                        }();
+                        // Count existing instances in m_building for this container.
+                        const std::string bracket_prefix = prefix + "[";
+                        std::size_t instance_count = 0;
+                        for(const key_path &bp : m_building.paths())
+                        {
+                            const std::string bps = bp.str();
+                            if(bps.compare(0, bracket_prefix.size(), bracket_prefix) != 0)
+                                continue;
+                            // Extract the ordinal from "prefix[N]/..."; track max+1.
+                            const auto lb = bps.find('[', prefix.size());
+                            const auto rb = bps.find(']', lb);
+                            if(lb == std::string::npos || rb == std::string::npos)
+                                continue;
+                            const std::size_t slot = [&]() {
+                                std::size_t v = 0;
+                                for(std::size_t k = lb + 1; k < rb; ++k)
+                                    v = v * 10 + static_cast<std::size_t>(bps[k] - '0');
+                                return v;
+                            }();
+                            if(slot + 1 > instance_count)
+                                instance_count = slot + 1;
+                        }
+                        // D-11: ordinal must be strictly less than instance count.
+                        if(ordinal >= instance_count)
+                            return unexpected(error{errc::schema_violation, nucleus::format(
+                                "argv ordinal {} for '{}' is out of range: "
+                                "{} instance(s) exist; out of range",
+                                ordinal, prefix, instance_count)});
+                        // Re-bracket: "prefix/N/rest" -> "prefix[N]/rest".
+                        std::string rebracketed = prefix + "[" + std::to_string(ordinal) + "]";
+                        for(std::size_t j = i + 1; j < segs.size(); ++j)
+                        {
+                            rebracketed += key_path::separator;
+                            rebracketed += segs[j];
+                        }
+                        auto kp = key_path::parse(rebracketed);
+                        if(!kp)
+                            return unexpected(error{errc::malformed_source, std::move(kp).error()});
+                        return std::optional<key_path>{std::move(kp).value()};
+                    }
+                    return std::optional<key_path>{std::nullopt};
+                }();
+                if(!plain_ordinal_rebracketed)
+                    return unexpected(std::move(plain_ordinal_rebracketed).error());
+
+                if(plain_ordinal_rebracketed.value().has_value())
+                {
+                    // Case C: CLI plain-ordinal override (D-09/D-11). The path has
+                    // been re-bracketed; store directly without wholesale-replace so
+                    // only this specific instance is overridden (rank-precedence wins).
+                    const key_path &rebracketed_path = plain_ordinal_rebracketed.value().value();
+                    m_building.set(rebracketed_path, value::owned(std::move(expanded).value()));
+                    m_provenance.record(rebracketed_path.str(),
+                                        origin{lh->rank, lh->label, lh->owner,
+                                               lh->inheritance_layer});
+                }
+                else if(is_already_indexed)
                 {
                     // Case B: already-indexed path (from a tree source's ordinal emission).
                     // Find the container prefix (the declared repeated container path).

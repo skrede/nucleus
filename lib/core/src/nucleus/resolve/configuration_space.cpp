@@ -371,9 +371,13 @@ config_space_builder config_space::expand() const
 key_recognizer recognizer_of(const config_space &space)
 {
     // Captures the space's schema registry by pointer; the recognizer is valid
-    // for as long as the space outlives it.
+    // for as long as the space outlives it. Uses the ordinal-aware variant so
+    // CLI plain-ordinal paths (D-09) are accepted: "cluster/node/0/endpoint/port"
+    // is recognized when "cluster/node" is a repeated container and
+    // "cluster/node/endpoint/port" is declared.
     const schema_registry *schema = &space.m_impl->schema;
-    return [schema](const key_path &path) { return schema->recognizes(path); };
+    return [schema](const key_path &path)
+    { return schema->recognizes_with_ordinal(path); };
 }
 
 // --- load(space, source_stack, load_options) --------------------------------
