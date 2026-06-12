@@ -198,7 +198,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     nucleus_enable_coverage(xml_repeated_container_test)
     nucleus_warnings(xml_repeated_container_test)
     target_link_libraries(xml_repeated_container_test
-        PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
+        PRIVATE nucleus::nucleus nucleus::xml nucleus::runtime Catch2::Catch2WithMain)
     target_include_directories(xml_repeated_container_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )

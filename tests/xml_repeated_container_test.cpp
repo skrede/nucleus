@@ -14,6 +14,8 @@
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/schema_registry.h"
 
+#include "nucleus/runtime/runtime_source.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
@@ -262,4 +264,57 @@ TEST_CASE("xml emitter -- repeated container round-trip", "[xml][xml_emitter][ro
     REQUIRE(reloaded.value().get("cluster/node[1]/port") == "2.0");
     REQUIRE(reloaded.value().get("cluster/node[0]/metrics/latency") == "0.1");
     REQUIRE(reloaded.value().get("cluster/node[1]/metrics/latency") == "0.2");
+}
+
+TEST_CASE("xml emitter -- repeated container round-trip with N >= 11 instances",
+          "[xml][xml_emitter][round_trip][D22][CR01]")
+{
+    // Schema: cluster -> node (repeated) -> port (leaf).
+    nucleus::config_space_builder builder;
+    REQUIRE(builder.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(builder.register_element(
+        nucleus::repeated_element("node", anchor::keyspace("cluster"))));
+    REQUIRE(builder.register_element(
+        nucleus::element("port", anchor::keyspace("cluster/node"))));
+    nucleus::config_space space = builder.build();
+
+    // Inject 12 instances via runtime_source (ordinals 0..11).
+    nucleus::runtime_source src;
+    for(int i = 0; i < 12; ++i)
+        src.set("cluster/node[" + std::to_string(i) + "]/port",
+                std::to_string(i * 10));
+
+    auto original = nucleus::load_config(space,
+        nucleus::source_stack{std::move(src)}, {});
+    REQUIRE(original);
+
+    // Emit to XML string, then re-load.
+    std::ostringstream out;
+    nucleus::xml::emit_document(original.value(), out);
+
+    const std::string emitted = out.str();
+
+    // Reload through a doc_opts lambda.
+    nucleus::load_options reload_opts;
+    reload_opts.document_paths = {"doc.xml"};
+    reload_opts.make_document = [&](const std::string &) {
+        return nucleus::source_handle(xml_source_of(emitted));
+    };
+    auto reloaded = nucleus::load_config(space, nucleus::source_stack{}, reload_opts);
+    REQUIRE(reloaded);
+    const nucleus::config &cfg = reloaded.value();
+
+    // Every instance must survive in ordinal order (not lexicographic order).
+    for(int i = 0; i < 12; ++i)
+    {
+        const std::string path = "cluster/node[" + std::to_string(i) + "]/port";
+        const std::string expected = std::to_string(i * 10);
+        REQUIRE(cfg.get(path) == expected);
+    }
+
+    // get_all must return values in numeric order (node[10], node[11] after node[9]).
+    auto ports = cfg.get_all("cluster/node/port");
+    REQUIRE(ports.size() == 12);
+    for(int i = 0; i < 12; ++i)
+        REQUIRE(ports[static_cast<std::size_t>(i)] == std::to_string(i * 10));
 }

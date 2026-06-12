@@ -15,6 +15,8 @@
 #include <ostream>
 #include <cstddef>
 #include <string_view>
+#include <algorithm>
+#include <tuple>
 
 namespace nucleus::xml {
 
@@ -175,6 +177,36 @@ void emit_template(const config_space &space, std::ostream &out,
     }
 }
 
+namespace {
+
+// Produces a sort key for a config map key so that numeric ordinals in indexed
+// segments compare by value, not lexicographically. Each segment yields a
+// (base_name, ordinal) pair; non-indexed segments use ordinal = 0.
+// "cluster/node[10]/port" < "cluster/node[2]/port" lexicographically, but this
+// key correctly orders node[2] before node[10].
+std::vector<std::pair<std::string, std::size_t>>
+numeric_sort_key(const std::string &key)
+{
+    std::vector<std::pair<std::string, std::size_t>> parts;
+    std::size_t start = 0;
+    for(std::size_t i = 0; i <= key.size(); ++i)
+    {
+        if(i == key.size() || key[i] == key_path::separator)
+        {
+            std::string_view seg(key.data() + start, i - start);
+            if(key_path::is_indexed_segment(seg))
+                parts.emplace_back(std::string(key_path::base_name(seg)),
+                                   key_path::ordinal_of(seg));
+            else
+                parts.emplace_back(std::string(seg), std::size_t{0});
+            start = i + 1;
+        }
+    }
+    return parts;
+}
+
+} // namespace
+
 // Projects a resolved config into a populated XML document: each '/'-separated
 // key splits into element segments, intermediate segments are shared parent nodes,
 // and the leaf is appended once per value so a repeated path persists ALL its values.
@@ -189,7 +221,15 @@ void emit_document(const config &config, std::ostream &out,
 {
     pugi::xml_document doc;
 
-    for(const std::string &key : config.keys())
+    // Sort keys by numeric ordinal so indexed siblings are visited in 0, 1, 2, ...
+    // order regardless of lexicographic map order (which puts node[10] before node[2]).
+    std::vector<std::string> sorted_keys = config.keys();
+    std::stable_sort(sorted_keys.begin(), sorted_keys.end(),
+        [](const std::string &a, const std::string &b) {
+            return numeric_sort_key(a) < numeric_sort_key(b);
+        });
+
+    for(const std::string &key : sorted_keys)
     {
         auto parsed = key_path::parse(key);
         if(!parsed)
