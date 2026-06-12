@@ -7,7 +7,7 @@ documents the parts nucleus ships that satisfy those seams.
 
 | Document | Scope |
 | --- | --- |
-| [Types you use](api-using.md) | The host-facing vocabulary a program instantiates and reads: the builder and the sealed space, the schema, `load()` and its options, the resolved configuration, source stacks, emitters, diagnostics, completion. |
+| [Types you use](api-using.md) | The host-facing vocabulary a program instantiates and reads: the builder and the sealed space, the schema, `load_config()` and its options, the resolved configuration, source stacks, emitters, diagnostics, completion. |
 | [Seams you extend](api-extending.md) | The concepts a host makes a type satisfy and the policies it composes: the `config_source` concept and its optional affordances, capability descriptors and gating, inheritance, custom tokenizers and converters, `registration_policy`, `log_sink`, discovery. |
 | [Shipped implementations](api-implementations.md) | The concrete modules nucleus ships that satisfy the seams: `xml_source`, `env_source`, `argv_source`, `runtime_source`, the per-format emitters, and the `log_sink` adapters — with the capability descriptor and CMake target of each. |
 
@@ -25,7 +25,7 @@ decides what is admissible.
 The lifecycle has two phases. A `config_space_builder` accepts
 registrations (`register_element` / `register_*` / `install_tokenizer`) until
 `build()` seals it into an immutable `config_space`. The free function
-`nucleus::load(space, source_stack, load_options)` gates the stack's
+`nucleus::load_config(space, source_stack, load_options)` gates the stack's
 capabilities against the schema's shape, folds the sources, validates, expands
 `${...}` tokens, converts typed values, and yields an immutable, freely
 thread-readable `config`. Registration after `build()` is a
@@ -34,7 +34,7 @@ state-machine error, and one sealed space serves any number of loads.
 ```
 config_space_builder  --register_*-->  build()  -->  config_space (sealed)
                                                                   |
-                          nucleus::load(space, stack, options)  --+-->  config (resolved, immutable)
+                          nucleus::load_config(space, stack, options)  --+-->  config (resolved, immutable)
 ```
 
 The core carries no policy: ownership, reservation, filename conventions, and
