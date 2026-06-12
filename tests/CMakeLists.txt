@@ -223,6 +223,17 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     )
     add_test(NAME integration_shape_test COMMAND integration_shape_test)
 
+    # config_node cursor: null-view chaining, shape queries, visit(), walk(), ordinal order.
+    add_executable(config_node_test config_node_test.cpp)
+    nucleus_enable_coverage(config_node_test)
+    nucleus_warnings(config_node_test)
+    target_link_libraries(config_node_test
+        PRIVATE nucleus::nucleus nucleus::xml nucleus::runtime Catch2::Catch2WithMain)
+    target_include_directories(config_node_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/lib/core/src
+    )
+    add_test(NAME config_node_test COMMAND config_node_test)
+
     # Unified fold: repeated containers and repeated leaves stored as indexed scalars;
     # wholesale-replace across layers; extend= guard; get_all numeric ordinal order.
     add_executable(repeated_container_test repeated_container_test.cpp)
