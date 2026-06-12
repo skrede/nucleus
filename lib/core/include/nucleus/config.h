@@ -340,6 +340,16 @@ private:
 
 namespace nucleus {
 
+[[nodiscard]] inline config_node config_node::operator[](std::size_t index) const
+{
+    if(!m_config || kind() != node_kind::repeated)
+        return config_node{};
+    const auto ordinals = distinct_ordinals();
+    if(std::find(ordinals.begin(), ordinals.end(), index) == ordinals.end())
+        return config_node{};
+    return config_node{m_config, m_path + "[" + std::to_string(index) + "]"};
+}
+
 [[nodiscard]] inline bool config_node::exists() const noexcept
 {
     if(!m_config)

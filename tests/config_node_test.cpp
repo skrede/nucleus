@@ -532,3 +532,31 @@ TEST_CASE("config_node walker -- enter/leave order over loaded config",
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// WR-05: operator[](size_t) returns a true null-view for out-of-range indices
+// ---------------------------------------------------------------------------
+
+TEST_CASE("config_node operator[](size_t) out-of-range returns null-view",
+          "[config_node][null_view][WR05]")
+{
+    const nucleus::config cfg = load_two_nodes("80", "443");
+
+    // node has ordinals 0 and 1 only; ordinal 2 is out of range.
+    auto node = cfg.root()["cluster"]["node"];
+    REQUIRE(node.kind() == nucleus::node_kind::repeated);
+
+    auto out_of_range = node[2];
+    // Must be a true null-view: exists() == false.
+    REQUIRE_FALSE(out_of_range.exists());
+
+    // Further navigation from a null-view stays null-view.
+    auto further = out_of_range["port"];
+    REQUIRE_FALSE(further.exists());
+    auto deep = out_of_range[0];
+    REQUIRE_FALSE(deep.exists());
+
+    // In-range ordinals still work.
+    REQUIRE(node[0].exists());
+    REQUIRE(node[1].exists());
+}

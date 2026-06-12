@@ -75,15 +75,9 @@ public:
         return config_node{m_config, std::move(child)};
     }
 
-    // Navigate to the Nth instance of a repeated node. Returns invalid view when
-    // this node is not repeated or the index is out of range.
-    [[nodiscard]] config_node operator[](std::size_t index) const
-    {
-        if(!m_config || kind() != node_kind::repeated)
-            return config_node{};
-        return config_node{m_config,
-            m_path + "[" + std::to_string(index) + "]"};
-    }
+    // Navigate to the Nth instance of a repeated node. Returns a null-view
+    // (m_config == nullptr) when this node is not repeated or the index is absent.
+    [[nodiscard]] config_node operator[](std::size_t index) const;
 
     // True when the node corresponds to a path that exists in the config.
     [[nodiscard]] bool exists() const noexcept;
