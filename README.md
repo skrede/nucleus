@@ -44,7 +44,7 @@ loudly before folding.
 * **Two-phase lifecycle** \
 A `config_space_builder` accepts registrations (`register_*` /
 `install_tokenizer`) until `build()` seals it into an immutable
-`config_space`. The free function `nucleus::load(space, stack, options)`
+`config_space`. The free function `nucleus::load_config(space, stack, options)`
 folds a source stack against the sealed space and yields an immutable, freely
 thread-readable `config`. Registration after `build()` is a
 state-machine error; the space can be reused across many loads, and the source
@@ -77,6 +77,23 @@ space as key `x`). `argv::emit_template`, `argv::emit_document`, and
 `generate_completion` all accept an optional `space_name` so the emitted surface
 round-trips exactly with the parser. See [`docs/cli-grammar.md`](docs/cli-grammar.md)
 for the full grammar reference, setup example, and cross-format envelope table.
+
+* **Repeated containers** \
+`repeated` is legal on any schema element &mdash; leaf or container. N sibling
+instances each occupy a distinct zero-based ordinal slot in the resolved keyspace
+(`cluster/node[0]/port`, `cluster/node[1]/port`); nesting composes
+(`node[0]/route[1]/...`). A higher-precedence source layer replaces the
+collection wholesale. CLI flags address instances via a plain ordinal segment
+(`--cluster-node-0-port=v`). See [`docs/api-using.md`](docs/api-using.md) for the
+full addressing rules including `get_all` gather and `errc::index_required`.
+
+* **Configuration walk API** \
+`config::root()` returns a value-semantic `config_node` cursor backed by the
+immutable `config`. Chainable navigation (`cfg.root()["cluster"]["node"][0]["port"]`)
+never fails loudly &mdash; absent keys yield a null-view that propagates. Shape queries
+(`kind`, `count`, `children`, `exists`, `path`) and two traversal forms: a
+pre-order `visit(fn)` with bool-stop, and an enter/leave `walk(walker)` via
+`config_tree_walker`. Repeated instances are visited in numeric ordinal order.
 
 ## Build
 
@@ -158,7 +175,7 @@ nucleus::config_space space = builder.build();
 nucleus::argv_source argv(std::vector<std::string>{"--server-port=8080"});
 argv.recognize_with(nucleus::recognizer_of(space));
 
-auto loaded = nucleus::load(space, nucleus::source_stack{std::move(argv)}, {});
+auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(argv)}, {});
 if(!loaded)
 {
     std::cerr << "load failed: " << loaded.error() << '\n';

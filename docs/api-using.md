@@ -13,9 +13,10 @@ back. None of these requires subclassing. For the seams a host extends, see
 - [Keying model: primary key, uniqueness, strains](#keying)
 - [`config_space` — the sealed space](#space)
 - [Composing sources: `source_stack`](#stack)
-- [`load()` and `load_options`](#load)
+- [`load_config()` and `load_options`](#load)
 - [Capability pre-flight: `check_capabilities`](#preflight)
 - [`config` — the resolved result](#configuration)
+- [`config_node` — the walk API](#config_node)
 - [Provenance: `origin`](#provenance)
 - [`key_path` — addressing the keyspace](#key_path)
 - [Emitting: templates and documents](#emit)
@@ -36,11 +37,11 @@ config_space_builder  --register_* / install_tokenizer-->  build()
 config_space (sealed, immutable, reusable)
         |
         v
-nucleus::load(space, source_stack, load_options)  -->  expected<config, error>
+nucleus::load_config(space, source_stack, load_options)  -->  expected<config, error>
 ```
 
 A builder accepts registrations and `build()` seals it into an immutable
-`config_space`. The free function `nucleus::load` folds an explicitly
+`config_space`. The free function `nucleus::load_config` folds an explicitly
 composed `source_stack` against the sealed space and yields an immutable
 `config`. The space is never modified by a load, so one space serves many
 loads — even concurrently (see [`examples/reusable_space.cpp`](../examples/reusable_space.cpp)).
@@ -128,7 +129,7 @@ struct schema_element {
     bool required = false;                   // must carry a value at load
     bool identity = false;                   // the parent container's primary key / slice selector
     bool unique = false;                     // value distinct across sibling instances
-    bool repeated = false;                   // keeps ALL N same-named values as a collection
+    bool repeated = false;                   // N instances each occupy a distinct ordinal slot
     std::vector<std::string> allowed_values; // closed set; empty = unconstrained
     // plus the typed seam: converter, type_identity (set by typed_element<T>)
     key_path declared_path() const;          // anchor path + name
@@ -162,16 +163,53 @@ See [`examples/schema.cpp`](../examples/schema.cpp).
 
 ### Repeated elements
 
-A `repeated_element` is a leaf field that keeps ALL N occurrences of a
-same-named entry as one ordered collection — distinct from keyed containers
-(instances distinguished by the primary key) and template merging (anonymous
-instances composing). An element cannot be both `repeated` and `identity`, nor
-`repeated` and `unique`. Feeding a repeated element requires a source layer with
-the `duplicate_keys` capability (XML, argv, or the runtime source); within one
-source layer occurrences accumulate in document/flag order, and a
-higher-precedence layer replaces the collection wholesale. `get_all()` / `get_all_as<T>()` return values
-in fold order, and `collection_provenance_of()` returns one origin per element
-in the same order. See [`examples/round_trip.cpp`](../examples/round_trip.cpp).
+`repeated` is legal on **any** element — leaf or container. N sibling instances
+each occupy a distinct zero-based ordinal slot in the resolved keyspace:
+
+- **Repeated leaf** — instances are scalars: `config/tags[0]`, `config/tags[1]`.
+- **Repeated container** — instances are indexed subtrees: `cluster/node[0]/port`,
+  `cluster/node[1]/port`.
+- **Nested repetition** — composes: `cluster/node[0]/route[1]/target`.
+
+Ordinals are zero-based and assigned in document order. A higher-precedence
+source layer replaces the entire collection wholesale — there is no positional
+merging across layers. `extend=` may not target a repeated container
+(`errc::layering_violation`). `repeated` requires no `identity` or `unique`
+declaration: the three axes are orthogonal — `repeated` governs placement,
+`identity` governs strain selection, and `unique` governs value validation. An
+element cannot be both `repeated` and `unique`.
+
+```cpp
+// Repeated container: each <node> becomes an indexed subtree.
+if(!builder.register_element(
+    nucleus::repeated_element("node", nucleus::anchor::keyspace("cluster"))))
+    return 1;
+if(!builder.register_element(
+    nucleus::element("port", nucleus::anchor::keyspace("cluster/node"))))
+    return 1;
+```
+
+Feeding a repeated element requires a source layer with the `duplicate_keys`
+capability (XML, argv, or the runtime source).
+
+**Indexed FQN addressing.** The resolved keyspace stores indexed scalars
+(`cluster/node[0]/port`, `cluster/node[1]/port`). Access rules:
+
+| Call | Behavior |
+|------|----------|
+| `cfg.get("cluster/node[0]/port")` | returns the scalar at that exact ordinal |
+| `cfg.get("cluster/node/port")` | returns `nullopt` (unindexed crossing) |
+| `cfg.get_as<T>("cluster/node[0]/port")` | returns `expected<T, error>` at that ordinal |
+| `cfg.get_as<T>("cluster/node/port")` | returns `errc::index_required` naming the container and instance count |
+| `cfg.get_all("cluster/node/port")` | gathers across all instances in numeric ordinal order |
+| `cfg.get_all_as<T>("cluster/node/port")` | typed gather across all instances in numeric ordinal order |
+
+`get_all` skips instances that lack the sub-path; use `get_all_as` for typed
+values. The `config_node` cursor (see [`config_node`](#config_node)) is the
+correlation tool when per-instance structure matters.
+
+See [`examples/quickstart.cpp`](../examples/quickstart.cpp) and
+[`examples/round_trip.cpp`](../examples/round_trip.cpp).
 
 ---
 
@@ -289,7 +327,7 @@ See [`examples/strains.cpp`](../examples/strains.cpp).
 
 The immutable product of `build()`. Its surface is read-only — registration on a
 sealed space is impossible by construction. It is copyable (a deep copy; no
-shared state links two spaces) and freely thread-readable: `load()` borrows it
+shared state links two spaces) and freely thread-readable: `load_config()` borrows it
 by const reference.
 
 ```cpp
@@ -321,7 +359,7 @@ flags (the closure borrows the space; keep the space alive). See
 
 `#include "nucleus/config_source/source_stack.h"`
 
-The explicit, ordered set of sources handed to `load()`. **Order is
+The explicit, ordered set of sources handed to `load_config()`. **Order is
 precedence**: a later-listed source overlays an earlier-listed one. Sources are
 moved in and type-erased into `source_handle`s; the stack owns them.
 
@@ -343,7 +381,7 @@ env.set("server/host", "staging-host");
 nucleus::argv_source argv(std::vector<std::string>{"--server-port=9090"});
 argv.recognize_with(nucleus::recognizer_of(space));   // highest precedence
 
-auto loaded = nucleus::load(space,
+auto loaded = nucleus::load_config(space,
     nucleus::source_stack{std::move(defaults), std::move(env), std::move(argv)},
     {});
 ```
@@ -357,17 +395,17 @@ See [`examples/source_stack.cpp`](../examples/source_stack.cpp).
 ---
 
 <a id="load"></a>
-## `load()` and `load_options`
+## `load_config()` and `load_options`
 
 `#include "nucleus/config_space.h"`
 
 ```cpp
-load_result load(const config_space &space,
-                 source_stack &stack,
-                 const load_options &options = {});
-load_result load(const config_space &space,
-                 source_stack &&stack,         // inline composition: source_stack{...}
-                 const load_options &options = {});
+load_result load_config(const config_space &space,
+                        source_stack &stack,
+                        const load_options &options = {});
+load_result load_config(const config_space &space,
+                        source_stack &&stack,         // inline composition: source_stack{...}
+                        const load_options &options = {});
 // load_result = expected<config, error>
 
 struct load_options {
@@ -379,7 +417,7 @@ struct load_options {
 };
 ```
 
-`load` is the one entry point. In order it:
+`load_config` is the one entry point. In order it:
 
 1. expands `document_paths` through `make_document` (the host's "path → source"
    decision) and walks each document's inheritance chain (base documents first);
@@ -408,7 +446,7 @@ auto make = [document](const std::string &) -> nucleus::source_handle {
             nucleus::xml_source_options::of_string(document)));
 };
 
-auto loaded = nucleus::load(space,
+auto loaded = nucleus::load_config(space,
     nucleus::source_stack{std::move(argv)},
     nucleus::load_options{.document_paths = {"config.xml"}, .make_document = make});
 ```
@@ -431,9 +469,9 @@ gate_result check_capabilities(const config_space &space,
                                const load_options &options = {});
 ```
 
-Runs the same capability gate `load()` runs, without pulling or folding, so a
+Runs the same capability gate `load_config()` runs, without pulling or folding, so a
 host can validate fit ahead of a load; the pre-flight and the load never
-disagree. The stack is borrowed const — it stays intact for the `load()` that
+disagree. The stack is borrowed const — it stays intact for the `load_config()` that
 follows it. `gate_result` is `expected<gated_features, error>` — the honored
 capabilities plus the observable degradations, or the hard-shortfall error
 (`errc::unmet_capability`).
@@ -447,7 +485,7 @@ hard capability is satisfied when ANY layer in the stack provides it. See
 
 ---
 
-<a id="config"></a>
+<a id="configuration"></a>
 ## `config` — the resolved result
 
 `#include "nucleus/config.h"`
@@ -456,23 +494,33 @@ The immutable, self-owning output of a load. Every value is copied out into an
 owned string at the load boundary and the source buffers are dropped, so it
 outlives every source and is freely thread-safe to read.
 
+Repeated paths (both repeated containers and repeated leaves) are stored as
+indexed scalars in the internal map: `"config/tags[0]"="a"`,
+`"cluster/node[0]/port"="80"`, `"cluster/node[1]/port"="90"`.
+
 ```cpp
 std::optional<std::string> get(const std::string &key) const;
-std::vector<std::string> get_all(const std::string &key) const;   // repeated paths: the full collection
+std::vector<std::string> get_all(const std::string &key) const;
 bool contains(const std::string &key) const;
-const origin *provenance_of(const std::string &key) const;        // "why is this value X?"
-const std::vector<origin> *collection_provenance_of(const std::string &key) const;
+const origin *provenance_of(const std::string &key) const;   // "why is this value X?"
 template<typename T> expected<T, error> get_as(const std::string &key) const;
 template<typename T> expected<std::vector<T>, error> get_all_as(const std::string &key) const;
+config_node root() const noexcept;   // entry point for the walk API
 std::size_t size() const noexcept;
 bool empty() const noexcept;
-std::vector<std::string> keys() const;   // canonical order, repeated paths once
+std::vector<std::string> keys() const;
 ```
 
-For a path declared `repeated`, `get_all()` returns the full ordered collection
-and `get()` returns the last value; for a single-value path `get_all()` returns
-a one-element vector. `provenance_of()` covers scalar keys only; a collection's
-per-element origins come from `collection_provenance_of()`.
+- `get("cluster/node[0]/port")` — scalar at an exact indexed path.
+- `get("cluster/node/port")` — returns `nullopt` when the path crosses a
+  repeated container without an index.
+- `get_all("cluster/node/port")` — gathers across all instances in numeric
+  ordinal order; returns a one-element vector for non-repeated paths.
+- `get_as<T>("cluster/node[0]/port")` — typed value at an exact indexed path.
+- `get_as<T>("cluster/node/port")` — returns `errc::index_required` naming
+  the container and instance count when the path crosses a repeated container.
+- `get_all_as<T>("cluster/node/port")` — typed gather across all instances in
+  numeric ordinal order.
 
 The typed reads return `expected<T, error>`; branch on the `code`, print the
 whole `error` (or its `message`) for humans:
@@ -480,10 +528,9 @@ whole `error` (or its `message`) for humans:
 | Condition | `error.code` | `error.message` says |
 |-----------|--------------|----------------------|
 | path carries no value | `errc::absent_key` | the path is absent |
+| path crosses a repeated container without an index | `errc::index_required` | names the container and instance count |
 | path has a value but no converter | `errc::missing_converter` | the path declares no type converter |
 | stored type does not equal requested type | `errc::mismatched_type` | type mismatch for the path |
-| path holds a typed collection — use `get_all_as` | `errc::mismatched_type` | use `get_all_as<T>()` |
-| path holds a single typed value — use `get_as` | `errc::mismatched_type` | use `get_as<T>()` |
 
 Branching on the code is the supported host pattern:
 
@@ -501,6 +548,120 @@ else if(port.error().code != nucleus::errc::absent_key)
 
 See [`examples/typed.cpp`](../examples/typed.cpp) and
 [`examples/reusable_space.cpp`](../examples/reusable_space.cpp).
+
+---
+
+<a id="config_node"></a>
+## `config_node` — the walk API
+
+`#include "nucleus/config_node.h"` (included transitively by `"nucleus/config.h"`)
+
+A cheap, value-semantic cursor into the resolved configuration tree. Holds a
+`const` pointer to the immutable `config` and an owned path string — two words,
+copyable, never exposes internal storage. Lifetime is tied to the `config` it
+was derived from.
+
+**Entry point:** `config::root()` returns a root-anchored cursor.
+
+```cpp
+const nucleus::config &cfg = loaded.value();
+nucleus::config_node root = cfg.root();
+```
+
+**Navigation** — never fails loudly. A missing child or out-of-range index
+yields a null-view that propagates through further navigation. Terminal
+`as<T>()` returns `errc::absent_key` carrying the full attempted path.
+
+```cpp
+// Chained navigation: cluster -> node (repeated) -> [0] -> port.
+auto port = cfg.root()["cluster"]["node"][0]["port"].as<std::string>();
+// port is expected<std::string, error>; check before use.
+if(port)
+    std::cout << *port << '\n';
+```
+
+**Null-view chaining** — navigation through an absent key stays invalid:
+
+```cpp
+cfg.root()["nonexistent"]["child"].exists()  // false
+cfg.root()["nonexistent"][0].exists()        // false
+```
+
+**Shape queries:**
+
+```cpp
+bool     exists() const noexcept;          // true when the path exists in the config
+node_kind kind() const noexcept;           // scalar | container | repeated
+std::size_t count() const noexcept;        // instance count for repeated; 1 for scalar/container; 0 for absent
+std::vector<config_node> children() const; // ordinal order for repeated; canonical order for container
+std::string_view path() const noexcept;    // the key path that identifies this node
+std::optional<std::string> value() const;  // raw string for scalars; nullopt for containers/absent
+```
+
+`node_kind` values: `node_kind::scalar`, `node_kind::container`,
+`node_kind::repeated`.
+
+**Typed read** — delegates to `config::get_as<T>()`:
+
+```cpp
+template<typename T>
+expected<T, error> as() const;
+```
+
+`as<std::string>()` returns the raw scalar value directly without requiring a
+registered converter.
+
+**Example — iterate all ports across a repeated container:**
+
+```cpp
+auto nodes = cfg.root()["cluster"]["node"];
+if(nodes.kind() == nucleus::node_kind::repeated)
+{
+    for(const nucleus::config_node &instance : nodes.children())
+    {
+        auto port = instance["port"].as<std::string>();
+        if(port)
+            std::cout << instance.path() << "/port = " << *port << '\n';
+    }
+}
+```
+
+**Pre-order visit** — `visit(fn)` calls `fn` at each node; return `false` from
+`fn` to stop the walk immediately. Repeated instances are visited in numeric
+ordinal order; distinct sibling container fields in canonical order.
+
+```cpp
+cfg.root()["cluster"]["node"].visit([](const nucleus::config_node &n) {
+    std::cout << n.path() << '\n';
+    return true;   // continue
+});
+```
+
+**Enter/leave walk** — `walk(walker)` provides nesting-aware enter/leave
+callbacks via a `config_tree_walker` subclass. `enter()` returning `false`
+skips the subtree; `leave()` is called on ascent in all cases.
+
+```cpp
+struct port_collector : nucleus::config_tree_walker
+{
+    std::vector<std::string> ports;
+
+    bool enter(const nucleus::config_node &n) override
+    {
+        if(n.path().ends_with("/port"))
+            if(auto v = n.value(); v)
+                ports.push_back(*v);
+        return true;
+    }
+    void leave(const nucleus::config_node &) override {}
+};
+
+port_collector collector;
+cfg.root().walk(collector);
+```
+
+See [`examples/quickstart.cpp`](../examples/quickstart.cpp) (Part 2 repeated
+container demo), [`tests/config_node_test.cpp`](../tests/config_node_test.cpp).
 
 ---
 
@@ -543,10 +704,19 @@ const std::string &front() const;
 const std::string &leaf() const;
 key_path parent() const;                    // a/b/c -> a/b
 std::string str() const;                    // canonical "/"-joined form
+
+static bool is_indexed_segment(std::string_view seg) noexcept;  // "node[0]" -> true
+static std::string_view base_name(std::string_view seg) noexcept; // "node[0]" -> "node"
+static std::size_t ordinal_of(std::string_view seg) noexcept;   // "node[0]" -> 0
 ```
 
-`parse` rejects leading/trailing separators and empty segments. Most schema code
-can skip `key_path` entirely and pass a string to `anchor::keyspace`.
+`parse` rejects leading/trailing separators and empty segments. A segment
+containing `[` must be a valid indexed segment: non-empty base name, decimal
+ordinal with no leading zeros (except a lone `0`), max 18 digits, closing `]`.
+Element names must not start with a digit — this keeps the CLI bijection
+invertible (a digit-led segment after a repeated container is unambiguously an
+ordinal). Most schema code can skip `key_path` entirely and pass a string to
+`anchor::keyspace`.
 
 ---
 
@@ -587,7 +757,8 @@ nucleus::argv::emit_document(config, std::cout);    // --KEY=value flags (delimi
 
 The seam is stream-based and the caller owns persistence — write to a file with
 a `std::ofstream`, capture into a string with a `std::ostringstream`. A repeated
-path keeps all of its values in every format. See
+container emits N sibling elements (XML) or N indexed entries (env/argv) in
+numeric ordinal order. See
 [`examples/round_trip.cpp`](../examples/round_trip.cpp),
 [`examples/xml_persist.cpp`](../examples/xml_persist.cpp), and
 [`examples/emit_template.cpp`](../examples/emit_template.cpp).
@@ -613,7 +784,7 @@ enum class errc {
     unreadable_source, malformed_source, invalid_inheritance, unmet_capability,
     layering_violation, unresolved_token, invalid_selection, schema_violation,
     failed_conversion, rejected_registration, sealed_builder,
-    absent_key, missing_converter, mismatched_type,
+    absent_key, index_required, missing_converter, mismatched_type,
 };
 constexpr std::string_view to_string(errc code) noexcept;
 
@@ -633,7 +804,7 @@ traffic in plain reason strings — the engine attaches the code at the seam
 where the failure class is known.
 
 ```cpp
-auto loaded = nucleus::load(space, stack, {});
+auto loaded = nucleus::load_config(space, stack, {});
 if(!loaded)
 {
     std::cerr << loaded.error() << '\n';   // streams "code: message"

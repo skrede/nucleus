@@ -15,6 +15,34 @@ declared key back to exactly one flag, so `emit_template` / `emit_document` /
 `generate_completion` and `argv_source` all share one grammar when given the
 same delimiter. See the *trio invariant* in the main README.
 
+## Ordinal segment rule — repeated containers
+
+A repeated container's instances are addressed via a plain decimal ordinal
+segment in the flag. The ordinal takes the place of the `[N]` bracket in the
+FQN keyspace path:
+
+```
+--cluster-node-0-port=v  ⇄  cluster/node[0]/port
+--cluster-node-1-port=v  ⇄  cluster/node[1]/port
+```
+
+**Disambiguation rule.** Schema element names must not start with a digit
+(enforced at schema registration; XML element names already forbid this). A
+digit-led segment that immediately follows a repeated container is therefore
+unambiguously an ordinal index, making the bijection invertible.
+
+**argv is override-only for collections.** argv can set or replace a field at
+an in-range index; it cannot create new instances or extend a collection.
+Supplying an out-of-range index is a loud pull error that names the actual
+instance count. To populate a repeated container, use an XML source or
+`runtime_source` (which carry the `duplicate_keys` capability needed to create
+instances).
+
+**Completion.** The completion script treats the index position as a digit
+wildcard: after the user types `--cluster-node-2`, the sub-path completions
+(`-port`, etc.) are offered for any digit value. Completion scripts have no
+knowledge of the actual instance count at the time they are generated.
+
 ## Multi-space CLI addressing
 
 When a process hosts more than one independently-declared configuration space
@@ -89,8 +117,8 @@ beta_view.recognize_with(nucleus::recognizer_of(beta_space));
 nucleus::source_stack alpha_stack{nucleus::source_handle(alpha_view)};
 nucleus::source_stack beta_stack{nucleus::source_handle(beta_view)};
 
-auto alpha_cfg = nucleus::load(alpha_space, alpha_stack);
-auto beta_cfg  = nucleus::load(beta_space,  beta_stack);
+auto alpha_cfg = nucleus::load_config(alpha_space, alpha_stack);
+auto beta_cfg  = nucleus::load_config(beta_space,  beta_stack);
 ```
 
 ## Cross-format identity-envelope table

@@ -92,7 +92,7 @@ How it realizes the seams:
   The chain walker caps the depth at `inherit_policy::depth_cap` (default 16)
   and consults `inherit_policy::admissibility` for each fetched parent.
 
-A host usually does not construct it at the call site of `load`: it hands a
+A host usually does not construct it at the call site of `load_config`: it hands a
 factory to `load_options::make_document` that builds one per requested path:
 
 ```cpp
@@ -272,8 +272,8 @@ match the `argv_source` it round-trips with.
 
 `emit_template` projects a **sealed space's declared schema** into a blank
 document template; `emit_document` projects a **resolved configuration** into a
-populated one. A repeated path emits one entry per value in fold order in every
-format.
+populated one. A repeated path emits one entry per value in numeric ordinal
+order in every format.
 
 ```cpp
 nucleus::xml::emit_template(space, std::cout);    // blank template from the schema
