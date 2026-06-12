@@ -8,6 +8,7 @@
 
 #include "nucleus/config_source/source_handle.h"
 #include "nucleus/config_source/config_source.h"
+#include "nucleus/config_source/source_stack.h"
 
 #include "nucleus/keyspace/key_path.h"
 
@@ -15,6 +16,8 @@
 
 #include "nucleus/argv/argv_source.h"
 #include "nucleus/argv/cli_surface.h"
+
+#include "nucleus/xml/xml_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -281,4 +284,109 @@ TEST_CASE("repeated flags compose into one ordered collection", "[argv][capabili
     REQUIRE(loaded);
     const auto tags = loaded.value().get_all("server/tag");
     REQUIRE(tags == std::vector<std::string>{"alpha", "beta"});
+}
+
+// ---------------------------------------------------------------------------
+// D-09 / D-11: CLI ordinal addressing for repeated containers
+// ---------------------------------------------------------------------------
+
+namespace {
+
+nucleus::xml_source xml_of_cluster(const std::string &text)
+{
+    return nucleus::xml_source::from(nucleus::xml_source_options::of_string(text));
+}
+
+// Schema: cluster -> node (repeated container) -> endpoint (container) -> port (leaf).
+// Mirrors the schema from the plan (D-09/D-11).
+[[nodiscard]] nucleus::config_space make_cluster_space()
+{
+    nucleus::config_space_builder builder;
+    REQUIRE(builder.register_element(
+        nucleus::element("cluster", nucleus::anchor::root())));
+    REQUIRE(builder.register_element(
+        nucleus::repeated_element("node", nucleus::anchor::keyspace("cluster"))));
+    REQUIRE(builder.register_element(
+        nucleus::element("endpoint", nucleus::anchor::keyspace("cluster/node"))));
+    REQUIRE(builder.register_element(
+        nucleus::element("port", nucleus::anchor::keyspace("cluster/node/endpoint"))));
+    return builder.build();
+}
+
+}
+
+TEST_CASE("cli ordinal addressing -- argv override of indexed instance",
+          "[argv][repeated_container][D09]")
+{
+    const nucleus::config_space space = make_cluster_space();
+
+    // XML base: two node instances (port 80 and 443).
+    auto xml = xml_of_cluster(
+        "<cluster>"
+        "<node><endpoint><port>80</port></endpoint></node>"
+        "<node><endpoint><port>443</port></endpoint></node>"
+        "</cluster>");
+
+    // argv override layer: --cluster-node-0-endpoint-port=90 targets node[0].
+    argv_source argv(std::vector<std::string>{"--cluster-node-0-endpoint-port=90"});
+    argv.recognize_with(nucleus::recognizer_of(space));
+
+    auto loaded = nucleus::load_config(
+        space,
+        nucleus::source_stack{std::move(xml), std::move(argv)},
+        {});
+    REQUIRE(loaded);
+    const nucleus::config &cfg = loaded.value();
+
+    // node[0] overridden by argv; node[1] unchanged from XML.
+    REQUIRE(cfg.get("cluster/node[0]/endpoint/port") == "90");
+    REQUIRE(cfg.get("cluster/node[1]/endpoint/port") == "443");
+}
+
+TEST_CASE("argv out-of-range ordinal -- loud error", "[argv][repeated_container][D11]")
+{
+    const nucleus::config_space space = make_cluster_space();
+
+    auto xml = xml_of_cluster(
+        "<cluster>"
+        "<node><endpoint><port>80</port></endpoint></node>"
+        "<node><endpoint><port>443</port></endpoint></node>"
+        "</cluster>");
+
+    // ordinal 5 is far out of range (only 2 instances: 0 and 1).
+    argv_source argv(std::vector<std::string>{"--cluster-node-5-endpoint-port=90"});
+    argv.recognize_with(nucleus::recognizer_of(space));
+
+    auto loaded = nucleus::load_config(
+        space,
+        nucleus::source_stack{std::move(xml), std::move(argv)},
+        {});
+    REQUIRE_FALSE(loaded);
+    REQUIRE(loaded.error().message.find("out of range") != std::string::npos);
+    // The error names the actual count of instances (2).
+    REQUIRE(loaded.error().message.find("2") != std::string::npos);
+}
+
+TEST_CASE("argv ordinal == count is out of range -- cannot append",
+          "[argv][repeated_container][D11]")
+{
+    const nucleus::config_space space = make_cluster_space();
+
+    auto xml = xml_of_cluster(
+        "<cluster>"
+        "<node><endpoint><port>80</port></endpoint></node>"
+        "<node><endpoint><port>443</port></endpoint></node>"
+        "</cluster>");
+
+    // ordinal 2 == count (2 instances: 0 and 1): append is not allowed per D-11.
+    argv_source argv(std::vector<std::string>{"--cluster-node-2-endpoint-port=90"});
+    argv.recognize_with(nucleus::recognizer_of(space));
+
+    auto loaded = nucleus::load_config(
+        space,
+        nucleus::source_stack{std::move(xml), std::move(argv)},
+        {});
+    REQUIRE_FALSE(loaded);
+    REQUIRE(loaded.error().message.find("out of range") != std::string::npos);
+    REQUIRE(loaded.error().message.find("2") != std::string::npos);
 }
