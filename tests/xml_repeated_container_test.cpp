@@ -2,8 +2,13 @@
 // ordinals in document order to sibling elements under a repeated schema container.
 // Tests verify the raw batch entries emitted by xml_source::pull() (the fold is not
 // yet aware of indexed paths; that is Plan 05).
+// Plan 08: xml_emitter round-trip tests (D-22) appended below.
 
 #include "nucleus/xml/xml_source.h"
+#include "nucleus/xml/xml_emitter.h"
+
+#include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -12,6 +17,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -135,6 +141,36 @@ TEST_CASE("xml nested ordinal emission", "[xml][repeated_container][nested]")
     }
 }
 
+// Helper: build a config_space with cluster -> node (repeated) -> port + metrics/latency.
+namespace {
+
+nucleus::config_space make_cluster_space_for_emitter()
+{
+    nucleus::config_space_builder builder;
+    REQUIRE(builder.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(builder.register_element(nucleus::repeated_element("node", anchor::keyspace("cluster"))));
+    REQUIRE(builder.register_element(nucleus::element("port", anchor::keyspace("cluster/node"))));
+    REQUIRE(builder.register_element(nucleus::element("metrics", anchor::keyspace("cluster/node"))));
+    REQUIRE(builder.register_element(nucleus::element("latency", anchor::keyspace("cluster/node/metrics"))));
+    return builder.build();
+}
+
+nucleus::source_handle xml_source_of(const std::string &text)
+{
+    return nucleus::source_handle(
+        nucleus::xml_source::from(nucleus::xml_source_options::of_string(text)));
+}
+
+nucleus::load_options doc_opts(const std::string &xml)
+{
+    nucleus::load_options opts;
+    opts.document_paths = {"doc.xml"};
+    opts.make_document = [xml](const std::string &) { return xml_source_of(xml); };
+    return opts;
+}
+
+} // namespace
+
 TEST_CASE("non-repeated container -- no ordinals assigned", "[xml][repeated_container][plain]")
 {
     schema_registry reg = cluster_plain_server_registry();
@@ -161,4 +197,69 @@ TEST_CASE("non-repeated container -- no ordinals assigned", "[xml][repeated_cont
     // No indexed paths produced for a plain container.
     for(const auto &p : paths)
         REQUIRE(p.find('[') == std::string::npos);
+}
+
+TEST_CASE("xml emitter -- repeated container bracket strip", "[xml][xml_emitter][D22]")
+{
+    const nucleus::config_space space = make_cluster_space_for_emitter();
+
+    const std::string kXml =
+        "<cluster>"
+        "<node><port>1.5</port><metrics><latency>0.1</latency></metrics></node>"
+        "<node><port>2.0</port><metrics><latency>0.2</latency></metrics></node>"
+        "</cluster>";
+
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{}, doc_opts(kXml));
+    REQUIRE(loaded);
+
+    std::ostringstream out;
+    nucleus::xml::emit_document(loaded.value(), out);
+    const std::string emitted = out.str();
+
+    // No bracket-suffixed element names in the output.
+    REQUIRE(emitted.find("node[0]") == std::string::npos);
+    REQUIRE(emitted.find("node[1]") == std::string::npos);
+
+    // Both <node> elements appear as siblings (at least two occurrences of <node>).
+    std::size_t count = 0;
+    std::size_t pos = 0;
+    while((pos = emitted.find("<node>", pos)) != std::string::npos)
+    {
+        ++count;
+        ++pos;
+    }
+    REQUIRE(count >= 2);
+
+    // Values from both instances are present.
+    REQUIRE(emitted.find("1.5") != std::string::npos);
+    REQUIRE(emitted.find("2.0") != std::string::npos);
+    REQUIRE(emitted.find("0.1") != std::string::npos);
+    REQUIRE(emitted.find("0.2") != std::string::npos);
+}
+
+TEST_CASE("xml emitter -- repeated container round-trip", "[xml][xml_emitter][round_trip][D22]")
+{
+    const nucleus::config_space space = make_cluster_space_for_emitter();
+
+    const std::string kXml =
+        "<cluster>"
+        "<node><port>1.5</port><metrics><latency>0.1</latency></metrics></node>"
+        "<node><port>2.0</port><metrics><latency>0.2</latency></metrics></node>"
+        "</cluster>";
+
+    auto original = nucleus::load_config(space, nucleus::source_stack{}, doc_opts(kXml));
+    REQUIRE(original);
+
+    // Emit to a string, then re-load.
+    std::ostringstream out;
+    nucleus::xml::emit_document(original.value(), out);
+
+    auto reloaded = nucleus::load_config(space, nucleus::source_stack{}, doc_opts(out.str()));
+    REQUIRE(reloaded);
+
+    // Round-trip: indexed paths must survive.
+    REQUIRE(reloaded.value().get("cluster/node[0]/port") == "1.5");
+    REQUIRE(reloaded.value().get("cluster/node[1]/port") == "2.0");
+    REQUIRE(reloaded.value().get("cluster/node[0]/metrics/latency") == "0.1");
+    REQUIRE(reloaded.value().get("cluster/node[1]/metrics/latency") == "0.2");
 }
