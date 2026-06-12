@@ -20,7 +20,7 @@ namespace nucleus::argv {
 // relative to it and skips keys outside it -- the anchored grammar cannot
 // address them. When space_name is non-empty, it is prepended as the leading
 // segment so the emitted flags match what multispace_argv_source parses, e.g.
-// `--vagus-plugin-x=` for key `plugin/x` in space `vagus`.
+// `--engine-plugin-x=` for key `plugin/x` in space `engine`.
 inline void emit_template(const config_space &space, std::ostream &out,
                           const cli_delimiter &delimiter = {},
                           const key_path &anchor = {},
