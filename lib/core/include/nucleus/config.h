@@ -1,6 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_CONFIG_H
 #define HPP_GUARD_NUCLEUS_CONFIG_H
 
+#include "nucleus/config_node.h"
 #include "nucleus/error.h"
 #include "nucleus/format.h"
 #include "nucleus/expected.h"
@@ -35,6 +36,14 @@ class config
 {
 public:
     config() = default;
+
+    // Entry point for the walk API (D-13). Returns a root-anchored cursor backed by
+    // this immutable config. The cursor holds a const pointer to *this; the config
+    // must outlive all cursors derived from it.
+    [[nodiscard]] config_node root() const noexcept
+    {
+        return config_node{this, std::string{}};
+    }
 
     config(std::map<std::string, std::string> values, provenance origins)
         : m_values(std::move(values)), m_provenance(std::move(origins))
@@ -323,5 +332,169 @@ private:
 };
 
 }
+
+// ---------------------------------------------------------------------------
+// config_node method bodies -- defined here so they have access to the full
+// config class definition. config_node.h only forward-declares config.
+// ---------------------------------------------------------------------------
+
+namespace nucleus {
+
+[[nodiscard]] inline bool config_node::exists() const noexcept
+{
+    if(!m_config)
+        return false;
+    // Root node (empty path) exists when the config has at least one key.
+    if(m_path.empty())
+        return !m_config->keys().empty();
+    if(m_config->contains(m_path))
+        return true;
+    const std::string indexed_prefix = m_path + "[";
+    for(const std::string &k : m_config->keys())
+        if(k.starts_with(indexed_prefix))
+            return true;
+    const std::string child_prefix = m_path + key_path::separator;
+    for(const std::string &k : m_config->keys())
+        if(k.starts_with(child_prefix))
+            return true;
+    return false;
+}
+
+[[nodiscard]] inline node_kind config_node::kind() const noexcept
+{
+    if(!m_config || !exists())
+        return node_kind::scalar;
+    // Root (empty path) is always a container -- it has no index.
+    if(m_path.empty())
+        return node_kind::container;
+    const std::string indexed_prefix = m_path + "[";
+    for(const std::string &k : m_config->keys())
+        if(k.starts_with(indexed_prefix))
+            return node_kind::repeated;
+    const std::string child_prefix = m_path + key_path::separator;
+    for(const std::string &k : m_config->keys())
+        if(k.starts_with(child_prefix))
+            return node_kind::container;
+    return node_kind::scalar;
+}
+
+[[nodiscard]] inline std::size_t config_node::count() const noexcept
+{
+    if(!m_config || !exists())
+        return 0;
+    if(kind() != node_kind::repeated)
+        return 1;
+    return distinct_ordinals().size();
+}
+
+[[nodiscard]] inline std::vector<config_node> config_node::children() const
+{
+    if(!m_config || !exists())
+        return {};
+
+    const node_kind k = kind();
+
+    if(k == node_kind::repeated)
+    {
+        std::vector<std::size_t> ordinals = distinct_ordinals();
+        std::vector<config_node> result;
+        result.reserve(ordinals.size());
+        for(std::size_t ord : ordinals)
+            result.emplace_back(m_config,
+                m_path + "[" + std::to_string(ord) + "]");
+        return result;
+    }
+
+    if(k == node_kind::container)
+    {
+        // For the root node (empty path), every key is a direct child.
+        // Otherwise, filter keys that start with m_path + '/'.
+        const bool is_root = m_path.empty();
+        const std::string child_prefix = is_root ? std::string{} : (m_path + key_path::separator);
+        std::set<std::string> seen_names;
+        for(const std::string &key : m_config->keys())
+        {
+            if(!is_root && !key.starts_with(child_prefix))
+                continue;
+            std::string_view remainder(key.data() + child_prefix.size(),
+                                       key.size() - child_prefix.size());
+            // Take only the first segment (stop at separator or '[').
+            const auto sep_pos = remainder.find(key_path::separator);
+            const auto idx_pos = remainder.find('[');
+            const std::size_t end = std::min(
+                sep_pos == std::string_view::npos ? remainder.size() : sep_pos,
+                idx_pos == std::string_view::npos ? remainder.size() : idx_pos);
+            seen_names.emplace(remainder.substr(0, end));
+        }
+        std::vector<config_node> result;
+        result.reserve(seen_names.size());
+        for(const std::string &name : seen_names)
+        {
+            const std::string child_path = is_root ? name : (m_path + key_path::separator + name);
+            result.emplace_back(m_config, child_path);
+        }
+        return result;
+    }
+
+    return {};
+}
+
+[[nodiscard]] inline std::optional<std::string> config_node::value() const
+{
+    if(!m_config)
+        return std::nullopt;
+    return m_config->get(m_path);
+}
+
+template<typename T>
+[[nodiscard]] inline expected<T, error> config_node::as() const
+{
+    if(!m_config)
+        return unexpected(error{errc::absent_key,
+            "path '" + m_path + "' is absent"});
+    // For std::string, return the raw scalar value directly so callers do not
+    // need to register a string converter just to read a plain text field.
+    if constexpr(std::is_same_v<T, std::string>)
+    {
+        auto raw = m_config->get(m_path);
+        if(raw.has_value())
+            return std::move(*raw);
+        // Fall through to get_as<T> for the proper error (index_required,
+        // absent_key, etc.) from the canonical error surface.
+    }
+    return m_config->get_as<T>(m_path);
+}
+
+[[nodiscard]] inline std::vector<std::size_t> config_node::distinct_ordinals() const
+{
+    const std::string indexed_prefix = m_path + "[";
+    std::set<std::size_t> ordinal_set;
+    for(const std::string &k : m_config->keys())
+    {
+        if(!k.starts_with(indexed_prefix))
+            continue;
+        // Remainder after m_path: "[N]" or "[N]/...".
+        std::string_view remainder(k.data() + m_path.size(),
+                                   k.size() - m_path.size());
+        if(remainder.size() < 3 || remainder[0] != '[')
+            continue;
+        const auto close = remainder.find(']');
+        if(close == std::string_view::npos || close < 2)
+            continue;
+        const std::string_view digits = remainder.substr(1, close - 1);
+        bool all_digits = !digits.empty();
+        for(char c : digits)
+            if(c < '0' || c > '9') { all_digits = false; break; }
+        if(!all_digits)
+            continue;
+        std::size_t ordinal = 0;
+        for(char c : digits)
+            ordinal = ordinal * 10 + static_cast<std::size_t>(c - '0');
+        ordinal_set.insert(ordinal);
+    }
+    return std::vector<std::size_t>(ordinal_set.begin(), ordinal_set.end());
+}
+
+} // namespace nucleus
 
 #endif
