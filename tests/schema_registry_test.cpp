@@ -228,11 +228,31 @@ TEST_CASE("D-18: primary key inside repeated container rejected at attach",
     auto bad = reg.attach(
         nucleus::identity_element("id", anchor::keyspace(path_of("link"))));
     REQUIRE_FALSE(bad);
-    REQUIRE(bad.error().find("primary key inside repeated container") != std::string::npos);
+    REQUIRE(bad.error().find("primary key under repeated") != std::string::npos);
 
     // Other fields under the same repeated container are perfectly admissible.
     REQUIRE(reg.attach(
         nucleus::required_element("mass", anchor::keyspace(path_of("link")))));
     REQUIRE(reg.attach(
         nucleus::element("length", anchor::keyspace(path_of("link")))));
+}
+
+TEST_CASE("D-18: primary key under non-repeated child of repeated container rejected",
+          "[schema_registry][repeated_pkey][CR02]")
+{
+    // Schema: cluster -> node (repeated) -> details (NOT repeated) -> name (identity)
+    // The transitive-ancestor check must catch this: 'name' is under 'details',
+    // which is not repeated, but 'node' is a repeated ancestor.
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::element("cluster", anchor::root())));
+    REQUIRE(reg.attach(nucleus::repeated_element("node", anchor::keyspace("cluster"))));
+    REQUIRE(reg.attach(nucleus::element("details", anchor::keyspace("cluster/node"))));
+
+    // Identity element under details -- rejected because node is a repeated ancestor.
+    auto bad = reg.attach(
+        nucleus::identity_element("name", anchor::keyspace("cluster/node/details")));
+    REQUIRE_FALSE(bad);
+    REQUIRE(bad.error().find("primary key under repeated") != std::string::npos);
+    // The ancestor 'cluster/node' must be named in the error.
+    REQUIRE(bad.error().find("cluster/node") != std::string::npos);
 }

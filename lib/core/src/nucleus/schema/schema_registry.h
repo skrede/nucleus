@@ -138,23 +138,26 @@ public:
                 el.name));
         }
 
-        // D-18: a primary key nested inside a repeated container is ambiguous —
+        // D-18: a primary key under ANY repeated ancestor is ambiguous —
         // each ordinal instance would need its own selector, which v1 does not
-        // support. Reject at attach so the schema can never express it.
+        // support. Walk the full ancestor chain of the container; reject at
+        // attach if any ancestor is a declared repeated element.
         if(el.identity)
         {
-            const key_path container = el.container();
-            auto repeated_parent = std::ranges::find_if(
-                m_elements, [&](const schema_element &e) {
-                    return e.repeated && e.declared_path() == container;
-                });
-            if(repeated_parent != m_elements.end())
+            key_path ancestor = el.container();
+            while(!ancestor.empty())
             {
-                return unexpected(nucleus::format(
-                    "schema element '{}' is a primary key inside repeated container '{}': "
-                    "keyed selection has no clean per-instance meaning inside a "
-                    "repeated container (v1 restriction)",
-                    el.name, container.str()));
+                auto repeated_ancestor = std::ranges::find_if(
+                    m_elements, [&](const schema_element &e) {
+                        return e.repeated && e.declared_path() == ancestor;
+                    });
+                if(repeated_ancestor != m_elements.end())
+                    return unexpected(nucleus::format(
+                        "schema element '{}' is a primary key under repeated "
+                        "ancestor '{}': keyed selection has no clean per-instance "
+                        "meaning inside a repeated container (v1 restriction)",
+                        el.name, ancestor.str()));
+                ancestor = ancestor.parent();
             }
         }
 
