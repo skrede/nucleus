@@ -40,9 +40,8 @@ struct schema_element
     // instances. Many allowed; carries no selector role. (A primary key is
     // implicitly unique whether or not this is also set.)
     bool unique = false;
-    // Collection mode: this element keeps ALL N values of the same-named field
-    // as an ordered collection. Distinct from keyed containers (instances) and
-    // template merging. Leaf fields only.
+    // Collection mode: N sibling instances each occupy a distinct ordinal slot.
+    // Legal on any element -- leaf (scalar instances) or container (structured instances).
     bool repeated = false;
 
     // The closed set of values this element accepts, if it is constrained. An
@@ -130,9 +129,8 @@ struct schema_element
     return e;
 }
 
-// A leaf field that keeps ALL N occurrences of a same-named entry as an ordered
-// collection. The fold appends within a source layer and replaces across layers.
-// get() returns the last value; get_all() returns the full collection.
+// An element that keeps N sibling instances in ordinal (document) order.
+// For a leaf, instances are scalars; for a container, instances are indexed subtrees.
 [[nodiscard]] inline schema_element repeated_element(std::string name, anchor at)
 {
     schema_element e = element(std::move(name), std::move(at));
