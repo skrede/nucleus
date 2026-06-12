@@ -156,12 +156,6 @@ public:
                             continue;
                         if(const value *v = resolved.find(kp))
                             check_value(std::string(v->text()));
-                        else if(const std::vector<value> *col =
-                                    resolved.find_collection(kp))
-                        {
-                            for(const value &v : *col)
-                                check_value(std::string(v.text()));
-                        }
                     }
                 }
                 else if(present)
