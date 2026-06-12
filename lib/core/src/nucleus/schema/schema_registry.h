@@ -5,6 +5,8 @@
 #include "nucleus/expected.h"
 #include "nucleus/identity.h"
 
+#include <cctype>
+
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/projection.h"
@@ -123,6 +125,38 @@ public:
                 "schema element '{}' cannot be both repeated and unique: "
                 "uniqueness requires a single comparable value, not a collection",
                 el.name));
+
+        // D-10: element names must not start with a digit so CLI flag text is
+        // unambiguously invertible back to a schema path (numeric leading chars
+        // would collide with ordinal index notation in the CLI bijection).
+        if(!el.name.empty()
+           && std::isdigit(static_cast<unsigned char>(el.name.front())))
+        {
+            return unexpected(nucleus::format(
+                "schema element '{}' has a digit-led name: element names must not "
+                "start with a digit (CLI flag disambiguation requires this)",
+                el.name));
+        }
+
+        // D-18: a primary key nested inside a repeated container is ambiguous —
+        // each ordinal instance would need its own selector, which v1 does not
+        // support. Reject at attach so the schema can never express it.
+        if(el.identity)
+        {
+            const key_path container = el.container();
+            auto repeated_parent = std::ranges::find_if(
+                m_elements, [&](const schema_element &e) {
+                    return e.repeated && e.declared_path() == container;
+                });
+            if(repeated_parent != m_elements.end())
+            {
+                return unexpected(nucleus::format(
+                    "schema element '{}' is a primary key inside repeated container '{}': "
+                    "keyed selection has no clean per-instance meaning inside a "
+                    "repeated container (v1 restriction)",
+                    el.name, container.str()));
+            }
+        }
 
         m_defined.insert(el.declared_path().str());
         m_elements.push_back(std::move(el));
