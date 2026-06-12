@@ -192,6 +192,18 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     )
     add_test(NAME xml_persist_test COMMAND xml_persist_test)
 
+    # Ordinal emission for repeated-container instances: xml_source assigns zero-based
+    # ordinals to sibling elements under a repeated schema container.
+    add_executable(xml_repeated_container_test xml_repeated_container_test.cpp)
+    nucleus_enable_coverage(xml_repeated_container_test)
+    nucleus_warnings(xml_repeated_container_test)
+    target_link_libraries(xml_repeated_container_test
+        PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
+    target_include_directories(xml_repeated_container_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/lib/core/src
+    )
+    add_test(NAME xml_repeated_container_test COMMAND xml_repeated_container_test)
+
     # Typed error model: every public failure channel must carry the errc that
     # names its pipeline stage. Links xml + runtime to drive each path for real.
     add_executable(error_code_test error_code_test.cpp)
