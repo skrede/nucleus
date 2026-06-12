@@ -25,6 +25,7 @@ enum class errc
     rejected_registration,
     sealed_builder,
     absent_key,
+    index_required,
     missing_converter,
     mismatched_type,
 };
@@ -45,6 +46,7 @@ enum class errc
         case errc::rejected_registration: return "rejected_registration";
         case errc::sealed_builder:        return "sealed_builder";
         case errc::absent_key:            return "absent_key";
+        case errc::index_required:        return "index_required";
         case errc::missing_converter:     return "missing_converter";
         case errc::mismatched_type:       return "mismatched_type";
     }

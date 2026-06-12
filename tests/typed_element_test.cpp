@@ -604,7 +604,7 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
         REQUIRE(r.error().message.find("type mismatch") != std::string::npos);
     }
 
-    SECTION("get_as on a repeated typed path returns absent for plain path")
+    SECTION("get_as on a repeated typed path returns index_required for plain path")
     {
         nucleus::config_space_builder engine;
         REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
@@ -616,10 +616,12 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
         auto loaded = resolve_one(engine, std::move(src));
         REQUIRE(loaded);
 
-        // Repeated values are indexed scalars; plain path is absent, indexed paths work.
+        // D-21: unindexed path crossing a repeated container returns index_required,
+        // not absent_key. Use get_all_as() to gather all instances, or get_as() with
+        // an explicit index (e.g. "cfg/nums[0]") for a single instance.
         auto r_plain = loaded.value().get_as<int32_t>("cfg/nums");
         REQUIRE(!r_plain);
-        REQUIRE(r_plain.error().code == nucleus::errc::absent_key);
+        REQUIRE(r_plain.error().code == nucleus::errc::index_required);
 
         // Indexed paths carry the typed value.
         auto r0 = loaded.value().get_as<int32_t>("cfg/nums[0]");

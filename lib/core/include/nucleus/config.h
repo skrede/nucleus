@@ -2,6 +2,7 @@
 #define HPP_GUARD_NUCLEUS_CONFIG_H
 
 #include "nucleus/error.h"
+#include "nucleus/format.h"
 #include "nucleus/expected.h"
 
 #include "nucleus/keyspace/key_path.h"
@@ -52,8 +53,10 @@ public:
 
     // The owned value at a key, or nullopt if the key carries no value. The
     // returned string is a copy -- no buffer dependency survives into it.
-    // For repeated paths, returns nullopt for unindexed paths; use get_all()
-    // or get("path[N]") for direct indexed access.
+    // Returns nullopt for absent keys and for unindexed paths crossing a repeated
+    // container (D-21 legacy untyped surface). Use get_as() for the typed loud error
+    // naming the container and instance count, or get("path[N]") / get_all() for
+    // indexed access.
     [[nodiscard]] std::optional<std::string> get(const std::string &key) const
     {
         auto it = m_values.find(key);
@@ -122,8 +125,10 @@ public:
     }
 
     // Returns the typed value at `key` converted by the registered converter.
-    // Errors distinguish three cases:
+    // Errors distinguish four cases:
     //   errc::absent_key        -- the key carries no value at all
+    //   errc::index_required    -- the path crosses a repeated container without an
+    //                              index; message names the container and instance count
     //   errc::missing_converter -- the key has a string value but no converter
     //                              was registered (untyped path)
     //   errc::mismatched_type   -- the stored type does not equal T (outright
@@ -138,6 +143,19 @@ public:
             if(contains(key))
                 return unexpected(error{errc::missing_converter,
                             std::string("path '") + key + "' declares no type converter"});
+            // Detect unindexed path crossing a repeated container (D-21 loud error).
+            if(auto container = crossing_repeated_container(key); container)
+            {
+                std::size_t count = 0;
+                const std::string prefix = *container + "[";
+                for(const auto &[k, _] : m_values)
+                    if(k.starts_with(prefix))
+                        ++count;
+                return unexpected(error{errc::index_required,
+                    nucleus::format(
+                        "path '{}' crosses repeated container '{}' "
+                        "-- index required, {} instance(s)", key, *container, count)});
+            }
             return unexpected(error{errc::absent_key,
                         std::string("path '") + key + "' is absent"});
         }
@@ -211,6 +229,52 @@ public:
     }
 
 private:
+    // Returns the repeated container path if `key` crosses a repeated container
+    // without an ordinal index; otherwise std::nullopt. Two cases:
+    //   (a) key IS the container path: m_values has "key[N]/..." entries.
+    //   (b) key is a leaf path UNDER the container without an index:
+    //       m_values has "prefix[N]/suffix" where canonical("prefix[N]/suffix") == key.
+    // This powers the D-21 index_required error in get_as() and the nullopt contract
+    // in get() (get() is unchanged -- both absent and crossing already return nullopt).
+    [[nodiscard]] std::optional<std::string> crossing_repeated_container(
+        const std::string &key) const
+    {
+        // Case (a): key is the container itself (e.g. "cluster/node").
+        const std::string direct_prefix = key + "[";
+        for(const auto &[k, _] : m_values)
+        {
+            if(k.starts_with(direct_prefix))
+                return key;
+        }
+
+        // Case (b): key is a sub-path (e.g. "cluster/node/port").
+        // For each prefix of key (split at '/'), check if m_values has entries
+        // of the form "prefix[N]/remainder" matching canonical_of(k) == key.
+        for(const auto &[k, _] : m_values)
+        {
+            if(canonical_of(k) != key)
+                continue;
+            // k has an indexed segment; extract the container prefix (up to the
+            // first indexed segment's base name).
+            std::size_t start = 0;
+            for(std::size_t i = 0; i <= k.size(); ++i)
+            {
+                if(i == k.size() || k[i] == key_path::separator)
+                {
+                    std::string_view seg(k.data() + start, i - start);
+                    if(key_path::is_indexed_segment(seg))
+                    {
+                        // Container prefix is everything before this indexed segment.
+                        std::string container = k.substr(0, start == 0 ? 0 : start - 1);
+                        return container;
+                    }
+                    start = i + 1;
+                }
+            }
+        }
+        return std::nullopt;
+    }
+
     // Computes the canonical form of a key by stripping [N] ordinal suffixes from
     // every segment. "cluster/node[0]/port" -> "cluster/node/port".
     // Used by get_all() and get_all_as() without accessing the schema registry.

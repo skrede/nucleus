@@ -720,33 +720,40 @@ public:
 
             const std::string path_str = el.declared_path().str();
 
-            if(el.repeated)
+            // For both repeated elements and non-repeated elements that live under a
+            // repeated container, iterate all indexed paths whose canonical form
+            // matches the declared path and convert each instance independently.
+            // A non-repeated leaf under a repeated container (e.g. cluster/node/port
+            // when node is repeated) has no scalar at the plain declared path; its
+            // values live at cluster/node[0]/port, cluster/node[1]/port, etc.
+            bool found_any_indexed = false;
+            for(const key_path &kp : m_building.paths())
             {
-                // Enumerate all indexed scalar paths whose canonical form matches
-                // the declared path; convert each one independently.
-                for(const key_path &kp : m_building.paths())
+                if(m_schema.canonical_text(kp) != path_str)
+                    continue;
+                if(kp.str() == path_str)
+                    continue; // handled by the direct path branch below
+                found_any_indexed = true;
+                const value *v = m_building.find(kp);
+                if(v == nullptr)
+                    continue;
+                auto res = (*conv)(v->text());
+                if(!res)
                 {
-                    if(m_schema.canonical_text(kp) != path_str)
-                        continue;
-                    const value *v = m_building.find(kp);
-                    if(v == nullptr)
-                        continue;
-                    auto res = (*conv)(v->text());
-                    if(!res)
-                    {
-                        std::string layer_label = "unknown layer";
-                        const origin *orig = m_provenance.of(kp.str());
-                        if(orig != nullptr)
-                            layer_label = orig->layer;
-                        return unexpected(error{errc::failed_conversion,
-                            nucleus::format(
-                                "conversion failed for '{}': {} (layer: {})",
-                                kp.str(), res.error(), layer_label)});
-                    }
-                    m_typed.emplace(kp.str(), std::move(res).value());
+                    std::string layer_label = "unknown layer";
+                    const origin *orig = m_provenance.of(kp.str());
+                    if(orig != nullptr)
+                        layer_label = orig->layer;
+                    return unexpected(error{errc::failed_conversion,
+                        nucleus::format(
+                            "conversion failed for '{}': {} (layer: {})",
+                            kp.str(), res.error(), layer_label)});
                 }
+                m_typed.emplace(kp.str(), std::move(res).value());
             }
-            else
+
+            // Direct path lookup: plain (non-indexed) scalar at the declared path.
+            if(!found_any_indexed)
             {
                 const auto kp_opt = key_path::parse(path_str);
                 if(!kp_opt)

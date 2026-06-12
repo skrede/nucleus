@@ -97,10 +97,12 @@ public:
                 && std::ranges::find(keyed_satisfied, el.container().str())
                        != keyed_satisfied.end();
 
-            // Check presence: direct (scalar/collection at declared path) or
-            // via any indexed instance path whose canonical matches.
+            // Check presence: direct (scalar/collection at declared path) or via
+            // any indexed instance path whose canonical matches. The fallback is
+            // needed for non-repeated leaves under a repeated container, not just
+            // for repeated elements themselves.
             bool present = resolved.contains(declared);
-            if(!present && el.repeated)
+            if(!present)
             {
                 for(const key_path &kp : resolved.paths())
                 {

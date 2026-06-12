@@ -252,7 +252,7 @@ TEST_CASE("get_all gather -- numeric ordinal order with N >= 11 instances",
 
 namespace {
 
-key_path kp(const char *text) { return nucleus::key_path::parse(text).value(); }
+nucleus::key_path kp(const char *text) { return nucleus::key_path::parse(text).value(); }
 
 // Builds a schema_registry with cluster -> node (repeated container) -> port.
 nucleus::schema_registry cluster_node_registry()
