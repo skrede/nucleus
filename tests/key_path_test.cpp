@@ -131,4 +131,36 @@ TEST_CASE("indexed segment helpers", "[key_path][indexed]")
         REQUIRE_FALSE(empty_idx);
         REQUIRE(empty_idx.error().find("malformed indexed segment") != std::string::npos);
     }
+
+    SECTION("is_indexed_segment rejects digit runs longer than 18 chars -- overflow guard")
+    {
+        // 19-digit ordinal -- exceeds safe 64-bit range.
+        REQUIRE_FALSE(key_path::is_indexed_segment("node[9999999999999999999]"));
+        // 20-digit ordinal.
+        REQUIRE_FALSE(key_path::is_indexed_segment("node[99999999999999999999]"));
+        // 18-digit ordinal is still accepted (max safe range).
+        REQUIRE(key_path::is_indexed_segment("node[999999999999999999]"));
+    }
+
+    SECTION("parse treats 19-digit ordinal as a malformed indexed segment")
+    {
+        // is_indexed_segment rejects it, so parse() surfaces the malformed-segment error.
+        auto result = key_path::parse("cluster/node[9999999999999999999]/port");
+        REQUIRE_FALSE(result);
+        REQUIRE(result.error().find("malformed indexed segment") != std::string::npos);
+    }
+}
+
+TEST_CASE("is_indexed_segment rejects leading-zero ordinals", "[key_path][indexed][IN01]")
+{
+    // A lone "0" is the valid zero-ordinal; leading zero in a multi-digit sequence is rejected.
+    REQUIRE(key_path::is_indexed_segment("node[0]"));
+    REQUIRE_FALSE(key_path::is_indexed_segment("node[01]"));
+    REQUIRE_FALSE(key_path::is_indexed_segment("node[00]"));
+    REQUIRE_FALSE(key_path::is_indexed_segment("node[007]"));
+
+    // parse() rejects the malformed segment.
+    auto result = key_path::parse("cluster/node[01]/port");
+    REQUIRE_FALSE(result);
+    REQUIRE(result.error().find("malformed indexed segment") != std::string::npos);
 }

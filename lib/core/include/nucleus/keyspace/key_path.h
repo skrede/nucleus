@@ -123,7 +123,8 @@ public:
     }
 
     // True iff seg is a bracket-indexed token: non-empty base, `[`, one or more
-    // decimal digits, `]`. E.g. "node[0]" -> true, "node[]" -> false, "[0]" -> false.
+    // decimal digits (no leading zeros, max 18 digits), `]`.
+    // E.g. "node[0]" -> true, "node[]" -> false, "[0]" -> false.
     [[nodiscard]] static bool is_indexed_segment(std::string_view seg) noexcept
     {
         auto lb = seg.find('[');
@@ -132,7 +133,10 @@ public:
         if(seg.back() != ']')
             return false;
         auto digits = seg.substr(lb + 1, seg.size() - lb - 2);
-        if(digits.empty())
+        if(digits.empty() || digits.size() > 18)
+            return false;
+        // Reject leading zeros (except a lone "0").
+        if(digits.size() > 1 && digits[0] == '0')
             return false;
         for(char c : digits)
             if(c < '0' || c > '9')
