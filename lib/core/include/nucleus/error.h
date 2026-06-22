@@ -9,8 +9,8 @@ namespace nucleus {
 
 // The machine-readable identity of every failure the library reports. The codes
 // follow the load pipeline (source -> inheritance -> gate -> fold -> tokens ->
-// selection -> schema -> conversion), then registration, then typed reads. A
-// host branches on the code; the human detail travels in error::message.
+// selection -> schema -> conversion), then registration, then typed reads, then
+// query terminals. A host branches on the code; the human detail travels in error::message.
 enum class errc
 {
     unreadable_source,
@@ -28,6 +28,7 @@ enum class errc
     index_required,
     missing_converter,
     mismatched_type,
+    ambiguous_result,
 };
 
 constexpr std::string_view to_string(errc code) noexcept
@@ -49,6 +50,7 @@ constexpr std::string_view to_string(errc code) noexcept
         case errc::index_required:        return "index_required";
         case errc::missing_converter:     return "missing_converter";
         case errc::mismatched_type:       return "mismatched_type";
+        case errc::ambiguous_result:      return "ambiguous_result";
     }
     return "unknown";
 }
