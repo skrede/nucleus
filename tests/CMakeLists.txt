@@ -83,6 +83,9 @@ nucleus_add_test(recognizer_of_test nucleus::argv)
 nucleus_add_test(converter_edge_cases_test)
 nucleus_add_test(selector_test nucleus::runtime)
 nucleus_add_test(selector_combinator_test nucleus::runtime)
+nucleus_add_test(selector_schema_role_test nucleus::runtime)
+nucleus_add_test(selector_owner_test nucleus::runtime)
+nucleus_add_test(selector_strain_test nucleus::runtime)
 
 # The concurrent-load guarantee test spawns std::threads; link the platform's
 # threading library so the shared-const-read design is exercised under ASan.

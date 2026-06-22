@@ -140,6 +140,68 @@ selector selector::repeated() const
     });
 }
 
+// schema index is authoritative; 0-instance repeated yields no matching config_nodes
+// (none exist to visit), but the schema context still classifies the declared path.
+selector selector::role(node_role r) const
+{
+    return with_predicate([r](const config_node &node, const schema_query_context *ctx) -> bool {
+        if(!ctx)
+            return false;
+        const std::string canonical = ctx->canonicalize(node.path());
+        return ctx->role_of(canonical) == r;
+    });
+}
+
+selector selector::owned_by(owner_token token) const
+{
+    return with_predicate(
+        [token = std::move(token)](const config_node &node,
+                                   const schema_query_context *ctx) -> bool {
+            if(!ctx)
+                return false;
+            const std::string canonical = ctx->canonicalize(node.path());
+            const auto owner = ctx->owner_of(canonical);
+            return owner.has_value() && *owner == token;
+        });
+}
+
+selector selector::in_strain() const
+{
+    if(!m_ctx)
+        return with_predicate([](const config_node &, const schema_query_context *) { return false; });
+
+    // Compute strain prefix once at call time, not per node visit.
+    const std::string pkey_cont{m_ctx->primary_key_container()};
+    const std::string_view anchor_path = m_anchor.path();
+
+    // Anchor must be within a specific ordinal instance of pkey_cont.
+    const bool within_instance = anchor_path.size() > pkey_cont.size()
+        && anchor_path.starts_with(pkey_cont)
+        && anchor_path[pkey_cont.size()] == '[';
+
+    if(!within_instance)
+        return with_predicate([](const config_node &, const schema_query_context *) { return false; });
+
+    const std::string_view after_cont = anchor_path.substr(pkey_cont.size());
+    const auto close_bracket = after_cont.find(']');
+    if(close_bracket == std::string_view::npos)
+        return with_predicate([](const config_node &, const schema_query_context *) { return false; });
+
+    // e.g. pkey_cont="cluster/server" + "[0]" → "cluster/server[0]"
+    const std::string strain_prefix = pkey_cont + std::string(after_cont.substr(0, close_bracket + 1));
+
+    return with_predicate(
+        [strain_prefix](const config_node &node, const schema_query_context *) -> bool {
+            const std::string_view p = node.path();
+            if(p == strain_prefix)
+                return true;
+            // Child or descendant: path continues with '/' after the strain prefix.
+            return p.size() > strain_prefix.size()
+                && p.substr(0, strain_prefix.size()) == strain_prefix
+                && p[strain_prefix.size()] == '/';
+        });
+}
+
 selector selector::or_(const selector &other) const
 {
     node_predicate left  = m_predicate;
