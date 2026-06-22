@@ -77,6 +77,7 @@ nucleus_add_test(load_front_door_test nucleus::runtime)
 nucleus_add_test(reference_resolution_test nucleus::runtime)
 nucleus_add_test(reference_cycle_test nucleus::runtime)
 nucleus_add_test(reference_fallback_test nucleus::runtime)
+nucleus_add_test(config_node_parent_test nucleus::runtime)
 nucleus_add_test(recognizer_of_test nucleus::argv)
 nucleus_add_test(converter_edge_cases_test)
 
@@ -192,6 +193,18 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
     add_test(NAME inherit_chain_test COMMAND inherit_chain_test)
+
+    # LOC-01 wiring test: two XML files in different temp directories each resolve
+    # ${dir.path} to their own directory, proving per-source file-frame binding.
+    add_executable(location_token_wiring_test location_token_wiring_test.cpp)
+    nucleus_enable_coverage(location_token_wiring_test)
+    nucleus_warnings(location_token_wiring_test)
+    target_link_libraries(location_token_wiring_test
+        PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
+    target_include_directories(location_token_wiring_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/lib/core/src
+    )
+    add_test(NAME location_token_wiring_test COMMAND location_token_wiring_test)
 
     # XML persistence round-trip: load a configuration from XML, write it back via
     # the pugixml WRITE API inside the xml module, and re-load it -- keys, scalar

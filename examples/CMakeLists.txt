@@ -37,6 +37,9 @@ nucleus_add_example(diagnostics)
 nucleus_add_example(registration_policy)
 nucleus_add_example(capability_gating nucleus::env)
 
+# Phase 23: tree-reference resolution demonstration (abs:, rel:, ?? fallback, ${dir.path}).
+nucleus_add_example(tree_references nucleus::runtime)
+
 # The XML example layers an XML document under the command line, so it links the
 # xml module (nucleus::xml). Its public adapter headers under nucleus/xml/
 # arrive via that link; pugixml stays private inside lib/xml. Built only when the
