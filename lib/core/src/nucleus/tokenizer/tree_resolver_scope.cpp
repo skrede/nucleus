@@ -14,13 +14,15 @@ tree_resolver_scope::tree_resolver_scope(const keyspace &building,
                                          expansion_guard &leaf_guard,
                                          std::size_t &substitution_counter,
                                          std::size_t budget,
-                                         ensure_resolved_fn ensure_resolved) noexcept
+                                         ensure_resolved_fn ensure_resolved,
+                                         const tree_tokenizer_registry *tree_reg) noexcept
     : m_building(building)
     , m_current_path(std::move(current_path))
     , m_leaf_guard(leaf_guard)
     , m_substitution_counter(substitution_counter)
     , m_budget(budget)
     , m_ensure_resolved(std::move(ensure_resolved))
+    , m_tree_tokenizer(tree_reg)
 {
 }
 

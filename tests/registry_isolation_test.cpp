@@ -10,6 +10,7 @@
 
 #include "nucleus/tokenizer/tokenizer_builder.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
+#include "nucleus/tokenizer/tree_tokenizer_registry.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -21,6 +22,7 @@
 // these assertions, stopping the build.
 static_assert(nucleus::flat_registry<nucleus::schema_registry>);
 static_assert(nucleus::flat_registry<nucleus::tokenizer_registry>);
+static_assert(nucleus::flat_registry<nucleus::tree_tokenizer_registry>);
 static_assert(nucleus::flat_registry<nucleus::converter_registry>);
 
 // Strengthened pin: each registry is independently constructible AND exposes no
@@ -28,15 +30,23 @@ static_assert(nucleus::flat_registry<nucleus::converter_registry>);
 static_assert(nucleus::independently_constructible<
               nucleus::schema_registry,
               nucleus::tokenizer_registry,
+              nucleus::tree_tokenizer_registry,
               nucleus::converter_registry>::value);
 static_assert(nucleus::independently_constructible<
               nucleus::tokenizer_registry,
               nucleus::schema_registry,
+              nucleus::tree_tokenizer_registry,
+              nucleus::converter_registry>::value);
+static_assert(nucleus::independently_constructible<
+              nucleus::tree_tokenizer_registry,
+              nucleus::schema_registry,
+              nucleus::tokenizer_registry,
               nucleus::converter_registry>::value);
 static_assert(nucleus::independently_constructible<
               nucleus::converter_registry,
               nucleus::schema_registry,
-              nucleus::tokenizer_registry>::value);
+              nucleus::tokenizer_registry,
+              nucleus::tree_tokenizer_registry>::value);
 
 TEST_CASE("each registry is constructed and exercised with no sibling in scope", "[isolation]")
 {
@@ -69,6 +79,7 @@ TEST_CASE("siblings collaborate only through a hand-built resolution context", "
     nucleus::schema_registry schema;
     nucleus::tokenizer_registry tokenizer;
     nucleus::converter_registry converters;
+    nucleus::tree_tokenizer_registry tree_tokenizer;
 
     // Populate the registries directly; the context borrows them by CONST reference
     // (read-only) and exposes them through const accessors.
@@ -76,7 +87,7 @@ TEST_CASE("siblings collaborate only through a hand-built resolution context", "
     tokenizer.add(nucleus::tokenizer_builder("noop").build(), nucleus::owner_token{});
     converters.set<int>(nucleus::make_scalar_converter<int>());
 
-    nucleus::resolution_context ctx(schema, tokenizer, converters);
+    nucleus::resolution_context ctx(schema, tokenizer, converters, tree_tokenizer);
 
     REQUIRE(ctx.schema().size() == 1);
     REQUIRE(ctx.tokenizer().size() == 1);

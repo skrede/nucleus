@@ -19,6 +19,7 @@
 
 #include "nucleus/tokenizer/builtin_tokenizers.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
+#include "nucleus/tokenizer/tree_tokenizer_registry.h"
 
 #include <map>
 #include <span>
@@ -92,6 +93,7 @@ struct space_core
     std::string name;
     schema_registry schema;
     tokenizer_registry tokenizer;
+    tree_tokenizer_registry tree_tokenizer;
     converter_registry converters;
     std::shared_ptr<registration_policy> m_policy = std::make_shared<registration_policy>();
 
@@ -118,6 +120,16 @@ public:
 };
 
 namespace {
+
+// D-04: pkey tag must not shadow a builtin category or a pass-2 scheme head.
+// A collision is a loud build-time error — the schema author renames the element.
+inline bool is_reserved_tree_tokenizer_name(std::string_view name) noexcept
+{
+    return name == "env"  || name == "string"
+        || name == "abs"  || name == "rel"
+        || name == "scope"|| name == "file"
+        || name == "dir"  || name == "self";
+}
 
 // The state-machine guard: mutating the builder is only legal until build() seals
 // it. An attempt after build() is rejected with a reason naming the operation that
@@ -268,6 +280,21 @@ registration_result config_space_builder::install_tokenizer(tokenizer tok, owner
     return registration_ok();
 }
 
+registration_result config_space_builder::install_tree_tokenizer(tree_tokenizer tok,
+                                                                   owner_token owner)
+{
+    if(auto guard = reject_if_built(m_impl->built, "install_tree_tokenizer"); !guard)
+        return guard;
+    if(is_reserved_tree_tokenizer_name(tok.category()))
+        return unexpected(error{errc::rejected_registration,
+            nucleus::format("tree tokenizer category '{}' collides with a reserved name; "
+                            "rename the schema element", tok.category())});
+    if(auto verdict = m_impl->review(registration_kind::tokenizer, owner); !verdict)
+        return verdict;
+    m_impl->tree_tokenizer.add(std::move(tok), std::move(owner));
+    return registration_ok();
+}
+
 registration_result config_space_builder::register_converter(
     std::type_index id,
     std::function<expected<std::any, std::string>(std::string_view)> conv,
@@ -402,7 +429,8 @@ load_result load_config(const config_space &space,
     if(auto gated = gate_assembled_handles(state.schema, handles, default_log); !gated)
         return unexpected(std::move(gated).error());
 
-    resolution_context ctx(state.schema, state.tokenizer, state.converters);
+    resolution_context ctx(state.schema, state.tokenizer, state.converters,
+                           state.tree_tokenizer);
     if(auto folded = ctx.fold(handles); !folded)
         return unexpected(std::move(folded).error());
     if(auto sliced = ctx.slice(options.selection, options.scope); !sliced)

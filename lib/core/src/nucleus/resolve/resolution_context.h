@@ -23,6 +23,7 @@
 #include "nucleus/tokenizer/token_resolution.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
 #include "nucleus/tokenizer/tree_resolver_scope.h"
+#include "nucleus/tokenizer/tree_tokenizer_registry.h"
 
 #include <any>
 #include <map>
@@ -75,8 +76,12 @@ class resolution_context
 public:
     resolution_context(const schema_registry &schema,
                         const tokenizer_registry &tokenizer,
-                        const converter_registry &converters) noexcept
-        : m_schema(schema), m_tokenizer(tokenizer), m_converters(converters)
+                        const converter_registry &converters,
+                        const tree_tokenizer_registry &tree_tokenizer) noexcept
+        : m_schema(schema)
+        , m_tokenizer(tokenizer)
+        , m_converters(converters)
+        , m_tree_tokenizer(tree_tokenizer)
     {
     }
 
@@ -1038,7 +1043,7 @@ private:
 
         tree_resolver_scope scope(m_building, kp, leaf_guard,
                                   substitution_counter, m_reference_budget,
-                                  std::move(ensure));
+                                  std::move(ensure), &m_tree_tokenizer);
         auto resolved = scope.resolve_value(text);
         if(!resolved)
             return unexpected(std::move(resolved).error());
@@ -1216,9 +1221,10 @@ private:
         return canonical;
     }
 
-    const schema_registry &m_schema;
-    const tokenizer_registry &m_tokenizer;
-    const converter_registry &m_converters;
+    const schema_registry           &m_schema;
+    const tokenizer_registry        &m_tokenizer;
+    const converter_registry        &m_converters;
+    const tree_tokenizer_registry   &m_tree_tokenizer;
 
     std::size_t m_reference_budget = default_reference_budget;
 

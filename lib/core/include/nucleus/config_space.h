@@ -40,6 +40,11 @@ namespace nucleus {
 // machinery into every consumer.
 class tokenizer;
 
+// A constructed tree-access tokenizer (nucleus/tokenizer/tree_tokenizer.h). Forward
+// declared so install_tree_tokenizer is reachable without pulling the tree-access
+// machinery into every consumer.
+class tree_tokenizer;
+
 // The shell a completion script targets (completion header). Forward declared so
 // generate_completion is reachable without pulling the completion machinery.
 enum class shell;
@@ -110,6 +115,14 @@ public:
     // injects an additional host-built category). Moved in; a later registration of
     // the same category shadows it. Same state-machine/policy seam as register_tokenizer.
     registration_result install_tokenizer(tokenizer tok, owner_token owner = {});
+
+    // Installs a host-defined tree-access tokenizer for pass-2 ${category.field}
+    // resolution. The resolver receives the assembled tree cursor and current leaf path
+    // via tree_access; the caller must not store those references beyond the call.
+    // A category colliding with a reserved name (env, string, abs, rel, scope, file,
+    // dir, self) is rejected. A later registration of the same category shadows an
+    // earlier one (last-registration-wins).
+    registration_result install_tree_tokenizer(tree_tokenizer tok, owner_token owner = {});
 
     // Registers a value converter for a type, keyed by std::type_index. At resolve
     // a typed element with no per-element converter uses the converter registered

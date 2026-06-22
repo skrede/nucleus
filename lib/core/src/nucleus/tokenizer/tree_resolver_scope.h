@@ -11,6 +11,7 @@
 #include "nucleus/tokenizer/token_lexer.h"
 
 #include "nucleus/tokenizer/tokenizer.h"
+#include "nucleus/tokenizer/tree_tokenizer_registry.h"
 
 #include <functional>
 #include <string>
@@ -37,7 +38,8 @@ public:
                         expansion_guard &leaf_guard,
                         std::size_t &substitution_counter,
                         std::size_t budget,
-                        ensure_resolved_fn ensure_resolved) noexcept;
+                        ensure_resolved_fn ensure_resolved,
+                        const tree_tokenizer_registry *tree_reg = nullptr) noexcept;
 
     // Resolves all ${abs:} and ${rel:} tokens in value_text, splicing resolved
     // strings in place. Returns the fully-resolved string on success.
@@ -51,12 +53,13 @@ private:
     token_result resolve_relative(std::string_view rel_body);
     key_path     resolve_relative_path(std::string_view rel_body);
 
-    const keyspace   &m_building;
-    key_path          m_current_path;
-    expansion_guard  &m_leaf_guard;
-    std::size_t      &m_substitution_counter;
-    std::size_t       m_budget;
-    ensure_resolved_fn m_ensure_resolved;
+    const keyspace                  &m_building;
+    key_path                         m_current_path;
+    expansion_guard                 &m_leaf_guard;
+    std::size_t                     &m_substitution_counter;
+    std::size_t                      m_budget;
+    ensure_resolved_fn               m_ensure_resolved;
+    const tree_tokenizer_registry   *m_tree_tokenizer = nullptr;
 };
 
 }
