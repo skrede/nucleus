@@ -131,6 +131,41 @@ inline bool is_reserved_tree_tokenizer_name(std::string_view name) noexcept
         || name == "dir"  || name == "self";
 }
 
+// Builds the auto-named pkey tree tokenizer for identity element `el`.
+// Category = the container's last segment (D-01); resolver reads the sliced
+// keyspace anchored to the pkey container (D-02), with a precise D-03 diagnostic
+// when no instance is in scope post-slice.
+tree_tokenizer make_pkey_tree_tokenizer(const schema_element &el)
+{
+    std::string category = std::string(key_path::base_name(el.container().leaf()));
+    key_path pkey_container = el.container();
+    std::string identity_field = el.name;
+
+    return tree_tokenizer(
+        std::move(category),
+        [pkey_container, identity_field](const tree_access &access) -> token_result
+        {
+            // D-03: verify an instance is selected by checking the identity leaf.
+            key_path identity_path = pkey_container.child(identity_field);
+            if(access.building.find(identity_path) == nullptr)
+                return unexpected(resolve_error(resolve_errc::missing_field,
+                    nucleus::format("${{{}}} requires a selected primary-key instance; "
+                                    "this configuration has none in scope",
+                                    std::string(access.category) + "." +
+                                    std::string(access.field_name))));
+
+            // D-02: resolve the requested field within the pkey container.
+            key_path field_path = pkey_container.child(std::string(access.field_name));
+            const value *v = access.building.find(field_path);
+            if(v == nullptr)
+                return unexpected(resolve_error(resolve_errc::missing_field,
+                    nucleus::format("${{{}}} has no field '{}' in the selected instance",
+                                    access.category, access.field_name)));
+
+            return std::string(v->text());
+        });
+}
+
 // The state-machine guard: mutating the builder is only legal until build() seals
 // it. An attempt after build() is rejected with a reason naming the operation that
 // was actually attempted -- the lifecycle enforced, not merely documented.
@@ -250,6 +285,17 @@ registration_result config_space_builder::register_element(schema_element elemen
         return guard;
     if(auto verdict = m_impl->review(registration_kind::schema, owner); !verdict)
         return verdict;
+    // D-04: identity elements whose container tag collides with a reserved name
+    // would produce an unusable auto-registered tokenizer — reject loudly before
+    // schema.attach() so the error reaches the host at schema-build time.
+    if(element.identity && !element.container().empty())
+    {
+        std::string category = std::string(key_path::base_name(element.container().leaf()));
+        if(is_reserved_tree_tokenizer_name(category))
+            return unexpected(error{errc::rejected_registration,
+                nucleus::format("tree tokenizer category '{}' collides with a reserved name; "
+                                "rename the schema element", category)});
+    }
     // The element's declared path is the key it claims; record it for conflict
     // surfacing before attach consumes the element.
     const std::string claimed = element.declared_path().str();
@@ -324,6 +370,16 @@ std::vector<conflict_report> config_space_builder::conflicts() const { return m_
 
 config_space config_space_builder::build()
 {
+    // D-07: auto-register a pkey tree tokenizer for every identity element.
+    // Reserved names cannot reach here — register_element is the enforcement gate.
+    owner_token core;
+    for(const schema_element &el : m_impl->schema.elements())
+    {
+        if(!el.identity || el.container().empty())
+            continue;
+        m_impl->tree_tokenizer.add(make_pkey_tree_tokenizer(el), core);
+    }
+
     // Infallible: copy the core (deep copy of the three registries + ledger; the
     // policy shared_ptr is shared host-owned behavior) into the sealed product and
     // mark the builder spent. After this, every mutating call is a loud error.
