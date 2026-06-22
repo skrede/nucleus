@@ -5,6 +5,7 @@
 #include "nucleus/config_space.h"
 
 #include "nucleus/schema/schema.h"
+#include "nucleus/schema/projection.h"
 
 #include "nucleus/keyspace/key_path.h"
 
@@ -207,6 +208,12 @@ numeric_sort_key(const std::string &key)
 
 } // namespace
 
+void emit_document(const config &config, std::ostream &out,
+                   std::string_view space_name)
+{
+    emit_document(config, out, schema_projection{}, space_name);
+}
+
 // Projects a resolved config into a populated XML document: each '/'-separated
 // key splits into element segments, intermediate segments are shared parent nodes,
 // and the leaf is appended once per value so a repeated path persists ALL its values.
@@ -216,7 +223,10 @@ numeric_sort_key(const std::string &key)
 // A malformed key is skipped (never thrown), consistent with the read path.
 // When space_name is non-empty, all top-level elements are re-parented under a new
 // wrapper element named space_name for symmetric round-trip with with_space_name().
+// When proj is non-empty, pkey leaves are rendered as attributes on their parent
+// container element (preventing double-write on round-trip); empty proj is schema-blind.
 void emit_document(const config &config, std::ostream &out,
+                   const schema_projection &proj,
                    std::string_view space_name)
 {
     pugi::xml_document doc;
@@ -239,22 +249,21 @@ void emit_document(const config &config, std::ostream &out,
         if(segments.empty())
             continue;
 
-        // Descend through every segment but the leaf. For indexed segments (e.g.
-        // "node[0]") use the base name as the element name and place/reuse the
-        // correct ordinal sibling; for plain segments reuse or create normally.
+        // Descend through every segment but the leaf. Track parent_canonical in
+        // parallel (base names joined by separator) for the pkey attribute check.
         pugi::xml_node node = doc;
+        std::string parent_canonical;
         for(std::size_t i = 0; i + 1 < segments.size(); ++i)
         {
             const std::string &seg = segments[i];
+            const std::string base = std::string(key_path::base_name(seg));
+            if(!parent_canonical.empty())
+                parent_canonical += key_path::separator;
+            parent_canonical += base;
             if(key_path::is_indexed_segment(seg))
-            {
-                const std::string name = std::string(key_path::base_name(seg));
-                node = indexed_child(node, name, key_path::ordinal_of(seg));
-            }
+                node = indexed_child(node, base, key_path::ordinal_of(seg));
             else
-            {
-                node = child_or_append(node, seg);
-            }
+                node = child_or_append(node, base);
         }
 
         // Emit the leaf. Indexed leaves (rare) strip the bracket suffix.
@@ -265,6 +274,19 @@ void emit_document(const config &config, std::ostream &out,
         const std::string leaf_name = key_path::is_indexed_segment(leaf_seg)
             ? std::string(key_path::base_name(leaf_seg))
             : leaf_seg;
+
+        // When proj identifies this leaf as the pkey field of its parent container,
+        // render it as an XML attribute on the parent node to prevent double-write.
+        if(!proj.empty())
+        {
+            const std::string *pkey_field = proj.key_of(parent_canonical);
+            if(pkey_field != nullptr && *pkey_field == leaf_name)
+            {
+                for(const std::string &value : config.get_all(key))
+                    node.append_attribute(leaf_name.c_str()).set_value(value.c_str());
+                continue;
+            }
+        }
 
         for(const std::string &value : config.get_all(key))
         {
