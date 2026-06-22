@@ -50,6 +50,9 @@ nucleus_add_example(query nucleus::runtime)
 # Phase 27: container-scoped constraint groups + identity groups.
 nucleus_add_example(constraint_groups nucleus::runtime)
 
+# Phase 28: cross-layer keyed composition (merge modes).
+nucleus_add_example(keyed_composition nucleus::runtime)
+
 # The XML example layers an XML document under the command line, so it links the
 # xml module (nucleus::xml). Its public adapter headers under nucleus/xml/
 # arrive via that link; pugixml stays private inside lib/xml. Built only when the

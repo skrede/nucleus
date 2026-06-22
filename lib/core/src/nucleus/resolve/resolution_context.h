@@ -987,6 +987,10 @@ public:
                     }
                     if(path_rank == 0 || path_rank <= Ld)
                         continue;
+                    // Keyed-merge collections were finalised across layers already;
+                    // never rank-prune them here either.
+                    if(under_keyed_merge(m_schema.canonical_text(path)))
+                        continue;
                     // Skip entries belonging to the chosen strain when it is
                     // extend-wide: they must survive to compose via relay_strain.
                     if(wide_extend && path.str().compare(0, chosen_prefix.size(),
@@ -1301,7 +1305,13 @@ private:
         {
             const origin *from = m_provenance.of(keyed.str());
             std::size_t entry_rank = from != nullptr ? from->rank : 0;
-            const bool excluded = !wide_extend && (
+            // A keyed-merge collection was already finalised across layers by
+            // merge_keyed_collections(); its instances legitimately span ranks, so the
+            // scope-policy rank pruning and the wholesale-displacement logic below must
+            // not re-prune them. The merge_mode governs this collection's cross-layer
+            // composition, overriding the default strain scope freezing.
+            const bool keyed_merge = under_keyed_merge(m_schema.canonical_text(keyed));
+            const bool excluded = !keyed_merge && !wide_extend && (
                 policy == strain_scope_policy::container_open_until_next_strain
                     ? entry_rank >= Ls
                     : entry_rank > Ld);
@@ -1339,7 +1349,7 @@ private:
                         return true;
                 return false;
             }();
-            if(unified_is_indexed)
+            if(unified_is_indexed && !keyed_merge)
             {
                 // Canonical base: strip ordinals from all segments.
                 const std::string canonical_base = m_schema.canonical_text(unified.value());
@@ -1374,7 +1384,7 @@ private:
 
             // Check if the unified path is already occupied by a higher-rank value.
             const origin *at = m_provenance.of(unified_str);
-            const bool displaced = at != nullptr && at->rank > entry_rank;
+            const bool displaced = !keyed_merge && at != nullptr && at->rank > entry_rank;
             if(displaced)
             {
                 // D-01: a pkey leaf is authoritative and read-only. If the unified
@@ -1404,6 +1414,21 @@ private:
             m_provenance.forget(keyed.str());
         }
         return {};
+    }
+
+    // True when a canonical path is at or under a container declaring a keyed merge
+    // mode (unite/replace_by_key). Such collections were finalised across layers by
+    // merge_keyed_collections(); slice() must relay them verbatim, never rank-prune.
+    bool under_keyed_merge(const std::string &canonical_path) const
+    {
+        for(const auto &[cpath, mode] : m_keyed_modes)
+        {
+            const std::string cslash = cpath + key_path::separator;
+            if(canonical_path == cpath
+               || canonical_path.compare(0, cslash.size(), cslash) == 0)
+                return true;
+        }
+        return false;
     }
 
     // Computes the unified relay path for a keyed+possibly-indexed path:
