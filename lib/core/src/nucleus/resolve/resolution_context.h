@@ -22,6 +22,7 @@
 
 #include "nucleus/tokenizer/token_resolution.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
+#include "nucleus/tokenizer/tree_resolver_scope.h"
 
 #include <any>
 #include <map>
@@ -35,6 +36,7 @@
 #include <optional>
 #include <algorithm>
 #include <typeindex>
+#include <unordered_map>
 
 namespace nucleus {
 
@@ -796,6 +798,58 @@ public:
         return {};
     }
 
+    // Pass-2 tree-reference resolution: runs after slice() and before validate().
+    // Resolves all ${abs:} and ${rel:} tokens in the sliced keyspace, writing back
+    // the resolved strings to the same paths. Enforces:
+    //   - Value-only invariant (D-06): a key segment containing "${" is a loud error.
+    //   - Cross-leaf cycle detection via expansion_guard (D-08).
+    //   - Substitution-count budget (D-09): budget_exceeded stops billion-laughs.
+    //   - ?? chaining: missing_field falls through; all other errors propagate.
+    expected<void, resolve_fold_error> resolve_references()
+    {
+        // Value-only invariant scan (D-06): path segments must not contain "${".
+        // The tree shape is frozen by slice(); references may only appear in values.
+        for(const key_path &kp : m_building.paths())
+        {
+            for(const std::string &seg : kp.segments())
+            {
+                if(seg.find("${") != std::string::npos)
+                    return unexpected(error{errc::unresolved_token,
+                        nucleus::format("reference in structural key position: '{}'",
+                                       kp.str())});
+            }
+        }
+
+        expansion_guard leaf_guard(default_reference_depth_cap);
+        std::unordered_map<std::string, std::string> resolved_cache;
+        std::size_t substitution_counter = 0;
+
+        // Snapshot paths (resolving writes back via m_building.set()).
+        std::vector<key_path> all_paths = m_building.paths();
+
+        for(const key_path &kp : all_paths)
+        {
+            const value *v = m_building.find(kp);
+            if(v == nullptr)
+                continue;
+            const std::string_view text = v->text();
+            if(text.find("${abs:") == std::string_view::npos
+               && text.find("${rel:") == std::string_view::npos)
+                continue;
+
+            auto r = resolve_one_leaf(kp, leaf_guard, resolved_cache, substitution_counter);
+            if(!r)
+            {
+                const resolve_error &re = r.error();
+                return unexpected(error{errc::unresolved_token,
+                    nucleus::format("reference resolution failed for '{}': {}",
+                                   kp.str(), re.message)});
+            }
+        }
+
+        return {};
+    }
+
     // Validates the folded keyspace against the borrowed schema -- the step that
     // makes the schema authoritative over CONTENT at resolve time, reached only
     // through ctx.schema() so the registry stays a borrowed sibling. Runs ONLY
@@ -932,6 +986,63 @@ public:
     }
 
 private:
+    // Recursive single-leaf resolver for pass-2. Resolves `kp`'s value by first
+    // ensuring all leaves it references are themselves resolved (depth-first).
+    // The expansion_guard detects cycles; the cache prevents repeated work.
+    // Returns a resolve_error (not resolve_fold_error) so it integrates with the
+    // ensure_resolved_fn callback type used by tree_resolver_scope.
+    expected<void, resolve_error>
+    resolve_one_leaf(const key_path &kp,
+                     expansion_guard &leaf_guard,
+                     std::unordered_map<std::string, std::string> &resolved_cache,
+                     std::size_t &substitution_counter)
+    {
+        const std::string path_str = kp.str();
+
+        // Already resolved in this pass.
+        if(resolved_cache.count(path_str))
+            return {};
+
+        const value *v = m_building.find(kp);
+        if(v == nullptr)
+            return {};
+
+        const std::string_view text = v->text();
+
+        // Nothing to resolve for this leaf (no tree-access tokens).
+        if(text.find("${abs:") == std::string_view::npos
+           && text.find("${rel:") == std::string_view::npos)
+        {
+            resolved_cache[path_str] = std::string(text);
+            return {};
+        }
+
+        // Enter cross-leaf guard — detects A -> B -> A cycles.
+        auto guard_scope = leaf_guard.enter(path_str);
+        if(!guard_scope)
+            return unexpected(std::move(guard_scope).error());
+
+        // Build the ensure_resolved callback for depth-first recursive resolution.
+        // Captures this, leaf_guard, resolved_cache, and substitution_counter by ref.
+        ensure_resolved_fn ensure = [&](const key_path &target)
+            -> expected<void, resolve_error>
+        {
+            return resolve_one_leaf(target, leaf_guard, resolved_cache,
+                                    substitution_counter);
+        };
+
+        tree_resolver_scope scope(m_building, kp, leaf_guard,
+                                  substitution_counter, m_reference_budget,
+                                  std::move(ensure));
+        auto resolved = scope.resolve_value(text);
+        if(!resolved)
+            return unexpected(std::move(resolved).error());
+
+        resolved_cache[path_str] = resolved.value();
+        m_building.set(kp, value::owned(std::move(resolved).value()));
+        return {};
+    }
+
     // Re-lays one strain's keyed entries onto the unified (key-stripped) paths.
     // All repeated-path entries are indexed scalars; no collection branch needed.
     // Ordinal segments in the keyed path are preserved; only key-value segments

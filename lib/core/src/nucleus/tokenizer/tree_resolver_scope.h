@@ -12,10 +12,17 @@
 
 #include "nucleus/tokenizer/tokenizer.h"
 
+#include <functional>
 #include <string>
 #include <string_view>
 
 namespace nucleus {
+
+// Callback type used to ensure a referenced leaf is resolved before its value
+// is read. Called by tree_resolver_scope for each abs:/rel: target path.
+// Returns an error if the target's resolution fails (e.g. cycle or budget).
+using ensure_resolved_fn =
+    std::function<expected<void, resolve_error>(const key_path &)>;
 
 // Pass-2 resolver for tree-access tokens (${abs:...} and ${rel:...}) in a
 // single value string. Constructed transiently per leaf during resolve_references();
@@ -29,7 +36,8 @@ public:
                         key_path current_path,
                         expansion_guard &leaf_guard,
                         std::size_t &substitution_counter,
-                        std::size_t budget) noexcept;
+                        std::size_t budget,
+                        ensure_resolved_fn ensure_resolved) noexcept;
 
     // Resolves all ${abs:} and ${rel:} tokens in value_text, splicing resolved
     // strings in place. Returns the fully-resolved string on success.
@@ -43,11 +51,12 @@ private:
     token_result resolve_relative(std::string_view rel_body);
     key_path     resolve_relative_path(std::string_view rel_body);
 
-    const keyspace &m_building;
-    key_path        m_current_path;
-    expansion_guard &m_leaf_guard;
-    std::size_t    &m_substitution_counter;
-    std::size_t     m_budget;
+    const keyspace   &m_building;
+    key_path          m_current_path;
+    expansion_guard  &m_leaf_guard;
+    std::size_t      &m_substitution_counter;
+    std::size_t       m_budget;
+    ensure_resolved_fn m_ensure_resolved;
 };
 
 }

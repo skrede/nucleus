@@ -404,6 +404,9 @@ load_result load_config(const config_space &space,
         return unexpected(std::move(folded).error());
     if(auto sliced = ctx.slice(options.selection, options.scope); !sliced)
         return unexpected(std::move(sliced).error());
+    ctx.set_reference_budget(options.reference_budget);
+    if(auto refs = ctx.resolve_references(); !refs)
+        return unexpected(std::move(refs).error());
     if(auto checked = ctx.validate(); !checked)
         return unexpected(std::move(checked).error());
     if(auto converted = ctx.convert(); !converted)

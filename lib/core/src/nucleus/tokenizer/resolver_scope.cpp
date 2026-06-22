@@ -241,6 +241,17 @@ token_result resolver_scope::resolve_all(std::string_view input)
         result.append(input.substr(pos, span->start - pos));
 
         auto token = input.substr(span->start, span->end - span->start + 1);
+
+        // Pass-1 inertness for tree-access tokens: ${abs:...} and ${rel:...}
+        // are reserved for pass-2 (resolve_references()) and must not be
+        // dispatched in pass-1. Leave them verbatim so pass-2 can process them.
+        if(token.starts_with("${abs:") || token.starts_with("${rel:"))
+        {
+            result.append(token);
+            pos = span->end + 1;
+            continue;
+        }
+
         auto resolved = resolve_one(token);
         if(!resolved) return unexpected(std::move(resolved).error());
         result.append(resolved.value());
