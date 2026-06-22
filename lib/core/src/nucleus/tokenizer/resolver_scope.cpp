@@ -4,6 +4,7 @@
 #include "nucleus/tokenizer/token_lexer.h"
 #include "nucleus/tokenizer/resolver_scope.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
+#include "nucleus/tokenizer/tree_tokenizer_registry.h"
 
 #include <ranges>
 #include <optional>
@@ -242,14 +243,30 @@ token_result resolver_scope::resolve_all(std::string_view input)
 
         auto token = input.substr(span->start, span->end - span->start + 1);
 
-        // Pass-1 inertness for tree-access tokens: ${abs:...} and ${rel:...}
-        // are reserved for pass-2 (resolve_references()) and must not be
-        // dispatched in pass-1. Leave them verbatim so pass-2 can process them.
+        // Pass-1 inertness for tree-access tokens: abs:/rel: scheme tokens and
+        // registered tree-tokenizer category tokens are reserved for pass-2
+        // (resolve_references()). Leave them verbatim so pass-2 can process them.
         if(token.starts_with("${abs:") || token.starts_with("${rel:"))
         {
             result.append(token);
             pos = span->end + 1;
             continue;
+        }
+        if(m_tree_reg != nullptr)
+        {
+            // Extract category from "${category.field}" (between "${" and first ".").
+            const std::string_view body = token.substr(2, token.size() - 3);
+            const auto dot = body.find('.');
+            if(dot != std::string_view::npos && dot > 0)
+            {
+                const std::string_view category = body.substr(0, dot);
+                if(m_tree_reg->find(category) != nullptr)
+                {
+                    result.append(token);
+                    pos = span->end + 1;
+                    continue;
+                }
+            }
         }
 
         auto resolved = resolve_one(token);

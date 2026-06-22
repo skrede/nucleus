@@ -21,6 +21,7 @@
 namespace nucleus {
 
 class tokenizer_registry;
+class tree_tokenizer_registry;
 
 // Move-only RAII frame popper. push_*_frame returns one; it pops its frame on
 // destruction (including stack unwind), so a frame's lifetime is scoped to the
@@ -66,8 +67,9 @@ class resolver_scope
 {
 public:
     explicit resolver_scope(const tokenizer_registry &registry,
-                            std::size_t depth_cap = default_expansion_depth_cap)
-        : m_registry(registry), m_guard(depth_cap)
+                            std::size_t depth_cap = default_expansion_depth_cap,
+                            const tree_tokenizer_registry *tree_reg = nullptr)
+        : m_registry(registry), m_guard(depth_cap), m_tree_reg(tree_reg)
     {
     }
 
@@ -100,9 +102,10 @@ public:
     token_result resolve_one(std::string_view token);
 
 private:
-    const tokenizer_registry &m_registry;
-    expansion_guard m_guard;
-    std::vector<scope_frame> m_frames;
+    const tokenizer_registry          &m_registry;
+    expansion_guard                    m_guard;
+    std::vector<scope_frame>           m_frames;
+    const tree_tokenizer_registry     *m_tree_reg = nullptr;
 
     void pop_frame() noexcept;
 

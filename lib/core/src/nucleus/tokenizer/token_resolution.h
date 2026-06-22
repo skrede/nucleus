@@ -7,6 +7,7 @@
 #include "nucleus/tokenizer/resolve_error.h"
 #include "nucleus/tokenizer/resolver_scope.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
+#include "nucleus/tokenizer/tree_tokenizer_registry.h"
 
 #include <utility>
 #include <filesystem>
@@ -18,9 +19,10 @@ namespace nucleus {
 // `value` against the registered tokenizers, with no lexical scope. Suitable for
 // values whose source has no file location and no host frames.
 inline token_result resolve_tokens(std::string_view value,
-                                                 const tokenizer_registry &registry)
+                                   const tokenizer_registry &registry,
+                                   const tree_tokenizer_registry *tree_reg = nullptr)
 {
-    resolver_scope scope(registry);
+    resolver_scope scope(registry, default_expansion_depth_cap, tree_reg);
     return scope.resolve_all(value);
 }
 
@@ -32,10 +34,11 @@ inline token_result resolve_tokens(std::string_view value,
 // frames) construct a resolver_scope directly and push frames before
 // resolve_all.
 inline token_result resolve_tokens(std::string_view value,
-                                                 const tokenizer_registry &registry,
-                                                 std::filesystem::path source_location)
+                                   const tokenizer_registry &registry,
+                                   std::filesystem::path source_location,
+                                   const tree_tokenizer_registry *tree_reg = nullptr)
 {
-    resolver_scope scope(registry);
+    resolver_scope scope(registry, default_expansion_depth_cap, tree_reg);
     auto frame = scope.push_file_frame(std::move(source_location));
     return scope.resolve_all(value);
 }
