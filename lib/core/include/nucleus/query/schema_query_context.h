@@ -25,7 +25,7 @@ public:
     // to the claim ledger. Elements span is borrowed only for construction;
     // owner_by_canonical_path is moved in.
     schema_query_context(std::span<const schema_element> elements,
-                         std::map<std::string, owner_token> owner_by_canonical_path)
+                         std::map<std::string, owner_token, std::less<>> owner_by_canonical_path)
         : m_owners(std::move(owner_by_canonical_path))
     {
         for(const schema_element &el : elements)
