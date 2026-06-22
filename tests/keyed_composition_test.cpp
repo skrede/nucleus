@@ -147,15 +147,31 @@ TEST_CASE("KCM-03: keyed merge composes with strain slicing (nested in a pkey st
     auto space = std::move(b).build();
 
     runtime_source base;
-    base.set("cluster/server/web/output[0]/id", "x");
     runtime_source over;
-    over.set("cluster/server/web/output[0]/id", "y");
 
-    load_options opt;
-    opt.selection = "web";
-    auto r = load_config(space, source_stack{std::move(base), std::move(over)}, opt);
-    REQUIRE(r.has_value());
-    auto ids = r->get_all("cluster/server/output/id");
-    std::sort(ids.begin(), ids.end());
-    REQUIRE(ids == std::vector<std::string>{"x", "y"});  // unioned within the selected strain
+    SECTION("union within the selected strain")
+    {
+        base.set("cluster/server/web/output[0]/id", "x");
+        over.set("cluster/server/web/output[0]/id", "y");
+        load_options opt;
+        opt.selection = "web";
+        auto r = load_config(space, source_stack{std::move(base), std::move(over)}, opt);
+        REQUIRE(r.has_value());
+        auto ids = r->get_all("cluster/server/output/id");
+        std::sort(ids.begin(), ids.end());
+        REQUIRE(ids == std::vector<std::string>{"x", "y"});
+    }
+    SECTION("a sibling strain's keyed collection does not leak into the selection")
+    {
+        base.set("cluster/server/web/output[0]/id", "x")
+            .set("cluster/server/api/output[0]/id", "p");  // a different strain
+        over.set("cluster/server/web/output[0]/id", "y");
+        load_options opt;
+        opt.selection = "web";
+        auto r = load_config(space, source_stack{std::move(base), std::move(over)}, opt);
+        REQUIRE(r.has_value());
+        auto ids = r->get_all("cluster/server/output/id");
+        std::sort(ids.begin(), ids.end());
+        REQUIRE(ids == std::vector<std::string>{"x", "y"});  // 'p' (api strain) excluded
+    }
 }
