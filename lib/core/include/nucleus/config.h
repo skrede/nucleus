@@ -518,6 +518,37 @@ inline std::vector<std::size_t> config_node::distinct_ordinals() const
     return std::vector<std::size_t>(ordinal_set.begin(), ordinal_set.end());
 }
 
+inline config_node config_node::parent() const
+{
+    if(!m_config || m_path.empty())
+        return config_node{};
+    auto kp = key_path::parse(m_path);
+    if(!kp)
+        return config_node{};
+    key_path p = kp.value().parent();
+    if(p.empty())
+        return config_node{m_config, std::string{}};
+    return config_node{m_config, p.str()};
+}
+
+inline config_node config_node::ancestor(std::string_view name) const
+{
+    // rel:./x sugar: '.' segment handled in resolve_relative_path() only; key_path::parse accepts it as a plain segment
+    config_node cur = parent();
+    while(cur.m_config)
+    {
+        if(cur.m_path.empty())
+            break;
+        auto kp = key_path::parse(cur.m_path);
+        if(!kp)
+            break;
+        if(key_path::base_name(kp.value().leaf()) == name)
+            return cur;
+        cur = cur.parent();
+    }
+    return config_node{};
+}
+
 } // namespace nucleus
 
 #endif

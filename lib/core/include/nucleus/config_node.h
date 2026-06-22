@@ -128,6 +128,16 @@ public:
         walker.leave(*this);
     }
 
+    // The parent node: strips the trailing path segment. Root (empty path) and
+    // null nodes return a null node. Correct for indexed segments: parent of
+    // "cluster/node[0]" is "cluster", handled entirely by key_path::parent().
+    config_node parent() const;
+
+    // Nearest ancestor (walking toward root) whose leaf segment base name (ordinal
+    // stripped) matches `name`. Returns a null node when no ancestor matches.
+    // One shared walk routine reused by the relative-reference resolver and Phase-25 query.
+    config_node ancestor(std::string_view name) const;
+
 private:
     // Returns distinct ordinal values for this repeated node, sorted numerically.
     std::vector<std::size_t> distinct_ordinals() const;

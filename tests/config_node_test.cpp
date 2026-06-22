@@ -560,3 +560,124 @@ TEST_CASE("config_node operator[](size_t) out-of-range returns null-view",
     REQUIRE(node[0].exists());
     REQUIRE(node[1].exists());
 }
+
+// ---------------------------------------------------------------------------
+// REF-08: config_node::parent() / ancestor()
+// ---------------------------------------------------------------------------
+
+TEST_CASE("config_node parent -- null and root nodes return null",
+          "[config_node][parent][REF08]")
+{
+    const nucleus::config cfg = load_two_nodes("80", "443");
+
+    // Null-view node returns null.
+    nucleus::config_node null_node;
+    REQUIRE_FALSE(null_node.parent().exists());
+
+    // Root (empty-path) node returns null.
+    REQUIRE_FALSE(cfg.root().parent().exists());
+}
+
+TEST_CASE("config_node parent -- single-segment path returns root",
+          "[config_node][parent][REF08]")
+{
+    const nucleus::config cfg = load_two_nodes("80", "443");
+
+    auto cluster = cfg.root()["cluster"];
+    REQUIRE(cluster.exists());
+
+    auto p = cluster.parent();
+    // Parent of "cluster" is the root (empty path).
+    REQUIRE(p.exists());
+    REQUIRE(p.path().empty());
+}
+
+TEST_CASE("config_node parent -- multi-segment path strips last segment",
+          "[config_node][parent][REF08]")
+{
+    const nucleus::config cfg = load_two_nodes("80", "443");
+
+    auto port = cfg.root()["cluster"]["node"][0]["port"];
+    REQUIRE(port.exists());
+    REQUIRE(port.path() == "cluster/node[0]/port");
+
+    // parent of "cluster/node[0]/port" is "cluster/node[0]"
+    auto p1 = port.parent();
+    REQUIRE(p1.path() == "cluster/node[0]");
+
+    // parent of "cluster/node[0]" is "cluster"
+    auto p2 = p1.parent();
+    REQUIRE(p2.path() == "cluster");
+
+    // parent of "cluster" is root
+    auto p3 = p2.parent();
+    REQUIRE(p3.path().empty());
+
+    // parent of root is null
+    REQUIRE_FALSE(p3.parent().exists());
+}
+
+TEST_CASE("config_node parent -- indexed segment: parent of node[0] is cluster",
+          "[config_node][parent][REF08]")
+{
+    const nucleus::config cfg = load_two_nodes("80", "443");
+
+    auto node0 = cfg.root()["cluster"]["node"][0];
+    REQUIRE(node0.exists());
+    REQUIRE(node0.path() == "cluster/node[0]");
+
+    auto p = node0.parent();
+    REQUIRE(p.path() == "cluster");
+}
+
+TEST_CASE("config_node ancestor -- finds first ancestor matching base name",
+          "[config_node][ancestor][REF08]")
+{
+    const nucleus::config cfg = load_two_nodes("80", "443");
+
+    auto port = cfg.root()["cluster"]["node"][0]["port"];
+    REQUIRE(port.exists());
+
+    // ancestor("cluster") walks up from "cluster/node[0]/port" and finds "cluster".
+    auto anc = port.ancestor("cluster");
+    REQUIRE(anc.exists());
+    REQUIRE(anc.path() == "cluster");
+}
+
+TEST_CASE("config_node ancestor -- matches indexed segment base name (strips ordinal)",
+          "[config_node][ancestor][REF08]")
+{
+    const nucleus::config cfg = load_two_nodes("80", "443");
+
+    auto port = cfg.root()["cluster"]["node"][0]["port"];
+    REQUIRE(port.exists());
+
+    // "node[0]" has base name "node" -- ancestor("node") should match it.
+    auto anc = port.ancestor("node");
+    REQUIRE(anc.exists());
+    REQUIRE(anc.path() == "cluster/node[0]");
+}
+
+TEST_CASE("config_node ancestor -- returns null when no ancestor matches",
+          "[config_node][ancestor][REF08]")
+{
+    const nucleus::config cfg = load_two_nodes("80", "443");
+
+    auto port = cfg.root()["cluster"]["node"][0]["port"];
+    REQUIRE(port.exists());
+
+    // No ancestor named "server" exists.
+    REQUIRE_FALSE(port.ancestor("server").exists());
+}
+
+TEST_CASE("config_node ancestor -- returns null on null and root nodes",
+          "[config_node][ancestor][REF08]")
+{
+    const nucleus::config cfg = load_two_nodes("80", "443");
+
+    nucleus::config_node null_node;
+    REQUIRE_FALSE(null_node.ancestor("cluster").exists());
+
+    // Root has no ancestors.
+    REQUIRE_FALSE(cfg.root().ancestor("cluster").exists());
+}
