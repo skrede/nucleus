@@ -48,8 +48,26 @@ struct head_parse
 // for field form). Rejects an empty category, an empty name, a name that still
 // carries a dot (a multi-dot head is malformed), and a dynamically-named function
 // (a nested ${...} in the function name -- an unsupported nesting shape).
+// Colon-scheme heads (abs: / rel:) are recognized before the dot-check; they
+// have no function form, so paren_pos is always npos for scheme refs.
 expected<head_parse, resolve_error> parse_head(std::string_view body)
 {
+    auto colon = body.find(':');
+    if(colon != std::string_view::npos && colon > 0)
+    {
+        auto scheme = body.substr(0, colon);
+        if(scheme == "abs" || scheme == "rel")
+        {
+            head_parse out;
+            out.category = scheme;
+            out.name     = body.substr(colon + 1);
+            out.paren_pos = std::string_view::npos;
+            if(out.name.empty())
+                return parse_failure("scheme ref body is empty after ':'");
+            return out;
+        }
+    }
+
     auto dot = body.find('.');
     if(dot == std::string_view::npos || dot == 0)
         return unexpected(resolve_error(resolve_errc::parse_error,
