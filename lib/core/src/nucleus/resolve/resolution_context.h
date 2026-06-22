@@ -12,6 +12,7 @@
 #include "nucleus/keyspace/provenance.h"
 
 #include "nucleus/schema/schema_enforcer.h"
+#include "nucleus/schema/group_enforcer.h"
 #include "nucleus/schema/schema_registry.h"
 #include "nucleus/schema/converter_registry.h"
 
@@ -874,7 +875,23 @@ public:
 
         schema_validation checked = schema_enforcer::validate(m_schema, m_building,
                                                               m_keyed_satisfied);
-        if(checked)
+
+        // Container-scoped constraint + identity groups enforce over the resolved,
+        // sliced tree -- run on a transient config snapshot so the Tier-3 valve and
+        // member navigation use the real config_node walk. Skipped when no group is
+        // declared (the common case pays nothing).
+        std::vector<schema_violation> group_violations;
+        if(!m_schema.constraint_groups().empty() || !m_schema.identity_groups().empty())
+        {
+            std::map<std::string, std::string> owned;
+            for(const key_path &path : m_building.paths())
+                if(const value *v = m_building.find(path))
+                    owned.emplace(path.str(), std::string(v->text()));
+            config snapshot(std::move(owned), m_provenance);
+            group_violations = group_enforcer::validate(m_schema, snapshot);
+        }
+
+        if(checked && group_violations.empty())
             return {};
 
         const std::vector<key_path> surface = m_schema.surface();
@@ -884,16 +901,23 @@ public:
             known.push_back(path.str());
 
         std::string report = "schema validation failed:";
-        for(const schema_violation &v : checked.error())
+        // Unknown-path / required violations get a did-you-mean; group violations
+        // already name their parties precisely, so they carry no spurious suggestion.
+        if(!checked)
         {
-            report += nucleus::format("\n  - {}", v.reason);
-            if(!m_schema.recognizes_text(v.path))
+            for(const schema_violation &v : checked.error())
             {
-                auto near = suggest_keys(v.path, known, 1);
-                if(!near.empty())
-                    report += nucleus::format(" (did you mean '{}'?)", near.front());
+                report += nucleus::format("\n  - {}", v.reason);
+                if(!m_schema.recognizes_text(v.path))
+                {
+                    auto near = suggest_keys(v.path, known, 1);
+                    if(!near.empty())
+                        report += nucleus::format(" (did you mean '{}'?)", near.front());
+                }
             }
         }
+        for(const schema_violation &v : group_violations)
+            report += nucleus::format("\n  - {}", v.reason);
         return unexpected(error{errc::schema_violation, std::move(report)});
     }
 
