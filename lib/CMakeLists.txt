@@ -81,7 +81,8 @@ nucleus_add_module(core
         core/src/nucleus/tokenizer/resolver_scope.cpp
         core/src/nucleus/tokenizer/tree_resolver_scope.cpp
         core/src/nucleus/tokenizer/builtin_tokenizers.cpp
-        core/src/nucleus/completion/completion.cpp)
+        core/src/nucleus/completion/completion.cpp
+        core/src/nucleus/query/query.cpp)
 
 set_target_properties(nucleus_core PROPERTIES VERSION ${PROJECT_VERSION})
 

@@ -81,6 +81,8 @@ nucleus_add_test(pkey_tokenizer_test nucleus::runtime)
 nucleus_add_test(config_node_parent_test nucleus::runtime)
 nucleus_add_test(recognizer_of_test nucleus::argv)
 nucleus_add_test(converter_edge_cases_test)
+nucleus_add_test(selector_test nucleus::runtime)
+nucleus_add_test(selector_combinator_test nucleus::runtime)
 
 # The concurrent-load guarantee test spawns std::threads; link the platform's
 # threading library so the shared-const-read design is exercised under ASan.
