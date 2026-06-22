@@ -27,9 +27,10 @@ public:
         return *this;
     }
 
-    tokenizer_builder &add_function(std::string name, function_resolver resolve)
+    tokenizer_builder &add_function(std::string name, std::vector<arg_spec> params,
+                                    named_function_resolver resolve)
     {
-        m_functions.push_back(token_function{std::move(name), std::move(resolve)});
+        m_functions.push_back(token_function{std::move(name), std::move(params), std::move(resolve)});
         return *this;
     }
 

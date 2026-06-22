@@ -11,15 +11,15 @@ namespace nucleus {
 // enumeration -- so it reads std::getenv per lookup with no caching.
 tokenizer make_env_tokenizer();
 
-// The string tokenizer: pure string operations over already-resolved arguments.
-//   ${string.upper(s)}        -> s upcased (ASCII)
-//   ${string.lower(s)}        -> s downcased (ASCII)
-//   ${string.trim(s)}         -> s with leading/trailing ASCII whitespace removed
-//   ${string.replace(s,a,b)}  -> s with every occurrence of a replaced by b
-//   ${string.substr(s,pos)}   -> s from byte offset pos to the end
-//   ${string.substr(s,pos,n)} -> n bytes of s from byte offset pos
-//   ${string.concat(a,b,...)} -> the arguments joined with no separator
-//   ${string.length(s)}       -> the byte length of s as a decimal string
+// The string tokenizer: pure string operations over named, typed arguments
+// (value is the string subject; values is a list; pos/count are ints).
+//   ${string.upper(value=s)}                      -> s upcased (ASCII)
+//   ${string.lower(value=s)}                      -> s downcased (ASCII)
+//   ${string.trim(value=s)}                       -> s with surrounding ASCII whitespace removed
+//   ${string.length(value=s)}                     -> the byte length of s as a decimal string
+//   ${string.replace(value=s, from=a, to=b)}      -> s with every a replaced by b
+//   ${string.substr(value=s, pos=p[, count=n])}   -> s from byte offset p, optionally n bytes
+//   ${string.concat(values=[a,b,...][, separator=sep])} -> the elements joined by sep (default "")
 tokenizer make_string_tokenizer();
 
 }

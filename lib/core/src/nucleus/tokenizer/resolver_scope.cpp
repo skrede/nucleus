@@ -165,7 +165,7 @@ token_result resolver_scope::dispatch_field(std::string_view category, std::stri
 }
 
 token_result resolver_scope::dispatch_function(std::string_view category, std::string_view name,
-                                               std::span<const std::string> args)
+                                               std::span<const token_argument> args)
 {
     if(const tokenizer *t = m_registry.find(category))
         return t->resolve_function(name, args);
@@ -202,13 +202,19 @@ token_result resolver_scope::resolve_one(std::string_view token)
 
     token_result produced = lexed.value().is_function
                                 ? [&] {
-                                      std::vector<std::string> resolved_args;
+                                      std::vector<token_argument> resolved_args;
                                       resolved_args.reserve(lexed.value().args.size());
                                       for(const auto &arg : lexed.value().args)
                                       {
-                                          auto r = resolve_all(arg);
-                                          if(!r) return token_result(unexpected(std::move(r).error()));
-                                          resolved_args.push_back(std::move(r).value());
+                                          token_argument out{arg.name, arg.is_list, {}};
+                                          out.values.reserve(arg.values.size());
+                                          for(const auto &value : arg.values)
+                                          {
+                                              auto r = resolve_all(value);
+                                              if(!r) return token_result(unexpected(std::move(r).error()));
+                                              out.values.push_back(std::move(r).value());
+                                          }
+                                          resolved_args.push_back(std::move(out));
                                       }
                                       return dispatch_function(lexed.value().category,
                                                                lexed.value().name, resolved_args);

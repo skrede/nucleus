@@ -36,6 +36,18 @@ inline const char *to_string(arg_type type) noexcept
 // One coerced argument value. Lists hold one of these per element.
 using arg_scalar = std::variant<std::string, long long, double, bool>;
 
+// A single parsed argument in its pre-coercion string form: the name, whether it
+// was written as a list, and the (possibly token-bearing) value text. The lexer
+// produces these with raw values; the resolver re-emits the same shape with each
+// value resolved, then dispatch coerces them per the declared arg_spec. A scalar
+// argument holds exactly one value.
+struct token_argument
+{
+    std::string name;
+    bool is_list = false;
+    std::vector<std::string> values;
+};
+
 // The author's declaration of one named argument: its name, fundamental type,
 // whether it is a list, and its optionality. A required argument must be supplied;
 // an optional one is either absent (queried via named_args::has) or carries a

@@ -1,6 +1,5 @@
 #include "nucleus/tokenizer/token_lexer.h"
 
-#include <cctype>
 #include <cstddef>
 #include <utility>
 
@@ -94,98 +93,157 @@ expected<head_parse, resolve_error> parse_head(std::string_view body)
     return out;
 }
 
-void append_significant(std::string &current, std::size_t &significant_end, char c)
+void skip_ws(std::string_view body, std::size_t &i)
 {
-    current += c;
-    significant_end = current.size();
+    while(i < body.size() && (body[i] == ' ' || body[i] == '\t'))
+        ++i;
 }
 
-// Splits the argument list between the open paren and the matching close paren
-// on top-level commas. Honors paren depth, brace depth (so a nested ${...} arg
-// stays one literal argument), and quote state. A surrounding pair of matching
-// quotes on a whole argument is stripped. Leading/trailing whitespace around an
-// argument boundary is trimmed; interior whitespace survives.
-expected<std::vector<std::string>, resolve_error> parse_args(std::string_view body, std::size_t open_paren)
+// Reads one scalar value starting at i, stopping (without consuming) at a
+// top-level character in `stops`. Single/double quotes group and protect a
+// literal (stripped, content verbatim, so '' is the empty string); a nested
+// ${...} is copied verbatim at brace depth; a balanced (...) run survives. Bare
+// leading/trailing whitespace is trimmed; interior and quoted whitespace survive.
+expected<std::string, resolve_error> read_scalar(std::string_view body, std::size_t &i,
+                                                 std::string_view stops)
 {
-    std::vector<std::string> args;
     std::string current;
     std::size_t significant_end = 0;
-    int paren_depth = 0;
     int brace_depth = 0;
+    int paren_depth = 0;
     char quote_char = '\0';
-    bool current_quoted = false;
+    auto keep = [&](char c) { current += c; significant_end = current.size(); };
 
-    auto push_arg = [&] {
-        current.resize(significant_end);
-        args.push_back(std::move(current));
-        current.clear();
-        significant_end = 0;
-        current_quoted = false;
-    };
-
-    for(std::size_t i = open_paren + 1; i < body.size(); ++i)
+    for(; i < body.size(); ++i)
     {
         char c = body[i];
-
         if(quote_char != '\0')
         {
             if(c == quote_char) { quote_char = '\0'; continue; }
-            append_significant(current, significant_end, c);
+            keep(c);
             continue;
         }
-
-        if(c == '\'' || c == '"')
-        {
-            if(current.empty() && paren_depth == 0 && brace_depth == 0)
-                current_quoted = true;
-            quote_char = c;
-            significant_end = current.size();
-            continue;
-        }
-
+        if(c == '\'' || c == '"') { quote_char = c; continue; }
         if(c == '$' && i + 1 < body.size() && body[i + 1] == '{')
         {
             ++brace_depth;
-            append_significant(current, significant_end, c);
-            append_significant(current, significant_end, body[++i]);
+            keep(c);
+            keep(body[++i]);
             continue;
         }
-        if(c == '}' && brace_depth > 0)
-        {
-            --brace_depth;
-            append_significant(current, significant_end, c);
-            continue;
-        }
-
+        if(c == '}' && brace_depth > 0) { --brace_depth; keep(c); continue; }
         if(brace_depth == 0)
         {
-            if(c == '(') { ++paren_depth; append_significant(current, significant_end, c); continue; }
-            if(c == ')')
-            {
-                if(paren_depth == 0)
-                {
-                    if(i + 1 != body.size())
-                        return parse_failure("stray content after token argument list");
-                    if(!(current.empty() && args.empty() && !current_quoted))
-                        push_arg();
-                    return args;
-                }
-                --paren_depth;
-                append_significant(current, significant_end, c);
-                continue;
-            }
-            if(c == ',' && paren_depth == 0) { push_arg(); continue; }
+            if(c == '(') { ++paren_depth; keep(c); continue; }
+            if(c == ')' && paren_depth > 0) { --paren_depth; keep(c); continue; }
+            if(paren_depth == 0 && stops.find(c) != std::string_view::npos)
+                break;
         }
-
         if(c == ' ' || c == '\t')
         {
             if(!current.empty())
                 current += c;
             continue;
         }
-        append_significant(current, significant_end, c);
+        keep(c);
     }
-    return parse_failure("token argument list is not closed");
+    if(quote_char != '\0')
+        return parse_failure("unterminated quote in token argument value");
+    current.resize(significant_end);
+    return current;
+}
+
+// Reads the argument name up to the top-level '='. Trims surrounding whitespace;
+// rejects an empty name or a missing '='.
+expected<std::string, resolve_error> read_arg_name(std::string_view body, std::size_t &i)
+{
+    std::size_t start = i;
+    while(i < body.size() && body[i] != '=' && body[i] != ',' && body[i] != ')')
+        ++i;
+    if(i >= body.size() || body[i] != '=')
+        return parse_failure("expected name=value in token argument list");
+    std::string_view raw = body.substr(start, i - start);
+    ++i;  // consume '='
+    auto first = raw.find_first_not_of(" \t");
+    if(first == std::string_view::npos)
+        return parse_failure("empty argument name in token argument list");
+    auto last = raw.find_last_not_of(" \t");
+    return std::string(raw.substr(first, last - first + 1));
+}
+
+// Reads one `name = value` argument. A value beginning with '[' is a list whose
+// elements are scalars; otherwise it is a single scalar. A '[' is a list opener
+// only as the first non-space character of a value -- elsewhere it is literal.
+expected<token_argument, resolve_error> read_arg(std::string_view body, std::size_t &i)
+{
+    auto name = read_arg_name(body, i);
+    if(!name) return unexpected(std::move(name).error());
+
+    token_argument arg;
+    arg.name = std::move(name).value();
+    skip_ws(body, i);
+
+    if(i < body.size() && body[i] == '[')
+    {
+        arg.is_list = true;
+        ++i;  // consume '['
+        skip_ws(body, i);
+        if(i < body.size() && body[i] == ']') { ++i; return arg; }
+        for(;;)
+        {
+            auto element = read_scalar(body, i, ",]");
+            if(!element) return unexpected(std::move(element).error());
+            arg.values.push_back(std::move(element).value());
+            skip_ws(body, i);
+            if(i >= body.size())
+                return parse_failure("token argument list is not closed");
+            if(body[i] == ',') { ++i; continue; }
+            if(body[i] == ']') { ++i; return arg; }
+            return parse_failure("expected ',' or ']' in list argument value");
+        }
+    }
+
+    auto value = read_scalar(body, i, ",)");
+    if(!value) return unexpected(std::move(value).error());
+    arg.values.push_back(std::move(value).value());
+    return arg;
+}
+
+// Parses the named argument list between the open paren and the matching close
+// paren: comma-separated `name=value` pairs (a value may be a `[ ... ]` list).
+// An empty list `()` yields no arguments. Positional arguments are no longer a
+// valid form -- a value with no `name=` is a parse error.
+expected<std::vector<token_argument>, resolve_error> parse_args(std::string_view body,
+                                                                std::size_t open_paren)
+{
+    std::vector<token_argument> args;
+    std::size_t i = open_paren + 1;
+    skip_ws(body, i);
+    if(i < body.size() && body[i] == ')')
+    {
+        ++i;
+        if(i != body.size())
+            return parse_failure("stray content after token argument list");
+        return args;
+    }
+    for(;;)
+    {
+        auto arg = read_arg(body, i);
+        if(!arg) return unexpected(std::move(arg).error());
+        args.push_back(std::move(arg).value());
+        skip_ws(body, i);
+        if(i >= body.size())
+            return parse_failure("token argument list is not closed");
+        if(body[i] == ',') { ++i; continue; }
+        if(body[i] == ')')
+        {
+            ++i;
+            if(i != body.size())
+                return parse_failure("stray content after token argument list");
+            return args;
+        }
+        return parse_failure("expected ',' or ')' in token argument list");
+    }
 }
 
 }

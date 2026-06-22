@@ -3,6 +3,7 @@
 
 #include "nucleus/expected.h"
 
+#include "nucleus/tokenizer/named_args.h"
 #include "nucleus/tokenizer/resolve_error.h"
 
 #include <span>
@@ -30,11 +31,12 @@ using field_resolver = std::function<token_result()>;
 // rather than a fixed enumeration.
 using wildcard_field_resolver = std::function<token_result(std::string_view)>;
 
-// A function resolver: ${category.name(arg, ...)}. The closure receives the
-// already-resolved argument list (each nested ${...} inside an arg is expanded
-// before the call) and produces a string-or-error. Arity policy lives in the
-// closure, keeping the registry dispatch free of per-function knowledge.
-using function_resolver = std::function<token_result(std::span<const std::string>)>;
+// A function resolver: ${category.name(name=value, ...)}. The framework binds and
+// coerces the call's named arguments against the function's declared arg_specs
+// (matching names, filling defaults, coercing each value to its declared type)
+// and hands the closure the resulting named_args -- so per-argument validation
+// lives in the framework, not re-implemented in every closure.
+using named_function_resolver = std::function<token_result(const named_args &)>;
 
 struct token_field
 {
@@ -45,7 +47,8 @@ struct token_field
 struct token_function
 {
     std::string name;
-    function_resolver resolve;
+    std::vector<arg_spec> params;
+    named_function_resolver resolve;
 };
 
 // A built tokenizer: one category and the field / function / wildcard surface it
@@ -80,7 +83,7 @@ public:
 
     token_result resolve_field(std::string_view name) const;
     token_result resolve_function(std::string_view name,
-                                                std::span<const std::string> args) const;
+                                  std::span<const token_argument> args) const;
 
 private:
     std::string m_category;

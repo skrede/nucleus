@@ -3,6 +3,7 @@
 
 #include "nucleus/expected.h"
 
+#include "nucleus/tokenizer/named_args.h"
 #include "nucleus/tokenizer/resolve_error.h"
 
 #include <string>
@@ -13,15 +14,16 @@ namespace nucleus {
 
 // Lexed shape of a single ${...} token. Field form (${category.name}) has
 // is_function == false and an empty args vector; function form
-// (${category.name(arg, ...)}) has is_function == true and one entry per
-// top-level comma-separated argument. Nested ${...} substrings inside an
-// argument are preserved verbatim -- the resolver recurses on each argument
-// separately, so the lexer never expands them itself.
+// (${category.name(name=value, ...)}) has is_function == true and one
+// token_argument per top-level comma-separated `name=value` pair (a value may be
+// a `[ ... ]` list). Nested ${...} substrings inside an argument value are
+// preserved verbatim -- the resolver recurses on each value separately, so the
+// lexer never expands them itself.
 struct lexed_token
 {
     std::string category;
     std::string name;
-    std::vector<std::string> args;
+    std::vector<token_argument> args;
     bool is_function = false;
 };
 

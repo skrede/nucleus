@@ -111,7 +111,7 @@ private:
 
     token_result dispatch_field(std::string_view category, std::string_view name);
     token_result dispatch_function(std::string_view category, std::string_view name,
-                                                 std::span<const std::string> args);
+                                                 std::span<const token_argument> args);
     token_result lookup_frame_binding(std::string_view category,
                                                     std::string_view name) const;
 };

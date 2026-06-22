@@ -7,8 +7,9 @@
 namespace nucleus {
 
 // Why a single ${...} resolution failed. The lexer reports malformed syntax;
-// the dispatch path reports a miss on a category, field, or function, or an
-// arity mismatch; the guards report the two loud halting conditions a recursive
+// the dispatch path reports a miss on a category, field, or function, an unknown
+// or missing named argument, or a value that fails to coerce to its declared
+// type; the guards report the two loud halting conditions a recursive
 // expansion must never silently swallow -- a cyclic/self reference and a depth
 // overflow. These last two are the named errors token expansion raises instead
 // of recursing forever.
@@ -18,7 +19,6 @@ enum class resolve_errc
     unknown_category,
     missing_field,
     unknown_function,
-    arg_count_mismatch,
     unknown_argument,
     missing_argument,
     type_mismatch,
@@ -52,7 +52,6 @@ inline const char *to_string(resolve_errc code) noexcept
     case resolve_errc::unknown_category: return "unknown_category";
     case resolve_errc::missing_field: return "missing_field";
     case resolve_errc::unknown_function: return "unknown_function";
-    case resolve_errc::arg_count_mismatch: return "arg_count_mismatch";
     case resolve_errc::unknown_argument: return "unknown_argument";
     case resolve_errc::missing_argument: return "missing_argument";
     case resolve_errc::type_mismatch: return "type_mismatch";
