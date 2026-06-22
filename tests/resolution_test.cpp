@@ -213,8 +213,8 @@ TEST_CASE("the space resolves core builtin tokens with no extra registration", "
     nucleus::config_space space = nucleus::config_space_builder{}.build();
 
     nucleus::env_source env;
-    env.set("greeting", "${string.upper(hi)}");
-    env.set("token", "${string.concat(a,b,c)}");
+    env.set("greeting", "${string.upper(value=hi)}");
+    env.set("token", "${string.concat(values=[a,b,c])}");
 
     auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(env)}, {});
     REQUIRE(loaded);
@@ -249,7 +249,7 @@ TEST_CASE("tokens are expanded per-source before layering (expand-then-layer)", 
     nucleus::config_space space = nucleus::config_space_builder{}.build();
 
     nucleus::env_source env;
-    env.set("loud", "${string.upper(hi)}").set("plain", "kept");
+    env.set("loud", "${string.upper(value=hi)}").set("plain", "kept");
 
     auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(env)}, {});
     REQUIRE(loaded);

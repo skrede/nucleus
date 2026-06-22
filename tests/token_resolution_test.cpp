@@ -58,14 +58,15 @@ TEST_CASE("env tokenizer expands a set variable and fails on unset", "[resolve][
 TEST_CASE("string tokenizer ops", "[resolve][string]")
 {
     auto reg = core_registry();
-    CHECK(resolve_tokens("${string.upper(abc)}", reg).value() == "ABC");
-    CHECK(resolve_tokens("${string.lower(ABC)}", reg).value() == "abc");
-    CHECK(resolve_tokens("${string.trim(  x  )}", reg).value() == "x");
-    CHECK(resolve_tokens("${string.length(hello)}", reg).value() == "5");
-    CHECK(resolve_tokens("${string.replace(a.b.c, ., /)}", reg).value() == "a/b/c");
-    CHECK(resolve_tokens("${string.concat(a, b, c)}", reg).value() == "abc");
-    CHECK(resolve_tokens("${string.substr(hello, 1)}", reg).value() == "ello");
-    CHECK(resolve_tokens("${string.substr(hello, 1, 3)}", reg).value() == "ell");
+    CHECK(resolve_tokens("${string.upper(value=abc)}", reg).value() == "ABC");
+    CHECK(resolve_tokens("${string.lower(value=ABC)}", reg).value() == "abc");
+    CHECK(resolve_tokens("${string.trim(value='  x  ')}", reg).value() == "x");
+    CHECK(resolve_tokens("${string.length(value=hello)}", reg).value() == "5");
+    CHECK(resolve_tokens("${string.replace(value=a.b.c, from=., to=/)}", reg).value() == "a/b/c");
+    CHECK(resolve_tokens("${string.concat(values=[a, b, c])}", reg).value() == "abc");
+    CHECK(resolve_tokens("${string.concat(values=[a, b, c], separator='-')}", reg).value() == "a-b-c");
+    CHECK(resolve_tokens("${string.substr(value=hello, pos=1)}", reg).value() == "ello");
+    CHECK(resolve_tokens("${string.substr(value=hello, pos=1, count=3)}", reg).value() == "ell");
 }
 
 TEST_CASE("unknown category is a named error", "[resolve]")
@@ -84,7 +85,7 @@ TEST_CASE("nested function-arg tokens resolve inner first", "[resolve][nested]")
     setenv("NUCLEUS_NEST", "abc", 1);
 #endif
     auto reg = core_registry();
-    auto r = resolve_tokens("${string.upper(${env.NUCLEUS_NEST})}", reg);
+    auto r = resolve_tokens("${string.upper(value=${env.NUCLEUS_NEST})}", reg);
     REQUIRE(r.has_value());
     CHECK(r.value() == "ABC");
 }
@@ -198,7 +199,7 @@ TEST_CASE("unknown self/dir/file location keys are named errors", "[resolve][sco
 TEST_CASE("an unknown tokenizer function is a named error", "[resolve][string]")
 {
     auto reg = core_registry();
-    auto r = resolve_tokens("${string.bogusfn(x)}", reg);
+    auto r = resolve_tokens("${string.bogusfn(value=x)}", reg);
     REQUIRE_FALSE(r.has_value());
     CHECK(r.error().code == resolve_errc::unknown_function);
 }

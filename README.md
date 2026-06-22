@@ -194,12 +194,14 @@ server/port = 8080
 
 Values carrying `${...}` expressions are expanded at load by the core tokenizers,
 which every `config_space` installs automatically. A token nested inside
-another resolves inner-first.
+another resolves inner-first. Tokenizer-function arguments are **named and typed**
+(`${string.upper(value=...)}`); see
+[Named tokenizer arguments](docs/named-tokenizer-arguments.md).
 
 ```cpp
 nucleus::env_source values;
-values.set("service/region", "${string.upper(${env.NUCLEUS_REGION})}")
-      .set("service/instance", "${string.lower(NODE-${env.NUCLEUS_REGION})}");
+values.set("service/region", "${string.upper(value=${env.NUCLEUS_REGION})}")
+      .set("service/instance", "${string.lower(value=NODE-${env.NUCLEUS_REGION})}");
 ```
 
 ```txt

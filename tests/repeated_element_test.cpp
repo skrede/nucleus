@@ -249,11 +249,11 @@ TEST_CASE("token expansion per value -- each value expanded independently",
     REQUIRE(engine.register_element(nucleus::repeated_element("val", anchor::keyspace("config"))));
     nucleus::config_space space = engine.build();
 
-    // ${string.upper(x)} is the built-in string tokenizer's upper function.
+    // ${string.upper(value=x)} is the built-in string tokenizer's upper function.
     auto src = xml_of(
         "<config>"
-        "<val>${string.upper(alpha)}_1</val>"
-        "<val>${string.upper(beta)}_2</val>"
+        "<val>${string.upper(value=alpha)}_1</val>"
+        "<val>${string.upper(value=beta)}_2</val>"
         "</config>");
     auto loaded = nucleus::load_config(space,
         nucleus::source_stack{std::move(src)},

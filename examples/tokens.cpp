@@ -29,8 +29,8 @@ int main()
     set_env("NUCLEUS_REGION", "eu-west");
 
     nucleus::env_source values;
-    values.set("service/region", "${string.upper(${env.NUCLEUS_REGION})}")
-          .set("service/instance", "${string.lower(NODE-${env.NUCLEUS_REGION})}");
+    values.set("service/region", "${string.upper(value=${env.NUCLEUS_REGION})}")
+          .set("service/instance", "${string.lower(value=NODE-${env.NUCLEUS_REGION})}");
 
     nucleus::config_space space = nucleus::config_space_builder{}.build();
 

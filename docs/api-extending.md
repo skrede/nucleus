@@ -354,37 +354,51 @@ builder; a host adds its own `${category....}` vocabulary by building a
 
 ```cpp
 using token_result = expected<std::string, resolve_error>;
-using field_resolver          = std::function<token_result()>;                          // ${cat.name}
-using wildcard_field_resolver = std::function<token_result(std::string_view)>;          // ${cat.<any>}
-using function_resolver       = std::function<token_result(std::span<const std::string>)>;  // ${cat.name(args...)}
+using field_resolver          = std::function<token_result()>;                  // ${cat.name}
+using wildcard_field_resolver = std::function<token_result(std::string_view)>;  // ${cat.<any>}
+using named_function_resolver = std::function<token_result(const named_args &)>;// ${cat.name(a=v, ...)}
 
 tokenizer_builder(std::string category);
 tokenizer_builder &add_field(std::string name, field_resolver resolve);
-tokenizer_builder &add_function(std::string name, function_resolver resolve);
+tokenizer_builder &add_function(std::string name, std::vector<arg_spec> params,
+                                named_function_resolver resolve);
 tokenizer_builder &set_wildcard(wildcard_field_resolver resolve);
 tokenizer build() &&;   // consumes the builder
 ```
+
+Function arguments are **named and typed**: the author declares each argument's
+name and fundamental type (`string | int | double | bool`, and list-of-each) at
+`add_function`, and the framework binds the call's `name=value` arguments against
+that declaration — matching names, filling defaults, and coercing each resolved
+value to its declared type — before the closure runs. The closure reads typed
+values from the `named_args` it receives. See the full grammar, the typed
+coercion, lists, and the did-you-mean diagnostics in
+[Named tokenizer arguments](named-tokenizer-arguments.md).
 
 ```cpp
 nucleus::config_space_builder engine;
 
 nucleus::tokenizer_builder builder("greet");
-builder.set_wildcard([](std::string_view who) -> nucleus::token_result {
-    return std::string("hello ") + std::string(who);
-});
+builder.add_function("hello",
+    {nucleus::arg_spec::scalar("who", nucleus::arg_type::string)},
+    [](const nucleus::named_args &a) -> nucleus::token_result {
+        return std::string("hello ") + a.string("who");
+    });
 if(!engine.install_tokenizer(std::move(builder).build()))
     return 1;
 nucleus::config_space space = engine.build();
 
-// A value "${greet.world}" now resolves to "hello world" at load.
+// A value "${greet.hello(who=world)}" now resolves to "hello world" at load.
 ```
 
-Function arguments arrive already expanded (a nested `${...}` inside an arg
-resolves first); arity policy lives in the closure. A later installation of the
-same category shadows the earlier one. The built-in expansion behavior (fixpoint
-recursion, inner-first nesting) is shown in
-[`examples/tokens.cpp`](../examples/tokens.cpp); the install path is exercised
-in [`tests/resolution_test.cpp`](../tests/resolution_test.cpp).
+A value inside an argument arrives already expanded (a nested `${...}` resolves
+first); per-argument validation lives in the framework, not the closure. A later
+installation of the same category shadows the earlier one. The built-in expansion
+behavior (fixpoint recursion, inner-first nesting) is shown in
+[`examples/tokens.cpp`](../examples/tokens.cpp); the named-argument surface is
+shown in [`examples/time_tokenizer.cpp`](../examples/time_tokenizer.cpp); the
+install path is exercised in
+[`tests/resolution_test.cpp`](../tests/resolution_test.cpp).
 
 ---
 
