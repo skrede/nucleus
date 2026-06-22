@@ -374,12 +374,18 @@ std::vector<conflict_report> config_space_builder::conflicts() const { return m_
 config_space config_space_builder::build()
 {
     // D-07: auto-register a pkey tree tokenizer for every identity element.
+    // D-05: if the host already registered a tokenizer for this category, skip
+    // auto-registration so the host's registration wins (last-registration-wins
+    // is implemented by the host calling install_tree_tokenizer before build()).
     // Reserved names cannot reach here — register_element is the enforcement gate.
     owner_token core;
     for(const schema_element &el : m_impl->schema.elements())
     {
         if(!el.identity || el.container().empty())
             continue;
+        std::string category = std::string(key_path::base_name(el.container().leaf()));
+        if(m_impl->tree_tokenizer.find(category) != nullptr)
+            continue; // D-05: host shadow wins
         m_impl->tree_tokenizer.add(make_pkey_tree_tokenizer(el), core);
     }
 

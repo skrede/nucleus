@@ -844,8 +844,7 @@ public:
             if(v == nullptr)
                 continue;
             const std::string_view text = v->text();
-            if(text.find("${abs:") == std::string_view::npos
-               && text.find("${rel:") == std::string_view::npos)
+            if(text.find("${") == std::string_view::npos)
                 continue;
 
             auto r = resolve_one_leaf(kp, leaf_guard, resolved_cache, substitution_counter);
