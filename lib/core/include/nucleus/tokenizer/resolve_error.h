@@ -19,6 +19,9 @@ enum class resolve_errc
     missing_field,
     unknown_function,
     arg_count_mismatch,
+    unknown_argument,
+    missing_argument,
+    type_mismatch,
     out_of_scope_context,
     cyclic_reference,
     depth_exceeded,
@@ -50,6 +53,9 @@ inline const char *to_string(resolve_errc code) noexcept
     case resolve_errc::missing_field: return "missing_field";
     case resolve_errc::unknown_function: return "unknown_function";
     case resolve_errc::arg_count_mismatch: return "arg_count_mismatch";
+    case resolve_errc::unknown_argument: return "unknown_argument";
+    case resolve_errc::missing_argument: return "missing_argument";
+    case resolve_errc::type_mismatch: return "type_mismatch";
     case resolve_errc::out_of_scope_context: return "out_of_scope_context";
     case resolve_errc::cyclic_reference: return "cyclic_reference";
     case resolve_errc::depth_exceeded: return "depth_exceeded";
