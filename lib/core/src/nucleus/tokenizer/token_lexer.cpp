@@ -212,4 +212,62 @@ expected<lexed_token, resolve_error> lex_token(std::string_view token)
     return out;
 }
 
+std::vector<std::string_view> split_fallback_arms(std::string_view body)
+{
+    auto trim = [](std::string_view s) -> std::string_view {
+        auto first = s.find_first_not_of(" \t");
+        if(first == std::string_view::npos)
+            return {};
+        auto last = s.find_last_not_of(" \t");
+        return s.substr(first, last - first + 1);
+    };
+
+    std::vector<std::string_view> arms;
+    int brace_depth = 0;
+    bool in_quote = false;
+    std::size_t arm_start = 0;
+
+    for(std::size_t i = 0; i < body.size(); ++i)
+    {
+        char c = body[i];
+
+        if(in_quote)
+        {
+            if(c == '"')
+                in_quote = false;
+            continue;
+        }
+
+        if(c == '"')
+        {
+            in_quote = true;
+            continue;
+        }
+
+        if(c == '$' && i + 1 < body.size() && body[i + 1] == '{')
+        {
+            ++brace_depth;
+            ++i;
+            continue;
+        }
+
+        if(c == '}' && brace_depth > 0)
+        {
+            --brace_depth;
+            continue;
+        }
+
+        if(brace_depth == 0 && c == '?' && i + 1 < body.size() && body[i + 1] == '?')
+        {
+            arms.push_back(trim(body.substr(arm_start, i - arm_start)));
+            i += 2;
+            arm_start = i;
+            --i;  // loop increment brings i back to arm_start
+        }
+    }
+
+    arms.push_back(trim(body.substr(arm_start)));
+    return arms;
+}
+
 }

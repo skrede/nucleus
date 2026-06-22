@@ -31,6 +31,10 @@ struct lexed_token
 // content after the closing paren.
 expected<lexed_token, resolve_error> lex_token(std::string_view token);
 
+// Splits body on top-level '??' outside ${} nesting and quotes; returns a
+// single-element vector when no top-level '??' is present.
+std::vector<std::string_view> split_fallback_arms(std::string_view body);
+
 }
 
 #endif
