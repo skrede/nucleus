@@ -43,6 +43,9 @@ nucleus_add_example(tree_references nucleus::runtime)
 # Phase 24: auto-named ${server.field} pkey tokenizer and host install_tree_tokenizer.
 nucleus_add_example(pkey_tokenizer nucleus::runtime)
 
+# Phase 25: programmatic query/selector API (query_context, role, owned_by, in_strain, one()).
+nucleus_add_example(query nucleus::runtime)
+
 # The XML example layers an XML document under the command line, so it links the
 # xml module (nucleus::xml). Its public adapter headers under nucleus/xml/
 # arrive via that link; pugixml stays private inside lib/xml. Built only when the

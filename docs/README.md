@@ -10,6 +10,7 @@ documents the parts nucleus ships that satisfy those seams.
 | [Types you use](api-using.md) | The host-facing vocabulary a program instantiates and reads: the builder and the sealed space, the schema, `load_config()` and its options, the resolved configuration, source stacks, emitters, diagnostics, completion. |
 | [Seams you extend](api-extending.md) | The concepts a host makes a type satisfy and the policies it composes: the `config_source` concept and its optional affordances, capability descriptors and gating, inheritance, custom tokenizers and converters, `registration_policy`, `log_sink`, discovery. |
 | [Shipped implementations](api-implementations.md) | The concrete modules nucleus ships that satisfy the seams: `xml_source`, `env_source`, `argv_source`, `runtime_source`, the per-format emitters, and the `log_sink` adapters — with the capability descriptor and CMake target of each. |
+| [Query / Selector API](query-selector-api.md) | Programmatic fluent query surface: `query_context()`, `query(anchor, ctx)`, structural/kind/schema-role selectors, `one()` loud semantics, owner-token and strain selectors, combinators, and the lifetime contract. |
 
 The [`examples/`](../examples) directory holds a small, self-contained program per
 concept; each reference section points at the matching example.
