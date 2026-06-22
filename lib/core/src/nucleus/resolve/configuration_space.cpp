@@ -337,6 +337,9 @@ registration_result config_space_builder::install_tree_tokenizer(tree_tokenizer 
                             "rename the schema element", tok.category())});
     if(auto verdict = m_impl->review(registration_kind::tokenizer, owner); !verdict)
         return verdict;
+    // D-05: host shadows the auto-registered pkey tokenizer for this category —
+    // last-registration-wins is correct; wire a log_sink to space_core to emit
+    // a debug-level message here when that seam is added.
     m_impl->tree_tokenizer.add(std::move(tok), std::move(owner));
     return registration_ok();
 }
