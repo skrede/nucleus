@@ -55,6 +55,25 @@ public:
     selector containers() const;
     selector repeated() const;
 
+    // Schema-aware selectors — require ctx (return empty if ctx is nullptr).
+
+    // Nodes whose schema-authoritative role matches r. Uses the ctx role index
+    // built from declared schema elements, so zero-instance repeated containers
+    // are still returned when r == node_role::repeated_container.
+    selector role(node_role r) const;
+
+    // Nodes registered under the supplied owner_token via ==-match only.
+    // A never-registered token yields an empty result; an anonymous
+    // (default-constructed) token matches nothing unless the EXACT same
+    // token object was registered.
+    selector owned_by(owner_token token) const;
+
+    // Nodes belonging to the same ordinal instance as the anchor. The instance
+    // is derived from the anchor's position under the primary-key container.
+    // A container-level anchor (not within a specific instance) yields empty,
+    // not an error.
+    selector in_strain() const;
+
     // Combinator methods.
 
     // Union: a node is included when this selector OR the other would include it.
