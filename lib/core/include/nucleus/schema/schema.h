@@ -65,6 +65,12 @@ struct schema_element
     // replaces wholesale; unite/replace_by_key key on an identity group's field.
     merge_mode merge = merge_mode::wholesale_replace;
 
+    // When non-empty, this leaf is a keyref: its value names a target in the identity
+    // group named here. A value matching no identifier in that namespace (within the
+    // slice) is a loud dangling-reference error; the value dereferences to its target
+    // node via follow_keyref(). Empty (default) means this is an ordinary leaf.
+    std::string keyref_into;
+
     // The closed set of values this element accepts, if it is constrained. An
     // empty vector (the default) means unconstrained -- any value is admissible.
     // A non-empty vector is a value constraint: a resolved value outside the set
@@ -165,6 +171,18 @@ inline schema_element repeated_element(std::string name, anchor at)
 inline schema_element merging(schema_element e, merge_mode mode)
 {
     e.merge = mode;
+    return e;
+}
+
+// A field typed as a reference into the named identity namespace (an identity group).
+// Its value names a target; a value matching no identifier is a loud dangling-reference
+// error, and the value dereferences to its target node via follow_keyref(). The target
+// namespace is named explicitly via `into`, never inferred. The identity group must be
+// registered before the keyref that references it.
+inline schema_element keyref_element(std::string name, anchor at, std::string into)
+{
+    schema_element e = element(std::move(name), std::move(at));
+    e.keyref_into = std::move(into);
     return e;
 }
 

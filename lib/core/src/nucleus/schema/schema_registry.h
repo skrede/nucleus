@@ -163,6 +163,22 @@ public:
             }
         }
 
+        // A keyref's `into=` must name an already-registered identity group (declare
+        // the namespace before the keyref that references it), mirroring the
+        // declare-before-reference rule the keyspace anchor enforces.
+        if(!el.keyref_into.empty())
+        {
+            const bool known = std::ranges::any_of(
+                m_identity_groups, [&](const identity_group_spec &g) {
+                    return g.name == el.keyref_into;
+                });
+            if(!known)
+                return unexpected(nucleus::format(
+                    "keyref '{}' references identity namespace '{}', which is not a "
+                    "registered identity group",
+                    el.name, el.keyref_into));
+        }
+
         m_defined.insert(el.declared_path().str());
         m_elements.push_back(std::move(el));
         return {};
