@@ -14,6 +14,7 @@
 
 #include <map>
 #include <set>
+#include <span>
 #include <string>
 #include <vector>
 #include <cstddef>
@@ -38,6 +39,9 @@ public:
             check_constraint_group(schema, resolved, g, violations);
         for(const identity_group_spec &g : schema.identity_groups())
             check_identity_group(schema, resolved, g, violations);
+        for(const schema_element &el : schema.elements())
+            if(!el.keyref_into.empty())
+                check_keyref(schema, resolved, el, violations);
         return violations;
     }
 
@@ -184,6 +188,62 @@ private:
                 "constraint group '{}' on '{}' requires {} {} active member(s) but "
                 "{} are active: {}",
                 g.name, inst, bound_word(g.bound), g.count, active, which)});
+        }
+    }
+
+    // The set of identifier values present in an identity namespace within the slice
+    // -- the valid targets a keyref may name. Shares the pooling shape with the
+    // identity check, but keyed by value alone (the keyref cares only "does it exist").
+    static std::set<std::string>
+    namespace_values(const schema_registry &schema, const config &resolved,
+                     const identity_group_spec &group)
+    {
+        const std::string parent = group.container().str();
+        std::set<std::string> values;
+        for(const std::string &m : group.members)
+        {
+            auto member_kp = key_path::parse(join(parent, m));
+            if(!member_kp)
+                continue;
+            for(const std::string &mi : instances_of(schema, resolved, *member_kp))
+                if(auto v = resolved.get(join(mi, group.field)); v.has_value())
+                    values.insert(*v);
+        }
+        return values;
+    }
+
+    // A keyref whose present value names no identifier in its namespace is a loud
+    // dangling-reference error with a did-you-mean. An absent keyref is not dangling
+    // (presence is the orthogonal `required` axis, not this check).
+    static void
+    check_keyref(const schema_registry &schema, const config &resolved,
+                 const schema_element &el, std::vector<schema_violation> &out)
+    {
+        const identity_group_spec *group = nullptr;
+        for(const identity_group_spec &g : schema.identity_groups())
+            if(g.name == el.keyref_into) { group = &g; break; }
+        if(group == nullptr)
+            return;
+
+        const std::set<std::string> valid = namespace_values(schema, resolved, *group);
+        const std::vector<std::string> candidates(valid.begin(), valid.end());
+        const std::string declared = el.declared_path().str();
+
+        for(const std::string &key : resolved.keys())
+        {
+            auto kp = key_path::parse(key);
+            if(!kp || schema.canonical_text(*kp) != declared)
+                continue;
+            auto v = resolved.get(key);
+            if(!v.has_value() || valid.count(*v) != 0)
+                continue;
+            std::string reason = nucleus::format(
+                "keyref '{}'='{}' matches no identifier in namespace '{}'",
+                key, *v, group->name);
+            const std::span<const std::string> cand(candidates.data(), candidates.size());
+            if(auto near = suggest_keys(*v, cand, 1); !near.empty())
+                reason += nucleus::format(" (did you mean '{}'?)", near.front());
+            out.push_back(schema_violation{key, std::move(reason)});
         }
     }
 

@@ -3,6 +3,7 @@
 
 #include "nucleus/identity.h"
 #include "nucleus/schema/schema.h"
+#include "nucleus/schema/identity_group.h"
 #include "nucleus/keyspace/key_path.h"
 #include "nucleus/query/node_role.h"
 
@@ -25,13 +26,22 @@ public:
     // to the claim ledger. Elements span is borrowed only for construction;
     // owner_by_canonical_path is moved in.
     schema_query_context(std::span<const schema_element> elements,
-                         std::map<std::string, owner_token, std::less<>> owner_by_canonical_path)
+                         std::map<std::string, owner_token, std::less<>> owner_by_canonical_path,
+                         std::span<const identity_group_spec> identity_groups = {})
         : m_owners(std::move(owner_by_canonical_path))
     {
+        for(const identity_group_spec &g : identity_groups)
+            m_namespaces.emplace(g.name, g);
+
         for(const schema_element &el : elements)
         {
             const std::string dp = el.declared_path().str();
             const std::string cp = el.container().str();
+
+            // Index keyref leaves by their canonical declared path so a keyref node
+            // can be dereferenced into its named identity namespace.
+            if(!el.keyref_into.empty())
+                m_keyref_into.emplace(dp, el.keyref_into);
 
             if(el.identity)
             {
@@ -95,6 +105,17 @@ public:
     bool is_repeated_container(std::string_view canonical_path) const
     {
         return m_repeated_containers.count(std::string(canonical_path)) != 0;
+    }
+
+    // The identity group a keyref leaf (by canonical declared path) points into, or
+    // nullptr when the path is not a declared keyref. Used by follow_keyref().
+    const identity_group_spec *keyref_target(std::string_view canonical_path) const
+    {
+        auto it = m_keyref_into.find(canonical_path);
+        if(it == m_keyref_into.end())
+            return nullptr;
+        auto ns = m_namespaces.find(it->second);
+        return ns == m_namespaces.end() ? nullptr : &ns->second;
     }
 
     // The leaf segment of the primary key element (e.g. "name").
@@ -162,6 +183,9 @@ private:
     std::map<std::string, owner_token, std::less<>> m_owners;
     std::set<std::string> m_repeated_containers;
     std::set<std::string> m_keyed_containers;
+    // Identity namespaces by name, and keyref canonical declared path -> namespace name.
+    std::map<std::string, identity_group_spec, std::less<>> m_namespaces;
+    std::map<std::string, std::string, std::less<>> m_keyref_into;
     std::string m_pkey_field;
     std::string m_pkey_container;
 };

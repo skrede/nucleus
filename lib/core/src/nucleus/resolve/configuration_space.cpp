@@ -492,7 +492,8 @@ schema_query_context config_space::query_context() const
         if(it != m_impl->m_claims.end() && !it->second.empty())
             owner_map.emplace(dp, it->second[0].owner);
     }
-    return schema_query_context{m_impl->schema.elements(), std::move(owner_map)};
+    return schema_query_context{m_impl->schema.elements(), std::move(owner_map),
+                                m_impl->schema.identity_groups()};
 }
 
 config_space_builder config_space::expand() const

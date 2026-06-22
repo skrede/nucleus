@@ -1,8 +1,10 @@
 #include "nucleus/query/query.h"
 #include "nucleus/config.h"
 #include "nucleus/error.h"
+#include "nucleus/format.h"
 
 #include <string>
+#include <vector>
 
 namespace nucleus {
 
@@ -285,6 +287,58 @@ expected<config_node, error> selector::one() const
 selector query(config_node anchor, const schema_query_context &ctx)
 {
     return selector{std::move(anchor), &ctx};
+}
+
+expected<config_node, error>
+follow_keyref(const config_node &keyref_leaf, const schema_query_context &ctx)
+{
+    const std::string path(keyref_leaf.path());
+    auto val = keyref_leaf.value();
+    if(!val.has_value())
+        return unexpected(error{errc::absent_key,
+            "keyref node '" + path + "' has no value to follow"});
+
+    const identity_group_spec *ns = ctx.keyref_target(ctx.canonicalize(path));
+    if(ns == nullptr)
+        return unexpected(error{errc::absent_key,
+            "node '" + path + "' is not a declared keyref"});
+
+    // Walk to the tree root, then descend to the namespace's parent container.
+    config_node root = keyref_leaf;
+    while(!root.path().empty())
+        root = root.parent();
+    config_node container = root;
+    for(const std::string &seg : ns->container().segments())
+        container = container[seg];
+
+    // The target is the member instance whose identifier field equals the value.
+    std::vector<config_node> matches;
+    for(const std::string &member : ns->members)
+    {
+        config_node collection = container[member];
+        if(!collection.exists())
+            continue;
+        if(collection.kind() == node_kind::repeated)
+        {
+            for(const config_node &instance : collection.children())
+                if(auto field = instance[ns->field].value();
+                   field.has_value() && *field == *val)
+                    matches.push_back(instance);
+        }
+        else if(auto field = collection[ns->field].value();
+                field.has_value() && *field == *val)
+            matches.push_back(collection);
+    }
+
+    if(matches.empty())
+        return unexpected(error{errc::absent_key, nucleus::format(
+            "keyref '{}'='{}' matches no identifier in namespace '{}'",
+            path, *val, ns->name)});
+    if(matches.size() > 1)
+        return unexpected(error{errc::ambiguous_result, nucleus::format(
+            "keyref '{}'='{}' matches {} targets in namespace '{}'",
+            path, *val, matches.size(), ns->name)});
+    return matches.front();
 }
 
 } // namespace nucleus

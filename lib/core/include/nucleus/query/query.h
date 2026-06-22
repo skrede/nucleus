@@ -137,6 +137,15 @@ private:
 // The default predicate matches every node reachable via visit() from the anchor.
 selector query(config_node anchor, const schema_query_context &ctx);
 
+// Dereferences a keyref leaf to its target node: the member instance in the keyref's
+// named identity namespace whose identifier field equals the keyref's value. Reuses
+// the v0.3.0 tree-addressing walk and the transient schema_query_context join -- NOT a
+// ${...} token. Returns errc::absent_key when the node is not a keyref, has no value, or
+// names no identifier (a dangling reference); errc::ambiguous_result when the namespace
+// somehow holds more than one match (a uniqueness violation the enforcer also flags).
+expected<config_node, error> follow_keyref(const config_node &keyref_leaf,
+                                           const schema_query_context &ctx);
+
 } // namespace nucleus
 
 #endif
