@@ -15,6 +15,7 @@ that satisfy these seams, see [Shipped implementations](api-implementations.md).
 - [`feature_gate` — capability gating](#feature_gate)
 - [Inheritance: `inherit_declaration`, `inherit_policy`, `extend_disposition`](#inheritance)
 - [Custom tokenizers: `tokenizer_builder` + `install_tokenizer`](#tokenizers)
+- [Tree-access tokenizers: `install_tree_tokenizer`](#tree-tokenizers)
 - [Custom converters: `register_converter`](#converters)
 - [`registration_policy` — intercepting registration](#registration_policy)
 - [`log_sink` — the logging seam](#log_sink)
@@ -384,6 +385,95 @@ same category shadows the earlier one. The built-in expansion behavior (fixpoint
 recursion, inner-first nesting) is shown in
 [`examples/tokens.cpp`](../examples/tokens.cpp); the install path is exercised
 in [`tests/resolution_test.cpp`](../tests/resolution_test.cpp).
+
+---
+
+<a id="tree-tokenizers"></a>
+## Tree-access tokenizers: `install_tree_tokenizer`
+
+`#include "nucleus/tokenizer/tree_tokenizer.h"` and `"nucleus/config_space.h"`
+
+Pass-2 tree-access tokens (`${category.field}`) are resolved by a separate
+registry of `tree_tokenizer` objects, dispatched after the source fold has
+assembled and sliced the keyspace. The engine auto-registers one built-in
+tree tokenizer per declared primary-key element (the auto-named pkey tokenizer,
+described in [Types you use — Tree references](api-using.md#tree-references)).
+A host installs its own tree tokenizers via `install_tree_tokenizer` — identical
+to `install_tokenizer` in lifecycle, but dispatched only in pass-2.
+
+### The `tree_access` struct
+
+The resolver callable receives a `tree_access` carrying the transient context
+for one token invocation. All references are valid only for the duration of the
+call; the host must not store them beyond it:
+
+```cpp
+struct tree_access
+{
+    const keyspace   &building;      // the sliced, assembled keyspace (read-only)
+    const key_path   &current_path;  // path of the leaf being resolved
+    std::string_view  category;      // token category (left of the '.')
+    std::string_view  field_name;    // token field (right of the '.')
+};
+
+using tree_field_resolver = std::function<token_result(const tree_access &)>;
+```
+
+### Constructing and installing a tree tokenizer
+
+A `tree_tokenizer` takes a category string and a single wildcard resolver
+covering all field names under that category:
+
+```cpp
+// Host tree tokenizer that reads cluster/server/<field> from the assembled tree.
+nucleus::tree_tokenizer tok("server",
+    [](const nucleus::tree_access &access) -> nucleus::token_result
+    {
+        auto field_path = nucleus::key_path::parse(
+            "cluster/server/" + std::string(access.field_name));
+        if(!field_path)
+            return nucleus::unexpected(
+                nucleus::resolve_error(nucleus::resolve_errc::missing_field,
+                    "invalid field path"));
+        const nucleus::value *v = access.building.find(field_path.value());
+        if(v == nullptr)
+            return nucleus::unexpected(
+                nucleus::resolve_error(nucleus::resolve_errc::missing_field,
+                    nucleus::format("${{server.{}}} not found", access.field_name)));
+        return std::string(v->text());
+    });
+
+if(!engine.install_tree_tokenizer(std::move(tok)))
+    return 1;
+auto space = engine.build();
+// A value "${server.name}" in a source now resolves via the host tokenizer.
+```
+
+### Reserved names and shadowing
+
+- **Reserved categories (D-04):** a category colliding with a built-in name
+  (`env`, `string`) or a pass-2 scheme head (`abs`, `rel`, `scope`, `file`,
+  `dir`, `self`) is rejected immediately with `errc::rejected_registration`.
+  The same check applies at `register_element` time when a primary-key element's
+  container tag would become a reserved category.
+
+- **Last-registration-wins shadowing (D-05):** installing a tree tokenizer for
+  a category that the engine already registered (e.g. "server" auto-named by a
+  pkey element) shadows the earlier registration. Install the host tokenizer
+  **before** `build()` — `build()` skips auto-registration for categories
+  already present in the registry, so the host's resolver takes precedence.
+
+### Host parity (TOK-02)
+
+The built-in auto-named pkey tokenizer is implemented using the same
+`install_tree_tokenizer` path (D-07 dogfooding), which proves host parity:
+a host-defined resolver for `${server.name}` is equivalent in power and
+behavior to the built-in one.
+
+See [`examples/pkey_tokenizer.cpp`](../examples/pkey_tokenizer.cpp) for a
+live side-by-side comparison and
+[`tests/pkey_tokenizer_test.cpp`](../tests/pkey_tokenizer_test.cpp) for the
+full acceptance suite (TOK-01, TOK-02, D-03, D-04, D-05).
 
 ---
 

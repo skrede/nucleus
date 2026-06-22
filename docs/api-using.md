@@ -11,6 +11,7 @@ back. None of these requires subclassing. For the seams a host extends, see
 - [Declaring a schema: `schema_element`, `anchor`, free factories](#schema)
 - [Typed fields: `typed_element<T>`, `register_converter`](#typed)
 - [Keying model: primary key, uniqueness, strains](#keying)
+- [Tree references and pkey shortcuts](#tree-references)
 - [`config_space` — the sealed space](#space)
 - [Composing sources: `source_stack`](#stack)
 - [`load_config()` and `load_options`](#load)
@@ -316,6 +317,98 @@ if(!builder.register_element(
 ```
 
 See [`examples/strains.cpp`](../examples/strains.cpp).
+
+---
+
+<a id="tree-references"></a>
+## Tree references and pkey shortcuts
+
+Values may embed `${...}` tokens that are resolved at load time by pass-2 after
+slicing. Three families of token exist:
+
+### `${abs:path}` and `${rel:path}` — absolute and relative references
+
+`${abs:cluster/port}` resolves to the value at the exact keyspace path
+`cluster/port`. `${rel:./sibling}` resolves relative to the containing scope of
+the value (parent path + segment), and `${rel:../other}` walks up one level
+before descending. The `??` operator chains arms left-to-right; the first
+present value wins; a quoted literal is the fallback floor:
+
+```
+app/label = ${abs:cluster/port ?? "8080"}
+server/url = ${rel:./host}:${rel:./port}
+```
+
+See [`examples/tree_references.cpp`](../examples/tree_references.cpp) for live
+demonstrations of `abs:`, `rel:`, `??`, and `${dir.path}`.
+
+### `${node.field}` — auto-named pkey tokenizer
+
+When a schema declares a primary-key element under a container, the engine
+auto-registers a tree-access tokenizer named after the **container's tag**.
+For a schema that declares:
+
+```cpp
+register_element(element("server", anchor::keyspace("cluster")));
+register_element(primary_key_element("name", anchor::keyspace("cluster/server")));
+register_element(element("endpoint", anchor::keyspace("cluster/server")));
+```
+
+the token `${server.name}` resolves to the **selected strain's** `name` field,
+and `${server.endpoint}` resolves to its `endpoint` field. The token is
+pkey-anchored: selecting "primary" does not leak "secondary"'s fields, even
+when both strains exist in the same source.
+
+- **Field surface (D-02):** only the pkey element's own sibling leaves are
+  reachable via `${server.*}`. Deeper subtrees or other containers use
+  `${abs:...}` or `${rel:...}`.
+- **Zero-instance diagnostic (D-03):** if the schema declares the pkey element
+  but no instance is in scope (optional pkey, zero strains selected),
+  `${server.name}` fails with the precise message
+  `"${server.name} requires a selected primary-key instance; this configuration
+  has none in scope"`. The `??` operator catches this and falls through to the
+  next arm.
+- **Reserved-name protection (D-04):** a pkey container whose tag collides with
+  a reserved category name (`env`, `string`, `abs`, `rel`, `scope`, `file`,
+  `dir`, `self`) is rejected at `register_element` time with
+  `errc::rejected_registration`. Rename the schema element.
+- **Host shadowing (D-05):** a host that calls `install_tree_tokenizer` with the
+  same category name before `build()` shadows the built-in auto-named tokenizer
+  for that category (last-registration-wins). See
+  [Tree-access tokenizers](api-extending.md#tree-tokenizers) for the host API.
+
+```cpp
+// The token in the source value:
+//   cluster/server/primary/description = "${server.name} at ${server.endpoint}"
+// After load with selection="primary":
+//   cfg.get("cluster/server/description") == "primary at 10.0.0.1:9000"
+```
+
+See [`examples/pkey_tokenizer.cpp`](../examples/pkey_tokenizer.cpp).
+
+### Multiplicity and path model (D-08)
+
+**Templating via anonymous-instance inheritance.** A config element that
+carries no primary-key value is a template: it composes into all named
+instances in document order. Named instances inherit the template's fields and
+may override specific ones.
+
+**`inherit=` specialization.** A derived XML document marks a named instance
+with `extend` to re-open it across the inheritance chain; without `extend`, a
+duplicate named instance is a layering violation.
+
+**`<include>` composition.** Explicit composition of multiple config fragments
+into one document is deferred (planned as SEED-006). Use the inheritance chain
+(`document_paths` + `make_document`) for multi-file loading today.
+
+**File-relative paths via `${dir.path}`.** Each document in an inheritance
+chain resolves `${dir.path}` to its own file's directory, so a base document
+and a derived document each resolve to their own location. This is the safe
+pattern for composing relative filesystem paths (e.g.
+`${dir.path}/certs/ca.pem`). The per-source binding is demonstrated in
+[`examples/tree_references.cpp`](../examples/tree_references.cpp) (see the
+`dir.path` note) and proved per-file in
+[`tests/location_token_wiring_test.cpp`](../tests/location_token_wiring_test.cpp).
 
 ---
 
