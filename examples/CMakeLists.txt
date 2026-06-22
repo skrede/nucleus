@@ -31,6 +31,7 @@ nucleus_add_example(argv_delimiter nucleus::argv)
 
 # Tokens, logging, completion, diagnostics, and the registration-policy seam.
 nucleus_add_example(tokens nucleus::env)
+nucleus_add_example(time_tokenizer nucleus::env)
 nucleus_add_example(logging nucleus::argv)
 nucleus_add_example(completion)
 nucleus_add_example(diagnostics)

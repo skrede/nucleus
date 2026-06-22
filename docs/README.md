@@ -11,6 +11,7 @@ documents the parts nucleus ships that satisfy those seams.
 | [Seams you extend](api-extending.md) | The concepts a host makes a type satisfy and the policies it composes: the `config_source` concept and its optional affordances, capability descriptors and gating, inheritance, custom tokenizers and converters, `registration_policy`, `log_sink`, discovery. |
 | [Shipped implementations](api-implementations.md) | The concrete modules nucleus ships that satisfy the seams: `xml_source`, `env_source`, `argv_source`, `runtime_source`, the per-format emitters, and the `log_sink` adapters — with the capability descriptor and CMake target of each. |
 | [Query / Selector API](query-selector-api.md) | Programmatic fluent query surface: `query_context()`, `query(anchor, ctx)`, structural/kind/schema-role selectors, `one()` loud semantics, owner-token and strain selectors, combinators, and the lifetime contract. |
+| [Named tokenizer arguments](named-tokenizer-arguments.md) | The named & typed tokenizer-function argument surface: the `name=value` grammar, `[ ]` list values and lexical quoting, declaring typed arguments (`arg_spec`) and reading them (`named_args`), and the did-you-mean / typed coercion diagnostics. |
 
 The [`examples/`](../examples) directory holds a small, self-contained program per
 concept; each reference section points at the matching example.
