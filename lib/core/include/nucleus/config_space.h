@@ -9,6 +9,8 @@
 #include "nucleus/config.h"
 #include "nucleus/registration_policy.h"
 
+#include "nucleus/query/schema_query_context.h"
+
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/cli_flag.h"
 
@@ -207,6 +209,10 @@ public:
     // The declared schema elements, the neutral data a format emitter projects into
     // a template. A pure read of the sealed schema; the registry stays encapsulated.
     std::span<const schema_element> schema_elements() const;
+
+    // Builds a transient schema_query_context for use with query(). Borrows this
+    // config_space; the returned context must not outlive this space.
+    schema_query_context query_context() const;
 
     // Returns a NEW builder pre-populated with a DEEP COPY of this sealed space's
     // three registries + policy + claim/conflict ledger. Base and derived are fully

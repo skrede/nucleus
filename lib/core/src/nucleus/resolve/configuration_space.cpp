@@ -1,6 +1,7 @@
 #include "nucleus/error.h"
 #include "nucleus/format.h"
 #include "nucleus/config_space.h"
+#include "nucleus/query/schema_query_context.h"
 #include "nucleus/registration_policy.h"
 
 #include "nucleus/completion/completion_generator.h"
@@ -447,6 +448,21 @@ std::span<const schema_element> config_space::schema_elements() const
     // Project the sealed schema's declared elements as a read-only view; the
     // registry stays encapsulated and no format knowledge enters core.
     return m_impl->schema.elements();
+}
+
+schema_query_context config_space::query_context() const
+{
+    // Build the transient owner index from the claim ledger: for each schema
+    // element, the first claimant's token is the canonical owner for that path.
+    std::map<std::string, owner_token, std::less<>> owner_map;
+    for(const schema_element &el : m_impl->schema.elements())
+    {
+        const std::string dp = el.declared_path().str();
+        auto it = m_impl->m_claims.find(dp);
+        if(it != m_impl->m_claims.end() && !it->second.empty())
+            owner_map.emplace(dp, it->second[0].owner);
+    }
+    return schema_query_context{m_impl->schema.elements(), std::move(owner_map)};
 }
 
 config_space_builder config_space::expand() const
