@@ -307,8 +307,9 @@ follow_keyref(const config_node &keyref_leaf, const schema_query_context &ctx)
     config_node root = keyref_leaf;
     while(!root.path().empty())
         root = root.parent();
+    const key_path container_path = ns->container();
     config_node container = root;
-    for(const std::string &seg : ns->container().segments())
+    for(const std::string &seg : container_path.segments())
         container = container[seg];
 
     // The target is the member instance whose identifier field equals the value.
