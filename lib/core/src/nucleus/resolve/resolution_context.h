@@ -148,6 +148,35 @@ public:
         const std::set<std::string> repeated_container_prefixes =
             m_schema.repeated_container_paths();
 
+        // Keyed-composition setup (Phase 28): for every repeated element declaring a
+        // non-default merge mode, find the identity-group field that keys it. A keyed
+        // mode with no covering identity group has no merge key -- a loud error.
+        for(const schema_element &el : m_schema.elements())
+        {
+            if(!el.repeated || el.merge == merge_mode::wholesale_replace)
+                continue;
+            const std::string cpath = el.declared_path().str();
+            std::string field;
+            for(const identity_group_spec &g : m_schema.identity_groups())
+            {
+                const std::string parent = g.container().str();
+                for(const std::string &m : g.members)
+                {
+                    const std::string mp = parent.empty()
+                        ? m : parent + key_path::separator + m;
+                    if(mp == cpath) { field = g.field; break; }
+                }
+                if(!field.empty())
+                    break;
+            }
+            if(field.empty())
+                return unexpected(error{errc::schema_violation, nucleus::format(
+                    "repeated element '{}' declares a keyed merge mode but no identity "
+                    "group provides its merge key", cpath)});
+            m_keyed_modes[cpath] = el.merge;
+            m_keyed_fields[cpath] = field;
+        }
+
         // Deferred D-11 checks: CLI plain-ordinal overrides deferred until after
         // all layers fold so the document layer is present in m_building regardless
         // of its rank relative to the argv layer.
@@ -193,6 +222,10 @@ public:
             // sweep done in this layer.
             std::set<std::string> swept_containers_this_layer;
 
+            // Per-layer ordinal counter for diverted keyed entries arriving flat
+            // (non-indexed) under a keyed-merge container. Keyed by actual container path.
+            std::map<std::string, std::size_t> keyed_flat_counter;
+
             for(keyspace_entry &entry : batch.entries)
             {
                 token_result expanded = lh->origin_file
@@ -219,6 +252,57 @@ public:
                             return true;
                     return false;
                 }();
+
+                // Keyed-composition divert (Phase 28): if this entry sits under a
+                // keyed-merge container, accumulate it (by identity-group key, merged
+                // post-fold) instead of storing it now -- the wholesale sweep is
+                // bypassed for these containers. The container is matched on the ACTUAL
+                // path (key segments still present pre-slice) by canonicalizing each
+                // prefix; the merge rebuilds at the actual path and slice() strips keys.
+                if(!m_keyed_modes.empty())
+                {
+                    const std::vector<std::string> &segs = path.segments();
+                    bool diverted = false;
+                    for(std::size_t len = 1; len <= segs.size() && !diverted; ++len)
+                    {
+                        std::string prefix;
+                        for(std::size_t i = 0; i < len; ++i)
+                            prefix = prefix.empty() ? segs[i]
+                                : prefix + key_path::separator + segs[i];
+                        auto prefix_kp = key_path::parse(prefix);
+                        if(!prefix_kp)
+                            continue;
+                        const std::string canon = m_schema.canonical_text(*prefix_kp);
+                        auto mode_it = m_keyed_modes.find(canon);
+                        if(mode_it == m_keyed_modes.end())
+                            continue;
+                        // segs[len-1] is the container-level segment (e.g. "output[0]").
+                        const std::string &cseg = segs[len - 1];
+                        std::string actual_container;
+                        for(std::size_t i = 0; i + 1 < len; ++i)
+                            actual_container = actual_container.empty() ? segs[i]
+                                : actual_container + key_path::separator + segs[i];
+                        actual_container = actual_container.empty()
+                            ? std::string(key_path::base_name(cseg))
+                            : actual_container + key_path::separator
+                                + std::string(key_path::base_name(cseg));
+                        const std::size_t ordinal = key_path::is_indexed_segment(cseg)
+                            ? key_path::ordinal_of(cseg)
+                            : keyed_flat_counter[actual_container]++;
+                        std::string suffix;
+                        for(std::size_t i = len; i < segs.size(); ++i)
+                            suffix = suffix.empty() ? segs[i]
+                                : suffix + key_path::separator + segs[i];
+                        m_actual_to_canonical[actual_container] = canon;
+                        m_keyed_accumulator[actual_container].push_back(keyed_instance_entry{
+                            lh->rank, ordinal, std::move(suffix),
+                            std::move(expanded).value(),
+                            origin{lh->rank, lh->label, lh->owner, lh->inheritance_layer}});
+                        diverted = true;
+                    }
+                    if(diverted)
+                        continue;
+                }
 
                 // Detect a CLI plain-ordinal path (D-09): a digit-only segment
                 // following a repeated container prefix is an ordinal index from
@@ -458,6 +542,120 @@ public:
             }
         }
 
+        return {};
+    }
+
+    // Pass between fold() and slice(): applies the per-collection merge mode to the
+    // diverted keyed collections (Phase 28). union/replace_by_key combine layers by the
+    // identity-group key VALUE (never by ordinal), then re-index survivors to contiguous
+    // ordinals in a stable order (defining-layer rank, then source ordinal), carrying
+    // provenance through every move. wholesale_replace never enters here (it stays on the
+    // fold's sweep path). Runs before slice() so the merge sees all layers and the key is
+    // still present; slice() later strips the transient strain-key segments.
+    expected<void, resolve_fold_error> merge_keyed_collections()
+    {
+        for(auto &[actual_container, entries] : m_keyed_accumulator)
+        {
+            const std::string &canon = m_actual_to_canonical.at(actual_container);
+            const merge_mode mode = m_keyed_modes.at(canon);
+            const std::string &field = m_keyed_fields.at(canon);
+
+            struct merged_instance
+            {
+                std::size_t rank = 0;
+                std::size_t ordinal = 0;
+                std::string key;
+                bool        has_key = false;
+                origin      prov;
+                std::vector<keyed_instance_entry *> leaves;
+            };
+            std::map<std::pair<std::size_t, std::size_t>, merged_instance> grouped;
+            for(keyed_instance_entry &e : entries)
+            {
+                merged_instance &mi = grouped[{e.source_rank, e.source_ordinal}];
+                mi.rank = e.source_rank;
+                mi.ordinal = e.source_ordinal;
+                mi.leaves.push_back(&e);
+                if(e.suffix == field)
+                {
+                    mi.key = e.value;
+                    mi.has_key = true;
+                    mi.prov = e.prov;
+                }
+            }
+
+            std::vector<merged_instance *> instances;
+            for(auto &[k, mi] : grouped)
+                instances.push_back(&mi);
+            std::sort(instances.begin(), instances.end(),
+                      [](const merged_instance *a, const merged_instance *b) {
+                          return a->rank != b->rank ? a->rank < b->rank
+                                                    : a->ordinal < b->ordinal;
+                      });
+
+            for(const merged_instance *mi : instances)
+                if(!mi->has_key)
+                    return unexpected(error{errc::schema_violation, nucleus::format(
+                        "keyed collection '{}' has an instance with no '{}' identifier; "
+                        "the keyed merge modes require the merge key on every element",
+                        canon, field)});
+
+            std::vector<merged_instance *> survivors;
+            if(mode == merge_mode::unite)
+            {
+                std::map<std::string, merged_instance *> by_key;
+                for(merged_instance *mi : instances)
+                {
+                    auto it = by_key.find(mi->key);
+                    if(it != by_key.end() && it->second->rank != mi->rank)
+                        return unexpected(error{errc::layering_violation, nucleus::format(
+                            "keyed collection '{}': identifier '{}'='{}' is introduced at "
+                            "two layers ('{}' and '{}'); unite is strict-additive "
+                            "(no override across layers)",
+                            canon, field, mi->key, it->second->prov.layer, mi->prov.layer)});
+                    by_key.emplace(mi->key, mi);
+                    survivors.push_back(mi);
+                }
+            }
+            else // replace_by_key: highest-rank instance per key wins
+            {
+                std::map<std::string, std::size_t> winner;
+                for(merged_instance *mi : instances)
+                {
+                    auto it = winner.find(mi->key);
+                    if(it == winner.end())
+                    {
+                        winner[mi->key] = survivors.size();
+                        survivors.push_back(mi);
+                    }
+                    else
+                        survivors[it->second] = mi;
+                }
+                std::sort(survivors.begin(), survivors.end(),
+                          [](const merged_instance *a, const merged_instance *b) {
+                              return a->rank != b->rank ? a->rank < b->rank
+                                                        : a->ordinal < b->ordinal;
+                          });
+            }
+
+            std::size_t new_ordinal = 0;
+            for(const merged_instance *mi : survivors)
+            {
+                const std::string base =
+                    actual_container + "[" + std::to_string(new_ordinal) + "]";
+                for(const keyed_instance_entry *leaf : mi->leaves)
+                {
+                    const std::string new_path = leaf->suffix.empty()
+                        ? base : base + key_path::separator + leaf->suffix;
+                    auto kp = key_path::parse(new_path);
+                    if(!kp)
+                        continue;
+                    m_building.set(kp.value(), value::owned(leaf->value));
+                    m_provenance.record(new_path, leaf->prov);
+                }
+                ++new_ordinal;
+            }
+        }
         return {};
     }
 
@@ -1267,6 +1465,25 @@ private:
     // Consumed by slice() to enforce cross-layer re-open rules and drive
     // the relay_strain wide_extend bypass.
     std::vector<extend_disposition> m_dispositions;
+
+    // Keyed-composition state (Phase 28). One leaf of a diverted keyed-collection
+    // instance, retained between fold() and merge_keyed_collections().
+    struct keyed_instance_entry
+    {
+        std::size_t source_rank;
+        std::size_t source_ordinal;
+        std::string suffix;
+        std::string value;
+        origin      prov;
+    };
+    // Canonical container path -> non-default merge mode and merge-key field (from the
+    // schema + its identity groups), built in fold(); read by merge_keyed_collections().
+    std::map<std::string, merge_mode> m_keyed_modes;
+    std::map<std::string, std::string> m_keyed_fields;
+    // ACTUAL container path (key segments still present pre-slice) -> diverted leaves,
+    // and its canonical form (to look up mode/field).
+    std::map<std::string, std::vector<keyed_instance_entry>> m_keyed_accumulator;
+    std::map<std::string, std::string> m_actual_to_canonical;
 };
 
 }

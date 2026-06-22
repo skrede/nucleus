@@ -544,6 +544,8 @@ load_result load_config(const config_space &space,
                            state.tree_tokenizer);
     if(auto folded = ctx.fold(handles); !folded)
         return unexpected(std::move(folded).error());
+    if(auto merged = ctx.merge_keyed_collections(); !merged)
+        return unexpected(std::move(merged).error());
     if(auto sliced = ctx.slice(options.selection, options.scope); !sliced)
         return unexpected(std::move(sliced).error());
     ctx.set_reference_budget(options.reference_budget);
