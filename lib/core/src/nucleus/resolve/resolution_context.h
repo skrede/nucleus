@@ -780,7 +780,8 @@ public:
                 }
             }
 
-            relay_strain(strains.at(chosen), policy, Ld, Ls, wide_extend);
+            if(auto r = relay_strain(strains.at(chosen), policy, Ld, Ls, wide_extend); !r)
+                return r;
 
             // The strain's key value named the instance and was consumed; the
             // enforcer's identity-presence check is satisfied structurally.
@@ -929,10 +930,13 @@ private:
     // being relayed, the entire repeated collection from the keyed source is
     // displaced (not just the individual slot). This ensures a flat override at
     // higher rank replaces the whole collection, not just [0].
-    void relay_strain(const std::vector<key_path> &keyed_paths,
-                      strain_scope_policy policy, std::size_t Ld, std::size_t Ls,
-                      bool wide_extend = false)
+    expected<void, resolve_fold_error>
+    relay_strain(const std::vector<key_path> &keyed_paths,
+                 strain_scope_policy policy, std::size_t Ld, std::size_t Ls,
+                 bool wide_extend = false)
     {
+        const schema_projection proj = m_schema.projection();
+
         // Canonical bases of repeated paths that are fully displaced by a
         // higher-rank flat override. Populated on first relay attempt per base.
         std::set<std::string> displaced_bases;
@@ -1015,7 +1019,26 @@ private:
             // Check if the unified path is already occupied by a higher-rank value.
             const origin *at = m_provenance.of(unified_str);
             const bool displaced = at != nullptr && at->rank > entry_rank;
-            if(!displaced)
+            if(displaced)
+            {
+                // D-01: a pkey leaf is authoritative and read-only. If the unified
+                // path IS the pkey leaf of its parent container and a higher-rank flat
+                // entry occupies it, that is a loud layering error, not a silent skip.
+                const auto slash = unified_str.rfind('/');
+                if(slash != std::string::npos)
+                {
+                    const std::string_view parent = std::string_view(unified_str).substr(0, slash);
+                    const std::string_view leaf   = std::string_view(unified_str).substr(slash + 1);
+                    const std::string *pkey = proj.key_of(parent);
+                    if(pkey != nullptr && *pkey == leaf)
+                        return unexpected(error{errc::layering_violation,
+                            nucleus::format(
+                                "identity field '{}' is read-only; "
+                                "source at rank {} cannot override it",
+                                unified_str, at->rank)});
+                }
+            }
+            else
             {
                 m_building.set(unified.value(), *v);
                 if(from != nullptr)
@@ -1024,6 +1047,7 @@ private:
             m_building.remove(keyed);
             m_provenance.forget(keyed.str());
         }
+        return {};
     }
 
     // Computes the unified relay path for a keyed+possibly-indexed path:
