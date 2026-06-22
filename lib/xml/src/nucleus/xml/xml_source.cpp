@@ -282,6 +282,13 @@ walk(const pugi::xml_node &node, std::string_view path,
                                 ext_val, child.name())});
                 }
 
+                // Emit the pkey field as an ordinary leaf so it survives slice.
+                // The recursive walk will still suppress it via skip, but
+                // this entry is already recorded before suppression fires.
+                batch.entries.push_back(make_entry(
+                    join(join(child_path, key_val), *key),
+                    value::view(key_val), caps));
+
                 if(auto r = walk(child, join(child_path, key_val), caps, proj,
                                  batch, *key, seen_keys, ordinal_counters,
                                  false, depth + 1); !r)
