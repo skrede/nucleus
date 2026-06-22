@@ -1,5 +1,6 @@
 # Build trees and IDE state
 **/build/
+Testing/
 **/build-*/
 cmake-build-*/
 .idea/
