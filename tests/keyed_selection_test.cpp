@@ -74,8 +74,8 @@ TEST_CASE("a selection resolves the matching strain and prunes others",
     // Only the web strain survives; its entries live at the declared paths.
     REQUIRE(config.get("cluster/server/port") == "80");
 
-    // The key field is consumed -- not a leaf.
-    REQUIRE_FALSE(config.contains("cluster/server/name"));
+    // Phase 22: the key field is retained as a readable leaf, not consumed.
+    REQUIRE(config.get("cluster/server/name") == "web");
     // Transient key segments do not appear as path segments.
     REQUIRE_FALSE(config.contains("cluster/server/web/port"));
     REQUIRE_FALSE(config.contains("cluster/server/db/port"));

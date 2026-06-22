@@ -169,6 +169,17 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     )
     add_test(NAME keyed_selection_test COMMAND keyed_selection_test)
 
+    # Phase 22: IDN-01/02/03 + D-01 + D-02 acceptance suite for pkey-identity-as-data.
+    add_executable(pkey_identity_test pkey_identity_test.cpp)
+    nucleus_enable_coverage(pkey_identity_test)
+    nucleus_warnings(pkey_identity_test)
+    target_link_libraries(pkey_identity_test
+        PRIVATE nucleus::nucleus nucleus::xml nucleus::runtime Catch2::Catch2WithMain)
+    target_include_directories(pkey_identity_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/lib/core/src
+    )
+    add_test(NAME pkey_identity_test COMMAND pkey_identity_test)
+
     add_executable(inherit_chain_test inherit_chain_test.cpp)
     nucleus_enable_coverage(inherit_chain_test)
     nucleus_warnings(inherit_chain_test)

@@ -1,4 +1,5 @@
 cluster/server/logger/log_level = info [path:cluster.xml]
+cluster/server/name = primary [path:cluster.xml]
 cluster/server/profile/message/description = one XML lists every server; each binary picks its block via --server-name [path:cluster.xml]
 cluster/server/profile/message/greeting = hello from primary (single_topology layout) [path:cluster.xml]
 cluster/server/profile/name = demo [path:cluster.xml]

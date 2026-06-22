@@ -45,6 +45,7 @@ void declare_cluster(nucleus::config_space_builder &engine)
         nucleus::element("protocol", anchor::keyspace("cluster/server"))));
 }
 
+
 // Loads `doc` as the sole document layer against `space`, with an optional strain
 // selection.
 nucleus::load_result load_doc(const nucleus::config_space &space, const char *doc,
@@ -80,8 +81,8 @@ TEST_CASE("a single named strain resolves onto the unified hierarchy",
     REQUIRE(config.get("cluster/server/port") == "80");
     REQUIRE_FALSE(config.contains("cluster/server/web/port"));
 
-    // The key field is consumed outright -- not a leaf either.
-    REQUIRE_FALSE(config.contains("cluster/server/name"));
+    // Phase 22: the key field is retained as a readable leaf, not consumed.
+    REQUIRE(config.get("cluster/server/name") == "web");
 }
 
 TEST_CASE("several named strains with no selection fail loudly",
@@ -124,7 +125,8 @@ TEST_CASE("a key carried as a text-leaf child is consumed the same way",
     const nucleus::config &config = loaded.value();
 
     REQUIRE(config.get("cluster/server/port") == "80");
-    REQUIRE_FALSE(config.contains("cluster/server/name"));
+    // Phase 22: the text-leaf-form pkey is also retained as a readable leaf.
+    REQUIRE(config.get("cluster/server/name") == "web");
     REQUIRE_FALSE(config.contains("cluster/server/web/port"));
 }
 

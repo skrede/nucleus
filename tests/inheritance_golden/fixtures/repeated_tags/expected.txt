@@ -1,4 +1,5 @@
 cluster/server/logger/log_level = info [path:cluster.xml]
+cluster/server/name = primary [path:cluster.xml]
 cluster/server/profile/message/description = a repeated leaf carries all its values through selection [path:cluster.xml]
 cluster/server/profile/message/greeting = hello from primary (repeated_tags layout) [path:cluster.xml]
 cluster/server/profile/name = demo [path:cluster.xml]
