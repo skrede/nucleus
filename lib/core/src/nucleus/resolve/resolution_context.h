@@ -42,6 +42,11 @@ namespace nucleus {
 // resolution failure, surfaced verbatim with the offending layer named.
 using resolve_fold_error = error;
 
+// Maximum total reference substitutions across one pass-2 resolve. Stops billion-laughs amplification.
+inline constexpr std::size_t default_reference_budget = 10000;
+// Maximum cross-leaf reference chain depth. Per-value nesting cap (16) stays in expansion_guard.h.
+inline constexpr std::size_t default_reference_depth_cap = 64;
+
 // The transient hand-off vehicle and the convergence keystone. It BORROWS (holds
 // references to) the flat sibling registries it actually consults during a
 // resolve; it does not own them and lives only for the duration of one
@@ -919,6 +924,13 @@ public:
         return config(std::move(owned), m_typed, m_provenance);
     }
 
+    // Sets the pass-2 reference substitution budget. 0 maps to the engine default (never zero-cap).
+    void set_reference_budget(std::size_t budget) noexcept
+    {
+        if(budget != 0)
+            m_reference_budget = budget;
+    }
+
 private:
     // Re-lays one strain's keyed entries onto the unified (key-stripped) paths.
     // All repeated-path entries are indexed scalars; no collection branch needed.
@@ -1091,6 +1103,8 @@ private:
     const schema_registry &m_schema;
     const tokenizer_registry &m_tokenizer;
     const converter_registry &m_converters;
+
+    std::size_t m_reference_budget = default_reference_budget;
 
     keyspace m_building;
     provenance m_provenance;

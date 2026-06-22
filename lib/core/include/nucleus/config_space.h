@@ -71,6 +71,8 @@ struct load_options
     inherit_policy                                      inherit;
     std::vector<std::string>                            document_paths;
     std::function<source_handle(const std::string &)>   make_document;
+    // Maximum tree-reference substitutions in one pass-2 resolve. 0 = engine default (10000).
+    std::size_t                                         reference_budget = 0;
 };
 
 // The mutable, free-standing builder: sole owner of the three flat sibling
