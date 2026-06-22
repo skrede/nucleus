@@ -21,7 +21,8 @@ enum class resolve_errc
     arg_count_mismatch,
     out_of_scope_context,
     cyclic_reference,
-    depth_exceeded
+    depth_exceeded,
+    budget_exceeded
 };
 
 // A resolution error: a machine-branchable code plus a human-readable message.
@@ -52,6 +53,7 @@ inline const char *to_string(resolve_errc code) noexcept
     case resolve_errc::out_of_scope_context: return "out_of_scope_context";
     case resolve_errc::cyclic_reference: return "cyclic_reference";
     case resolve_errc::depth_exceeded: return "depth_exceeded";
+    case resolve_errc::budget_exceeded: return "budget_exceeded";
     }
     return "unknown";
 }

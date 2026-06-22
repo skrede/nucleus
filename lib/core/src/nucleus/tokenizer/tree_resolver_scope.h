@@ -1,0 +1,55 @@
+#ifndef HPP_GUARD_NUCLEUS_TOKENIZER_TREE_RESOLVER_SCOPE_H
+#define HPP_GUARD_NUCLEUS_TOKENIZER_TREE_RESOLVER_SCOPE_H
+
+#include "nucleus/expected.h"
+
+#include "nucleus/keyspace/key_path.h"
+#include "nucleus/keyspace/keyspace.h"
+
+#include "nucleus/tokenizer/expansion_guard.h"
+#include "nucleus/tokenizer/resolve_error.h"
+#include "nucleus/tokenizer/token_lexer.h"
+
+#include "nucleus/tokenizer/tokenizer.h"
+
+#include <string>
+#include <string_view>
+
+namespace nucleus {
+
+// Pass-2 resolver for tree-access tokens (${abs:...} and ${rel:...}) in a
+// single value string. Constructed transiently per leaf during resolve_references();
+// borrows (never stores) the building keyspace, the cross-leaf cycle guard, and
+// the shared substitution counter. Flat-registry purity: no stored cross-registry
+// member; tree_resolver_scope lives only for the duration of one leaf resolution.
+class tree_resolver_scope
+{
+public:
+    tree_resolver_scope(const keyspace &building,
+                        key_path current_path,
+                        expansion_guard &leaf_guard,
+                        std::size_t &substitution_counter,
+                        std::size_t budget) noexcept;
+
+    // Resolves all ${abs:} and ${rel:} tokens in value_text, splicing resolved
+    // strings in place. Returns the fully-resolved string on success.
+    token_result resolve_value(std::string_view value_text);
+
+    // Resolves one fallback arm (the text between '??' separators, already trimmed).
+    token_result resolve_one_arm(std::string_view arm);
+
+private:
+    token_result resolve_absolute(std::string_view path_body);
+    token_result resolve_relative(std::string_view rel_body);
+    key_path     resolve_relative_path(std::string_view rel_body);
+
+    const keyspace &m_building;
+    key_path        m_current_path;
+    expansion_guard &m_leaf_guard;
+    std::size_t    &m_substitution_counter;
+    std::size_t     m_budget;
+};
+
+}
+
+#endif

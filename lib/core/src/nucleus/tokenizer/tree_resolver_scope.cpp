@@ -1,0 +1,249 @@
+#include "nucleus/tokenizer/tree_resolver_scope.h"
+
+#include "nucleus/format.h"
+
+#include <string>
+#include <utility>
+#include <cstddef>
+#include <string_view>
+
+namespace nucleus {
+
+tree_resolver_scope::tree_resolver_scope(const keyspace &building,
+                                         key_path current_path,
+                                         expansion_guard &leaf_guard,
+                                         std::size_t &substitution_counter,
+                                         std::size_t budget) noexcept
+    : m_building(building)
+    , m_current_path(std::move(current_path))
+    , m_leaf_guard(leaf_guard)
+    , m_substitution_counter(substitution_counter)
+    , m_budget(budget)
+{
+}
+
+// Scans value_text for ${...} tokens and splices each resolved value in place.
+// Nested ${} depths are tracked so braces inside a token body are not mistaken
+// for the closing brace of the outer token.
+token_result tree_resolver_scope::resolve_value(std::string_view value_text)
+{
+    if(value_text.find("${") == std::string_view::npos)
+        return std::string(value_text);
+
+    std::string result;
+    result.reserve(value_text.size());
+
+    std::size_t pos = 0;
+    while(pos < value_text.size())
+    {
+        auto open = value_text.find("${", pos);
+        if(open == std::string_view::npos)
+        {
+            result.append(value_text.substr(pos));
+            break;
+        }
+
+        // Literal text before the token.
+        result.append(value_text.substr(pos, open - pos));
+
+        // Find matching closing brace, tracking nested ${} depth.
+        std::size_t depth = 1;
+        std::size_t i = open + 2;
+        while(i < value_text.size() && depth > 0)
+        {
+            if(value_text[i] == '$' && i + 1 < value_text.size()
+               && value_text[i + 1] == '{')
+            {
+                ++depth;
+                i += 2;
+            }
+            else if(value_text[i] == '}')
+            {
+                --depth;
+                ++i;
+            }
+            else
+                ++i;
+        }
+        if(depth != 0)
+            return unexpected(resolve_error(resolve_errc::parse_error,
+                                      "unterminated ${ in value"));
+
+        // The full token body (between ${ and the matching }).
+        const std::string_view token_body = value_text.substr(open + 2, i - open - 3);
+        pos = i;
+
+        // Split on top-level '??' to get fallback arms.
+        std::vector<std::string_view> arms = split_fallback_arms(token_body);
+
+        token_result last = unexpected(resolve_error(
+            resolve_errc::missing_field, "all fallback arms absent"));
+        bool succeeded = false;
+        for(std::string_view arm : arms)
+        {
+            auto r = resolve_one_arm(arm);
+            if(r)
+            {
+                result += std::move(r).value();
+                succeeded = true;
+                break;
+            }
+            // Propagate hard errors immediately — only missing_field triggers fallthrough.
+            if(r.error().code != resolve_errc::missing_field)
+                return r;
+            last = std::move(r);
+        }
+        if(!succeeded)
+            return last;
+    }
+
+    return result;
+}
+
+// Resolves one fallback arm. An arm is either an abs:/rel: tree token or a
+// literal string (floor value). Unknown categories return missing_field so the
+// ?? chain can fall through to the next arm.
+token_result tree_resolver_scope::resolve_one_arm(std::string_view arm)
+{
+    // A bare literal arm (no ${...}) is returned as-is (string floor).
+    // Detect by checking whether the arm starts with the token head pattern.
+    // After split_fallback_arms, arms are trimmed token bodies without the
+    // outer ${ }. We need to detect if this arm is itself a scheme ref or a
+    // literal. In the token body context, an abs:/rel: arm is a plain path
+    // (no ${ wrapper); a literal arm contains none of abs:/rel: as prefix.
+    //
+    // Trimmed arm forms:
+    //   abs:cluster/port         -> tree abs reference
+    //   rel:../sibling           -> tree rel reference
+    //   "default"                -> quoted literal (strip quotes)
+    //   default                  -> unquoted literal
+    //
+    // For quoted literals: strip surrounding double-quotes.
+    auto stripped = arm;
+
+    // Check for colon-scheme heads (abs: / rel:).
+    auto colon = stripped.find(':');
+    if(colon != std::string_view::npos && colon > 0)
+    {
+        auto scheme = stripped.substr(0, colon);
+        if(scheme == "abs")
+            return resolve_absolute(stripped.substr(colon + 1));
+        if(scheme == "rel")
+            return resolve_relative(stripped.substr(colon + 1));
+    }
+
+    // Treat as a literal floor value (strip surrounding quotes if present).
+    if(stripped.size() >= 2 && stripped.front() == '"' && stripped.back() == '"')
+        return std::string(stripped.substr(1, stripped.size() - 2));
+
+    // An unrecognized token body that is neither a known scheme nor a literal:
+    // return missing_field so ?? can fall through.
+    if(stripped.empty())
+        return unexpected(resolve_error(resolve_errc::missing_field,
+                                  "empty fallback arm"));
+
+    // Unquoted literal string floor.
+    return std::string(stripped);
+}
+
+token_result tree_resolver_scope::resolve_absolute(std::string_view path_body)
+{
+    auto kp = key_path::parse(path_body);
+    if(!kp)
+        return unexpected(resolve_error(resolve_errc::parse_error,
+                              nucleus::format("invalid abs: path '{}': {}", path_body, kp.error())));
+
+    ++m_substitution_counter;
+    if(m_substitution_counter > m_budget)
+        return unexpected(resolve_error(resolve_errc::budget_exceeded,
+                              nucleus::format("reference substitution budget ({}) exceeded", m_budget)));
+
+    const value *v = m_building.find(kp.value());
+    if(v == nullptr)
+        return unexpected(resolve_error(resolve_errc::missing_field,
+                              nucleus::format("absent reference target '{}'", path_body)));
+
+    return std::string(v->text());
+}
+
+token_result tree_resolver_scope::resolve_relative(std::string_view rel_body)
+{
+    key_path target = resolve_relative_path(rel_body);
+    if(target.empty() && !rel_body.empty())
+    {
+        // resolve_relative_path signals a walk-above-root by returning empty path
+        // when rel_body is non-empty and all segments were consumed upward.
+        // A truly-empty rel_body is rejected below via parse of the starting base.
+    }
+
+    ++m_substitution_counter;
+    if(m_substitution_counter > m_budget)
+        return unexpected(resolve_error(resolve_errc::budget_exceeded,
+                              nucleus::format("reference substitution budget ({}) exceeded", m_budget)));
+
+    const value *v = m_building.find(target);
+    if(v == nullptr)
+        return unexpected(resolve_error(resolve_errc::missing_field,
+                              nucleus::format("absent relative reference target '{}'",
+                                             target.str())));
+
+    return std::string(v->text());
+}
+
+// Computes the target key_path for a rel: body, applying '..' (parent) and
+// '.' (current-scope, no-op) segments. The starting base is the parent of
+// m_current_path (the containing scope of the leaf being resolved).
+// rel:./x from "cluster/server/port" -> starts at "cluster/server", descends "x"
+//          => "cluster/server/x"
+// rel:../x from "cluster/server/port" -> starts at "cluster/server" (parent of leaf),
+//          then ".." => "cluster", then "x" => "cluster/x"
+key_path tree_resolver_scope::resolve_relative_path(std::string_view rel_body)
+{
+    // Base: the containing scope (parent of the current leaf).
+    key_path base = m_current_path.parent();
+
+    // Manual segment split on '/' (no views::split per GCC 11 floor).
+    std::string_view remaining = rel_body;
+    while(!remaining.empty())
+    {
+        std::string_view seg;
+        auto slash = remaining.find('/');
+        if(slash == std::string_view::npos)
+        {
+            seg = remaining;
+            remaining = std::string_view{};
+        }
+        else
+        {
+            seg = remaining.substr(0, slash);
+            remaining = remaining.substr(slash + 1);
+        }
+
+        if(seg == "..")
+        {
+            // Walk upward. If already at root, error.
+            if(base.empty())
+            {
+                // Signal above-root by returning a sentinel: empty path with
+                // remaining segments still to process is an error; return a
+                // non-error empty path and let the caller detect absence.
+                // Actually, we return empty here and resolve_relative handles it
+                // via a missing lookup (the path "" would not match any leaf).
+                return key_path{};
+            }
+            base = base.parent();
+        }
+        else if(seg == ".")
+        {
+            // Current scope — no movement.
+        }
+        else if(!seg.empty())
+        {
+            base = base.child(std::string(seg));
+        }
+    }
+
+    return base;
+}
+
+}

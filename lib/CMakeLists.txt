@@ -79,6 +79,7 @@ nucleus_add_module(core
         core/src/nucleus/tokenizer/token_lexer.cpp
         core/src/nucleus/tokenizer/scope_keys.cpp
         core/src/nucleus/tokenizer/resolver_scope.cpp
+        core/src/nucleus/tokenizer/tree_resolver_scope.cpp
         core/src/nucleus/tokenizer/builtin_tokenizers.cpp
         core/src/nucleus/completion/completion.cpp)
 
