@@ -17,6 +17,23 @@
 
 namespace nucleus {
 
+// How a repeated/identified collection combines across config layers. The mode
+// changes only the COMBINE OP within the existing source-stack precedence order; it
+// never changes layer ordering. unite and replace_by_key require an identity group
+// (its field is the merge key). None of the modes field-merge -- a resolved element
+// is always wholly from one layer -- so deep field-patch (modify_by_key) is deferred.
+enum class merge_mode
+{
+    // Default: a higher layer's collection replaces the lower wholesale.
+    wholesale_replace,
+    // The union / strict-additive mode: layers union; a duplicate identifier across
+    // layers is a loud error (additions only, never an accidental override).
+    unite,
+    // Layers union; a matching identifier replaces that whole element with the higher
+    // layer's version (never a per-field merge).
+    replace_by_key,
+};
+
 // One declared element of a schema: a named node under an anchor. The set of
 // elements is the single upstream authority dictating both the document structure
 // and the CLI surface (both are projections of the same elements). Its constraints
@@ -43,6 +60,10 @@ struct schema_element
     // Collection mode: N sibling instances each occupy a distinct ordinal slot.
     // Legal on any element -- leaf (scalar instances) or container (structured instances).
     bool repeated = false;
+
+    // Cross-layer combination mode for a repeated/identified collection. The default
+    // replaces wholesale; unite/replace_by_key key on an identity group's field.
+    merge_mode merge = merge_mode::wholesale_replace;
 
     // The closed set of values this element accepts, if it is constrained. An
     // empty vector (the default) means unconstrained -- any value is admissible.
@@ -135,6 +156,15 @@ inline schema_element repeated_element(std::string name, anchor at)
 {
     schema_element e = element(std::move(name), std::move(at));
     e.repeated = true;
+    return e;
+}
+
+// Sets the cross-layer combination mode on a repeated element. unite/replace_by_key
+// require an identity group whose field is the merge key. Reads as
+// merging(repeated_element("output", at), merge_mode::unite).
+inline schema_element merging(schema_element e, merge_mode mode)
+{
+    e.merge = mode;
     return e;
 }
 
