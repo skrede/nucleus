@@ -10,6 +10,8 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/projection.h"
+#include "nucleus/schema/constraint_group.h"
+#include "nucleus/schema/identity_group.h"
 
 #include "nucleus/keyspace/key_path.h"
 
@@ -169,6 +171,87 @@ public:
     const std::vector<schema_element> &elements() const noexcept
     {
         return m_elements;
+    }
+
+    // --- container-scoped constraint groups (Phase 27) ------------------------
+
+    // Attaches an exclusion/choice constraint group, enforcing referential
+    // integrity: the anchor container must be an already-defined node, and every
+    // member (and bundle member) must be a declared element under it. A group
+    // carrying a Tier-3 validator skips the member checks (the valve reads the
+    // resolved container directly). An empty member set with no validator is loud.
+    schema_attach_result attach_constraint_group(constraint_group group)
+    {
+        const key_path container = group.container();
+        if(!container.empty() && !is_defined_node(container))
+            return unexpected(nucleus::format(
+                "constraint group '{}' cannot anchor under undefined keyspace '{}'",
+                group.name, container.str()));
+
+        if(!group.validator)
+        {
+            if(group.members.empty())
+                return unexpected(nucleus::format(
+                    "constraint group '{}' declares no members", group.name));
+            for(const group_member &m : group.members)
+            {
+                const std::vector<std::string> names =
+                    m.bundle.empty() ? std::vector<std::string>{m.name} : m.bundle;
+                for(const std::string &n : names)
+                {
+                    const std::string member_path = container.empty()
+                        ? n : container.str() + key_path::separator + n;
+                    if(!is_defined_text(member_path))
+                        return unexpected(nucleus::format(
+                            "constraint group '{}' member '{}' is not a declared "
+                            "element under '{}'",
+                            group.name, n, container.str()));
+                }
+            }
+        }
+
+        m_constraint_groups.push_back(std::move(group));
+        return {};
+    }
+
+    // Attaches an identity (key) group, enforcing referential integrity: the parent
+    // container must be defined and every member element-type must declare the
+    // identifier field. A namespace pooling no members or no field is loud.
+    schema_attach_result attach_identity_group(identity_group_spec group)
+    {
+        const key_path container = group.container();
+        if(!container.empty() && !is_defined_node(container))
+            return unexpected(nucleus::format(
+                "identity group '{}' cannot anchor under undefined keyspace '{}'",
+                group.name, container.str()));
+        if(group.members.empty())
+            return unexpected(nucleus::format(
+                "identity group '{}' declares no members", group.name));
+        if(group.field.empty())
+            return unexpected(nucleus::format(
+                "identity group '{}' declares no identifier field", group.name));
+        for(const std::string &m : group.members)
+        {
+            const std::string field_path = container.str() + key_path::separator
+                + m + key_path::separator + group.field;
+            if(!is_defined_text(field_path))
+                return unexpected(nucleus::format(
+                    "identity group '{}' member '{}' has no declared identifier "
+                    "field '{}'",
+                    group.name, m, group.field));
+        }
+        m_identity_groups.push_back(std::move(group));
+        return {};
+    }
+
+    const std::vector<constraint_group> &constraint_groups() const noexcept
+    {
+        return m_constraint_groups;
+    }
+
+    const std::vector<identity_group_spec> &identity_groups() const noexcept
+    {
+        return m_identity_groups;
     }
 
     // The projection a source consults to render repeatable keyed containers: for
@@ -403,6 +486,8 @@ private:
 
     std::vector<registration<schema_spec>> m_entries;
     std::vector<schema_element> m_elements;
+    std::vector<constraint_group> m_constraint_groups;
+    std::vector<identity_group_spec> m_identity_groups;
     std::set<std::string> m_defined;
 };
 

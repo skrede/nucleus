@@ -307,6 +307,36 @@ registration_result config_space_builder::register_element(schema_element elemen
     return registration_ok();
 }
 
+registration_result config_space_builder::register_constraint_group(constraint_group group,
+                                                                     owner_token owner)
+{
+    if(auto guard = reject_if_built(m_impl->built, "register_constraint_group"); !guard)
+        return guard;
+    if(auto verdict = m_impl->review(registration_kind::schema, owner); !verdict)
+        return verdict;
+    if(auto attached = m_impl->schema.attach_constraint_group(std::move(group)); !attached)
+        return unexpected(error{errc::rejected_registration, std::move(attached).error()});
+    return registration_ok();
+}
+
+registration_result config_space_builder::register_identity_group(identity_group_spec group,
+                                                                  owner_token owner)
+{
+    if(auto guard = reject_if_built(m_impl->built, "register_identity_group"); !guard)
+        return guard;
+    if(auto verdict = m_impl->review(registration_kind::schema, owner); !verdict)
+        return verdict;
+    // Reserved-prefix carve-out: a namespace name colliding with a builtin (a
+    // reserved tree-tokenizer category or the engine's own 'nucleus' prefix) is
+    // rejected so host identifiers can never shadow a builtin.
+    if(is_reserved_tree_tokenizer_name(group.name) || group.name.rfind("nucleus", 0) == 0)
+        return unexpected(error{errc::rejected_registration, nucleus::format(
+            "identity group namespace '{}' collides with a reserved name", group.name)});
+    if(auto attached = m_impl->schema.attach_identity_group(std::move(group)); !attached)
+        return unexpected(error{errc::rejected_registration, std::move(attached).error()});
+    return registration_ok();
+}
+
 registration_result config_space_builder::register_tokenizer(std::string name, owner_token owner)
 {
     if(auto guard = reject_if_built(m_impl->built, "register_tokenizer"); !guard)

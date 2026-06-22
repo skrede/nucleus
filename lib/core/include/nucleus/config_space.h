@@ -13,6 +13,8 @@
 
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/cli_flag.h"
+#include "nucleus/schema/constraint_group.h"
+#include "nucleus/schema/identity_group.h"
 
 #include "nucleus/config_source/feature_gate.h"
 #include "nucleus/config_source/source_stack.h"
@@ -110,6 +112,18 @@ public:
     // validates the resolved keyspace against these elements and enforces
     // referential integrity at attach time. Same state-machine/policy seam as above.
     registration_result register_element(schema_element element, owner_token owner = {});
+
+    // Registers a container-scoped exclusion/choice constraint group (cardinality
+    // over the active members of one container instance, or a Tier-3 host validator).
+    // Enforced on the resolved/sliced tree by load_config; a violation is loud.
+    // Same state-machine/policy seam as register_element.
+    registration_result register_constraint_group(constraint_group group, owner_token owner = {});
+
+    // Registers an identity (key) group: a namespace pooling one identifier field
+    // across the instances of several member element-types under a parent container,
+    // required present and unique within a slice. The identifier is a handle (the
+    // keyed-composition merge key and the keyref target), never a slice selector.
+    registration_result register_identity_group(identity_group_spec group, owner_token owner = {});
 
     registration_result register_tokenizer(std::string name, owner_token owner = {});
 
