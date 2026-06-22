@@ -3,6 +3,7 @@
 
 #include "nucleus/config.h"
 #include "nucleus/config_space.h"
+#include "nucleus/schema/projection.h"
 
 #include <iosfwd>
 #include <string>
@@ -23,13 +24,22 @@ void emit_template(const config_space &space, std::ostream &out,
                    std::string_view space_name = {});
 void emit_document(const config &config, std::ostream &out,
                    std::string_view space_name = {});
+// Schema-aware overload: when proj is non-empty, pkey leaves are rendered as XML
+// attributes on their parent container element rather than as child text nodes,
+// preventing the double-write that would corrupt a load→emit→load round-trip.
+void emit_document(const config &config, std::ostream &out,
+                   const schema_projection &proj,
+                   std::string_view space_name = {});
 
 // The stateful emitter modeling nucleus::config_emitter: its members forward to the
 // free functions above, so the xml module satisfies the output contract by type as
 // well as by call surface. space_name is forwarded for named-space round-trips.
+// proj carries optional schema-projection for pkey-attribute rendering; default-
+// constructed (empty) proj produces schema-blind behavior identical to the old path.
 struct emitter
 {
     std::string space_name;
+    schema_projection proj;
 
     void emit_template(const config_space &space, std::ostream &out) const
     {
@@ -37,7 +47,7 @@ struct emitter
     }
     void emit_document(const config &config, std::ostream &out) const
     {
-        nucleus::xml::emit_document(config, out, space_name);
+        nucleus::xml::emit_document(config, out, proj, space_name);
     }
 };
 
