@@ -1020,8 +1020,9 @@ private:
         const std::string_view text = v->text();
 
         // Nothing to resolve for this leaf (no tree-access tokens).
-        if(text.find("${abs:") == std::string_view::npos
-           && text.find("${rel:") == std::string_view::npos)
+        // After pass-1 fold, any remaining ${ is a tree-access token (abs:, rel:,
+        // or a registered tree-tokenizer category) that pass-1 left verbatim.
+        if(text.find("${") == std::string_view::npos)
         {
             resolved_cache[path_str] = std::string(text);
             return {};

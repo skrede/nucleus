@@ -104,14 +104,16 @@ token_result tree_resolver_scope::resolve_value(std::string_view value_text)
     return result;
 }
 
-// Resolves one fallback arm. An arm is either an abs:/rel: tree token or a
-// literal string (floor value). Unknown categories return missing_field so the
-// ?? chain can fall through to the next arm.
+// Resolves one fallback arm. An arm is either an abs:/rel: tree token, a
+// category-named tree-tokenizer dispatch (${category.field}), or a literal
+// string (floor value). An unrecognised category returns unknown_category so
+// the ?? chain does NOT silently swallow typos (pitfall 5).
 token_result tree_resolver_scope::resolve_one_arm(std::string_view arm)
 {
     // Trimmed arm forms (after split_fallback_arms removes surrounding whitespace):
     //   abs:cluster/port         -> tree abs reference
     //   rel:../sibling           -> tree rel reference
+    //   category.field           -> tree-tokenizer dispatch (no colon scheme)
     //   "default"                -> quoted literal (strip quotes)
     //   default                  -> unquoted literal
     auto stripped = arm;
@@ -125,6 +127,41 @@ token_result tree_resolver_scope::resolve_one_arm(std::string_view arm)
             return resolve_absolute(stripped.substr(colon + 1));
         if(scheme == "rel")
             return resolve_relative(stripped.substr(colon + 1));
+    }
+
+    // Category-named dispatch: no colon scheme, but body contains a dot.
+    // lex_token parses the full ${...} form, so reconstruct the token for it.
+    {
+        auto dot = stripped.find('.');
+        if(dot != std::string_view::npos && dot > 0)
+        {
+            std::string as_token = "${";
+            as_token.append(stripped);
+            as_token += '}';
+            auto lexed = lex_token(as_token);
+            if(lexed)
+            {
+                const std::string_view category = lexed.value().category;
+                const std::string_view field    = lexed.value().name;
+                if(m_tree_tokenizer == nullptr
+                   || m_tree_tokenizer->find(category) == nullptr)
+                {
+                    return unexpected(resolve_error(resolve_errc::unknown_category,
+                        nucleus::format("unknown tree tokenizer category '{}'",
+                                        category)));
+                }
+
+                ++m_substitution_counter;
+                if(m_substitution_counter > m_budget)
+                    return unexpected(resolve_error(resolve_errc::budget_exceeded,
+                        nucleus::format("reference substitution budget ({}) exceeded",
+                                        m_budget)));
+
+                const tree_tokenizer *tok = m_tree_tokenizer->find(category);
+                tree_access access{m_building, m_current_path, category, field};
+                return tok->resolve(access);
+            }
+        }
     }
 
     // Treat as a literal floor value (strip surrounding quotes if present).
