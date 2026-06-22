@@ -65,10 +65,9 @@ int main()
     for(const std::string &key : config.keys())
         std::cout << key << " = " << config.get(key).value() << '\n';
 
-    // The primary-key value "primary" is stripped from the resolved keyspace.
-    // The path cluster/server/primary/port never exists after resolve.
-    if(!config.contains("cluster/server/primary/port"))
-        std::cout << "cluster/server/primary/port is absent (key segment stripped)\n";
+    // The selected strain's key value is retained as a readable leaf.
+    if(const auto name = config.get("cluster/server/name"))
+        std::cout << "cluster/server/name = " << *name << '\n';
 
     return 0;
 }

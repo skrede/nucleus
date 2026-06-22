@@ -56,6 +56,11 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     target_link_libraries(strains PRIVATE nucleus::nucleus nucleus::xml)
     nucleus_warnings(strains)
 
+    # Phase 22: pkey-identity-as-data demonstration (retain pkey leaf + round-trip fixpoint).
+    add_executable(pkey_identity pkey_identity.cpp)
+    target_link_libraries(pkey_identity PRIVATE nucleus::nucleus nucleus::xml)
+    nucleus_warnings(pkey_identity)
+
     add_executable(typed typed.cpp)
     target_link_libraries(typed PRIVATE nucleus::nucleus nucleus::xml)
     nucleus_warnings(typed)
