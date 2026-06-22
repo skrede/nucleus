@@ -35,6 +35,7 @@
 #include <utility>
 #include <optional>
 #include <algorithm>
+#include <filesystem>
 #include <typeindex>
 #include <unordered_map>
 
@@ -101,7 +102,9 @@ public:
         std::size_t    rank;
         std::string    label;
         owner_token    owner;
-        std::optional<std::size_t> inheritance_layer;
+        std::optional<std::size_t>          inheritance_layer;
+        // Set for document sources (derives from entries[i].path); absent for stack/argv/env sources.
+        std::optional<std::filesystem::path> origin_file;
     };
 
     // Fold overload that consumes a sequence of layered_handle descriptors.

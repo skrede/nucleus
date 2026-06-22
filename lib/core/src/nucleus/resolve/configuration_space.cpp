@@ -27,6 +27,7 @@
 #include <vector>
 #include <utility>
 #include <optional>
+#include <filesystem>
 #include <string_view>
 
 namespace nucleus {
@@ -166,14 +167,16 @@ assemble_handles(const space_core &state,
     // its inheritance-chain layer ordinal equal to its chain index.
     for(std::size_t i = 0; i < entries.size(); ++i)
         handles.push_back({&entries[i].src, i,
-                           nucleus::format("path:{}", entries[i].path), {}, i});
+                           nucleus::format("path:{}", entries[i].path), {}, i,
+                           std::filesystem::path(entries[i].path)});
 
     // Stack handles sit ABOVE the whole chain: rank = chain size + stack index.
     // Their label keeps the bare stack index so provenance reads stack[N].
     const std::size_t base_offset = entries.size();
     for(std::size_t i = 0; i < layers.size(); ++i)
         handles.push_back({&layers[i], base_offset + i,
-                           nucleus::format("stack[{}]", i), {}, std::nullopt});
+                           nucleus::format("stack[{}]", i), {}, std::nullopt,
+                           std::nullopt});
 
     return handles;
 }
