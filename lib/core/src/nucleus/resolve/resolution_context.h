@@ -189,7 +189,9 @@ public:
 
             for(keyspace_entry &entry : batch.entries)
             {
-                token_result expanded = resolve_tokens(entry.value.text(), m_tokenizer);
+                token_result expanded = lh->origin_file
+                    ? resolve_tokens(entry.value.text(), m_tokenizer, *lh->origin_file)
+                    : resolve_tokens(entry.value.text(), m_tokenizer);
                 if(!expanded)
                     return unexpected(error{errc::unresolved_token, nucleus::format(
                         "source '{}': token resolution failed for key '{}': {}",
