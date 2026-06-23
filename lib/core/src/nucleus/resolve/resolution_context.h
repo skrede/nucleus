@@ -148,7 +148,7 @@ public:
         const std::set<std::string> repeated_container_prefixes =
             m_schema.repeated_container_paths();
 
-        // Keyed-composition setup (Phase 28): for every repeated element declaring a
+        // Keyed-composition setup: for every repeated element declaring a
         // non-default merge mode, find the identity-group field that keys it. A keyed
         // mode with no covering identity group has no merge key -- a loud error.
         for(const schema_element &el : m_schema.elements())
@@ -177,7 +177,7 @@ public:
             m_keyed_fields[cpath] = field;
         }
 
-        // Deferred D-11 checks: CLI plain-ordinal overrides deferred until after
+        // Deferred checks: CLI plain-ordinal overrides deferred until after
         // all layers fold so the document layer is present in m_building regardless
         // of its rank relative to the argv layer.
         struct pending_cli_ordinal
@@ -201,7 +201,7 @@ public:
 
             config_source_batch &batch = pulled.value();
 
-            // D-19: extend= targeting a repeated container is not supported.
+            // Extend= targeting a repeated container is not supported.
             for(const extend_disposition &d : batch.dispositions)
             {
                 if(repeated_container_prefixes.count(d.container_path))
@@ -253,7 +253,7 @@ public:
                     return false;
                 }();
 
-                // Keyed-composition divert (Phase 28): if this entry sits under a
+                // Keyed-composition divert: if this entry sits under a
                 // keyed-merge container, accumulate it (by identity-group key, merged
                 // post-fold) instead of storing it now -- the wholesale sweep is
                 // bypassed for these containers. The container is matched on the ACTUAL
@@ -304,10 +304,10 @@ public:
                         continue;
                 }
 
-                // Detect a CLI plain-ordinal path (D-09): a digit-only segment
+                // Detect a CLI plain-ordinal path: a digit-only segment
                 // following a repeated container prefix is an ordinal index from
                 // "--cluster-node-0-endpoint-port=90" -> "cluster/node/0/endpoint/port".
-                // Re-bracket to "cluster/node[0]/endpoint/port" and enforce D-11
+                // Re-bracket to "cluster/node[0]/endpoint/port" and enforce
                 // (override-only: ordinal must be < existing instance count).
                 const auto plain_ordinal_rebracketed = [&]()
                     -> expected<std::optional<key_path>, resolve_fold_error>
@@ -346,7 +346,7 @@ public:
                         auto kp = key_path::parse(rebracketed_str);
                         if(!kp)
                             return unexpected(error{errc::malformed_source, std::move(kp).error()});
-                        // Defer storage and D-11 check until all layers are folded
+                        // Defer storage and check until all layers are folded
                         // so the document source is in m_building regardless of rank.
                         deferred_cli_overrides.push_back(
                             {ordinal, prefix, std::move(kp).value(),
@@ -368,11 +368,11 @@ public:
                     && plain_ordinal_rebracketed.value().value().empty();
 
                 if(cli_deferred_this_entry)
-                    continue; // storage and D-11 check deferred to post-fold pass
+                    continue; // storage and the ordinal-range check deferred to post-fold pass
 
                 if(plain_ordinal_rebracketed.value().has_value())
                 {
-                    // Case C: CLI plain-ordinal override (D-09/D-11). The path has
+                    // Case C: CLI plain-ordinal override. The path has
                     // been re-bracketed; store directly without wholesale-replace so
                     // only this specific instance is overridden (rank-precedence wins).
                     const key_path &rebracketed_path = plain_ordinal_rebracketed.value().value();
@@ -404,7 +404,7 @@ public:
                     if(!container_prefix.empty()
                        && !swept_containers_this_layer.count(container_prefix))
                     {
-                        // D-06 wholesale-replace: on first entry from a new layer
+                        //  wholesale-replace: on first entry from a new layer
                         // touching this container, remove all existing entries.
                         swept_containers_this_layer.insert(container_prefix);
                         const std::string cp_slash =
@@ -506,7 +506,7 @@ public:
             m_buffers.push_back(std::move(batch.buffer));
         }
 
-        // D-11 post-fold: validate and store all deferred CLI plain-ordinal overrides
+        //  post-fold: validate and store all deferred CLI plain-ordinal overrides
         // now that all document layers are present in m_building.
         for(pending_cli_ordinal &override : deferred_cli_overrides)
         {
@@ -546,7 +546,7 @@ public:
     }
 
     // Pass between fold() and slice(): applies the per-collection merge mode to the
-    // diverted keyed collections (Phase 28). union/replace_by_key combine layers by the
+    // diverted keyed collections. union/replace_by_key combine layers by the
     // identity-group key VALUE (never by ordinal), then re-index survivors to contiguous
     // ordinals in a stable order (defining-layer rank, then source ordinal), carrying
     // provenance through every move. wholesale_replace never enters here (it stays on the
@@ -1015,13 +1015,13 @@ public:
     // Pass-2 tree-reference resolution: runs after slice() and before validate().
     // Resolves all ${abs:} and ${rel:} tokens in the sliced keyspace, writing back
     // the resolved strings to the same paths. Enforces:
-    //   - Value-only invariant (D-06): a key segment containing "${" is a loud error.
-    //   - Cross-leaf cycle detection via expansion_guard (D-08).
-    //   - Substitution-count budget (D-09): budget_exceeded stops billion-laughs.
+    //   - Value-only invariant: a key segment containing "${" is a loud error.
+    //   - Cross-leaf cycle detection via expansion_guard.
+    //   - Substitution-count budget: budget_exceeded stops billion-laughs.
     //   - ?? chaining: missing_field falls through; all other errors propagate.
     expected<void, resolve_fold_error> resolve_references()
     {
-        // Value-only invariant scan (D-06): path segments must not contain "${".
+        // Value-only invariant scan: path segments must not contain "${".
         // The tree shape is frozen by slice(); references may only appear in values.
         for(const key_path &kp : m_building.paths())
         {
@@ -1079,7 +1079,7 @@ public:
                                                               m_keyed_satisfied);
 
         // Container-scoped constraint + identity groups enforce over the resolved,
-        // sliced tree -- run on a transient config snapshot so the Tier-3 valve and
+        // sliced tree -- run on a transient config snapshot so the host-validator valve and
         // member navigation use the real config_node walk. Skipped when no group is
         // declared (the common case pays nothing).
         std::vector<schema_violation> group_violations;
@@ -1387,7 +1387,7 @@ private:
             const bool displaced = !keyed_merge && at != nullptr && at->rank > entry_rank;
             if(displaced)
             {
-                // D-01: a pkey leaf is authoritative and read-only. If the unified
+                // A pkey leaf is authoritative and read-only. If the unified
                 // path IS the pkey leaf of its parent container and a higher-rank flat
                 // entry occupies it, that is a loud layering error, not a silent skip.
                 const auto slash = unified_str.rfind('/');
@@ -1491,7 +1491,7 @@ private:
     // the relay_strain wide_extend bypass.
     std::vector<extend_disposition> m_dispositions;
 
-    // Keyed-composition state (Phase 28). One leaf of a diverted keyed-collection
+    // Keyed-composition state. One leaf of a diverted keyed-collection
     // instance, retained between fold() and merge_keyed_collections().
     struct keyed_instance_entry
     {

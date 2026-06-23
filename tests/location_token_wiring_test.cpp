@@ -11,7 +11,7 @@
 #include <filesystem>
 #include <string>
 
-// LOC-01 acceptance test.
+// Acceptance test.
 // Two XML files in DIFFERENT directories each use ${dir.path}. After load each
 // value must resolve to that file's OWN directory, not the entrypoint directory.
 // This proves per-source file-frame binding (the assemble_handles origin_file wiring).
@@ -37,7 +37,7 @@ void write_file(const fs::path &path, const std::string &content)
 
 }
 
-TEST_CASE("LOC-01: two files in different directories resolve ${dir.path} to their own directory",
+TEST_CASE("Two files in different directories resolve ${dir.path} to their own directory",
           "[location][loc-01][xml]")
 {
     // Set up two temp directories under the system temp root.

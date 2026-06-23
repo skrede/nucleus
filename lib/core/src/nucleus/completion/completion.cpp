@@ -65,7 +65,7 @@ std::string wildcard_flag(const key_path &effective,
 // is deterministically ordered, so the model -- and every generated script -- is
 // reproducible. Each path becomes its canonical flag via the same flag_of() the
 // argv surface uses, so completion and the real CLI share one mapping.
-// For paths that cross a repeated container (D-12), an additional wildcard entry
+// For paths that cross a repeated container, an additional wildcard entry
 // is emitted with '*' at the container ordinal position.
 // When space_name is non-empty, it is prepended as the leading segment before
 // applying flag_of(), so the completion entries match the multispace_argv_source grammar.
@@ -98,7 +98,7 @@ completion_model project(const schema_registry &schema,
             opt.values = it->second;
         model.options.push_back(std::move(opt));
 
-        // D-12: emit an additional wildcard entry when the path crosses a repeated
+        // Emit an additional wildcard entry when the path crosses a repeated
         // container. Walk the full (pre-anchor) path to find the crossing container.
         std::string prefix;
         for(std::size_t depth = 1; depth < path.size(); ++depth)

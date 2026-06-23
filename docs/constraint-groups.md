@@ -58,7 +58,7 @@ builder.register_constraint_group(
         .exactly(1));
 ```
 
-### Tier-3 valve — `validate_group`
+### Host-validator valve — `validate_group`
 
 For the rare rule cardinality cannot express, a host validator runs over each resolved
 container instance. There is deliberately **no** predicate/boolean-constraint grammar —
@@ -104,6 +104,6 @@ builder.register_identity_group(
 ## What is out of scope
 
 - A predicate / boolean-constraint grammar (the Helm/Terraform conditional-soup
-  anti-feature). The Tier-3 valve covers the rare case.
+  anti-feature). The host-validator valve covers the rare case.
 - Per-member `field` override on an identity group (the field name is uniform across the
   member set; per-member override is a later extension).

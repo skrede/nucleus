@@ -616,7 +616,7 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
         auto loaded = resolve_one(engine, std::move(src));
         REQUIRE(loaded);
 
-        // D-21: unindexed path crossing a repeated container returns index_required,
+        // Unindexed path crossing a repeated container returns index_required,
         // not absent_key. Use get_all_as() to gather all instances, or get_as() with
         // an explicit index (e.g. "cfg/nums[0]") for a single instance.
         auto r_plain = loaded.value().get_as<int32_t>("cfg/nums");

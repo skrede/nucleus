@@ -128,7 +128,7 @@ public:
                 "uniqueness requires a single comparable value, not a collection",
                 el.name));
 
-        // D-10: element names must not start with a digit so CLI flag text is
+        // Element names must not start with a digit so CLI flag text is
         // unambiguously invertible back to a schema path (numeric leading chars
         // would collide with ordinal index notation in the CLI bijection).
         if(!el.name.empty()
@@ -140,7 +140,7 @@ public:
                 el.name));
         }
 
-        // D-18: a primary key under ANY repeated ancestor is ambiguous —
+        // A primary key under ANY repeated ancestor is ambiguous —
         // each ordinal instance would need its own selector, which v1 does not
         // support. Walk the full ancestor chain of the container; reject at
         // attach if any ancestor is a declared repeated element.
@@ -189,12 +189,12 @@ public:
         return m_elements;
     }
 
-    // --- container-scoped constraint groups (Phase 27) ------------------------
+    // --- container-scoped constraint groups -----------------------------------
 
     // Attaches an exclusion/choice constraint group, enforcing referential
     // integrity: the anchor container must be an already-defined node, and every
     // member (and bundle member) must be a declared element under it. A group
-    // carrying a Tier-3 validator skips the member checks (the valve reads the
+    // carrying a host validator skips the member checks (the valve reads the
     // resolved container directly). An empty member set with no validator is loud.
     schema_attach_result attach_constraint_group(constraint_group group)
     {
@@ -296,7 +296,7 @@ public:
         return m_defined.find(path.str()) != m_defined.end();
     }
 
-    // Recognizes a CLI plain-ordinal path (D-09): a path where a digit-only
+    // Recognizes a CLI plain-ordinal path: a path where a digit-only
     // segment following a repeated container prefix stands for an ordinal index.
     // "--cluster-node-0-endpoint-port=90" maps to "cluster/node/0/endpoint/port";
     // that is recognized here as equivalent to "cluster/node/endpoint/port".

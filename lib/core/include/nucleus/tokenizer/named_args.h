@@ -112,7 +112,7 @@ public:
     double real(std::string_view name) const noexcept;
     bool boolean(std::string_view name) const noexcept;
 
-    // List-of-string: the ARG-02 vector<string> contract. as_list() exposes the
+    // List-of-string: the vector<string> contract. as_list() exposes the
     // raw coerced elements for a typed (non-string) list.
     std::vector<std::string> strings(std::string_view name) const;
     const std::vector<arg_scalar> &as_list(std::string_view name) const;

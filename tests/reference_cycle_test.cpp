@@ -7,7 +7,7 @@
 
 #include <string>
 
-// REF-04 / REF-05 acceptance tests.
+// Acceptance tests.
 // Cross-leaf cycle detection (expansion_guard with leaf-path labels) and the
 // substitution-count budget (budget_exceeded stops billion-laughs amplification).
 
@@ -17,7 +17,7 @@ using nucleus::load_options;
 using nucleus::runtime_source;
 using nucleus::source_stack;
 
-TEST_CASE("cross-leaf cycle A->B->A is detected with the full FQN chain (REF-04)",
+TEST_CASE("cross-leaf cycle A->B->A is detected with the full FQN chain",
           "[reference][cycle]")
 {
     auto space = config_space_builder{}.build();
@@ -35,7 +35,7 @@ TEST_CASE("cross-leaf cycle A->B->A is detected with the full FQN chain (REF-04)
     CHECK(msg.find("graph/b") != std::string::npos);
 }
 
-TEST_CASE("self-referential leaf is detected as a cycle (REF-04)", "[reference][cycle]")
+TEST_CASE("self-referential leaf is detected as a cycle", "[reference][cycle]")
 {
     auto space = config_space_builder{}.build();
     runtime_source src;
@@ -46,7 +46,7 @@ TEST_CASE("self-referential leaf is detected as a cycle (REF-04)", "[reference][
     CHECK(loaded.error().message.find("cyclic") != std::string::npos);
 }
 
-TEST_CASE("three-leaf cycle A->B->C->A names all nodes (REF-04)", "[reference][cycle]")
+TEST_CASE("three-leaf cycle A->B->C->A names all nodes", "[reference][cycle]")
 {
     auto space = config_space_builder{}.build();
     runtime_source src;
@@ -60,7 +60,7 @@ TEST_CASE("three-leaf cycle A->B->C->A names all nodes (REF-04)", "[reference][c
     CHECK(msg.find("cyclic") != std::string::npos);
 }
 
-TEST_CASE("substitution budget exceeded stops billion-laughs amplification (REF-05)",
+TEST_CASE("substitution budget exceeded stops billion-laughs amplification",
           "[reference][budget]")
 {
     // Build a ladder: b="${abs:a}${abs:a}", c="${abs:b}${abs:b}", ...
@@ -87,7 +87,7 @@ TEST_CASE("substitution budget exceeded stops billion-laughs amplification (REF-
     CHECK(loaded.error().message.find("budget") != std::string::npos);
 }
 
-TEST_CASE("budget_exceeded does NOT trigger ?? fallthrough (REF-05 / D-05)",
+TEST_CASE("budget_exceeded does NOT trigger ?? fallthrough",
           "[reference][budget][fallback]")
 {
     // Even with a fallback arm, budget_exceeded must propagate, not be swallowed.
@@ -106,7 +106,7 @@ TEST_CASE("budget_exceeded does NOT trigger ?? fallthrough (REF-05 / D-05)",
     CHECK(loaded.error().message.find("budget") != std::string::npos);
 }
 
-TEST_CASE("diamond fan-in resolves without exponential substitution count (REF-05)",
+TEST_CASE("diamond fan-in resolves without exponential substitution count",
           "[reference][budget][diamond]")
 {
     // A -> B, A -> C; both B and C reference D.

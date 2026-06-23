@@ -156,7 +156,7 @@ TEST_CASE("a config space has exactly one primary key", "[schema][unique]")
         nucleus::unique_element("serial", anchor::keyspace(path_of("cluster/server")))));
 }
 
-TEST_CASE("D-10: digit-led element name rejected at attach", "[schema_registry][digit_led]")
+TEST_CASE("digit-led element name rejected at attach", "[schema_registry][digit_led]")
 {
     schema_registry reg;
 
@@ -217,7 +217,7 @@ TEST_CASE("canonical_text strips indexed segments", "[schema_registry][canonical
     }
 }
 
-TEST_CASE("D-18: primary key inside repeated container rejected at attach",
+TEST_CASE("Primary key inside repeated container rejected at attach",
           "[schema_registry][repeated_pkey]")
 {
     schema_registry reg;
@@ -237,7 +237,7 @@ TEST_CASE("D-18: primary key inside repeated container rejected at attach",
         nucleus::element("length", anchor::keyspace(path_of("link")))));
 }
 
-TEST_CASE("D-18: primary key under non-repeated child of repeated container rejected",
+TEST_CASE("Primary key under non-repeated child of repeated container rejected",
           "[schema_registry][repeated_pkey][CR02]")
 {
     // Schema: cluster -> node (repeated) -> details (NOT repeated) -> name (identity)

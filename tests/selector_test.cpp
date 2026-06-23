@@ -13,11 +13,11 @@
 #include <vector>
 #include <algorithm>
 
-// SEL-01: query() entry + each()/collect() + ordinal-stable ordering.
-// SEL-02: structural selectors — children(), descendants(), at_depth(n), under(path).
-// SEL-03: kind selectors — leaves(), containers(), repeated().
-// D-04: collect_as<T>() propagates converter errors.
-// D-05: >=11 ordinal-stable ordering (node[0]..node[10]).
+// query() entry + each()/collect() + ordinal-stable ordering.
+// Structural selectors — children(), descendants(), at_depth(n), under(path).
+// Kind selectors — leaves(), containers(), repeated().
+// collect_as<T>() propagates converter errors.
+// >=11 ordinal-stable ordering (node[0]..node[10]).
 
 using namespace nucleus;
 
@@ -52,10 +52,10 @@ config load_indexed_11()
 }
 
 // -------------------------------------------------------------------------
-// SEL-01: query() entry point + collect() + each()
+// query() entry point + collect() + each()
 // -------------------------------------------------------------------------
 
-TEST_CASE("SEL-01: query() returns a selector that collects all nodes from root", "[selector][SEL-01]")
+TEST_CASE("query() returns a selector that collects all nodes from root", "[selector]")
 {
     const auto cfg = load_simple();
     const auto ctx = config_space_builder{}.build().query_context();
@@ -65,7 +65,7 @@ TEST_CASE("SEL-01: query() returns a selector that collects all nodes from root"
     CHECK(nodes.size() >= 4);
 }
 
-TEST_CASE("SEL-01: each() iterates in pre-order DFS order", "[selector][SEL-01]")
+TEST_CASE("each() iterates in pre-order DFS order", "[selector]")
 {
     const auto cfg = load_simple();
     const auto ctx = config_space_builder{}.build().query_context();
@@ -84,10 +84,10 @@ TEST_CASE("SEL-01: each() iterates in pre-order DFS order", "[selector][SEL-01]"
 }
 
 // -------------------------------------------------------------------------
-// D-05: ordinal-stable ordering — >=11 instances, node[10] after node[2]
+// ordinal-stable ordering — >=11 instances, node[10] after node[2]
 // -------------------------------------------------------------------------
 
-TEST_CASE("D-05: collect() on >=11 repeated instances is ordinal-stable", "[selector][D-05]")
+TEST_CASE("collect() on >=11 repeated instances is ordinal-stable", "[selector]")
 {
     const auto cfg = load_indexed_11();
     const auto ctx = config_space_builder{}.build().query_context();
@@ -114,10 +114,10 @@ TEST_CASE("D-05: collect() on >=11 repeated instances is ordinal-stable", "[sele
 }
 
 // -------------------------------------------------------------------------
-// SEL-02: structural selectors
+// Structural selectors
 // -------------------------------------------------------------------------
 
-TEST_CASE("SEL-02: children() yields direct children only", "[selector][SEL-02]")
+TEST_CASE("children() yields direct children only", "[selector]")
 {
     const auto cfg = load_simple();
     const auto ctx = config_space_builder{}.build().query_context();
@@ -138,7 +138,7 @@ TEST_CASE("SEL-02: children() yields direct children only", "[selector][SEL-02]"
     CHECK(std::find(paths.begin(), paths.end(), "cluster/server/port") == paths.end());
 }
 
-TEST_CASE("SEL-02: descendants() excludes the anchor itself", "[selector][SEL-02]")
+TEST_CASE("descendants() excludes the anchor itself", "[selector]")
 {
     const auto cfg = load_simple();
     const auto ctx = config_space_builder{}.build().query_context();
@@ -150,7 +150,7 @@ TEST_CASE("SEL-02: descendants() excludes the anchor itself", "[selector][SEL-02
         CHECK(n.path() != anchor_path);
 }
 
-TEST_CASE("SEL-02: descendants() includes all transitive descendants", "[selector][SEL-02]")
+TEST_CASE("descendants() includes all transitive descendants", "[selector]")
 {
     const auto cfg = load_simple();
     const auto ctx = config_space_builder{}.build().query_context();
@@ -166,7 +166,7 @@ TEST_CASE("SEL-02: descendants() includes all transitive descendants", "[selecto
     CHECK(std::find(paths.begin(), paths.end(), "cluster/server/name") != paths.end());
 }
 
-TEST_CASE("SEL-02: at_depth(1) matches direct children only", "[selector][SEL-02]")
+TEST_CASE("at_depth(1) matches direct children only", "[selector]")
 {
     const auto cfg = load_simple();
     const auto ctx = config_space_builder{}.build().query_context();
@@ -181,7 +181,7 @@ TEST_CASE("SEL-02: at_depth(1) matches direct children only", "[selector][SEL-02
     CHECK(std::find(paths.begin(), paths.end(), "cluster/server/name") == paths.end());
 }
 
-TEST_CASE("SEL-02: at_depth(2) matches grandchildren only", "[selector][SEL-02]")
+TEST_CASE("at_depth(2) matches grandchildren only", "[selector]")
 {
     const auto cfg = load_simple();
     const auto ctx = config_space_builder{}.build().query_context();
@@ -196,7 +196,7 @@ TEST_CASE("SEL-02: at_depth(2) matches grandchildren only", "[selector][SEL-02]"
     CHECK(std::find(paths.begin(), paths.end(), "cluster/port")        == paths.end());
 }
 
-TEST_CASE("SEL-02: under() restricts to a named subpath subtree", "[selector][SEL-02]")
+TEST_CASE("under() restricts to a named subpath subtree", "[selector]")
 {
     const auto cfg = load_simple();
     const auto ctx = config_space_builder{}.build().query_context();
@@ -213,10 +213,10 @@ TEST_CASE("SEL-02: under() restricts to a named subpath subtree", "[selector][SE
 }
 
 // -------------------------------------------------------------------------
-// SEL-03: kind selectors
+// Kind selectors
 // -------------------------------------------------------------------------
 
-TEST_CASE("SEL-03: leaves() yields only scalar nodes", "[selector][SEL-03]")
+TEST_CASE("leaves() yields only scalar nodes", "[selector]")
 {
     const auto cfg = load_simple();
     const auto ctx = config_space_builder{}.build().query_context();
@@ -233,7 +233,7 @@ TEST_CASE("SEL-03: leaves() yields only scalar nodes", "[selector][SEL-03]")
     CHECK(std::find(paths.begin(), paths.end(), "cluster/server/name") != paths.end());
 }
 
-TEST_CASE("SEL-03: containers() yields only container (non-leaf) nodes", "[selector][SEL-03]")
+TEST_CASE("containers() yields only container (non-leaf) nodes", "[selector]")
 {
     const auto cfg = load_simple();
     const auto ctx = config_space_builder{}.build().query_context();
@@ -249,7 +249,7 @@ TEST_CASE("SEL-03: containers() yields only container (non-leaf) nodes", "[selec
     CHECK(std::find(paths.begin(), paths.end(), "cluster/server") != paths.end());
 }
 
-TEST_CASE("SEL-03: repeated() yields repeated-container nodes", "[selector][SEL-03]")
+TEST_CASE("repeated() yields repeated-container nodes", "[selector]")
 {
     const auto cfg = load_indexed_11();
     const auto ctx = config_space_builder{}.build().query_context();
@@ -262,10 +262,10 @@ TEST_CASE("SEL-03: repeated() yields repeated-container nodes", "[selector][SEL-
 }
 
 // -------------------------------------------------------------------------
-// D-04: collect_as<T>() — typed collection + error propagation
+// collect_as<T>() — typed collection + error propagation
 // -------------------------------------------------------------------------
 
-TEST_CASE("D-04: collect_as<string>() returns all leaf values as strings", "[selector][D-04]")
+TEST_CASE("collect_as<string>() returns all leaf values as strings", "[selector]")
 {
     const auto cfg = load_simple();
     const auto ctx = config_space_builder{}.build().query_context();
@@ -279,7 +279,7 @@ TEST_CASE("D-04: collect_as<string>() returns all leaf values as strings", "[sel
     CHECK(std::find(vec.begin(), vec.end(), "443")  != vec.end());
 }
 
-TEST_CASE("D-04: collect_as<int>() fails on a non-integer leaf", "[selector][D-04]")
+TEST_CASE("collect_as<int>() fails on a non-integer leaf", "[selector]")
 {
     const auto cfg = load_simple();
     const auto ctx = config_space_builder{}.build().query_context();
@@ -296,7 +296,7 @@ TEST_CASE("D-04: collect_as<int>() fails on a non-integer leaf", "[selector][D-0
 // count() and exists() smoke tests
 // -------------------------------------------------------------------------
 
-TEST_CASE("SEL-01: count() returns the number of matching nodes", "[selector][SEL-01]")
+TEST_CASE("count() returns the number of matching nodes", "[selector]")
 {
     const auto cfg = load_simple();
     const auto ctx = config_space_builder{}.build().query_context();
@@ -305,7 +305,7 @@ TEST_CASE("SEL-01: count() returns the number of matching nodes", "[selector][SE
     CHECK(c >= 4); // port, host, server/name, server/port
 }
 
-TEST_CASE("SEL-01: exists() is true when at least one node matches", "[selector][SEL-01]")
+TEST_CASE("exists() is true when at least one node matches", "[selector]")
 {
     const auto cfg = load_simple();
     const auto ctx = config_space_builder{}.build().query_context();

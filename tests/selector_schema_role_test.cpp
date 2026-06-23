@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-// SEL-04: schema-role selectors (role()) — primary key, all leaves, repeated containers.
+// schema-role selectors (role()) — primary key, all leaves, repeated containers.
 // Schema is the authority; zero-instance repeated containers are still classified
 // as repeated_container even when no config keys exist for them.
 
@@ -57,8 +57,8 @@ bool path_in(const std::vector<config_node> &nodes, std::string_view p)
 // role(primary_key): exactly the declared identity element
 // -------------------------------------------------------------------------
 
-TEST_CASE("SEL-04: role(primary_key) matches the declared identity leaf",
-          "[selector][SEL-04]")
+TEST_CASE("role(primary_key) matches the declared identity leaf",
+          "[selector]")
 {
     const auto space = build_server_space();
     const auto ctx   = space.query_context();
@@ -72,8 +72,8 @@ TEST_CASE("SEL-04: role(primary_key) matches the declared identity leaf",
         CHECK(n.path().find("name") != std::string::npos);
 }
 
-TEST_CASE("SEL-04: role(primary_key) does not match non-identity leaves",
-          "[selector][SEL-04]")
+TEST_CASE("role(primary_key) does not match non-identity leaves",
+          "[selector]")
 {
     const auto space = build_server_space();
     const auto ctx   = space.query_context();
@@ -86,11 +86,11 @@ TEST_CASE("SEL-04: role(primary_key) does not match non-identity leaves",
 }
 
 // -------------------------------------------------------------------------
-// role(leaf): all declared leaf elements, including the retained pkey leaf (D-10)
+// role(leaf): all declared leaf elements, including the retained pkey leaf
 // -------------------------------------------------------------------------
 
-TEST_CASE("SEL-04: role(leaf) includes the retained pkey leaf (D-10)",
-          "[selector][SEL-04]")
+TEST_CASE("role(leaf) includes the retained pkey leaf",
+          "[selector]")
 {
     const auto space = build_server_space();
     const auto ctx   = space.query_context();
@@ -98,7 +98,7 @@ TEST_CASE("SEL-04: role(leaf) includes the retained pkey leaf (D-10)",
 
     // role(leaf) matches elements declared as leaves; pkey (identity) leaf is
     // classified as primary_key, not leaf, in the role index.
-    // D-10 says leaf-enumerating selectors include pkey leaf; use leaves() for that.
+    // Says leaf-enumerating selectors include pkey leaf; use leaves() for that.
     // Here we verify that role(primary_key) and role(leaf) together cover all leaves.
     auto pkey_nodes = query(cfg.root(), ctx).role(node_role::primary_key).collect();
     auto leaf_nodes = query(cfg.root(), ctx).role(node_role::leaf).collect();
@@ -116,8 +116,8 @@ TEST_CASE("SEL-04: role(leaf) includes the retained pkey leaf (D-10)",
 // role(repeated_container): schema authority at zero-instance boundary
 // -------------------------------------------------------------------------
 
-TEST_CASE("SEL-04: role(repeated_container) classifies by schema, not tree structure",
-          "[selector][SEL-04]")
+TEST_CASE("role(repeated_container) classifies by schema, not tree structure",
+          "[selector]")
 {
     // Declare a repeated container but provide no instances in the config.
     config_space_builder builder;
@@ -144,8 +144,8 @@ TEST_CASE("SEL-04: role(repeated_container) classifies by schema, not tree struc
     CHECK(nodes.empty());
 }
 
-TEST_CASE("SEL-04: role(repeated_container) returns nodes when instances exist",
-          "[selector][SEL-04]")
+TEST_CASE("role(repeated_container) returns nodes when instances exist",
+          "[selector]")
 {
     config_space_builder builder;
     REQUIRE(builder.register_element(element("cluster", anchor::root())));
@@ -173,7 +173,7 @@ TEST_CASE("SEL-04: role(repeated_container) returns nodes when instances exist",
 // role() with null ctx returns false (no crash)
 // -------------------------------------------------------------------------
 
-TEST_CASE("SEL-04: role() with null ctx yields empty result", "[selector][SEL-04]")
+TEST_CASE("role() with null ctx yields empty result", "[selector]")
 {
     const auto space = build_server_space();
     const auto cfg   = load_ordinal(space);

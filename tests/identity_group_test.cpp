@@ -11,7 +11,7 @@
 
 #include <string>
 
-// IDG-01..04: identity (key) groups. A namespace pools one identifier field across
+// Identity (key) groups. A namespace pools one identifier field across
 // the instances of several repeated member element-types under one parent container,
 // required present and unique within a slice. Domain-neutral: a `pool` of `worker`
 // and `gateway` element-types, each identified by `name`.
@@ -46,7 +46,7 @@ bool mentions(const error &e, const char *needle)
 
 }
 
-TEST_CASE("IDG-01: distinct identifiers across pooled element-types validate", "[identity][IDG-01]")
+TEST_CASE("Distinct identifiers across pooled element-types validate", "[identity]")
 {
     auto b = pool_builder();
     REQUIRE(b.register_identity_group(pool_names()));
@@ -58,7 +58,7 @@ TEST_CASE("IDG-01: distinct identifiers across pooled element-types validate", "
     REQUIRE(load_config(space, source_stack{std::move(src)}, {}).has_value());
 }
 
-TEST_CASE("IDG-02: a duplicate identifier value alone is a collision", "[identity][IDG-02]")
+TEST_CASE("A duplicate identifier value alone is a collision", "[identity]")
 {
     SECTION("same value across two element-types names both")
     {
@@ -91,8 +91,8 @@ TEST_CASE("IDG-02: a duplicate identifier value alone is a collision", "[identit
     }
 }
 
-TEST_CASE("IDG-01: an instance missing its identifier field is loud (xs:key present)",
-          "[identity][IDG-01]")
+TEST_CASE("An instance missing its identifier field is loud (xs:key present)",
+          "[identity]")
 {
     auto b = pool_builder();
     REQUIRE(b.register_identity_group(pool_names()));
@@ -105,8 +105,8 @@ TEST_CASE("IDG-01: an instance missing its identifier field is loud (xs:key pres
     REQUIRE(mentions(r.error(), "missing its identifier field"));
 }
 
-TEST_CASE("IDG-03: uniqueness scope is the resolved slice (per selected strain)",
-          "[identity][IDG-03]")
+TEST_CASE("Uniqueness scope is the resolved slice (per selected strain)",
+          "[identity]")
 {
     // A pkey container `cluster/server[name]` slices to one strain; each strain
     // owns an independent `pool`, so the same component name may recur across strains.
@@ -132,7 +132,7 @@ TEST_CASE("IDG-03: uniqueness scope is the resolved slice (per selected strain)"
     REQUIRE(r.has_value());
 }
 
-TEST_CASE("IDG-04: a reserved namespace name is rejected at registration", "[identity][IDG-04]")
+TEST_CASE("A reserved namespace name is rejected at registration", "[identity]")
 {
     SECTION("a builtin tokenizer category")
     {

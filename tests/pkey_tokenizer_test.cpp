@@ -13,7 +13,7 @@
 
 #include <string>
 
-// TOK-01 / TOK-02 / D-03 / D-04 / D-05 acceptance tests.
+// Acceptance tests.
 // All tests drive load_config() with runtime_source so the full fold -> slice ->
 // resolve_references() -> validate() -> freeze() chain runs.
 
@@ -46,7 +46,7 @@ void declare_server_schema(config_space_builder &engine)
 
 }
 
-TEST_CASE("auto-named tokenizer resolves pkey field (TOK-01)", "[pkey_tokenizer]")
+TEST_CASE("auto-named tokenizer resolves pkey field", "[pkey_tokenizer]")
 {
     config_space_builder engine;
     declare_server_schema(engine);
@@ -66,7 +66,7 @@ TEST_CASE("auto-named tokenizer resolves pkey field (TOK-01)", "[pkey_tokenizer]
     CHECK(loaded.value().get("cluster/server/desc") == "primary:8080");
 }
 
-TEST_CASE("auto-named tokenizer: same-tag nested instances are unambiguous (TOK-01)",
+TEST_CASE("auto-named tokenizer: same-tag nested instances are unambiguous",
           "[pkey_tokenizer]")
 {
     // Two strains; selecting one must not leak the other's field into a pkey token.
@@ -92,7 +92,7 @@ TEST_CASE("auto-named tokenizer: same-tag nested instances are unambiguous (TOK-
     CHECK(loaded.value().get("cluster/server/label") == "secondary");
 }
 
-TEST_CASE("D-03 zero-instance: precise diagnostic when no selection", "[pkey_tokenizer]")
+TEST_CASE("Zero-instance: precise diagnostic when no selection", "[pkey_tokenizer]")
 {
     // Put the pkey token in a non-keyed path (app/desc) so the token is always
     // evaluated post-slice, even when the keyed container has zero instances.
@@ -103,7 +103,7 @@ TEST_CASE("D-03 zero-instance: precise diagnostic when no selection", "[pkey_tok
     auto space = engine.build();
 
     // Supply NO server instances. The ${server.name} in app/desc is evaluated
-    // post-slice but the identity leaf is absent — D-03 diagnostic fires.
+    // post-slice but the identity leaf is absent — the diagnostic fires.
     // The ?? fallback must resolve to "default" when no instance is in scope.
     runtime_source src;
     src.set("app/desc", "${server.name ?? \"default\"}");
@@ -113,7 +113,7 @@ TEST_CASE("D-03 zero-instance: precise diagnostic when no selection", "[pkey_tok
     CHECK(loaded.value().get("app/desc") == "default");
 }
 
-TEST_CASE("D-03 zero-instance: hard error without fallback", "[pkey_tokenizer]")
+TEST_CASE("Zero-instance: hard error without fallback", "[pkey_tokenizer]")
 {
     config_space_builder engine;
     declare_server_schema(engine);
@@ -121,7 +121,7 @@ TEST_CASE("D-03 zero-instance: hard error without fallback", "[pkey_tokenizer]")
     REQUIRE(engine.register_element(nucleus::element("desc", anchor::keyspace("app"))));
     auto space = engine.build();
 
-    // No server instances; token ${server.name} fails with precise D-03 diagnostic.
+    // No server instances; token ${server.name} fails with a precise diagnostic.
     runtime_source src;
     src.set("app/desc", "${server.name}");
 
@@ -131,7 +131,7 @@ TEST_CASE("D-03 zero-instance: hard error without fallback", "[pkey_tokenizer]")
           != std::string::npos);
 }
 
-TEST_CASE("D-04 reserved-name rejection via register_element", "[pkey_tokenizer]")
+TEST_CASE("Reserved-name rejection via register_element", "[pkey_tokenizer]")
 {
     // Each reserved category name must produce errc::rejected_registration.
     const std::vector<std::string> reserved =
@@ -145,7 +145,7 @@ TEST_CASE("D-04 reserved-name rejection via register_element", "[pkey_tokenizer]
         REQUIRE(engine.register_element(
             nucleus::element(name, anchor::keyspace("cluster"))));
         // Register an identity element under cluster/<reserved_name>:
-        // the container tag = reserved name → D-04 must fire.
+        // the container tag = reserved name → rejection must fire.
         auto result = engine.register_element(
             nucleus::primary_key_element("id", anchor::keyspace("cluster/" + name)));
         REQUIRE_FALSE(result.has_value());
@@ -155,7 +155,7 @@ TEST_CASE("D-04 reserved-name rejection via register_element", "[pkey_tokenizer]
     }
 }
 
-TEST_CASE("D-05 host shadow wins over auto-registered pkey tokenizer", "[pkey_tokenizer]")
+TEST_CASE("Host shadow wins over auto-registered pkey tokenizer", "[pkey_tokenizer]")
 {
     config_space_builder engine;
     declare_server_schema(engine);
@@ -182,7 +182,7 @@ TEST_CASE("D-05 host shadow wins over auto-registered pkey tokenizer", "[pkey_to
     CHECK(loaded.value().get("cluster/server/desc") == "host-value");
 }
 
-TEST_CASE("TOK-02 host parity: host-defined tree tokenizer equivalent to built-in",
+TEST_CASE("Host-defined tree tokenizer equivalent to built-in",
           "[pkey_tokenizer]")
 {
     // Build a schema with identity "name" under "cluster/server".

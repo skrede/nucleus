@@ -13,7 +13,7 @@
 #include <vector>
 #include <algorithm>
 
-// KCM-01..05: cross-layer merge modes on a repeated/identified collection. Domain-neutral
+// cross-layer merge modes on a repeated/identified collection. Domain-neutral
 // schema: endpoints/output[name] with an addr leaf. Two stacked runtime layers (the second
 // is the higher-precedence override).
 
@@ -49,8 +49,8 @@ bool mentions(const error &e, const char *needle)
 
 }
 
-TEST_CASE("KCM-01: wholesale_replace (default) — higher layer replaces the whole collection",
-          "[keyed][KCM-01]")
+TEST_CASE("wholesale_replace (default) — higher layer replaces the whole collection",
+          "[keyed]")
 {
     auto space = make_space(merge_mode::wholesale_replace, /*with_identity=*/false);
 
@@ -65,8 +65,8 @@ TEST_CASE("KCM-01: wholesale_replace (default) — higher layer replaces the who
     REQUIRE(n == std::vector<std::string>{"c"});  // base {a,b} replaced wholesale
 }
 
-TEST_CASE("KCM-02: unite — layers union; a duplicate identifier across layers is loud",
-          "[keyed][KCM-02]")
+TEST_CASE("Unite — layers union; a duplicate identifier across layers is loud",
+          "[keyed]")
 {
     SECTION("base + override union into one collection")
     {
@@ -97,8 +97,8 @@ TEST_CASE("KCM-02: unite — layers union; a duplicate identifier across layers 
     }
 }
 
-TEST_CASE("KCM-03: replace_by_key — a matching identifier replaces the whole element",
-          "[keyed][KCM-03]")
+TEST_CASE("replace_by_key — a matching identifier replaces the whole element",
+          "[keyed]")
 {
     auto space = make_space(merge_mode::replace_by_key);
     runtime_source base;
@@ -120,7 +120,7 @@ TEST_CASE("KCM-03: replace_by_key — a matching identifier replaces the whole e
     REQUIRE(std::find(addrs.begin(), addrs.end(), "base-b") == addrs.end());
 }
 
-TEST_CASE("KCM-04: a keyed mode without an identity group is a loud error", "[keyed][KCM-04]")
+TEST_CASE("A keyed mode without an identity group is a loud error", "[keyed]")
 {
     auto space = make_space(merge_mode::unite, /*with_identity=*/false);
     runtime_source src;
@@ -130,8 +130,8 @@ TEST_CASE("KCM-04: a keyed mode without an identity group is a loud error", "[ke
     REQUIRE(mentions(r.error(), "no identity group"));
 }
 
-TEST_CASE("KCM-03: keyed merge composes with strain slicing (nested in a pkey strain)",
-          "[keyed][KCM-03]")
+TEST_CASE("Keyed merge composes with strain slicing (nested in a pkey strain)",
+          "[keyed]")
 {
     config_space_builder b;
     REQUIRE(b.register_element(element("cluster", anchor::root())));

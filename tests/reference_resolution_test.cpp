@@ -7,7 +7,7 @@
 
 #include <string>
 
-// REF-01 / REF-02 / REF-03 / REF-06 acceptance tests.
+// Acceptance tests.
 // All tests drive the public load_config() pipeline with a runtime_source so the
 // full fold -> slice -> resolve_references() -> validate() -> freeze() chain runs.
 
@@ -17,7 +17,7 @@ using nucleus::load_options;
 using nucleus::runtime_source;
 using nucleus::source_stack;
 
-TEST_CASE("abs: reference resolves a value by absolute path (REF-02)", "[reference][abs]")
+TEST_CASE("abs: reference resolves a value by absolute path", "[reference][abs]")
 {
     auto space = config_space_builder{}.build();
     runtime_source src;
@@ -29,7 +29,7 @@ TEST_CASE("abs: reference resolves a value by absolute path (REF-02)", "[referen
     CHECK(loaded.value().get("cluster/alias") == "9090");
 }
 
-TEST_CASE("abs: reference to non-existent path is a hard error (REF-07 no-??)", "[reference][abs]")
+TEST_CASE("abs: reference to non-existent path is a hard error", "[reference][abs]")
 {
     auto space = config_space_builder{}.build();
     runtime_source src;
@@ -40,7 +40,7 @@ TEST_CASE("abs: reference to non-existent path is a hard error (REF-07 no-??)", 
     CHECK(loaded.error().message.find("absent") != std::string::npos);
 }
 
-TEST_CASE("rel: child reference descends from containing scope (REF-03)", "[reference][rel]")
+TEST_CASE("rel: child reference descends from containing scope", "[reference][rel]")
 {
     // ${rel:other} from cluster/alias starts at cluster (parent of alias),
     // then descends to "other" -> cluster/other.
@@ -54,7 +54,7 @@ TEST_CASE("rel: child reference descends from containing scope (REF-03)", "[refe
     CHECK(loaded.value().get("cluster/alias") == "8080");
 }
 
-TEST_CASE("rel: ../ reference walks up then descends (REF-03)", "[reference][rel]")
+TEST_CASE("rel: ../ reference walks up then descends", "[reference][rel]")
 {
     // ${rel:../sibling/port} from cluster/server/alias:
     // base = cluster/server (parent of alias)
@@ -71,7 +71,7 @@ TEST_CASE("rel: ../ reference walks up then descends (REF-03)", "[reference][rel
     CHECK(loaded.value().get("cluster/server/alias") == "7070");
 }
 
-TEST_CASE("rel: ./ is sugar for current-scope descend (REF-03)", "[reference][rel]")
+TEST_CASE("rel: ./ is sugar for current-scope descend", "[reference][rel]")
 {
     // ${rel:./port} from cluster/alias:
     // base = cluster (parent of alias), "." = no-op, "port" -> cluster/port
@@ -85,7 +85,7 @@ TEST_CASE("rel: ./ is sugar for current-scope descend (REF-03)", "[reference][re
     CHECK(loaded.value().get("cluster/alias") == "6060");
 }
 
-TEST_CASE("abs: reference including indexed segment resolves correctly (REF-02)", "[reference][abs]")
+TEST_CASE("abs: reference including indexed segment resolves correctly", "[reference][abs]")
 {
     // abs: can address an already-indexed path (node[N] form) once it is in the
     // keyspace. Supply the indexed path directly to avoid schema dependency.
@@ -102,7 +102,7 @@ TEST_CASE("abs: reference including indexed segment resolves correctly (REF-02)"
     CHECK(loaded.value().get("cluster/primary_name") == "primary");
 }
 
-TEST_CASE("resolve_references() runs post-slice, not during fold (REF-01)", "[reference][pipeline]")
+TEST_CASE("resolve_references() runs post-slice, not during fold", "[reference][pipeline]")
 {
     // Confirm the pass resolves values in the sliced tree, not pre-slice.
     // A value referencing another leaf that only exists after slice must resolve.
@@ -116,7 +116,7 @@ TEST_CASE("resolve_references() runs post-slice, not during fold (REF-01)", "[re
     CHECK(loaded.value().get("host/display") == "5050");
 }
 
-TEST_CASE("value-only invariant: reference in key position is a loud error (REF-06)",
+TEST_CASE("value-only invariant: reference in key position is a loud error",
           "[reference][value-only]")
 {
     // A key segment containing ${ is rejected by the value-only invariant scan.
@@ -134,7 +134,7 @@ TEST_CASE("value-only invariant: reference in key position is a loud error (REF-
     CHECK(loaded.error().message.find("structural key position") != std::string::npos);
 }
 
-TEST_CASE("multiple references in one value string all resolve (REF-02)", "[reference][abs]")
+TEST_CASE("multiple references in one value string all resolve", "[reference][abs]")
 {
     auto space = config_space_builder{}.build();
     runtime_source src;

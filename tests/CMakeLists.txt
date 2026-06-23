@@ -185,7 +185,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     )
     add_test(NAME keyed_selection_test COMMAND keyed_selection_test)
 
-    # Phase 22: IDN-01/02/03 + D-01 + D-02 acceptance suite for pkey-identity-as-data.
+    # pkey-identity-as-data acceptance suite.
     add_executable(pkey_identity_test pkey_identity_test.cpp)
     nucleus_enable_coverage(pkey_identity_test)
     nucleus_warnings(pkey_identity_test)
@@ -206,7 +206,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     )
     add_test(NAME inherit_chain_test COMMAND inherit_chain_test)
 
-    # LOC-01 wiring test: two XML files in different temp directories each resolve
+    # Location-token wiring test: two XML files in different temp directories each resolve
     # ${dir.path} to their own directory, proving per-source file-frame binding.
     add_executable(location_token_wiring_test location_token_wiring_test.cpp)
     nucleus_enable_coverage(location_token_wiring_test)

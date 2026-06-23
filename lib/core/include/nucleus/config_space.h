@@ -114,7 +114,7 @@ public:
     registration_result register_element(schema_element element, owner_token owner = {});
 
     // Registers a container-scoped exclusion/choice constraint group (cardinality
-    // over the active members of one container instance, or a Tier-3 host validator).
+    // over the active members of one container instance, or a host validator).
     // Enforced on the resolved/sliced tree by load_config; a violation is loud.
     // Same state-machine/policy seam as register_element.
     registration_result register_constraint_group(constraint_group group, owner_token owner = {});

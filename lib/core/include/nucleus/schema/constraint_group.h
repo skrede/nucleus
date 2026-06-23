@@ -57,7 +57,7 @@ inline group_member all_of(std::vector<std::string> names)
 enum class group_bound { at_most, exactly, at_least };
 
 // A container-anchored constraint over a member set, carrying a named diagnostic.
-// Either a cardinality clause over its members, or a Tier-3 host validator run over
+// Either a cardinality clause over its members, or a host validator run over
 // the resolved container (the escape hatch for the rare case cardinality cannot cover
 // -- there is deliberately NO predicate/boolean-constraint grammar).
 struct constraint_group
@@ -157,7 +157,7 @@ inline constraint_group mutually_exclusive(std::string name, anchor at,
     return g;
 }
 
-// Tier-3 valve: a host validator run over each resolved container instance.
+// A host validator run over each resolved container instance.
 inline constraint_group
 validate_group(std::string name, anchor at,
                std::function<expected<void, std::string>(const config_node &)> validator)

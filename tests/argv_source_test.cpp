@@ -287,7 +287,7 @@ TEST_CASE("repeated flags compose into one ordered collection", "[argv][capabili
 }
 
 // ---------------------------------------------------------------------------
-// D-09 / D-11: CLI ordinal addressing for repeated containers
+// CLI ordinal addressing for repeated containers
 // ---------------------------------------------------------------------------
 
 namespace {
@@ -298,7 +298,7 @@ nucleus::xml_source xml_of_cluster(const std::string &text)
 }
 
 // Schema: cluster -> node (repeated container) -> endpoint (container) -> port (leaf).
-// Mirrors the schema from the plan (D-09/D-11).
+// Mirrors the schema from the plan.
 nucleus::config_space make_cluster_space()
 {
     nucleus::config_space_builder builder;
@@ -316,7 +316,7 @@ nucleus::config_space make_cluster_space()
 }
 
 TEST_CASE("cli ordinal addressing -- argv override of indexed instance",
-          "[argv][repeated_container][D09]")
+          "[argv][repeated_container]")
 {
     const nucleus::config_space space = make_cluster_space();
 
@@ -343,7 +343,7 @@ TEST_CASE("cli ordinal addressing -- argv override of indexed instance",
     REQUIRE(cfg.get("cluster/node[1]/endpoint/port") == "443");
 }
 
-TEST_CASE("argv out-of-range ordinal -- loud error", "[argv][repeated_container][D11]")
+TEST_CASE("argv out-of-range ordinal -- loud error", "[argv][repeated_container]")
 {
     const nucleus::config_space space = make_cluster_space();
 
@@ -368,7 +368,7 @@ TEST_CASE("argv out-of-range ordinal -- loud error", "[argv][repeated_container]
 }
 
 TEST_CASE("argv ordinal == count is out of range -- cannot append",
-          "[argv][repeated_container][D11]")
+          "[argv][repeated_container]")
 {
     const nucleus::config_space space = make_cluster_space();
 
@@ -378,7 +378,7 @@ TEST_CASE("argv ordinal == count is out of range -- cannot append",
         "<node><endpoint><port>443</port></endpoint></node>"
         "</cluster>");
 
-    // ordinal 2 == count (2 instances: 0 and 1): append is not allowed per D-11.
+    // ordinal 2 == count (2 instances: 0 and 1): append is not allowed.
     argv_source argv(std::vector<std::string>{"--cluster-node-2-endpoint-port=90"});
     argv.recognize_with(nucleus::recognizer_of(space));
 
@@ -391,8 +391,8 @@ TEST_CASE("argv ordinal == count is out of range -- cannot append",
     REQUIRE(loaded.error().message.find("2") != std::string::npos);
 }
 
-TEST_CASE("argv lower-rank than document with valid ordinal 0 succeeds (WR-03)",
-          "[argv][repeated_container][D11][WR03]")
+TEST_CASE("argv lower-rank than document with valid ordinal 0 succeeds",
+          "[argv][repeated_container][WR03]")
 {
     // argv has a LOWER rank than the XML document (it appears first in the stack).
     // With the old eager check, m_building is empty when argv is processed, so

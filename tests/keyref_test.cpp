@@ -12,7 +12,7 @@
 
 #include <string>
 
-// KRF-01..03: schema-declared references by identifier (the xs:keyref analog). A
+// schema-declared references by identifier (the xs:keyref analog). A
 // `route/target` keyref points into the `endpoint_names` namespace, which pools the
 // `name` of the `output` and `endpoint` element-types under `endpoints`.
 
@@ -52,8 +52,8 @@ bool mentions(const error &e, const char *needle)
 
 }
 
-TEST_CASE("KRF-01: a keyref into an unregistered namespace is a registration error",
-          "[keyref][KRF-01]")
+TEST_CASE("A keyref into an unregistered namespace is a registration error",
+          "[keyref]")
 {
     config_space_builder b;
     REQUIRE(b.register_element(element("route", anchor::root())));
@@ -63,8 +63,8 @@ TEST_CASE("KRF-01: a keyref into an unregistered namespace is a registration err
     REQUIRE(reg.error().message.find("nonsuch") != std::string::npos);
 }
 
-TEST_CASE("KRF-02: a valid keyref validates; a dangling one is loud with a did-you-mean",
-          "[keyref][KRF-02]")
+TEST_CASE("A valid keyref validates; a dangling one is loud with a did-you-mean",
+          "[keyref]")
 {
     auto space = make_space();
 
@@ -91,7 +91,7 @@ TEST_CASE("KRF-02: a valid keyref validates; a dangling one is loud with a did-y
     }
 }
 
-TEST_CASE("KRF-03: follow_keyref dereferences to the target node", "[keyref][KRF-03]")
+TEST_CASE("follow_keyref dereferences to the target node", "[keyref]")
 {
     auto space = make_space();
     const auto ctx = space.query_context();

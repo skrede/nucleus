@@ -122,7 +122,7 @@ public:
 
 namespace {
 
-// D-04: pkey tag must not shadow a builtin category or a pass-2 scheme head.
+// Pkey tag must not shadow a builtin category or a pass-2 scheme head.
 // A collision is a loud build-time error — the schema author renames the element.
 inline bool is_reserved_tree_tokenizer_name(std::string_view name) noexcept
 {
@@ -133,8 +133,8 @@ inline bool is_reserved_tree_tokenizer_name(std::string_view name) noexcept
 }
 
 // Builds the auto-named pkey tree tokenizer for identity element `el`.
-// Category = the container's last segment (D-01); resolver reads the sliced
-// keyspace anchored to the pkey container (D-02), with a precise D-03 diagnostic
+// Category = the container's last segment; resolver reads the sliced
+// keyspace anchored to the pkey container, with a precise diagnostic
 // when no instance is in scope post-slice.
 tree_tokenizer make_pkey_tree_tokenizer(const schema_element &el)
 {
@@ -146,7 +146,7 @@ tree_tokenizer make_pkey_tree_tokenizer(const schema_element &el)
         std::move(category),
         [pkey_container, identity_field](const tree_access &access) -> token_result
         {
-            // D-03: verify an instance is selected by checking the identity leaf.
+            // Verify an instance is selected by checking the identity leaf.
             key_path identity_path = pkey_container.child(identity_field);
             if(access.building.find(identity_path) == nullptr)
                 return unexpected(resolve_error(resolve_errc::missing_field,
@@ -155,7 +155,7 @@ tree_tokenizer make_pkey_tree_tokenizer(const schema_element &el)
                                     std::string(access.category) + "." +
                                     std::string(access.field_name))));
 
-            // D-02: resolve the requested field within the pkey container.
+            // Resolve the requested field within the pkey container.
             key_path field_path = pkey_container.child(std::string(access.field_name));
             const value *v = access.building.find(field_path);
             if(v == nullptr)
@@ -286,7 +286,7 @@ registration_result config_space_builder::register_element(schema_element elemen
         return guard;
     if(auto verdict = m_impl->review(registration_kind::schema, owner); !verdict)
         return verdict;
-    // D-04: identity elements whose container tag collides with a reserved name
+    // Identity elements whose container tag collides with a reserved name
     // would produce an unusable auto-registered tokenizer — reject loudly before
     // schema.attach() so the error reaches the host at schema-build time.
     if(element.identity && !element.container().empty())
@@ -368,7 +368,7 @@ registration_result config_space_builder::install_tree_tokenizer(tree_tokenizer 
                             "rename the schema element", tok.category())});
     if(auto verdict = m_impl->review(registration_kind::tokenizer, owner); !verdict)
         return verdict;
-    // D-05: host shadows the auto-registered pkey tokenizer for this category —
+    // Host shadows the auto-registered pkey tokenizer for this category —
     // last-registration-wins is correct; wire a log_sink to space_core to emit
     // a debug-level message here when that seam is added.
     m_impl->tree_tokenizer.add(std::move(tok), std::move(owner));
@@ -404,8 +404,8 @@ std::vector<conflict_report> config_space_builder::conflicts() const { return m_
 
 config_space config_space_builder::build()
 {
-    // D-07: auto-register a pkey tree tokenizer for every identity element.
-    // D-05: if the host already registered a tokenizer for this category, skip
+    // Auto-register a pkey tree tokenizer for every identity element.
+    // If the host already registered a tokenizer for this category, skip
     // auto-registration so the host's registration wins (last-registration-wins
     // is implemented by the host calling install_tree_tokenizer before build()).
     // Reserved names cannot reach here — register_element is the enforcement gate.
@@ -416,7 +416,7 @@ config_space config_space_builder::build()
             continue;
         std::string category = std::string(key_path::base_name(el.container().leaf()));
         if(m_impl->tree_tokenizer.find(category) != nullptr)
-            continue; // D-05: host shadow wins
+            continue; // host shadow wins
         m_impl->tree_tokenizer.add(make_pkey_tree_tokenizer(el), core);
     }
 
@@ -514,7 +514,7 @@ key_recognizer recognizer_of(const config_space &space)
 {
     // Captures the space's schema registry by pointer; the recognizer is valid
     // for as long as the space outlives it. Uses the ordinal-aware variant so
-    // CLI plain-ordinal paths (D-09) are accepted: "cluster/node/0/endpoint/port"
+    // CLI plain-ordinal paths are accepted: "cluster/node/0/endpoint/port"
     // is recognized when "cluster/node" is a repeated container and
     // "cluster/node/endpoint/port" is declared.
     const schema_registry *schema = &space.m_impl->schema;

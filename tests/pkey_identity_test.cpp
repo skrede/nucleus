@@ -19,11 +19,11 @@
 #include <string>
 #include <vector>
 
-// Phase 22 acceptance suite: primary-key identity as data.
-// Covers IDN-01 (pkey leaf readable after slice), IDN-02 (schema validation
-// passes with pkey leaf present), IDN-03 (emit renders pkey once as attribute;
-// load→emit→load is a byte-stable fixpoint), D-01 (override attempt is a loud
-// layering_violation), and D-02 (pkey leaf visible in config_node::children()).
+// Acceptance suite: primary-key identity as data.
+// Covers: the pkey leaf is readable after slice; schema validation passes with the
+// pkey leaf present; emit renders the pkey once as an attribute and load→emit→load is
+// a byte-stable fixpoint; a higher-rank override attempt is a loud layering_violation;
+// and the pkey leaf is visible in config_node::children().
 
 using nucleus::anchor;
 
@@ -86,11 +86,11 @@ nucleus::load_result load_doc(const nucleus::config_space &space, const char *do
 }
 
 // ---------------------------------------------------------------------------
-// IDN-01: pkey leaf is readable after slice
+// Pkey leaf is readable after slice
 // ---------------------------------------------------------------------------
 
-TEST_CASE("IDN-01: attribute-form pkey retained as readable leaf",
-          "[pkey_identity][IDN-01]")
+TEST_CASE("attribute-form pkey retained as readable leaf",
+          "[pkey_identity]")
 {
     const char *doc = R"(<cluster><server name="web"><port>80</port></server></cluster>)";
 
@@ -109,8 +109,8 @@ TEST_CASE("IDN-01: attribute-form pkey retained as readable leaf",
     REQUIRE_FALSE(config.contains("cluster/server/web/port"));
 }
 
-TEST_CASE("IDN-01: text-leaf-form pkey retained as readable leaf",
-          "[pkey_identity][IDN-01]")
+TEST_CASE("text-leaf-form pkey retained as readable leaf",
+          "[pkey_identity]")
 {
     const char *doc = R"(<cluster><server><name>web</name><port>80</port></server></cluster>)";
 
@@ -127,8 +127,8 @@ TEST_CASE("IDN-01: text-leaf-form pkey retained as readable leaf",
     REQUIRE_FALSE(config.contains("cluster/server/web/port"));
 }
 
-TEST_CASE("IDN-01: anonymous strain produces no pkey leaf",
-          "[pkey_identity][IDN-01]")
+TEST_CASE("Anonymous strain produces no pkey leaf",
+          "[pkey_identity]")
 {
     // No named strain: anonymous instance only; no key value present.
     const char *doc = R"(<cluster><server><port>80</port></server></cluster>)";
@@ -143,11 +143,11 @@ TEST_CASE("IDN-01: anonymous strain produces no pkey leaf",
 }
 
 // ---------------------------------------------------------------------------
-// IDN-02: schema validation accepts the retained pkey leaf
+// Schema validation accepts the retained pkey leaf
 // ---------------------------------------------------------------------------
 
-TEST_CASE("IDN-02: schema validation passes with pkey leaf present",
-          "[pkey_identity][IDN-02]")
+TEST_CASE("Schema validation passes with pkey leaf present",
+          "[pkey_identity]")
 {
     const char *doc = R"(<cluster><server name="web"><port>80</port></server></cluster>)";
 
@@ -161,8 +161,8 @@ TEST_CASE("IDN-02: schema validation passes with pkey leaf present",
     REQUIRE(loaded.value().get("cluster/server/name") == "web");
 }
 
-TEST_CASE("IDN-02: required pkey on anonymous strain fails validation",
-          "[pkey_identity][IDN-02]")
+TEST_CASE("Required pkey on anonymous strain fails validation",
+          "[pkey_identity]")
 {
     // Schema marks pkey as required: an anonymous instance (no key value) omits
     // the leaf, triggering a schema_violation.
@@ -178,11 +178,11 @@ TEST_CASE("IDN-02: required pkey on anonymous strain fails validation",
 }
 
 // ---------------------------------------------------------------------------
-// IDN-03: emit renders pkey once as attribute; load→emit→load is a fixpoint
+// Emit renders pkey once as attribute; load→emit→load is a fixpoint
 // ---------------------------------------------------------------------------
 
-TEST_CASE("IDN-03: emit_document renders pkey as XML attribute not child element",
-          "[pkey_identity][IDN-03]")
+TEST_CASE("emit_document renders pkey as XML attribute not child element",
+          "[pkey_identity]")
 {
     const char *doc = R"(<cluster><server name="web"><port>80</port></server></cluster>)";
 
@@ -203,8 +203,8 @@ TEST_CASE("IDN-03: emit_document renders pkey as XML attribute not child element
     REQUIRE(emitted.find("<name>web</name>") == std::string::npos);
 }
 
-TEST_CASE("IDN-03: load→emit→load round-trip is a byte-stable fixpoint",
-          "[pkey_identity][IDN-03][round_trip]")
+TEST_CASE("load→emit→load round-trip is a byte-stable fixpoint",
+          "[pkey_identity][round_trip]")
 {
     const char *doc = R"(<cluster><server name="web"><port>80</port></server></cluster>)";
 
@@ -239,11 +239,11 @@ TEST_CASE("IDN-03: load→emit→load round-trip is a byte-stable fixpoint",
 }
 
 // ---------------------------------------------------------------------------
-// D-01: higher-rank flat source override of pkey leaf is a loud error
+// higher-rank flat source override of pkey leaf is a loud error
 // ---------------------------------------------------------------------------
 
-TEST_CASE("D-01: flat source attempting to override pkey leaf is layering_violation",
-          "[pkey_identity][D-01]")
+TEST_CASE("Flat source attempting to override pkey leaf is layering_violation",
+          "[pkey_identity]")
 {
     const char *doc = R"(<cluster><server name="web"><port>80</port></server></cluster>)";
 
@@ -268,11 +268,11 @@ TEST_CASE("D-01: flat source attempting to override pkey leaf is layering_violat
 }
 
 // ---------------------------------------------------------------------------
-// D-02: pkey leaf appears in config_node::children() of its parent container
+// Pkey leaf appears in config_node::children() of its parent container
 // ---------------------------------------------------------------------------
 
-TEST_CASE("D-02: pkey leaf visible in children() of its parent container node",
-          "[pkey_identity][D-02]")
+TEST_CASE("Pkey leaf visible in children() of its parent container node",
+          "[pkey_identity]")
 {
     const char *doc = R"(<cluster><server name="web"><port>80</port></server></cluster>)";
 

@@ -11,9 +11,9 @@
 
 #include <string>
 
-// CGR-01..05: container-scoped exclusion/choice constraint groups. Domain-neutral
+// container-scoped exclusion/choice constraint groups. Domain-neutral
 // schema: a `server/cache` policy with mutually-exclusive members, a `server/auth`
-// mode selection via all_of bundles, and a Tier-3 validator valve.
+// mode selection via all_of bundles, and a host-validator valve.
 
 using namespace nucleus;
 
@@ -38,7 +38,7 @@ bool mentions(const error &e, const char *needle)
 
 }
 
-TEST_CASE("CGR-01: at_most(1) over presence members rejects two active", "[constraint][CGR-01]")
+TEST_CASE("at_most(1) over presence members rejects two active", "[constraint]")
 {
     auto b = cache_builder();
     REQUIRE(b.register_constraint_group(
@@ -59,7 +59,7 @@ TEST_CASE("CGR-01: at_most(1) over presence members rejects two active", "[const
     REQUIRE(mentions(bad.error(), "'ttl'"));
 }
 
-TEST_CASE("CGR-02: when_value activation only counts the matching value", "[constraint][CGR-02]")
+TEST_CASE("when_value activation only counts the matching value", "[constraint]")
 {
     auto b = cache_builder();
     REQUIRE(b.register_constraint_group(
@@ -83,7 +83,7 @@ TEST_CASE("CGR-02: when_value activation only counts the matching value", "[cons
     REQUIRE(mentions(r.error(), "'eager'"));
 }
 
-TEST_CASE("CGR-01: exactly(1) and at_least(1) cardinality", "[constraint][CGR-01]")
+TEST_CASE("exactly(1) and at_least(1) cardinality", "[constraint]")
 {
     SECTION("exactly(1): one active satisfies, two active violates")
     {
@@ -120,7 +120,7 @@ TEST_CASE("CGR-01: exactly(1) and at_least(1) cardinality", "[constraint][CGR-01
     }
 }
 
-TEST_CASE("CGR-01: mutually_exclusive sugar desugars to at_most(1)", "[constraint][CGR-01]")
+TEST_CASE("mutually_exclusive sugar desugars to at_most(1)", "[constraint]")
 {
     auto b = cache_builder();
     REQUIRE(b.register_constraint_group(
@@ -135,7 +135,7 @@ TEST_CASE("CGR-01: mutually_exclusive sugar desugars to at_most(1)", "[constrain
     REQUIRE(mentions(r.error(), "cache_policy"));
 }
 
-TEST_CASE("CGR-03: choice over all_of bundles selects exactly one", "[constraint][CGR-03]")
+TEST_CASE("Choice over all_of bundles selects exactly one", "[constraint]")
 {
     config_space_builder b;
     REQUIRE(b.register_element(element("server", anchor::root())));
@@ -175,7 +175,7 @@ TEST_CASE("CGR-03: choice over all_of bundles selects exactly one", "[constraint
     }
 }
 
-TEST_CASE("CGR-04: Tier-3 validate_group valve runs a host predicate", "[constraint][CGR-04]")
+TEST_CASE("validate_group valve runs a host predicate", "[constraint]")
 {
     auto b = cache_builder();
     REQUIRE(b.register_constraint_group(validate_group(
@@ -199,7 +199,7 @@ TEST_CASE("CGR-04: Tier-3 validate_group valve runs a host predicate", "[constra
     REQUIRE(mentions(r.error(), "ttl must not be zero"));
 }
 
-TEST_CASE("CGR-05: registration rejects an undefined member loudly", "[constraint][CGR-05]")
+TEST_CASE("Registration rejects an undefined member loudly", "[constraint]")
 {
     auto b = cache_builder();
     auto reg = b.register_constraint_group(

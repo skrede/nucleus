@@ -8,7 +8,7 @@
 
 #include <string>
 
-// REF-08 acceptance tests: config_node::parent() and config_node::ancestor().
+// Acceptance tests: config_node::parent() and config_node::ancestor().
 // Covers root/single/multi-segment paths, indexed segments, named ancestor
 // matching, and no-match returns.
 
@@ -41,7 +41,7 @@ nucleus::config load_indexed()
 
 }
 
-TEST_CASE("REF-08: parent() on multi-segment path strips last segment", "[config_node][parent]")
+TEST_CASE("parent() on multi-segment path strips last segment", "[config_node][parent]")
 {
     const auto cfg = load_flat();
     const auto port_node = cfg.root()["cluster"]["server"]["port"];
@@ -52,7 +52,7 @@ TEST_CASE("REF-08: parent() on multi-segment path strips last segment", "[config
     CHECK(p.path() == "cluster/server");
 }
 
-TEST_CASE("REF-08: parent() on single-segment path returns root node", "[config_node][parent]")
+TEST_CASE("parent() on single-segment path returns root node", "[config_node][parent]")
 {
     const auto cfg = load_flat();
     // "cluster" is a single-segment path; its parent is the root (empty path).
@@ -65,7 +65,7 @@ TEST_CASE("REF-08: parent() on single-segment path returns root node", "[config_
     CHECK(p.path() == "");
 }
 
-TEST_CASE("REF-08: parent() of root returns a null node", "[config_node][parent]")
+TEST_CASE("parent() of root returns a null node", "[config_node][parent]")
 {
     const auto cfg = load_flat();
     const auto root = cfg.root();
@@ -74,7 +74,7 @@ TEST_CASE("REF-08: parent() of root returns a null node", "[config_node][parent]
     CHECK_FALSE(p.exists());
 }
 
-TEST_CASE("REF-08: parent() of indexed path cluster/node[0] returns cluster", "[config_node][parent]")
+TEST_CASE("parent() of indexed path cluster/node[0] returns cluster", "[config_node][parent]")
 {
     const auto cfg = load_indexed();
     // Navigate to the indexed container node[0].
@@ -87,7 +87,7 @@ TEST_CASE("REF-08: parent() of indexed path cluster/node[0] returns cluster", "[
     CHECK(p.path() == "cluster");
 }
 
-TEST_CASE("REF-08: ancestor() walks toward root and matches base name", "[config_node][ancestor]")
+TEST_CASE("ancestor() walks toward root and matches base name", "[config_node][ancestor]")
 {
     const auto cfg = load_flat();
     const auto port_node = cfg.root()["cluster"]["server"]["port"];
@@ -99,7 +99,7 @@ TEST_CASE("REF-08: ancestor() walks toward root and matches base name", "[config
     CHECK(anc.path() == "cluster");
 }
 
-TEST_CASE("REF-08: ancestor() with no match returns null node", "[config_node][ancestor]")
+TEST_CASE("ancestor() with no match returns null node", "[config_node][ancestor]")
 {
     const auto cfg = load_flat();
     const auto port_node = cfg.root()["cluster"]["server"]["port"];
@@ -108,7 +108,7 @@ TEST_CASE("REF-08: ancestor() with no match returns null node", "[config_node][a
     CHECK_FALSE(anc.exists());
 }
 
-TEST_CASE("REF-08: ancestor() matches base name of indexed segment", "[config_node][ancestor]")
+TEST_CASE("ancestor() matches base name of indexed segment", "[config_node][ancestor]")
 {
     const auto cfg = load_indexed();
     // Path is "cluster/node[0]/port" -- ancestor("node") must match "cluster/node[0]".

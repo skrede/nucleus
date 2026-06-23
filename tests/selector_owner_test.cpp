@@ -14,7 +14,7 @@
 #include <vector>
 #include <algorithm>
 
-// SEL-05: owned_by() — ==-match only; never-registered token yields empty;
+// owned_by() — ==-match only; never-registered token yields empty;
 // anonymous token matches nothing (distinct pointer identity per construction);
 // tagged tokens compare by payload.
 
@@ -52,8 +52,8 @@ bool path_in(const std::vector<config_node> &nodes, std::string_view p)
 // Tagged token: == match by payload
 // -------------------------------------------------------------------------
 
-TEST_CASE("SEL-05: owned_by() with tagged token matches registered elements",
-          "[selector][SEL-05]")
+TEST_CASE("owned_by() with tagged token matches registered elements",
+          "[selector]")
 {
     owner_token token_a(std::string("plugin.a"));
     owner_token token_b(std::string("plugin.b"));
@@ -72,8 +72,8 @@ TEST_CASE("SEL-05: owned_by() with tagged token matches registered elements",
     CHECK_FALSE(path_in(nodes_a, "cluster/host"));
 }
 
-TEST_CASE("SEL-05: owned_by() with a different tag yields its own elements",
-          "[selector][SEL-05]")
+TEST_CASE("owned_by() with a different tag yields its own elements",
+          "[selector]")
 {
     owner_token token_a(std::string("plugin.a"));
     owner_token token_b(std::string("plugin.b"));
@@ -92,8 +92,8 @@ TEST_CASE("SEL-05: owned_by() with a different tag yields its own elements",
 // Never-registered token yields empty result (not error)
 // -------------------------------------------------------------------------
 
-TEST_CASE("SEL-05: owned_by() with a never-registered token yields empty",
-          "[selector][SEL-05]")
+TEST_CASE("owned_by() with a never-registered token yields empty",
+          "[selector]")
 {
     owner_token token_a(std::string("plugin.a"));
     owner_token token_b(std::string("plugin.b"));
@@ -113,8 +113,8 @@ TEST_CASE("SEL-05: owned_by() with a never-registered token yields empty",
 // Anonymous tokens never collide (each is a distinct identity)
 // -------------------------------------------------------------------------
 
-TEST_CASE("SEL-05: anonymous default-constructed owner tokens never match each other",
-          "[selector][SEL-05]")
+TEST_CASE("Anonymous default-constructed owner tokens never match each other",
+          "[selector]")
 {
     config_space_builder builder;
     owner_token anon_a; // used during registration
@@ -134,8 +134,8 @@ TEST_CASE("SEL-05: anonymous default-constructed owner tokens never match each o
     CHECK(nodes.empty());
 }
 
-TEST_CASE("SEL-05: owned_by(same_anon_token) matches the registered element",
-          "[selector][SEL-05]")
+TEST_CASE("owned_by(same_anon_token) matches the registered element",
+          "[selector]")
 {
     config_space_builder builder;
     owner_token anon;
@@ -161,7 +161,7 @@ TEST_CASE("SEL-05: owned_by(same_anon_token) matches the registered element",
 // owned_by() with null ctx returns empty (not error)
 // -------------------------------------------------------------------------
 
-TEST_CASE("SEL-05: owned_by() with null ctx yields empty", "[selector][SEL-05]")
+TEST_CASE("owned_by() with null ctx yields empty", "[selector]")
 {
     auto space = config_space_builder{}.build();
 

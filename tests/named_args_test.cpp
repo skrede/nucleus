@@ -1,4 +1,4 @@
-// Named & typed tokenizer-function arguments (ARG-01..04): order independence,
+// Named & typed tokenizer-function arguments: order independence,
 // list values, lexical quoting / empty string, typed coercion, and the loud
 // did-you-mean / typed diagnostics. Exercised through resolve_tokens against the
 // core env + string tokenizers.

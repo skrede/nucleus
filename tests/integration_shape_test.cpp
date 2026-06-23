@@ -83,7 +83,7 @@ nucleus::load_result load_chain(const nucleus::config_space &space,
 }
 
 // ---------------------------------------------------------------------------
-// Shared document constants for the main 3-file chain (TC-1 and TC-6/TC-7).
+// Shared document constants for the main 3-file chain.
 // ---------------------------------------------------------------------------
 
 const char *ROOT_DOC = R"(
@@ -118,7 +118,7 @@ auto make_main_factory()
 }
 
 // ---------------------------------------------------------------------------
-// TC-4 document constants: 3-doc chain for scope-policy contrast.
+// Document constants: 3-doc chain for scope-policy contrast.
 // ---------------------------------------------------------------------------
 
 const char *ROOT_DOC_TC4 = R"(
@@ -153,7 +153,7 @@ auto make_tc4_factory()
 }
 
 // ---------------------------------------------------------------------------
-// TC-1: select primary, full 3-doc chain; verify unified keyspace, no pkey segments.
+// Select primary, full 3-doc chain; verify unified keyspace, no pkey segments.
 // ---------------------------------------------------------------------------
 TEST_CASE("integration: select primary resolves unified keyspace with template composition",
           "[integration][keyed]")
@@ -181,7 +181,7 @@ TEST_CASE("integration: select primary resolves unified keyspace with template c
 }
 
 // ---------------------------------------------------------------------------
-// TC-2: auto-resolve single named strain without a selection.
+// auto-resolve single named strain without a selection.
 // ---------------------------------------------------------------------------
 TEST_CASE("integration: auto-resolve single named strain succeeds without selection",
           "[integration][keyed]")
@@ -218,7 +218,7 @@ TEST_CASE("integration: auto-resolve single named strain succeeds without select
 }
 
 // ---------------------------------------------------------------------------
-// TC-3: file_level scope policy excludes derived-layer keyed entries.
+// file_level scope policy excludes derived-layer keyed entries.
 // ---------------------------------------------------------------------------
 TEST_CASE("integration: file_level scope policy excludes derived-layer entries",
           "[integration][keyed]")
@@ -258,7 +258,7 @@ TEST_CASE("integration: file_level scope policy excludes derived-layer entries",
 }
 
 // ---------------------------------------------------------------------------
-// TC-4: scope-policy contrast: container_open_until_next_strain vs.
+// scope-policy contrast: container_open_until_next_strain vs.
 //        space_open_container_closed, same fileset, opposite outcomes.
 // ---------------------------------------------------------------------------
 TEST_CASE("integration: scope-policy contrast for primary's derived entry",
@@ -299,7 +299,7 @@ TEST_CASE("integration: scope-policy contrast for primary's derived entry",
 }
 
 // ---------------------------------------------------------------------------
-// TC-5: opt-out (inherit="none") parses as the explicit chain terminator.
+// opt-out (inherit="none") parses as the explicit chain terminator.
 // ---------------------------------------------------------------------------
 TEST_CASE("integration: opt-out terminates the chain by declaration",
           "[integration][keyed]")
@@ -334,7 +334,7 @@ TEST_CASE("integration: opt-out terminates the chain by declaration",
 }
 
 // ---------------------------------------------------------------------------
-// TC-6: multiple strains with no selection is a loud error.
+// Multiple strains with no selection is a loud error.
 // ---------------------------------------------------------------------------
 TEST_CASE("integration: multiple strains with no selection is a loud error",
           "[integration][keyed]")
@@ -369,7 +369,7 @@ TEST_CASE("integration: multiple strains with no selection is a loud error",
 }
 
 // ---------------------------------------------------------------------------
-// TC-7: select with unknown key value is a loud error.
+// Select with unknown key value is a loud error.
 // ---------------------------------------------------------------------------
 TEST_CASE("integration: select with unknown key value is a loud error",
           "[integration][keyed]")
@@ -403,7 +403,7 @@ TEST_CASE("integration: select with unknown key value is a loud error",
 }
 
 // ---------------------------------------------------------------------------
-// TC-8: duplicate unique field value across strains is a loud error.
+// Duplicate unique field value across strains is a loud error.
 // ---------------------------------------------------------------------------
 TEST_CASE("integration: duplicate unique field value across strains is a loud error",
           "[integration][keyed]")

@@ -10,8 +10,8 @@
 #include <vector>
 #include <algorithm>
 
-// SEL-07: AND-chain, OR, NOT combinators + single-pass evaluation.
-// D-03: one() loud on zero matches (errc::absent_key) and many matches
+// AND-chain, OR, NOT combinators + single-pass evaluation.
+// one() loud on zero matches (errc::absent_key) and many matches
 //       (errc::ambiguous_result, message includes the count).
 
 using namespace nucleus;
@@ -34,10 +34,10 @@ config load_simple()
 }
 
 // -------------------------------------------------------------------------
-// SEL-07: AND combinator — method chaining narrows the result set
+// AND combinator — method chaining narrows the result set
 // -------------------------------------------------------------------------
 
-TEST_CASE("SEL-07: AND-chain narrows results (descendants + leaves)", "[selector][SEL-07]")
+TEST_CASE("AND-chain narrows results (descendants + leaves)", "[selector]")
 {
     const auto cfg = load_simple();
     const auto ctx = config_space_builder{}.build().query_context();
@@ -57,10 +57,10 @@ TEST_CASE("SEL-07: AND-chain narrows results (descendants + leaves)", "[selector
 }
 
 // -------------------------------------------------------------------------
-// SEL-07: OR combinator — union of two selectors
+// OR combinator — union of two selectors
 // -------------------------------------------------------------------------
 
-TEST_CASE("SEL-07: or_() produces the union of two selectors", "[selector][SEL-07]")
+TEST_CASE("or_() produces the union of two selectors", "[selector]")
 {
     const auto cfg = load_simple();
     const auto ctx = config_space_builder{}.build().query_context();
@@ -81,10 +81,10 @@ TEST_CASE("SEL-07: or_() produces the union of two selectors", "[selector][SEL-0
 }
 
 // -------------------------------------------------------------------------
-// SEL-07: NOT combinator — excluding() removes matching nodes
+// NOT combinator — excluding() removes matching nodes
 // -------------------------------------------------------------------------
 
-TEST_CASE("SEL-07: excluding() removes nodes matching the given predicate", "[selector][SEL-07]")
+TEST_CASE("excluding() removes nodes matching the given predicate", "[selector]")
 {
     const auto cfg = load_simple();
     const auto ctx = config_space_builder{}.build().query_context();
@@ -109,10 +109,10 @@ TEST_CASE("SEL-07: excluding() removes nodes matching the given predicate", "[se
 }
 
 // -------------------------------------------------------------------------
-// D-03: one() loud on zero matches → errc::absent_key
+// one() loud on zero matches → errc::absent_key
 // -------------------------------------------------------------------------
 
-TEST_CASE("D-03: one() returns absent_key when no node matches", "[selector][D-03]")
+TEST_CASE("one() returns absent_key when no node matches", "[selector]")
 {
     const auto cfg = load_simple();
     const auto ctx = config_space_builder{}.build().query_context();
@@ -127,10 +127,10 @@ TEST_CASE("D-03: one() returns absent_key when no node matches", "[selector][D-0
 }
 
 // -------------------------------------------------------------------------
-// D-03: one() loud on many matches → errc::ambiguous_result, count in message
+// one() loud on many matches → errc::ambiguous_result, count in message
 // -------------------------------------------------------------------------
 
-TEST_CASE("D-03: one() returns ambiguous_result when many nodes match", "[selector][D-03]")
+TEST_CASE("one() returns ambiguous_result when many nodes match", "[selector]")
 {
     const auto cfg = load_simple();
     const auto ctx = config_space_builder{}.build().query_context();
@@ -145,10 +145,10 @@ TEST_CASE("D-03: one() returns ambiguous_result when many nodes match", "[select
 }
 
 // -------------------------------------------------------------------------
-// D-03: one() succeeds when exactly one node matches
+// one() succeeds when exactly one node matches
 // -------------------------------------------------------------------------
 
-TEST_CASE("D-03: one() returns the node when exactly one matches", "[selector][D-03]")
+TEST_CASE("one() returns the node when exactly one matches", "[selector]")
 {
     const auto cfg = load_simple();
     const auto ctx = config_space_builder{}.build().query_context();
@@ -163,10 +163,10 @@ TEST_CASE("D-03: one() returns the node when exactly one matches", "[selector][D
 }
 
 // -------------------------------------------------------------------------
-// SEL-07: single-pass — each() calls visit() exactly once per invocation
+// single-pass — each() calls visit() exactly once per invocation
 // -------------------------------------------------------------------------
 
-TEST_CASE("SEL-07: single-pass evaluation — each() traverses the tree once", "[selector][SEL-07]")
+TEST_CASE("single-pass evaluation — each() traverses the tree once", "[selector]")
 {
     const auto cfg = load_simple();
     const auto ctx = config_space_builder{}.build().query_context();

@@ -174,7 +174,7 @@ TEST_CASE("a value containing a quote cannot break out of the bash literal",
     REQUIRE(bash.find("'a'\\''b'") != std::string::npos);
 }
 
-// D-12: project() emits a wildcard entry for paths that cross a repeated container.
+// project() emits a wildcard entry for paths that cross a repeated container.
 // The wildcard flag substitutes a '*' at the repeated-container position so the bash
 // and zsh completion scripts can complete after any typed ordinal (e.g. --cluster-node-2-).
 namespace {
@@ -192,7 +192,7 @@ schema_registry repeated_cluster_registry()
 } // namespace
 
 TEST_CASE("completion emits wildcard flag for path crossing a repeated container",
-          "[completion][repeated_container][D12]")
+          "[completion][repeated_container]")
 {
     const schema_registry reg = repeated_cluster_registry();
     const std::string bash = generate_completion(shell::bash, reg, "myapp");
@@ -205,7 +205,7 @@ TEST_CASE("completion emits wildcard flag for path crossing a repeated container
 }
 
 TEST_CASE("completion wildcard entry appears in zsh script for repeated container",
-          "[completion][repeated_container][D12]")
+          "[completion][repeated_container]")
 {
     const schema_registry reg = repeated_cluster_registry();
     const std::string zsh = generate_completion(shell::zsh, reg, "myapp");
@@ -215,7 +215,7 @@ TEST_CASE("completion wildcard entry appears in zsh script for repeated containe
 }
 
 TEST_CASE("completion wildcard does not appear for non-repeated schema",
-          "[completion][repeated_container][D12]")
+          "[completion][repeated_container]")
 {
     const std::string bash = generate_completion(shell::bash, fixture(), "myapp");
     // fixture() has no repeated container -- no wildcard should be present.

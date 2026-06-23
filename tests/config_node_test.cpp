@@ -1,9 +1,9 @@
 // config_node cursor: null-view chaining navigation, shape queries, visit(), walk()
-// D-13: value-semantic cursor entered via config::root()
-// D-14: navigation never fails loudly; as<T>() returns expected with full path
-// D-15: kind(), count(), children(), exists(), path()
-// D-16: pre-order visit() + enter/leave config_tree_walker
-// D-07: repeated instances in numeric ordinal order (correct for N >= 11)
+// value-semantic cursor entered via config::root()
+// Navigation never fails loudly; as<T>() returns expected with full path
+// kind(), count(), children(), exists(), path()
+// pre-order visit() + enter/leave config_tree_walker
+// Repeated instances in numeric ordinal order (correct for N >= 11)
 
 #include "nucleus/config_node.h"
 #include "nucleus/config_space.h"
@@ -312,7 +312,7 @@ TEST_CASE("config_node visit() enumerates repeated instances in ordinal order", 
 }
 
 // ---------------------------------------------------------------------------
-// N >= 11 numeric ordinal order (D-07) -- must NOT be lexicographic
+// N >= 11 numeric ordinal order -- must NOT be lexicographic
 // ---------------------------------------------------------------------------
 
 TEST_CASE("config_node N >= 11 instances visit in numeric order not lexicographic",
@@ -443,11 +443,11 @@ TEST_CASE("config_node deep navigation reaches scalar value", "[config_node][nav
 }
 
 // ---------------------------------------------------------------------------
-// D-16 integration: visit() pre-order and walker enter/leave over loaded config
+// integration: visit() pre-order and walker enter/leave over loaded config
 // ---------------------------------------------------------------------------
 
 TEST_CASE("config_node visit -- depth-first pre-order over loaded config",
-          "[config_node][visit][D16]")
+          "[config_node][visit]")
 {
     // Two-node cluster config loaded via load_config.
     const nucleus::config cfg = load_two_nodes("80", "443");
@@ -478,7 +478,7 @@ TEST_CASE("config_node visit -- depth-first pre-order over loaded config",
 }
 
 TEST_CASE("config_node visit -- returning false stops the walk over loaded config",
-          "[config_node][visit][D16]")
+          "[config_node][visit]")
 {
     const nucleus::config cfg = load_two_nodes("80", "443");
 
@@ -492,7 +492,7 @@ TEST_CASE("config_node visit -- returning false stops the walk over loaded confi
 }
 
 TEST_CASE("config_node walker -- enter/leave order over loaded config",
-          "[config_node][walker][D16]")
+          "[config_node][walker]")
 {
     const nucleus::config cfg = load_two_nodes("80", "443");
 
@@ -534,7 +534,7 @@ TEST_CASE("config_node walker -- enter/leave order over loaded config",
 }
 
 // ---------------------------------------------------------------------------
-// WR-05: operator[](size_t) returns a true null-view for out-of-range indices
+// operator[](size_t) returns a true null-view for out-of-range indices
 // ---------------------------------------------------------------------------
 
 TEST_CASE("config_node operator[](size_t) out-of-range returns null-view",
@@ -562,7 +562,7 @@ TEST_CASE("config_node operator[](size_t) out-of-range returns null-view",
 }
 
 // ---------------------------------------------------------------------------
-// REF-08: config_node::parent() / ancestor()
+// config_node::parent() / ancestor()
 // ---------------------------------------------------------------------------
 
 TEST_CASE("config_node parent -- null and root nodes return null",

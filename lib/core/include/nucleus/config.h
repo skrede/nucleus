@@ -38,7 +38,7 @@ class config
 public:
     config() = default;
 
-    // Entry point for the walk API (D-13). Returns a root-anchored cursor backed by
+    // Entry point for the walk API. Returns a root-anchored cursor backed by
     // this immutable config. The cursor holds a const pointer to *this; the config
     // must outlive all cursors derived from it.
     config_node root() const noexcept
@@ -64,7 +64,7 @@ public:
     // The owned value at a key, or nullopt if the key carries no value. The
     // returned string is a copy -- no buffer dependency survives into it.
     // Returns nullopt for absent keys and for unindexed paths crossing a repeated
-    // container (D-21 legacy untyped surface). Use get_as() for the typed loud error
+    // container (legacy untyped surface). Use get_as() for the typed loud error
     // naming the container and instance count, or get("path[N]") / get_all() for
     // indexed access.
     std::optional<std::string> get(const std::string &key) const
@@ -136,12 +136,12 @@ public:
 
     // Returns the typed value at `key` converted by the registered converter.
     // Errors distinguish four cases:
-    //   errc::absent_key        -- the key carries no value at all
-    //   errc::index_required    -- the path crosses a repeated container without an
+    //   errc::absent_key -- the key carries no value at all
+    //   errc::index_required -- the path crosses a repeated container without an
     //                              index; message names the container and instance count
     //   errc::missing_converter -- the key has a string value but no converter
     //                              was registered (untyped path)
-    //   errc::mismatched_type   -- the stored type does not equal T (outright
+    //   errc::mismatched_type -- the stored type does not equal T (outright
     //                              type_index equality; no widening or coercion)
     // Note: any_cast<T> produces a copy of the stored value.
     template<typename T>
@@ -153,7 +153,7 @@ public:
             if(contains(key))
                 return unexpected(error{errc::missing_converter,
                             std::string("path '") + key + "' declares no type converter"});
-            // Detect unindexed path crossing a repeated container (D-21 loud error).
+            // Detect unindexed path crossing a repeated container (loud error).
             if(auto container = crossing_repeated_container(key); container)
             {
                 // Count distinct ordinals at the container -- one per instance,
@@ -256,7 +256,7 @@ private:
     //   (a) key IS the container path: m_values has "key[N]/..." entries.
     //   (b) key is a leaf path UNDER the container without an index:
     //       m_values has "prefix[N]/suffix" where canonical("prefix[N]/suffix") == key.
-    // This powers the D-21 index_required error in get_as() and the nullopt contract
+    // This powers the index_required error in get_as() and the nullopt contract
     // in get() (get() is unchanged -- both absent and crossing already return nullopt).
     std::optional<std::string> crossing_repeated_container(
         const std::string &key) const

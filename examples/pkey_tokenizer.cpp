@@ -14,10 +14,8 @@
 #include <iostream>
 #include <string>
 
-// -----------------------------------------------------------------------
 // Schema setup: cluster/server is a keyed container whose primary key is
 // "name". The "endpoint" leaf holds a value we compose using the pkey token.
-// -----------------------------------------------------------------------
 static nucleus::config_space make_server_space()
 {
     nucleus::config_space_builder engine;
@@ -34,13 +32,11 @@ static nucleus::config_space make_server_space()
 
 int main()
 {
-    // -----------------------------------------------------------------------
     // 1. Auto-named ${server.field} tokenizer: resolves pkey-anchored fields.
     //
     // ${server.name} expands to the selected strain's primary-key value.
     // ${server.endpoint} expands to the same strain's "endpoint" field.
     // The tokenizer is auto-registered by build() — no host install needed.
-    // -----------------------------------------------------------------------
     {
         auto space = make_server_space();
 
@@ -78,16 +74,14 @@ int main()
         // Prints: secondary: secondary at 10.0.0.2:9000
     }
 
-    // -----------------------------------------------------------------------
     // 2. Host tree tokenizer: install_tree_tokenizer replicates the built-in.
     //
     // A host can replace or augment the auto-named tokenizer by calling
     // install_tree_tokenizer before build(). Last-registration wins, so the
     // host's resolver shadows the auto-named built-in for the same category.
     //
-    // This proves host parity (TOK-02): a host-defined resolver is equivalent
+    // This proves host/built-in equivalence: a host-defined resolver is equivalent
     // to the auto-named built-in — both read cluster/server/<field> post-slice.
-    // -----------------------------------------------------------------------
     {
         nucleus::config_space_builder engine;
         engine.register_element(nucleus::element("cluster", nucleus::anchor::root()));

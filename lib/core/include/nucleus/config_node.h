@@ -29,7 +29,7 @@ enum class node_kind
     repeated,  // Ordered collection: has N indexed instances (node[0], node[1], ...).
 };
 
-// Enter/leave walker for depth-first tree traversal (D-16).
+// Enter/leave walker for depth-first tree traversal.
 // Pattern: enter/leave callbacks with recurse-on-enter semantics.
 class config_tree_walker
 {
@@ -43,12 +43,12 @@ public:
     virtual void leave(const class config_node &node) = 0;
 };
 
-// A cheap, value-semantic cursor into the resolved configuration tree (D-13).
+// A cheap, value-semantic cursor into the resolved configuration tree.
 // Holds a const pointer to the immutable config and an owned path string.
 // Lifetime: must not outlive the config object it was derived from.
 //
 // Navigation never fails loudly -- absent keys yield an invalid view that
-// propagates through further navigation (D-14). Terminal as<T>() returns
+// propagates through further navigation. Terminal as<T>() returns
 // expected<T, error> with errc::absent_key carrying the full attempted path.
 //
 // Method bodies that call config APIs are defined in config.h after the full
@@ -135,7 +135,7 @@ public:
 
     // Nearest ancestor (walking toward root) whose leaf segment base name (ordinal
     // stripped) matches `name`. Returns a null node when no ancestor matches.
-    // One shared walk routine reused by the relative-reference resolver and Phase-25 query.
+    // One shared walk routine reused by the relative-reference resolver and the query API.
     config_node ancestor(std::string_view name) const;
 
 private:

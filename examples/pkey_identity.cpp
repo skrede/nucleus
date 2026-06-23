@@ -2,7 +2,7 @@
 // as a readable leaf after strain resolution, and that load → emit → load is a
 // byte-stable fixpoint when the schema-aware emit_document overload is used.
 //
-// Phase 22 feature: the pkey value (e.g. name="web") previously disappeared
+// The pkey value (e.g. name="web") previously disappeared
 // from the resolved keyspace; it now lives at cluster/server/name and is readable
 // like any other leaf. The schema-aware emit overload renders it as an XML
 // attribute on the parent element rather than a child, preventing double-write on
@@ -87,7 +87,7 @@ int main()
     }
     const nucleus::config &config = loaded.value();
 
-    // IDN-01: the selected pkey value is a readable leaf at cluster/server/name.
+    // The selected pkey value is a readable leaf at cluster/server/name.
     if(const auto name = config.get("cluster/server/name"))
         std::cout << "cluster/server/name = " << *name << '\n';
 
@@ -95,7 +95,7 @@ int main()
     for(const std::string &key : config.keys())
         std::cout << key << " = " << config.get(key).value_or("") << '\n';
 
-    // IDN-03: emit with schema projection so the pkey renders as an XML attribute.
+    // Emit with schema projection so the pkey renders as an XML attribute.
     std::ostringstream out;
     nucleus::xml::emit_document(config, out, projection_of(space));
     const std::string emitted = out.str();

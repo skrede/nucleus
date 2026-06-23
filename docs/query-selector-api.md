@@ -85,7 +85,7 @@ Kind selectors classify nodes structurally via `config_node::kind()`.
 | `containers()` | Container nodes (`node_kind::container`). |
 | `repeated()` | Repeated-container structural nodes (`node_kind::repeated`). |
 
-**Note:** `leaves()` includes the retained primary-key leaf (Phase 22 D-10).
+**Note:** `leaves()` includes the retained primary-key leaf.
 For schema-authoritative role classification, use `role()` instead (see below).
 
 ---
@@ -167,7 +167,7 @@ primary-key container.
   result, not an error.
 - Results are prefix-filtered to the exact `[N]` instance — `server[0]` and
   `server[1]` never overlap.
-- The retained primary-key leaf is included (D-10).
+- The retained primary-key leaf is included.
 
 ```cpp
 const auto anchor0 = cfg.root()["cluster"]["server"][std::size_t{0}];

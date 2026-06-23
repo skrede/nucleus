@@ -1,7 +1,7 @@
 // constraint_groups: container-scoped constraint groups and identity groups.
 //
 // Covers: exclusion_group cardinality (at_most/exactly), when_value activation,
-// choice over all_of bundles, a Tier-3 validate_group valve, and an identity_group
+// choice over all_of bundles, a validate_group host valve, and an identity_group
 // (a uniquely-named member set pooled across element-types).
 // Domain-neutral vocabulary (server / cache / auth / pool / worker / gateway).
 
@@ -20,11 +20,9 @@
 
 using namespace nucleus;
 
-// -----------------------------------------------------------------------
 // Schema: server/cache{eager,lru,ttl} with a mutually-exclusive policy and a
 // ttl-positive valve; server/auth{cert,key,token} as a TLS-or-token choice; and
 // a pool of uniquely-named worker/gateway element-types.
-// -----------------------------------------------------------------------
 static config_space make_space()
 {
     config_space_builder b;
@@ -41,7 +39,7 @@ static config_space make_space()
             .member("lru")
             .member("ttl")
             .at_most(1));
-    // Tier-3 valve: a host rule cardinality cannot express.
+    // Host-validator valve: a host rule cardinality cannot express.
     b.register_constraint_group(validate_group(
         "ttl_positive", anchor::keyspace("server/cache"),
         [](const config_node &cache) -> expected<void, std::string> {
@@ -107,7 +105,7 @@ int main()
 
     runtime_source bad_ttl;
     bad_ttl.set("server/cache/ttl", "0").set("server/auth/token", "t");
-    show(space, "violation: Tier-3 valve rejects ttl=0", std::move(bad_ttl));
+    show(space, "violation: host-validator valve rejects ttl=0", std::move(bad_ttl));
 
     runtime_source dup;
     dup.set("server/cache/lru", "on").set("server/auth/token", "t")

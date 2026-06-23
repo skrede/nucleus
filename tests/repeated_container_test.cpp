@@ -1,7 +1,7 @@
 // Unified fold: repeated containers and repeated leaves stored as indexed scalars
 // in m_values; wholesale-replace across layers; extend= guard; get_all numeric order.
-// D-08: schema_enforcer normalizes indexed paths via canonical_text.
-// D-21: get_as() loud error for unindexed crossing; get_all_as() typed gather.
+// schema_enforcer normalizes indexed paths via canonical_text.
+// get_as() loud error for unindexed crossing; get_all_as() typed gather.
 
 #include "nucleus/config_space.h"
 
@@ -247,7 +247,7 @@ TEST_CASE("get_all gather -- numeric ordinal order with N >= 11 instances",
 }
 
 // ---------------------------------------------------------------------------
-// D-08: schema_enforcer canonical_text normalization
+// schema_enforcer canonical_text normalization
 // ---------------------------------------------------------------------------
 
 namespace {
@@ -267,7 +267,7 @@ nucleus::schema_registry cluster_node_registry()
 }
 
 TEST_CASE("schema_enforcer: indexed path normalizes to declared path",
-          "[repeated_container][enforcer][D08]")
+          "[repeated_container][enforcer]")
 {
     const auto reg = cluster_node_registry();
 
@@ -283,7 +283,7 @@ TEST_CASE("schema_enforcer: indexed path normalizes to declared path",
 }
 
 TEST_CASE("schema_enforcer: unknown indexed path produces violation",
-          "[repeated_container][enforcer][D08]")
+          "[repeated_container][enforcer]")
 {
     const auto reg = cluster_node_registry();
 
@@ -329,11 +329,11 @@ TEST_CASE("schema_enforcer: required check satisfied by indexed instance",
 }
 
 // ---------------------------------------------------------------------------
-// D-21: get_as() loud error; get() nullopt; get_all_as() typed gather
+// get_as() loud error; get() nullopt; get_all_as() typed gather
 // ---------------------------------------------------------------------------
 
 TEST_CASE("get_as on unindexed repeated container path returns errc::index_required",
-          "[repeated_container][D21][get_as]")
+          "[repeated_container][get_as]")
 {
     nucleus::config_space_builder engine;
     declare_cluster_node_schema(engine);
@@ -363,7 +363,7 @@ TEST_CASE("get_as on unindexed repeated container path returns errc::index_requi
 }
 
 TEST_CASE("get on unindexed repeated container path returns nullopt",
-          "[repeated_container][D21][get]")
+          "[repeated_container][get]")
 {
     nucleus::config_space_builder engine;
     declare_cluster_node_schema(engine);
@@ -388,7 +388,7 @@ TEST_CASE("get on unindexed repeated container path returns nullopt",
 }
 
 TEST_CASE("get_all_as gathers typed values across indexed instances",
-          "[repeated_container][D21][get_all_as]")
+          "[repeated_container][get_all_as]")
 {
     nucleus::config_space_builder engine;
     REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
@@ -417,11 +417,11 @@ TEST_CASE("get_all_as gathers typed values across indexed instances",
 }
 
 // ---------------------------------------------------------------------------
-// D-04: repeated is orthogonal to identity/unique
+// Repeated is orthogonal to identity/unique
 // ---------------------------------------------------------------------------
 
-TEST_CASE("D-04: repeated element with no identity or unique attaches and loads",
-          "[repeated_container][D04]")
+TEST_CASE("Repeated element with no identity or unique attaches and loads",
+          "[repeated_container]")
 {
     SECTION("repeated container with no identity/unique succeeds")
     {
@@ -484,11 +484,11 @@ TEST_CASE("D-04: repeated element with no identity or unique attaches and loads"
 }
 
 // ---------------------------------------------------------------------------
-// D-17: repeated container inside a keyed container -- ordinals survive slice
+// Repeated container inside a keyed container -- ordinals survive slice
 // ---------------------------------------------------------------------------
 
-TEST_CASE("D-17: repeated container inside keyed container -- ordinals survive slice",
-          "[repeated_container][D17]")
+TEST_CASE("Repeated container inside keyed container -- ordinals survive slice",
+          "[repeated_container]")
 {
     // Schema: cluster -> server (keyed by name) -> route (repeated) -> port.
     nucleus::config_space_builder engine;
@@ -528,11 +528,11 @@ TEST_CASE("D-17: repeated container inside keyed container -- ordinals survive s
 }
 
 // ---------------------------------------------------------------------------
-// D-19: extend= targeting repeated container via inheritance chain
+// extend= targeting repeated container via inheritance chain
 // ---------------------------------------------------------------------------
 
-TEST_CASE("D-19: extend= on repeated container via document inheritance is a layering violation",
-          "[repeated_container][D19]")
+TEST_CASE("extend= on repeated container via document inheritance is a layering violation",
+          "[repeated_container]")
 {
     // Two XML documents in an inheritance chain: base declares cluster/node
     // instances; the derived document applies extend= to a node element inside
@@ -566,11 +566,11 @@ TEST_CASE("D-19: extend= on repeated container via document inheritance is a lay
 }
 
 // ---------------------------------------------------------------------------
-// D-21: get_all gathers across instances with floating-point values
+// get_all gathers across instances with floating-point values
 // ---------------------------------------------------------------------------
 
-TEST_CASE("D-21: get_all gathers across three repeated instances in ordinal order",
-          "[repeated_container][D21][gather]")
+TEST_CASE("get_all gathers across three repeated instances in ordinal order",
+          "[repeated_container][gather]")
 {
     // Three-node schema; XML with port values 1.5, 2.0, 3.0 (as text scalars).
     nucleus::config_space_builder engine;
@@ -596,8 +596,8 @@ TEST_CASE("D-21: get_all gathers across three repeated instances in ordinal orde
     REQUIRE(cfg.get("cluster/node") == std::nullopt);
 }
 
-TEST_CASE("D-21: get_all_as gathers typed double values across three instances",
-          "[repeated_container][D21][gather][typed]")
+TEST_CASE("get_all_as gathers typed double values across three instances",
+          "[repeated_container][gather][typed]")
 {
     nucleus::config_space_builder engine;
     REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
@@ -625,7 +625,7 @@ TEST_CASE("D-21: get_all_as gathers typed double values across three instances",
 }
 
 // ---------------------------------------------------------------------------
-// WR-01: index_required error message reports distinct instance count, not entry count
+// index_required error message reports distinct instance count, not entry count
 // ---------------------------------------------------------------------------
 
 TEST_CASE("get_as index_required reports instance count not entry count",

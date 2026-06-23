@@ -359,20 +359,20 @@ and `${server.endpoint}` resolves to its `endpoint` field. The token is
 pkey-anchored: selecting "primary" does not leak "secondary"'s fields, even
 when both strains exist in the same source.
 
-- **Field surface (D-02):** only the pkey element's own sibling leaves are
+- **Field surface:** only the pkey element's own sibling leaves are
   reachable via `${server.*}`. Deeper subtrees or other containers use
   `${abs:...}` or `${rel:...}`.
-- **Zero-instance diagnostic (D-03):** if the schema declares the pkey element
+- **Zero-instance diagnostic:** if the schema declares the pkey element
   but no instance is in scope (optional pkey, zero strains selected),
   `${server.name}` fails with the precise message
   `"${server.name} requires a selected primary-key instance; this configuration
   has none in scope"`. The `??` operator catches this and falls through to the
   next arm.
-- **Reserved-name protection (D-04):** a pkey container whose tag collides with
+- **Reserved-name protection:** a pkey container whose tag collides with
   a reserved category name (`env`, `string`, `abs`, `rel`, `scope`, `file`,
   `dir`, `self`) is rejected at `register_element` time with
   `errc::rejected_registration`. Rename the schema element.
-- **Host shadowing (D-05):** a host that calls `install_tree_tokenizer` with the
+- **Host shadowing:** a host that calls `install_tree_tokenizer` with the
   same category name before `build()` shadows the built-in auto-named tokenizer
   for that category (last-registration-wins). See
   [Tree-access tokenizers](api-extending.md#tree-tokenizers) for the host API.
@@ -386,7 +386,7 @@ when both strains exist in the same source.
 
 See [`examples/pkey_tokenizer.cpp`](../examples/pkey_tokenizer.cpp).
 
-### Multiplicity and path model (D-08)
+### Multiplicity and path model
 
 **Templating via anonymous-instance inheritance.** A config element that
 carries no primary-key value is a template: it composes into all named
@@ -398,7 +398,7 @@ with `extend` to re-open it across the inheritance chain; without `extend`, a
 duplicate named instance is a layering violation.
 
 **`<include>` composition.** Explicit composition of multiple config fragments
-into one document is deferred (planned as SEED-006). Use the inheritance chain
+into one document is deferred. Use the inheritance chain
 (`document_paths` + `make_document`) for multi-file loading today.
 
 **File-relative paths via `${dir.path}`.** Each document in an inheritance

@@ -1,8 +1,8 @@
 // Ordinal emission for repeated-container instances: xml_source assigns zero-based
 // ordinals in document order to sibling elements under a repeated schema container.
 // Tests verify the raw batch entries emitted by xml_source::pull() (the fold is not
-// yet aware of indexed paths; that is Plan 05).
-// Plan 08: xml_emitter round-trip tests (D-22) appended below.
+// yet aware of indexed paths).
+// xml_emitter round-trip tests appended below.
 
 #include "nucleus/xml/xml_source.h"
 #include "nucleus/xml/xml_emitter.h"
@@ -201,7 +201,7 @@ TEST_CASE("non-repeated container -- no ordinals assigned", "[xml][repeated_cont
         REQUIRE(p.find('[') == std::string::npos);
 }
 
-TEST_CASE("xml emitter -- repeated container bracket strip", "[xml][xml_emitter][D22]")
+TEST_CASE("xml emitter -- repeated container bracket strip", "[xml][xml_emitter]")
 {
     const nucleus::config_space space = make_cluster_space_for_emitter();
 
@@ -239,7 +239,7 @@ TEST_CASE("xml emitter -- repeated container bracket strip", "[xml][xml_emitter]
     REQUIRE(emitted.find("0.2") != std::string::npos);
 }
 
-TEST_CASE("xml emitter -- repeated container round-trip", "[xml][xml_emitter][round_trip][D22]")
+TEST_CASE("xml emitter -- repeated container round-trip", "[xml][xml_emitter][round_trip]")
 {
     const nucleus::config_space space = make_cluster_space_for_emitter();
 
@@ -267,7 +267,7 @@ TEST_CASE("xml emitter -- repeated container round-trip", "[xml][xml_emitter][ro
 }
 
 TEST_CASE("xml emitter -- repeated container round-trip with N >= 11 instances",
-          "[xml][xml_emitter][round_trip][D22][CR01]")
+          "[xml][xml_emitter][round_trip][CR01]")
 {
     // Schema: cluster -> node (repeated) -> port (leaf).
     nucleus::config_space_builder builder;

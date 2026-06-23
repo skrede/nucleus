@@ -7,7 +7,7 @@
 
 #include <string>
 
-// REF-07 acceptance tests: ?? fallback chaining.
+// Acceptance tests: ?? fallback chaining.
 // ?? catches missing reference only; parse/cycle/budget errors propagate.
 // Arms are evaluated left-to-right; first success wins.
 
@@ -17,7 +17,7 @@ using nucleus::load_options;
 using nucleus::runtime_source;
 using nucleus::source_stack;
 
-TEST_CASE("?? falls through to second arm when first is absent (REF-07)", "[reference][fallback]")
+TEST_CASE("?? falls through to second arm when first is absent", "[reference][fallback]")
 {
     auto space = config_space_builder{}.build();
     runtime_source src;
@@ -30,7 +30,7 @@ TEST_CASE("?? falls through to second arm when first is absent (REF-07)", "[refe
     CHECK(loaded.value().get("host/result") == "8080");
 }
 
-TEST_CASE("?? uses literal string floor when all ref arms are absent (REF-07)",
+TEST_CASE("?? uses literal string floor when all ref arms are absent",
           "[reference][fallback]")
 {
     auto space = config_space_builder{}.build();
@@ -42,7 +42,7 @@ TEST_CASE("?? uses literal string floor when all ref arms are absent (REF-07)",
     CHECK(loaded.value().get("host/result") == "9090");
 }
 
-TEST_CASE("?? left-to-right: first present value wins (REF-07)", "[reference][fallback]")
+TEST_CASE("?? left-to-right: first present value wins", "[reference][fallback]")
 {
     auto space = config_space_builder{}.build();
     runtime_source src;
@@ -56,7 +56,7 @@ TEST_CASE("?? left-to-right: first present value wins (REF-07)", "[reference][fa
     CHECK(loaded.value().get("host/result") == "primary-value");
 }
 
-TEST_CASE("cycle error propagates past all ?? arms (REF-07 / D-05)", "[reference][fallback]")
+TEST_CASE("cycle error propagates past all ?? arms", "[reference][fallback]")
 {
     auto space = config_space_builder{}.build();
     runtime_source src;
@@ -69,7 +69,7 @@ TEST_CASE("cycle error propagates past all ?? arms (REF-07 / D-05)", "[reference
     CHECK(loaded.error().message.find("cyclic") != std::string::npos);
 }
 
-TEST_CASE("no ?? and missing reference is a hard error (REF-07)", "[reference][fallback]")
+TEST_CASE("no ?? and missing reference is a hard error", "[reference][fallback]")
 {
     auto space = config_space_builder{}.build();
     runtime_source src;
@@ -80,7 +80,7 @@ TEST_CASE("no ?? and missing reference is a hard error (REF-07)", "[reference][f
     CHECK(loaded.error().message.find("absent") != std::string::npos);
 }
 
-TEST_CASE("three-arm ?? chain falls through to the literal floor (REF-07)",
+TEST_CASE("three-arm ?? chain falls through to the literal floor",
           "[reference][fallback]")
 {
     auto space = config_space_builder{}.build();

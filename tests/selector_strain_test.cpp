@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-// SEL-06: in_strain() — ordinal-instance-correct; no cross-ordinal leak; pkey leaf
+// in_strain() — ordinal-instance-correct; no cross-ordinal leak; pkey leaf
 // included; container-level anchor returns empty; null ctx returns empty.
 //
 // Ordinal-indexed source paths survive the pkey fold (resolution_context skips paths
@@ -64,8 +64,8 @@ bool path_in(const std::vector<config_node> &nodes, std::string_view p)
 // Ordinal instance isolation: [0] fields do not appear in [1] query
 // -------------------------------------------------------------------------
 
-TEST_CASE("SEL-06: in_strain() from [0] anchor does not include [1] fields",
-          "[selector][SEL-06]")
+TEST_CASE("in_strain() from [0] anchor does not include [1] fields",
+          "[selector]")
 {
     const auto space = build_server_space();
     const auto ctx   = space.query_context();
@@ -89,8 +89,8 @@ TEST_CASE("SEL-06: in_strain() from [0] anchor does not include [1] fields",
     CHECK_FALSE(path_in(nodes, "cluster/server[1]/proto"));
 }
 
-TEST_CASE("SEL-06: in_strain() from [1] anchor does not include [0] fields",
-          "[selector][SEL-06]")
+TEST_CASE("in_strain() from [1] anchor does not include [0] fields",
+          "[selector]")
 {
     const auto space = build_server_space();
     const auto ctx   = space.query_context();
@@ -109,11 +109,11 @@ TEST_CASE("SEL-06: in_strain() from [1] anchor does not include [0] fields",
 }
 
 // -------------------------------------------------------------------------
-// in_strain() includes the pkey leaf (D-10)
+// in_strain() includes the pkey leaf
 // -------------------------------------------------------------------------
 
-TEST_CASE("SEL-06: in_strain() includes the retained pkey leaf (D-10)",
-          "[selector][SEL-06]")
+TEST_CASE("in_strain() includes the retained pkey leaf",
+          "[selector]")
 {
     const auto space = build_server_space();
     const auto ctx   = space.query_context();
@@ -132,8 +132,8 @@ TEST_CASE("SEL-06: in_strain() includes the retained pkey leaf (D-10)",
 // Container-level anchor yields empty (not error)
 // -------------------------------------------------------------------------
 
-TEST_CASE("SEL-06: in_strain() on container-level anchor yields empty",
-          "[selector][SEL-06]")
+TEST_CASE("in_strain() on container-level anchor yields empty",
+          "[selector]")
 {
     const auto space = build_server_space();
     const auto ctx   = space.query_context();
@@ -152,7 +152,7 @@ TEST_CASE("SEL-06: in_strain() on container-level anchor yields empty",
 // in_strain() with null ctx yields empty (not error)
 // -------------------------------------------------------------------------
 
-TEST_CASE("SEL-06: in_strain() with null ctx yields empty", "[selector][SEL-06]")
+TEST_CASE("in_strain() with null ctx yields empty", "[selector]")
 {
     const auto space = build_server_space();
     const auto cfg   = load_two_ordinal_strains(space);
@@ -168,8 +168,8 @@ TEST_CASE("SEL-06: in_strain() with null ctx yields empty", "[selector][SEL-06]"
 // Root-level anchor: in_strain() still correctly filters by [N] instance
 // -------------------------------------------------------------------------
 
-TEST_CASE("SEL-06: in_strain() from root with [0] ordinal anchor selects [0] strain only",
-          "[selector][SEL-06]")
+TEST_CASE("in_strain() from root with [0] ordinal anchor selects [0] strain only",
+          "[selector]")
 {
     const auto space = build_server_space();
     const auto ctx   = space.query_context();

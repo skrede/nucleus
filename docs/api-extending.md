@@ -465,29 +465,29 @@ auto space = engine.build();
 
 ### Reserved names and shadowing
 
-- **Reserved categories (D-04):** a category colliding with a built-in name
+- **Reserved categories:** a category colliding with a built-in name
   (`env`, `string`) or a pass-2 scheme head (`abs`, `rel`, `scope`, `file`,
   `dir`, `self`) is rejected immediately with `errc::rejected_registration`.
   The same check applies at `register_element` time when a primary-key element's
   container tag would become a reserved category.
 
-- **Last-registration-wins shadowing (D-05):** installing a tree tokenizer for
+- **Last-registration-wins shadowing:** installing a tree tokenizer for
   a category that the engine already registered (e.g. "server" auto-named by a
   pkey element) shadows the earlier registration. Install the host tokenizer
   **before** `build()` — `build()` skips auto-registration for categories
   already present in the registry, so the host's resolver takes precedence.
 
-### Host parity (TOK-02)
+### Host/built-in equivalence
 
 The built-in auto-named pkey tokenizer is implemented using the same
-`install_tree_tokenizer` path (D-07 dogfooding), which proves host parity:
-a host-defined resolver for `${server.name}` is equivalent in power and
+`install_tree_tokenizer` path (the engine dogfoods its own seam): a
+host-defined resolver for `${server.name}` is equivalent in power and
 behavior to the built-in one.
 
 See [`examples/pkey_tokenizer.cpp`](../examples/pkey_tokenizer.cpp) for a
 live side-by-side comparison and
 [`tests/pkey_tokenizer_test.cpp`](../tests/pkey_tokenizer_test.cpp) for the
-full acceptance suite (TOK-01, TOK-02, D-03, D-04, D-05).
+full acceptance suite.
 
 ---
 
