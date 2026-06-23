@@ -6,7 +6,7 @@ validates a keyref against dangling references and lets a host *dereference* it 
 target node, reusing the existing tree-addressing and query machinery — there is **no**
 new `${...}` token.
 
-Runnable example: [`examples/keyref.cpp`](../examples/keyref.cpp).
+Runnable example: [`examples/references/keyref.cpp`](../examples/references/keyref.cpp).
 
 ## Declaring a keyref
 

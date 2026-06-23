@@ -45,7 +45,7 @@ A builder accepts registrations and `build()` seals it into an immutable
 `config_space`. The free function `nucleus::load_config` folds an explicitly
 composed `source_stack` against the sealed space and yields an immutable
 `config`. The space is never modified by a load, so one space serves many
-loads — even concurrently (see [`examples/reusable_space.cpp`](../examples/reusable_space.cpp)).
+loads — even concurrently (see [`examples/composition/reusable_space.cpp`](../examples/composition/reusable_space.cpp)).
 The stack is borrowed by the load, not consumed, so one stack serves many loads
 too. Every fallible step reports a typed [`error`](#expected): an `errc` code a
 program branches on plus a verbatim human-readable message.
@@ -91,7 +91,7 @@ config_space build();   // seals; the builder is spent afterwards
 - After `build()`, every `register_*` / `install_*` call is a loud state-machine
   error (`errc::sealed_builder`), never a silent no-op.
 
-See [`examples/quickstart.cpp`](../examples/quickstart.cpp).
+See [`examples/basics/quickstart.cpp`](../examples/basics/quickstart.cpp).
 
 ---
 
@@ -159,7 +159,7 @@ if(!builder.register_element(
     return 1;
 ```
 
-See [`examples/schema.cpp`](../examples/schema.cpp).
+See [`examples/schema/schema.cpp`](../examples/schema/schema.cpp).
 
 ### Repeated elements
 
@@ -208,8 +208,8 @@ capability (XML, argv, or the runtime source).
 values. The `config_node` cursor (see [`config_node`](#config_node)) is the
 correlation tool when per-instance structure matters.
 
-See [`examples/quickstart.cpp`](../examples/quickstart.cpp) and
-[`examples/round_trip.cpp`](../examples/round_trip.cpp).
+See [`examples/basics/quickstart.cpp`](../examples/basics/quickstart.cpp) and
+[`examples/xml/round_trip.cpp`](../examples/xml/round_trip.cpp).
 
 ---
 
@@ -257,7 +257,7 @@ auto mass = config.get_as<int32_t>("body/mass");
 The stored type must equal the type requested from `get_as<T>` outright —
 `type_index` equality, no widening, no coercion. Storing `int32_t` and reading
 `int64_t` is a type mismatch. A complete custom-converter registration and typed
-read-back is in [`examples/typed.cpp`](../examples/typed.cpp).
+read-back is in [`examples/schema/typed.cpp`](../examples/schema/typed.cpp).
 
 ---
 
@@ -316,7 +316,7 @@ if(!builder.register_element(
     return 1;
 ```
 
-See [`examples/strains.cpp`](../examples/strains.cpp).
+See [`examples/schema/strains.cpp`](../examples/schema/strains.cpp).
 
 ---
 
@@ -339,7 +339,7 @@ app/label = ${abs:cluster/port ?? "8080"}
 server/url = ${rel:./host}:${rel:./port}
 ```
 
-See [`examples/tree_references.cpp`](../examples/tree_references.cpp) for live
+See [`examples/references/tree_references.cpp`](../examples/references/tree_references.cpp) for live
 demonstrations of `abs:`, `rel:`, `??`, and `${dir.path}`.
 
 ### `${node.field}` — auto-named pkey tokenizer
@@ -384,7 +384,7 @@ when both strains exist in the same source.
 //   cfg.get("cluster/server/description") == "primary at 10.0.0.1:9000"
 ```
 
-See [`examples/pkey_tokenizer.cpp`](../examples/pkey_tokenizer.cpp).
+See [`examples/tokens/pkey_tokenizer.cpp`](../examples/tokens/pkey_tokenizer.cpp).
 
 ### Multiplicity and path model
 
@@ -406,7 +406,7 @@ chain resolves `${dir.path}` to its own file's directory, so a base document
 and a derived document each resolve to their own location. This is the safe
 pattern for composing relative filesystem paths (e.g.
 `${dir.path}/certs/ca.pem`). The per-source binding is demonstrated in
-[`examples/tree_references.cpp`](../examples/tree_references.cpp) (see the
+[`examples/references/tree_references.cpp`](../examples/references/tree_references.cpp) (see the
 `dir.path` note) and proved per-file in
 [`tests/location_token_wiring_test.cpp`](../tests/location_token_wiring_test.cpp).
 
@@ -442,7 +442,7 @@ key_recognizer recognizer_of(const config_space &space);
 
 returns the schema-surface predicate an `argv_source` uses to reject undeclared
 flags (the closure borrows the space; keep the space alive). See
-[`examples/argv_recognizer.cpp`](../examples/argv_recognizer.cpp).
+[`examples/cli/argv_recognizer.cpp`](../examples/cli/argv_recognizer.cpp).
 
 ---
 
@@ -482,7 +482,7 @@ The shipped sources — `xml_source`, `env_source`, `argv_source`,
 `runtime_source` — are documented in
 [Shipped implementations](api-implementations.md); any plain struct satisfying
 the [source concept](api-extending.md#source_concept) composes the same way.
-See [`examples/source_stack.cpp`](../examples/source_stack.cpp).
+See [`examples/composition/source_stack.cpp`](../examples/composition/source_stack.cpp).
 
 ---
 
@@ -543,9 +543,9 @@ auto loaded = nucleus::load_config(space,
     nucleus::load_options{.document_paths = {"config.xml"}, .make_document = make});
 ```
 
-See [`examples/xml.cpp`](../examples/xml.cpp) (documents under argv),
-[`examples/strains.cpp`](../examples/strains.cpp) (selection), and
-[`examples/layering.cpp`](../examples/layering.cpp) (precedence and
+See [`examples/xml/xml.cpp`](../examples/xml/xml.cpp) (documents under argv),
+[`examples/schema/strains.cpp`](../examples/schema/strains.cpp) (selection), and
+[`examples/composition/layering.cpp`](../examples/composition/layering.cpp) (precedence and
 provenance).
 
 ---
@@ -573,7 +573,7 @@ The derivation is shape-driven (`"nucleus/schema/capability_requirements.h"`,
 non-root element requires `nesting` (hard), any repeated element requires
 `duplicate_keys` (hard), any typed element requests `typed_scalars` (soft). A
 hard capability is satisfied when ANY layer in the stack provides it. See
-[`examples/capability_gating.cpp`](../examples/capability_gating.cpp).
+[`examples/sources/capability_gating.cpp`](../examples/sources/capability_gating.cpp).
 
 ---
 
@@ -638,8 +638,8 @@ else if(port.error().code != nucleus::errc::absent_key)
 }
 ```
 
-See [`examples/typed.cpp`](../examples/typed.cpp) and
-[`examples/reusable_space.cpp`](../examples/reusable_space.cpp).
+See [`examples/schema/typed.cpp`](../examples/schema/typed.cpp) and
+[`examples/composition/reusable_space.cpp`](../examples/composition/reusable_space.cpp).
 
 ---
 
@@ -752,7 +752,7 @@ port_collector collector;
 cfg.root().walk(collector);
 ```
 
-See [`examples/quickstart.cpp`](../examples/quickstart.cpp) (Part 2 repeated
+See [`examples/basics/quickstart.cpp`](../examples/basics/quickstart.cpp) (Part 2 repeated
 container demo), [`tests/config_node_test.cpp`](../tests/config_node_test.cpp).
 
 ---
@@ -773,7 +773,7 @@ struct origin {
 };
 ```
 
-See [`examples/layering.cpp`](../examples/layering.cpp).
+See [`examples/composition/layering.cpp`](../examples/composition/layering.cpp).
 
 ---
 
@@ -851,9 +851,9 @@ The seam is stream-based and the caller owns persistence — write to a file wit
 a `std::ofstream`, capture into a string with a `std::ostringstream`. A repeated
 container emits N sibling elements (XML) or N indexed entries (env/argv) in
 numeric ordinal order. See
-[`examples/round_trip.cpp`](../examples/round_trip.cpp),
-[`examples/xml_persist.cpp`](../examples/xml_persist.cpp), and
-[`examples/emit_template.cpp`](../examples/emit_template.cpp).
+[`examples/xml/round_trip.cpp`](../examples/xml/round_trip.cpp),
+[`examples/xml/xml_persist.cpp`](../examples/xml/xml_persist.cpp), and
+[`examples/xml/emit_template.cpp`](../examples/xml/emit_template.cpp).
 
 ---
 
@@ -955,7 +955,7 @@ std::size_t size() const;
 std::string describe() const;
 ```
 
-See [`examples/diagnostics.cpp`](../examples/diagnostics.cpp).
+See [`examples/basics/diagnostics.cpp`](../examples/basics/diagnostics.cpp).
 
 ---
 
@@ -980,5 +980,5 @@ keeping the completed flags identical to the parsed ones.
 An `enum_element`'s value set becomes that flag's completion candidates. A pure
 read of the sealed schema. nucleus is a library, not a CLI — it returns the
 script as a string and the host decides how to surface it. See
-[`examples/completion.cpp`](../examples/completion.cpp) and
-[`examples/argv_delimiter.cpp`](../examples/argv_delimiter.cpp).
+[`examples/cli/completion.cpp`](../examples/cli/completion.cpp) and
+[`examples/cli/argv_delimiter.cpp`](../examples/cli/argv_delimiter.cpp).

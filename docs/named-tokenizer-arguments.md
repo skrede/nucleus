@@ -127,7 +127,7 @@ Argument errors are loud and named, in the same family as the unknown-key
 
 ## See also
 
-- [`examples/time_tokenizer.cpp`](../examples/time_tokenizer.cpp) — a host
+- [`examples/tokens/time_tokenizer.cpp`](../examples/tokens/time_tokenizer.cpp) — a host
   authoring a `${time.*}` tokenizer with an optional `format=` argument and a
   list-valued `concat` showcase.
 - [Seams you extend — Custom tokenizers](api-extending.md#tokenizers) — the

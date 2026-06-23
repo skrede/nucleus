@@ -72,8 +72,8 @@ static_assert(nucleus::config_source<table_source>);
 
 A concept-satisfying struct is moved into a `source_handle` and reaches the
 engine through the same fold path as any shipped source. See
-[`examples/custom_source.cpp`](../examples/custom_source.cpp) (a custom source
-folded by `load`) and [`examples/parser_concept.cpp`](../examples/parser_concept.cpp)
+[`examples/sources/custom_source.cpp`](../examples/sources/custom_source.cpp) (a custom source
+folded by `load`) and [`examples/sources/parser_concept.cpp`](../examples/sources/parser_concept.cpp)
 (the concept, the `static_assert`, and pulling through a handle directly).
 
 ---
@@ -184,7 +184,7 @@ The load copies values out (`value::to_owned`) and only then drops the batch, so
 a view never outlives its buffer — but a source that returned views without
 pinning the arena would dangle the instant the batch outlived the parser. The
 simplest correct source emits owned values and pins nothing
-([`examples/custom_source.cpp`](../examples/custom_source.cpp)); the shipped
+([`examples/sources/custom_source.cpp`](../examples/sources/custom_source.cpp)); the shipped
 `xml_source` is the worked arena-pinning example
 ([Shipped implementations](api-implementations.md#xml_source)).
 
@@ -220,7 +220,7 @@ A descriptor that claims everything is a red flag: it never exercises
 degradation. An honest, narrow descriptor (env's is empty) is what proves the
 gating mechanism works — and what lets the auto-gate refuse a stack that
 genuinely cannot carry the schema's shape
-([`examples/capability_gating.cpp`](../examples/capability_gating.cpp)).
+([`examples/sources/capability_gating.cpp`](../examples/sources/capability_gating.cpp)).
 
 ---
 
@@ -395,8 +395,8 @@ A value inside an argument arrives already expanded (a nested `${...}` resolves
 first); per-argument validation lives in the framework, not the closure. A later
 installation of the same category shadows the earlier one. The built-in expansion
 behavior (fixpoint recursion, inner-first nesting) is shown in
-[`examples/tokens.cpp`](../examples/tokens.cpp); the named-argument surface is
-shown in [`examples/time_tokenizer.cpp`](../examples/time_tokenizer.cpp); the
+[`examples/tokens/tokens.cpp`](../examples/tokens/tokens.cpp); the named-argument surface is
+shown in [`examples/tokens/time_tokenizer.cpp`](../examples/tokens/time_tokenizer.cpp); the
 install path is exercised in
 [`tests/resolution_test.cpp`](../tests/resolution_test.cpp).
 
@@ -484,7 +484,7 @@ The built-in auto-named pkey tokenizer is implemented using the same
 host-defined resolver for `${server.name}` is equivalent in power and
 behavior to the built-in one.
 
-See [`examples/pkey_tokenizer.cpp`](../examples/pkey_tokenizer.cpp) for a
+See [`examples/tokens/pkey_tokenizer.cpp`](../examples/tokens/pkey_tokenizer.cpp) for a
 live side-by-side comparison and
 [`tests/pkey_tokenizer_test.cpp`](../tests/pkey_tokenizer_test.cpp) for the
 full acceptance suite.
@@ -527,7 +527,7 @@ a load error with code `errc::failed_conversion` and a message of the form
 the zero-based element index) — the converter supplies only the `<reason>`
 string; the engine attaches the code. `make_scalar_converter<T>()` is public so a host
 can wrap the built-in parsing with extra validation instead of reimplementing
-it — [`examples/typed.cpp`](../examples/typed.cpp) composes the float converter
+it — [`examples/schema/typed.cpp`](../examples/schema/typed.cpp) composes the float converter
 into an aggregate `vec3` converter.
 
 ---
@@ -565,7 +565,7 @@ Install it with
 The verdict traffics in a plain reason string; a rejection's `reason()` is
 surfaced verbatim as the `message` of the `registration_result` error, with
 code `errc::rejected_registration` attached by the engine. See
-[`examples/registration_policy.cpp`](../examples/registration_policy.cpp).
+[`examples/sources/registration_policy.cpp`](../examples/sources/registration_policy.cpp).
 
 ---
 
@@ -591,7 +591,7 @@ public:
 Most hosts do not subclass it — the shipped adapters (`log_sink_f` for a
 callable, `log_sink_s` for an `std::ostream`) cover the common cases; see
 [Shipped implementations](api-implementations.md#log_sink_adapters) and
-[`examples/logging.cpp`](../examples/logging.cpp).
+[`examples/basics/logging.cpp`](../examples/basics/logging.cpp).
 
 ---
 

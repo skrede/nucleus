@@ -6,7 +6,7 @@ combines with a lower one. nucleus declares that rule schema-side as a `merge_mo
 collection element. The mode changes only the *combine operation* within the existing
 source-stack precedence order — it never changes layer ordering.
 
-Runnable example: [`examples/keyed_composition.cpp`](../examples/keyed_composition.cpp).
+Runnable example: [`examples/schema/keyed_composition.cpp`](../examples/schema/keyed_composition.cpp).
 
 ## The three modes
 

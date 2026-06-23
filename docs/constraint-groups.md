@@ -12,7 +12,7 @@ a named diagnostic):
 1. **Exclusion / choice** — cardinality over the active members of one container instance.
 2. **Identity / key** — uniqueness of one identifier field across a set of element-types.
 
-Runnable example: [`examples/constraint_groups.cpp`](../examples/constraint_groups.cpp).
+Runnable example: [`examples/schema/constraint_groups.cpp`](../examples/schema/constraint_groups.cpp).
 
 ## Exclusion groups
 

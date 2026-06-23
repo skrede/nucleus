@@ -288,4 +288,4 @@ config cfg = load_config(...);     // resolved, same lifetime as space
 ```
 
 A runnable example covering these patterns lives in
-[`examples/query.cpp`](../examples/query.cpp).
+[`examples/references/query.cpp`](../examples/references/query.cpp).

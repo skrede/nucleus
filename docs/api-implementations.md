@@ -102,8 +102,8 @@ auto make = [](const std::string &path) -> nucleus::source_handle {
 };
 ```
 
-See [`examples/xml.cpp`](../examples/xml.cpp),
-[`examples/strains.cpp`](../examples/strains.cpp), and
+See [`examples/xml/xml.cpp`](../examples/xml/xml.cpp),
+[`examples/schema/strains.cpp`](../examples/schema/strains.cpp), and
 [`tests/inherit_chain_test.cpp`](../tests/inherit_chain_test.cpp).
 
 ---
@@ -117,7 +117,7 @@ The minimal source: a flat `(path → value)` table the host populates. It is
 deliberately honest — its capability descriptor is **empty**, which is what lets
 it exercise the gate's degradation and refusal paths (ask a schema with nesting
 for an env-only stack and the auto-gate refuses; see
-[`examples/capability_gating.cpp`](../examples/capability_gating.cpp)). The
+[`examples/sources/capability_gating.cpp`](../examples/sources/capability_gating.cpp)). The
 core never reads the process environment; the host decides which variable maps
 to which key path.
 
@@ -139,7 +139,7 @@ nucleus::env_source values;
 values.set("service/region", "eu-west").set("service/tier", "gold");
 ```
 
-See [`examples/env.cpp`](../examples/env.cpp).
+See [`examples/sources/env.cpp`](../examples/sources/env.cpp).
 
 ---
 
@@ -208,10 +208,10 @@ rationale: the bijection genuinely addresses nested paths, and repeating a flag
 (`--tag=a --tag=b`) is the CLI idiom for collections — occurrences compose into
 one ordered collection. So a nested schema loads from argv alone. Not
 `typed_scalars`: flag values are text, so typing degrades softly. See
-[`examples/argv.cpp`](../examples/argv.cpp),
-[`examples/argv_recognizer.cpp`](../examples/argv_recognizer.cpp),
-[`examples/argv_delimiter.cpp`](../examples/argv_delimiter.cpp), and
-[`examples/logging.cpp`](../examples/logging.cpp).
+[`examples/cli/argv.cpp`](../examples/cli/argv.cpp),
+[`examples/cli/argv_recognizer.cpp`](../examples/cli/argv_recognizer.cpp),
+[`examples/cli/argv_delimiter.cpp`](../examples/cli/argv_delimiter.cpp), and
+[`examples/basics/logging.cpp`](../examples/basics/logging.cpp).
 
 ---
 
@@ -248,8 +248,8 @@ nucleus::runtime_source defaults;
 defaults.set("server/host", "localhost").set("server/port", "8080");
 ```
 
-See [`examples/source_stack.cpp`](../examples/source_stack.cpp) and
-[`examples/reusable_space.cpp`](../examples/reusable_space.cpp).
+See [`examples/composition/source_stack.cpp`](../examples/composition/source_stack.cpp) and
+[`examples/composition/reusable_space.cpp`](../examples/composition/reusable_space.cpp).
 
 ---
 
@@ -284,10 +284,10 @@ nucleus::xml::emit_document(config, file);        // persistence is yours
 ```
 
 The runtime module ships no emitter — its "format" is C++ code. See
-[`examples/round_trip.cpp`](../examples/round_trip.cpp) (one configuration
+[`examples/xml/round_trip.cpp`](../examples/xml/round_trip.cpp) (one configuration
 rendered through all three formats),
-[`examples/xml_persist.cpp`](../examples/xml_persist.cpp), and
-[`examples/emit_template.cpp`](../examples/emit_template.cpp).
+[`examples/xml/xml_persist.cpp`](../examples/xml/xml_persist.cpp), and
+[`examples/xml/emit_template.cpp`](../examples/xml/emit_template.cpp).
 
 ---
 
@@ -324,4 +324,4 @@ auto sink = nucleus::log_sink_f([](nucleus::log_level lvl, std::string_view msg)
 argv.log_to(sink);
 ```
 
-See [`examples/logging.cpp`](../examples/logging.cpp).
+See [`examples/basics/logging.cpp`](../examples/basics/logging.cpp).
