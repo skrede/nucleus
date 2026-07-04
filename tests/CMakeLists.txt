@@ -459,18 +459,24 @@ target_include_directories(source_concept_unsatisfied_fixture PRIVATE
 # ---------------------------------------------------------------------------
 # Reintroduced-warning proof: a fixture that deliberately stores an unread
 # private field. Routing it through nucleus_warnings() puts it under the same
-# centralized -Werror a developer hits locally, so WILL_FAIL asserts the gate
-# fails the build on the exact clang-only diagnostic (-Wunused-private-field)
-# that once slipped through non-fatally. Clang-gated: GCC has no such diagnostic,
-# so there the build would succeed and WILL_FAIL would falsely report failure.
+# centralized -Werror a developer hits locally. Rather than a bare WILL_FAIL
+# (which any nonzero build exit satisfies), the compile is driven through a
+# wrapper that asserts the build both fails AND fails on the exact clang-only
+# diagnostic (-Wunused-private-field) that once slipped through non-fatally --
+# so an unrelated compile break cannot pass the test for the wrong reason.
+# Clang-gated: GCC has no such diagnostic, so there the fixture compiles clean.
 # ---------------------------------------------------------------------------
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     add_test(
         NAME reintroduced_warning_negative_compile
-        COMMAND ${CMAKE_COMMAND} --build . --target reintroduced_warning_fixture --config $<CONFIG>
+        COMMAND ${CMAKE_COMMAND}
+            -DNUCLEUS_BUILD_DIR=${CMAKE_BINARY_DIR}
+            -DNUCLEUS_TARGET=reintroduced_warning_fixture
+            -DNUCLEUS_CONFIG=$<CONFIG>
+            -DNUCLEUS_EXPECT=unused-private-field
+            -P ${CMAKE_SOURCE_DIR}/scripts/expect_warning_compile_failure.cmake
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )
-    set_tests_properties(reintroduced_warning_negative_compile PROPERTIES WILL_FAIL TRUE)
 
     add_executable(reintroduced_warning_fixture EXCLUDE_FROM_ALL
         isolation/reintroduced_warning_fixture.cpp)

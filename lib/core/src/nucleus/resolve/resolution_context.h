@@ -597,7 +597,7 @@ public:
 
             std::vector<merged_instance *> instances;
             instances.reserve(grouped.size());
-for(auto &[k, mi] : grouped)
+            for(auto &[k, mi] : grouped)
                 instances.push_back(&mi);
             // NOLINTNEXTLINE(bugprone-nondeterministic-pointer-iteration-order): ordered by the stable rank and ordinal keys, not by pointer address, so the result is deterministic.
             std::sort(instances.begin(), instances.end(),
