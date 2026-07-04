@@ -115,9 +115,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        flavor: [address, thread]
+        flavor: [address, thread, undefined]
     runs-on: ubuntu-24.04
     name: sanitizer (${{ matrix.flavor }})
+    # Runtime belt-and-braces alongside the compile-time -fno-sanitize-recover:
+    # halt_on_error=1 makes a UBSan finding stop and return non-zero so the step
+    # fails natively instead of printing "runtime error:" and passing vacuously.
+    env:
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
     steps:
       - uses: actions/checkout@v4
 

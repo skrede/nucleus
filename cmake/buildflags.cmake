@@ -104,15 +104,27 @@ endfunction()
 
 # NUCLEUS_SANITIZER selects the instrumentation flavor for sanitizer builds:
 # "address" pairs ASan with UBSan (they compose; TSan composes with neither),
-# "thread" is the data-race validator behind the concurrent-load claim.
+# "thread" is the data-race validator behind the concurrent-load claim, and
+# "undefined" is UBSan on its own so it can be proven live independent of ASan.
+#
+# -fno-sanitize-recover=undefined is applied on every path that carries UBSan
+# (the composed address leg and the dedicated undefined leg): without it UBSan
+# prints "runtime error:" and continues with exit 0, so a real finding would
+# pass vacuously. -fsanitize=integer is deliberately NOT added -- unsigned wrap
+# is intentional behavior for the hashing/indexing paths, not a defect.
 set(NUCLEUS_SANITIZER "address" CACHE STRING
-    "Sanitizer flavor for NUCLEUS_BUILD_SANITIZER builds: address or thread")
+    "Sanitizer flavor for NUCLEUS_BUILD_SANITIZER builds: address, thread, or undefined")
 if(NUCLEUS_BUILD_SANITIZER AND NOT MSVC)
     if(NUCLEUS_SANITIZER STREQUAL "thread")
         add_compile_options(-fsanitize=thread -fno-omit-frame-pointer)
         add_link_options(-fsanitize=thread)
+    elseif(NUCLEUS_SANITIZER STREQUAL "undefined")
+        add_compile_options(-fsanitize=undefined -fno-sanitize-recover=undefined
+                            -fno-omit-frame-pointer)
+        add_link_options(-fsanitize=undefined)
     else()
-        add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+        add_compile_options(-fsanitize=address,undefined -fno-sanitize-recover=undefined
+                            -fno-omit-frame-pointer)
         add_link_options(-fsanitize=address,undefined)
     endif()
 endif()
