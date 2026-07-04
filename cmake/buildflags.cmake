@@ -2,11 +2,23 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Emitted for every configure so tooling (clang-tidy, clangd) has a compilation
+# database without a bespoke build step.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "" FORCE)
     message(STATUS "nucleus: CMAKE_BUILD_TYPE not set -- defaulting to Debug "
                    "(pass -DCMAKE_BUILD_TYPE=Release for an optimized build)")
 endif()
+
+# The single gate for treating warnings as errors on first-party targets. Kept
+# OFF by default so a stray toolchain-specific diagnostic never blocks a build
+# unexpectedly; downstream consumers and CI opt in explicitly. This is the ONLY
+# switch that injects -Werror / /WX -- no per-job or per-target duplication --
+# so a warning cannot be fatal under one compiler while silently green under
+# another.
+option(NUCLEUS_WERROR "Treat warnings as errors for first-party targets" OFF)
 
 # Warnings are applied PER TARGET, never directory-globally: a directory-scope
 # add_compile_options at the root would leak /W4 / -Wpedantic (and on MSVC
@@ -18,8 +30,14 @@ function(nucleus_warnings target)
         # /utf-8: MSVC otherwise reads source as the active code page, silently
         # double-encoding any non-ASCII byte in a u8 literal.
         target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)
+        if(NUCLEUS_WERROR)
+            target_compile_options(${target} PRIVATE /WX)
+        endif()
     else()
         target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
+        if(NUCLEUS_WERROR)
+            target_compile_options(${target} PRIVATE -Werror)
+        endif()
     endif()
 endfunction()
 
