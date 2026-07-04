@@ -28,7 +28,16 @@ void converts_to(std::string_view input, T expected)
     auto conv = make_scalar_converter<T>();
     auto r = conv(input);
     REQUIRE(r);
+    // Exact equality is the contract under test: a converter must reproduce the
+    // parsed value bit-for-bit, so for floating T this comparison is deliberate.
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wfloat-equal"
+#endif
     REQUIRE(std::any_cast<T>(r.value()) == expected);
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
 }
 
 // Asserts that `input` fails conversion with an error containing `reason`.

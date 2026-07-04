@@ -23,12 +23,12 @@ nucleus::load_options make_opts(std::string xml, std::string_view space_name = {
 {
     load_options opts;
     opts.document_paths = {"doc.xml"};
-    opts.make_document = [xml = std::move(xml), space_name = std::string(space_name)](
+    opts.make_document = [body = std::move(xml), space = std::string(space_name)](
                              const std::string &)
     {
-        auto src = xml_source::from(xml_source_options::of_string(xml));
-        if(!space_name.empty())
-            src.with_space_name(space_name);
+        auto src = xml_source::from(xml_source_options::of_string(body));
+        if(!space.empty())
+            src.with_space_name(space);
         return source_handle(std::move(src));
     };
     return opts;

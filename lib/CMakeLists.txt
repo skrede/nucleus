@@ -132,6 +132,9 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         GIT_REPOSITORY https://github.com/zeux/pugixml.git
         # v1.15, pinned to the commit so a moved tag cannot change the build
         GIT_TAG ee86beb30e4973f5feffe3ce63bfa4fbadf72f38
+        # SYSTEM: pugixml headers are third-party; consume them as system
+        # includes so their internals never trip our curated -Weverything/-Werror.
+        SYSTEM
         FIND_PACKAGE_ARGS NAMES pugixml
     )
     FetchContent_MakeAvailable(pugixml)

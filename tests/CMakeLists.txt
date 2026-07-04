@@ -8,6 +8,10 @@ if(NUCLEUS_FETCH_TEST_DEPS)
         GIT_REPOSITORY https://github.com/catchorg/Catch2.git
         # v3.15.0, pinned to the commit so a moved tag cannot change the build
         GIT_TAG 6ee0826dcae55ed1e06b2c5701981221e979e1e6
+        # SYSTEM: Catch2's headers are consumed as system includes so their own
+        # diagnostics (e.g. the float compare inside the REQUIRE decomposer) do
+        # not surface under our curated -Weverything/-Werror in test TUs.
+        SYSTEM
     )
     FetchContent_MakeAvailable(Catch2)
 else()

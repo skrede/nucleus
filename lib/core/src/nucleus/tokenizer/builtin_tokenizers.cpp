@@ -103,20 +103,20 @@ tokenizer make_string_tokenizer()
         {value(), arg_spec::scalar("pos", arg_type::integer),
          arg_spec::scalar("count", arg_type::integer).optional()},
         [](const named_args &a) -> token_result {
-            const std::string &value = a.string("value");
+            const std::string &text = a.string("value");
             const long long pos = a.integer("pos");
-            if(pos < 0 || static_cast<std::size_t>(pos) > value.size())
+            if(pos < 0 || static_cast<std::size_t>(pos) > text.size())
                 return unexpected(resolve_error(resolve_errc::type_mismatch,
                     nucleus::format("argument 'pos' ({}) is past the end of 'value' (length {})",
-                                    pos, value.size())));
+                                    pos, text.size())));
             const auto start = static_cast<std::size_t>(pos);
             if(!a.has("count"))
-                return value.substr(start);
+                return text.substr(start);
             const long long count = a.integer("count");
             if(count < 0)
                 return unexpected(resolve_error(resolve_errc::type_mismatch,
                     nucleus::format("argument 'count' ({}) must not be negative", count)));
-            return value.substr(start, static_cast<std::size_t>(count));
+            return text.substr(start, static_cast<std::size_t>(count));
         });
 
     return std::move(builder).build();

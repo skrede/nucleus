@@ -13,9 +13,9 @@ selector selector::with_predicate(node_predicate p) const
 {
     selector copy = *this;
     node_predicate old = m_predicate;
-    copy.m_predicate = [old = std::move(old), p = std::move(p)](
+    copy.m_predicate = [base = std::move(old), added = std::move(p)](
                            const config_node &node, const schema_query_context *ctx) {
-        return old(node, ctx) && p(node, ctx);
+        return base(node, ctx) && added(node, ctx);
     };
     return copy;
 }
@@ -157,13 +157,13 @@ selector selector::role(node_role r) const
 selector selector::owned_by(owner_token token) const
 {
     return with_predicate(
-        [token = std::move(token)](const config_node &node,
-                                   const schema_query_context *ctx) -> bool {
+        [held_token = std::move(token)](const config_node &node,
+                                        const schema_query_context *ctx) -> bool {
             if(!ctx)
                 return false;
             const std::string canonical = ctx->canonicalize(node.path());
             const auto owner = ctx->owner_of(canonical);
-            return owner.has_value() && *owner == token;
+            return owner.has_value() && *owner == held_token;
         });
 }
 
@@ -211,18 +211,18 @@ selector selector::or_(const selector &other) const
     const schema_query_context *other_ctx = other.m_ctx;
 
     selector copy = *this;
-    copy.m_predicate = [left = std::move(left), right = std::move(right), other_ctx](
+    copy.m_predicate = [lhs = std::move(left), rhs = std::move(right), other_ctx](
                            const config_node &node, const schema_query_context *ctx) {
-        return left(node, ctx) || right(node, other_ctx);
+        return lhs(node, ctx) || rhs(node, other_ctx);
     };
     return copy;
 }
 
 selector selector::excluding(node_predicate pred) const
 {
-    return with_predicate([pred = std::move(pred)](
+    return with_predicate([inner = std::move(pred)](
                               const config_node &node, const schema_query_context *ctx) {
-        return !pred(node, ctx);
+        return !inner(node, ctx);
     });
 }
 

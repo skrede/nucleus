@@ -12,13 +12,13 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
                    "(pass -DCMAKE_BUILD_TYPE=Release for an optimized build)")
 endif()
 
-# The single gate for treating warnings as errors on first-party targets. Kept
-# OFF by default so a stray toolchain-specific diagnostic never blocks a build
-# unexpectedly; downstream consumers and CI opt in explicitly. This is the ONLY
+# The single gate for treating warnings as errors on first-party targets.
+# Default ON: the first-party surface is clean under the curated warning set, so
+# the gate is enforced by default for every local and CI build. This is the ONLY
 # switch that injects -Werror / /WX -- no per-job or per-target duplication --
 # so a warning cannot be fatal under one compiler while silently green under
-# another.
-option(NUCLEUS_WERROR "Treat warnings as errors for first-party targets" OFF)
+# another. Pass -DNUCLEUS_WERROR=OFF to demote warnings to non-fatal locally.
+option(NUCLEUS_WERROR "Treat warnings as errors for first-party targets" ON)
 
 # Warnings are applied PER TARGET, never directory-globally: a directory-scope
 # add_compile_options at the root would leak /W4 / -Wpedantic (and on MSVC
@@ -35,6 +35,67 @@ function(nucleus_warnings target)
         endif()
     else()
         target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
+
+        if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+            # Maxed GCC set. The first block is portable (clang accepts every
+            # flag too, but it lives on the GCC branch to keep clang on its own
+            # -Weverything superset below). The second block is GCC-only: these
+            # flags are unknown to clang, so under -Werror an unguarded clang
+            # build would hard-error on -Wunknown-warning-option.
+            target_compile_options(${target} PRIVATE
+                -Wconversion -Wsign-conversion -Wshadow -Wold-style-cast
+                -Wcast-qual -Wnon-virtual-dtor -Woverloaded-virtual
+                -Wnull-dereference -Wdouble-promotion -Wformat=2
+                -Wimplicit-fallthrough -Wsuggest-override -Wextra-semi
+                -Wzero-as-null-pointer-constant
+                -Wuseless-cast -Wlogical-op -Wduplicated-cond
+                -Wduplicated-branches -Wmisleading-indentation)
+        elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")  # AppleClang + upstream Clang
+            # Curated -Weverything: opt in to the whole clang diagnostic
+            # universe, then subtract the categories that are pure noise for a
+            # value-semantics C++20 library. This -Wno- block is the single
+            # enumerated, justified opt-out list for the whole project. Some
+            # entries are inert on Apple clang 16 but flood on Linux clang-18,
+            # so the list is kept complete and portable rather than trimmed to
+            # what fires locally.
+            target_compile_options(${target} PRIVATE
+                -Weverything
+                # This is a C++20 library; the compat families warn that modern
+                # constructs are "incompatible with C++98/C++20".
+                -Wno-c++98-compat
+                -Wno-c++98-compat-pedantic
+                -Wno-c++98-compat-extra-semi
+                -Wno-c++20-compat
+                # Reports every struct with padding; meaningless for value types
+                # and would force artificial member reordering.
+                -Wno-padded
+                # Fires on polymorphic classes whose vtable cannot be pinned to
+                # one TU; a known false-positive magnet for header-heavy code.
+                -Wno-weak-vtables
+                # Intentional Meyers-style function-local sentinels (empty
+                # string/vector, cached type_info) legitimately have exit-time
+                # destructors / non-trivial construction; the pattern is by
+                # design, not a defect.
+                -Wno-exit-time-destructors
+                -Wno-global-constructors
+                # nucleus uses class-template-argument deduction idiomatically
+                # for types without explicit deduction guides.
+                -Wno-ctad-maybe-unsupported
+                # Keep -Wswitch (all enumerators without a default); drop the
+                # variants that demand an explicit case per enumerator or a
+                # mandatory default -- the latter conflicts with the
+                # covered-switch-default fixes that remove dead defaults.
+                -Wno-switch-enum
+                -Wno-switch-default
+                # Host artifact: warns that Homebrew include roots are "unsafe
+                # for cross-compilation"; irrelevant to a native build.
+                -Wno-poison-system-directories
+                # Experimental -fbounds-safety hardening family; extremely noisy
+                # and aimed at adopters of that model, not general libraries.
+                -Wno-unsafe-buffer-usage
+                -Wno-unsafe-buffer-usage-in-container)
+        endif()
+
         if(NUCLEUS_WERROR)
             target_compile_options(${target} PRIVATE -Werror)
         endif()

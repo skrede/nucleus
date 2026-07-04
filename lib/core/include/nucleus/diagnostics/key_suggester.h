@@ -84,8 +84,10 @@ inline std::vector<std::string> suggest_keys(
         ranked.push_back({weighted_levenshtein(unknown, candidate), candidate});
 
     std::sort(ranked.begin(), ranked.end(), [](const scored &lhs, const scored &rhs) {
-        if(lhs.cost != rhs.cost)
-            return lhs.cost < rhs.cost;
+        if(lhs.cost < rhs.cost)
+            return true;
+        if(rhs.cost < lhs.cost)
+            return false;
         return lhs.key < rhs.key;
     });
 

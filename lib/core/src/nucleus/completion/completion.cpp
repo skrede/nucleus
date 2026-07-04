@@ -134,14 +134,19 @@ std::string generate_completion(shell which, const schema_registry &schema,
                                 const key_path &anchor, std::string_view space_name)
 {
     const completion_model model = project(schema, prog, delimiter, anchor, space_name);
+    // No default label: an added shell must gain a case here rather than fall
+    // through silently to the bash emitter.
+    std::string script;
     switch(which)
     {
     case shell::zsh:
-        return zsh_emitter{}.emit(model);
+        script = zsh_emitter{}.emit(model);
+        break;
     case shell::bash:
-    default:
-        return bash_emitter{}.emit(model);
+        script = bash_emitter{}.emit(model);
+        break;
     }
+    return script;
 }
 
 }

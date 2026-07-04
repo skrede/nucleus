@@ -14,11 +14,14 @@
 
 namespace {
 
-// Minimal struct: only the two required members. Proves any satisfying struct is accepted.
+// Minimal struct: only the two required members. Proves any satisfying struct
+// is accepted. This type is only ever probed by the config_source concept in
+// the unevaluated static_asserts below, never instantiated or called, so its
+// members are deliberately unused.
 struct minimal_source
 {
-    nucleus::capability_descriptor capabilities() const { return {}; }
-    nucleus::config_source_result pull() { return nucleus::config_source_batch{}; }
+    [[maybe_unused]] nucleus::capability_descriptor capabilities() const { return {}; }
+    [[maybe_unused]] nucleus::config_source_result pull() { return nucleus::config_source_batch{}; }
 };
 
 // Flat stub: capabilities() + pull() only. No optional ops.
@@ -38,19 +41,19 @@ struct flat_stub
     }
 };
 
-// Projecting stub: adds apply_projection() to the flat interface.
+// Projecting stub: adds apply_projection() to the flat interface. Like
+// minimal_source, this type is only ever probed by the concept static_asserts,
+// so its members are deliberately unused.
 struct projecting_stub
 {
-    int projection_count = 0;
-
-    nucleus::capability_descriptor capabilities() const
+    [[maybe_unused]] nucleus::capability_descriptor capabilities() const
     {
         return {nucleus::capability::nesting};
     }
 
-    void apply_projection(const nucleus::schema_projection &) { ++projection_count; }
+    [[maybe_unused]] void apply_projection(const nucleus::schema_projection &) {}
 
-    nucleus::config_source_result pull()
+    [[maybe_unused]] nucleus::config_source_result pull()
     {
         return nucleus::config_source_batch{};
     }

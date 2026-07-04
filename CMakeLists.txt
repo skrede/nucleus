@@ -48,6 +48,9 @@ if(NOT NUCLEUS_HAVE_STD_FORMAT)
         GIT_REPOSITORY https://github.com/fmtlib/fmt.git
         # 11.0.2, pinned to the commit so a moved tag cannot change the build
         GIT_TAG 0c9fce2ffefecfdce794e1859584e25877b7b592
+        # SYSTEM: fmt headers are third-party; consume them as system includes so
+        # their internals never trip our curated -Weverything/-Werror.
+        SYSTEM
         FIND_PACKAGE_ARGS NAMES fmt
     )
     FetchContent_MakeAvailable(fmt)
