@@ -27,15 +27,17 @@ using ensure_resolved_fn =
 
 // Pass-2 resolver for tree-access tokens (${abs:...} and ${rel:...}) in a
 // single value string. Constructed transiently per leaf during resolve_references();
-// borrows (never stores) the building keyspace, the cross-leaf cycle guard, and
-// the shared substitution counter. Flat-registry purity: no stored cross-registry
-// member; tree_resolver_scope lives only for the duration of one leaf resolution.
+// borrows (never stores) the building keyspace and the shared substitution
+// counter. Cross-leaf cycle detection is owned by the caller (resolve_one_leaf
+// enters/exits the guard around each leaf); the recursive ensure_resolved
+// callback routes back through it, so this scope never touches the guard itself.
+// Flat-registry purity: no stored cross-registry member; tree_resolver_scope
+// lives only for the duration of one leaf resolution.
 class tree_resolver_scope
 {
 public:
     tree_resolver_scope(const keyspace &building,
                         key_path current_path,
-                        expansion_guard &leaf_guard,
                         std::size_t &substitution_counter,
                         std::size_t budget,
                         ensure_resolved_fn ensure_resolved,
@@ -55,7 +57,6 @@ private:
 
     const keyspace                  &m_building;
     key_path                         m_current_path;
-    expansion_guard                 &m_leaf_guard;
     std::size_t                     &m_substitution_counter;
     std::size_t                      m_budget;
     ensure_resolved_fn               m_ensure_resolved;

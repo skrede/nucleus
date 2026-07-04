@@ -1268,7 +1268,7 @@ private:
                                     substitution_counter);
         };
 
-        tree_resolver_scope scope(m_building, kp, leaf_guard,
+        tree_resolver_scope scope(m_building, kp,
                                   substitution_counter, m_reference_budget,
                                   std::move(ensure), &m_tree_tokenizer);
         auto resolved = scope.resolve_value(text);
