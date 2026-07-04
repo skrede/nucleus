@@ -76,6 +76,11 @@ public:
     resolver_scope(const resolver_scope &) = delete;
     resolver_scope &operator=(const resolver_scope &) = delete;
 
+    resolver_scope(resolver_scope &&) = delete;
+    resolver_scope &operator=(resolver_scope &&) = delete;
+
+    ~resolver_scope() = default;
+
     // Pushes the generic core file frame carrying the value's source location.
     // Activates the ${scope.file_*} keys for the bracketed resolution.
     frame_guard push_file_frame(std::filesystem::path file);

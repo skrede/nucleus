@@ -3,9 +3,11 @@
 
 #include <string_view>
 
+// NOLINTBEGIN(cppcoreguidelines-macro-to-enum,modernize-macro-to-enum,cppcoreguidelines-macro-usage): the version components must remain preprocessor macros so consumers can stringize them and test them in #if conditions.
 #define NUCLEUS_VERSION_MAJOR 0
 #define NUCLEUS_VERSION_MINOR 2
 #define NUCLEUS_VERSION_PATCH 0
+// NOLINTEND(cppcoreguidelines-macro-to-enum,modernize-macro-to-enum,cppcoreguidelines-macro-usage)
 
 namespace nucleus {
 

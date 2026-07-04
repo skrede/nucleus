@@ -67,7 +67,7 @@ private:
     static std::string brackets(const std::string &text)
     {
         std::string out;
-        for(char c : text)
+        for(char const c : text)
         {
             if(c == '[' || c == ']' || c == ':')
                 out.push_back('\\');
@@ -81,7 +81,7 @@ private:
     static std::string paren(const std::string &text)
     {
         std::string out;
-        for(char c : text)
+        for(char const c : text)
         {
             if(c == '(' || c == ')' || c == ' ' || c == ':')
                 out.push_back('\\');
@@ -96,7 +96,7 @@ private:
     static std::string single_quote(const std::string &text)
     {
         std::string out = "'";
-        for(char c : text)
+        for(char const c : text)
         {
             if(c == '\'')
                 out += "'\\''";
@@ -111,7 +111,7 @@ private:
     {
         std::string out;
         out.reserve(text.size());
-        for(char c : text)
+        for(char const c : text)
         {
             const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
                          || (c >= '0' && c <= '9') || c == '_';

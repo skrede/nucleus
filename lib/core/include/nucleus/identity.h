@@ -25,10 +25,9 @@ public:
     // value, so has_value() stays false.
     owner_token() : m_identity(std::make_shared<int>()) {}
 
-    template <typename T, typename = std::enable_if_t<
-                              !std::is_same_v<std::decay_t<T>, owner_token>>>
+    template <typename T>
     explicit owner_token(T value)
-        : m_payload(std::make_shared<model<std::decay_t<T>>>(std::move(value)))
+        requires (!std::is_same_v<std::decay_t<T>, owner_token>) : m_payload(std::make_shared<model<std::decay_t<T>>>(std::move(value)))
     {
     }
 
@@ -55,6 +54,11 @@ public:
 private:
     struct concept_base
     {
+        concept_base() = default;
+        concept_base(const concept_base &) = default;
+        concept_base &operator=(const concept_base &) = default;
+        concept_base(concept_base &&) = default;
+        concept_base &operator=(concept_base &&) = default;
         virtual ~concept_base() = default;
         virtual const std::type_info &type() const noexcept = 0;
         virtual bool equals(const concept_base &other) const noexcept = 0;

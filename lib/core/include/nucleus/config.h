@@ -123,7 +123,7 @@ public:
 
     bool contains(const std::string &key) const
     {
-        return m_values.find(key) != m_values.end();
+        return m_values.contains(key);
     }
 
     // "Why is this value X?" -- the winning source's origin for a scalar key, or
@@ -164,7 +164,7 @@ public:
                 {
                     if(!k.starts_with(bracket_prefix))
                         continue;
-                    std::string_view rem(k.data() + container->size(),
+                    std::string_view const rem(k.data() + container->size(),
                                         k.size() - container->size());
                     auto close = rem.find(']');
                     if(close == std::string_view::npos)
@@ -283,7 +283,7 @@ private:
             {
                 if(i == k.size() || k[i] == key_path::separator)
                 {
-                    std::string_view seg(k.data() + start, i - start);
+                    std::string_view const seg(k.data() + start, i - start);
                     if(key_path::is_indexed_segment(seg))
                     {
                         // Container prefix is everything before this indexed segment.
@@ -308,7 +308,7 @@ private:
         {
             if(i == key.size() || key[i] == key_path::separator)
             {
-                std::string_view seg(key.data() + start, i - start);
+                std::string_view const seg(key.data() + start, i - start);
                 if(!result.empty())
                     result.push_back(key_path::separator);
                 result.append(key_path::base_name(seg));
@@ -328,7 +328,7 @@ private:
         {
             if(i == key.size() || key[i] == key_path::separator)
             {
-                std::string_view seg(key.data() + start, i - start);
+                std::string_view const seg(key.data() + start, i - start);
                 if(key_path::is_indexed_segment(seg))
                     return key_path::ordinal_of(seg);
                 start = i + 1;
@@ -419,10 +419,10 @@ inline std::vector<config_node> config_node::children() const
 
     if(k == node_kind::repeated)
     {
-        std::vector<std::size_t> ordinals = distinct_ordinals();
+        std::vector<std::size_t> const ordinals = distinct_ordinals();
         std::vector<config_node> result;
         result.reserve(ordinals.size());
-        for(std::size_t ord : ordinals)
+        for(std::size_t const ord : ordinals)
             result.emplace_back(m_config,
                 m_path + "[" + std::to_string(ord) + "]");
         return result;
@@ -439,7 +439,7 @@ inline std::vector<config_node> config_node::children() const
         {
             if(!is_root && !key.starts_with(child_prefix))
                 continue;
-            std::string_view remainder(key.data() + child_prefix.size(),
+            std::string_view const remainder(key.data() + child_prefix.size(),
                                        key.size() - child_prefix.size());
             // Take only the first segment (stop at separator or '[').
             const auto sep_pos = remainder.find(key_path::separator);
@@ -497,7 +497,7 @@ inline std::vector<std::size_t> config_node::distinct_ordinals() const
         if(!k.starts_with(indexed_prefix))
             continue;
         // Remainder after m_path: "[N]" or "[N]/...".
-        std::string_view remainder(k.data() + m_path.size(),
+        std::string_view const remainder(k.data() + m_path.size(),
                                    k.size() - m_path.size());
         if(remainder.size() < 3 || remainder[0] != '[')
             continue;
@@ -506,16 +506,16 @@ inline std::vector<std::size_t> config_node::distinct_ordinals() const
             continue;
         const std::string_view digits = remainder.substr(1, close - 1);
         bool all_digits = !digits.empty();
-        for(char c : digits)
+        for(char const c : digits)
             if(c < '0' || c > '9') { all_digits = false; break; }
         if(!all_digits)
             continue;
         std::size_t ordinal = 0;
-        for(char c : digits)
-            ordinal = ordinal * 10 + static_cast<std::size_t>(c - '0');
+        for(char const c : digits)
+            ordinal = (ordinal * 10) + static_cast<std::size_t>(c - '0');
         ordinal_set.insert(ordinal);
     }
-    return std::vector<std::size_t>(ordinal_set.begin(), ordinal_set.end());
+    return {ordinal_set.begin(), ordinal_set.end()};
 }
 
 inline config_node config_node::parent() const
@@ -525,7 +525,7 @@ inline config_node config_node::parent() const
     auto kp = key_path::parse(m_path);
     if(!kp)
         return config_node{};
-    key_path p = kp.value().parent();
+    key_path const p = kp.value().parent();
     if(p.empty())
         return config_node{m_config, std::string{}};
     return config_node{m_config, p.str()};

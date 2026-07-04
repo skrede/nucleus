@@ -46,8 +46,7 @@ public:
     // True when container_path has been declared as a repeated container.
     bool is_repeated_container(std::string_view container_path) const
     {
-        return m_repeated_containers.find(std::string(container_path))
-               != m_repeated_containers.end();
+        return m_repeated_containers.contains(std::string(container_path));
     }
 
     bool empty() const noexcept { return m_keys.empty() && m_repeated_containers.empty(); }

@@ -7,6 +7,7 @@
 
 #include "nucleus/registry/registration.h"
 
+#include <ranges>
 #include <string>
 #include <vector>
 #include <cstddef>
@@ -39,9 +40,9 @@ public:
     // earlier built-in for the same category name.
     const tokenizer *find(std::string_view category) const noexcept
     {
-        for(auto it = m_entries.rbegin(); it != m_entries.rend(); ++it)
-            if(it->spec.category() == category)
-                return &it->spec;
+        for(const auto & m_entrie : std::views::reverse(m_entries))
+            if(m_entrie.spec.category() == category)
+                return &m_entrie.spec;
         return nullptr;
     }
 

@@ -293,7 +293,7 @@ public:
     // schema is the authority: an undeclared path is not a valid target.
     bool recognizes(const key_path &path) const
     {
-        return m_defined.find(path.str()) != m_defined.end();
+        return m_defined.contains(path.str());
     }
 
     // Recognizes a CLI plain-ordinal path: a path where a digit-only
@@ -312,7 +312,7 @@ public:
         {
             const bool all_digits = !seg.empty() && std::ranges::all_of(
                 seg, [](char c) { return c >= '0' && c <= '9'; });
-            if(all_digits && repeated_containers.count(collapsed))
+            if(all_digits && repeated_containers.contains(collapsed))
             {
                 // Skip the ordinal segment -- it selects an instance of the
                 // repeated container; the declared path does not include it.
@@ -433,7 +433,7 @@ public:
     // from a required/identity one without re-parsing.
     bool recognizes_text(const std::string &path) const
     {
-        return m_defined.find(path) != m_defined.end();
+        return m_defined.contains(path);
     }
 
     // The schema-projected surface: every declared element path, in canonical
@@ -487,7 +487,7 @@ private:
     {
         const std::string below = at + key_path::separator;
         return std::ranges::any_of(m_defined, [&](const std::string &defined) {
-            return defined == at || defined.compare(0, below.size(), below) == 0;
+            return defined == at || defined.starts_with(below);
         });
     }
 

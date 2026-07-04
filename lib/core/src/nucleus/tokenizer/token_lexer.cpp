@@ -24,7 +24,7 @@ struct head_parse
 {
     std::string_view category;
     std::string_view name;
-    std::size_t paren_pos;
+    std::size_t paren_pos{};
 };
 
 // Supported nesting shapes (recursive-to-fixpoint, resolved before this lexer
@@ -116,7 +116,7 @@ expected<std::string, resolve_error> read_scalar(std::string_view body, std::siz
 
     for(; i < body.size(); ++i)
     {
-        char c = body[i];
+        char const c = body[i];
         if(quote_char != '\0')
         {
             if(c == quote_char) { quote_char = '\0'; continue; }
@@ -157,12 +157,12 @@ expected<std::string, resolve_error> read_scalar(std::string_view body, std::siz
 // rejects an empty name or a missing '='.
 expected<std::string, resolve_error> read_arg_name(std::string_view body, std::size_t &i)
 {
-    std::size_t start = i;
+    std::size_t const start = i;
     while(i < body.size() && body[i] != '=' && body[i] != ',' && body[i] != ')')
         ++i;
     if(i >= body.size() || body[i] != '=')
         return parse_failure("expected name=value in token argument list");
-    std::string_view raw = body.substr(start, i - start);
+    std::string_view const raw = body.substr(start, i - start);
     ++i;  // consume '='
     auto first = raw.find_first_not_of(" \t");
     if(first == std::string_view::npos)
@@ -287,7 +287,7 @@ std::vector<std::string_view> split_fallback_arms(std::string_view body)
 
     for(std::size_t i = 0; i < body.size(); ++i)
     {
-        char c = body[i];
+        char const c = body[i];
 
         if(in_quote)
         {

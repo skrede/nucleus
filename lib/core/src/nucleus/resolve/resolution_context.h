@@ -129,6 +129,7 @@ public:
         ordered.reserve(layers.size());
         for(layered_handle &lh : layers)
             ordered.push_back(&lh);
+        // NOLINTNEXTLINE(bugprone-nondeterministic-pointer-iteration-order): ordered by the stable rank key, not by pointer address, so the result is deterministic.
         std::stable_sort(ordered.begin(), ordered.end(),
                          [](const layered_handle *a, const layered_handle *b) {
                              return a->rank < b->rank;
@@ -162,8 +163,10 @@ public:
                 const std::string parent = g.container().str();
                 for(const std::string &m : g.members)
                 {
-                    const std::string mp = parent.empty()
-                        ? m : parent + key_path::separator + m;
+                    std::string mp = parent;
+                    if(!mp.empty())
+                        mp += key_path::separator;
+                    mp += m;
                     if(mp == cpath) { field = g.field; break; }
                 }
                 if(!field.empty())
@@ -204,7 +207,7 @@ public:
             // Extend= targeting a repeated container is not supported.
             for(const extend_disposition &d : batch.dispositions)
             {
-                if(repeated_container_prefixes.count(d.container_path))
+                if(repeated_container_prefixes.contains(d.container_path))
                     return unexpected(error{errc::layering_violation,
                         nucleus::format(
                             "extend= targeting repeated container '{}' is not "
@@ -267,8 +270,11 @@ public:
                     {
                         std::string prefix;
                         for(std::size_t i = 0; i < len; ++i)
-                            prefix = prefix.empty() ? segs[i]
-                                : prefix + key_path::separator + segs[i];
+                        {
+                            if(!prefix.empty())
+                                prefix += key_path::separator;
+                            prefix += segs[i];
+                        }
                         auto prefix_kp = key_path::parse(prefix);
                         if(!prefix_kp)
                             continue;
@@ -280,22 +286,28 @@ public:
                         const std::string &cseg = segs[len - 1];
                         std::string actual_container;
                         for(std::size_t i = 0; i + 1 < len; ++i)
-                            actual_container = actual_container.empty() ? segs[i]
-                                : actual_container + key_path::separator + segs[i];
-                        actual_container = actual_container.empty()
-                            ? std::string(key_path::base_name(cseg))
-                            : actual_container + key_path::separator
-                                + std::string(key_path::base_name(cseg));
+                        {
+                            if(!actual_container.empty())
+                                actual_container += key_path::separator;
+                            actual_container += segs[i];
+                        }
+                        if(!actual_container.empty())
+                            actual_container += key_path::separator;
+                        actual_container += key_path::base_name(cseg);
                         const std::size_t ordinal = key_path::is_indexed_segment(cseg)
                             ? key_path::ordinal_of(cseg)
                             : keyed_flat_counter[actual_container]++;
                         std::string suffix;
                         for(std::size_t i = len; i < segs.size(); ++i)
-                            suffix = suffix.empty() ? segs[i]
-                                : suffix + key_path::separator + segs[i];
+                        {
+                            if(!suffix.empty())
+                                suffix += key_path::separator;
+                            suffix += segs[i];
+                        }
                         m_actual_to_canonical[actual_container] = canon;
                         m_keyed_accumulator[actual_container].push_back(keyed_instance_entry{
                             lh->rank, ordinal, std::move(suffix),
+                            // NOLINTNEXTLINE(bugprone-use-after-move): the move runs only on the diverted branch which immediately continues to the next entry, so expanded is never read afterward.
                             std::move(expanded).value(),
                             origin{lh->rank, lh->label, lh->owner, lh->inheritance_layer}});
                         diverted = true;
@@ -328,12 +340,12 @@ public:
                             if(j) prefix += key_path::separator;
                             prefix += segs[j];
                         }
-                        if(!repeated_container_prefixes.count(prefix))
+                        if(!repeated_container_prefixes.contains(prefix))
                             continue;
                         // Found: "prefix/N/..." is a CLI ordinal path.
                         const std::size_t ordinal = [&]() {
                             std::size_t v = 0;
-                            for(char c : seg) v = v * 10 + static_cast<std::size_t>(c - '0');
+                            for(char const c : seg) v = (v * 10) + static_cast<std::size_t>(c - '0');
                             return v;
                         }();
                         // Re-bracket: "prefix/N/rest" -> "prefix[N]/rest".
@@ -391,18 +403,18 @@ public:
                         // The canonical of this path must start with prefix + separator.
                         const std::string p_slash = prefix + key_path::separator;
                         if(canonical_path == prefix
-                           || canonical_path.compare(0, p_slash.size(), p_slash) == 0)
+                           || canonical_path.starts_with(p_slash))
                         {
                             container_prefix = prefix;
                             break;
                         }
                     }
                     // Also handle repeated leaves with indexed paths (config/tags[0]).
-                    if(container_prefix.empty() && repeated_paths.count(canonical_path))
+                    if(container_prefix.empty() && repeated_paths.contains(canonical_path))
                         container_prefix = canonical_path;
 
                     if(!container_prefix.empty()
-                       && !swept_containers_this_layer.count(container_prefix))
+                       && !swept_containers_this_layer.contains(container_prefix))
                     {
                         //  wholesale-replace: on first entry from a new layer
                         // touching this container, remove all existing entries.
@@ -418,7 +430,7 @@ public:
                             const std::string ec = m_schema.canonical_text(existing);
                             const bool under =
                                 ec == container_prefix
-                                || ec.compare(0, cp_slash.size(), cp_slash) == 0;
+                                || ec.starts_with(cp_slash);
                             if(under)
                             {
                                 m_building.remove(existing);
@@ -432,7 +444,7 @@ public:
                                         origin{lh->rank, lh->label, lh->owner,
                                                lh->inheritance_layer});
                 }
-                else if(repeated_paths.count(canonical_path))
+                else if(repeated_paths.contains(canonical_path))
                 {
                     // Case A: plain repeated-leaf entry arriving as a plain path
                     // (from duplicate_keys sources like runtime_source or tree sources).
@@ -442,7 +454,7 @@ public:
                     const std::string &actual_path_str = entry.path;
 
                     if(!entry.capabilities.supports(capability::duplicate_keys)
-                       && leaf_ordinal_counters.count(actual_path_str) != 0)
+                       && leaf_ordinal_counters.contains(actual_path_str))
                     {
                         return unexpected(error{errc::layering_violation,
                             nucleus::format(
@@ -459,7 +471,7 @@ public:
                     // contain transient key-value segments) are intentionally left in
                     // the building keyspace so slice() can still find and relay the
                     // strain; relay_strain handles displacement via its rank check.
-                    if(!swept_containers_this_layer.count(canonical_path))
+                    if(!swept_containers_this_layer.contains(canonical_path))
                     {
                         swept_containers_this_layer.insert(canonical_path);
                         const std::string cp_bracket = canonical_path + "[";
@@ -470,7 +482,7 @@ public:
                             // Only sweep flat entries: those that ARE the canonical path
                             // or are directly-indexed versions of it (canonical_path[N]).
                             if(es != canonical_path
-                               && es.compare(0, cp_bracket.size(), cp_bracket) != 0)
+                               && !es.starts_with(cp_bracket))
                                 continue;
                             m_building.remove(existing);
                             m_provenance.forget(es);
@@ -515,7 +527,7 @@ public:
             for(const key_path &bp : m_building.paths())
             {
                 const std::string bps = bp.str();
-                if(bps.compare(0, bracket_prefix.size(), bracket_prefix) != 0)
+                if(!bps.starts_with(bracket_prefix))
                     continue;
                 const auto lb = bps.find('[', override.container_prefix.size());
                 const auto rb = bps.find(']', lb);
@@ -523,9 +535,8 @@ public:
                     continue;
                 std::size_t slot = 0;
                 for(std::size_t k = lb + 1; k < rb; ++k)
-                    slot = slot * 10 + static_cast<std::size_t>(bps[k] - '0');
-                if(slot + 1 > instance_count)
-                    instance_count = slot + 1;
+                    slot = (slot * 10) + static_cast<std::size_t>(bps[k] - '0');
+                instance_count = std::max(slot + 1, instance_count);
             }
             if(override.ordinal >= instance_count)
                 return unexpected(error{errc::schema_violation, nucleus::format(
@@ -585,8 +596,10 @@ public:
             }
 
             std::vector<merged_instance *> instances;
-            for(auto &[k, mi] : grouped)
+            instances.reserve(grouped.size());
+for(auto &[k, mi] : grouped)
                 instances.push_back(&mi);
+            // NOLINTNEXTLINE(bugprone-nondeterministic-pointer-iteration-order): ordered by the stable rank and ordinal keys, not by pointer address, so the result is deterministic.
             std::sort(instances.begin(), instances.end(),
                       [](const merged_instance *a, const merged_instance *b) {
                           return a->rank != b->rank ? a->rank < b->rank
@@ -631,6 +644,7 @@ public:
                     else
                         survivors[it->second] = mi;
                 }
+                // NOLINTNEXTLINE(bugprone-nondeterministic-pointer-iteration-order): ordered by the stable rank and ordinal keys, not by pointer address, so the result is deterministic.
                 std::sort(survivors.begin(), survivors.end(),
                           [](const merged_instance *a, const merged_instance *b) {
                               return a->rank != b->rank ? a->rank < b->rank
@@ -753,7 +767,7 @@ public:
             {
                 // If the requested value is not among the bucketed strains,
                 // fail loudly listing every available value.
-                if(strains.find(selection.value()) == strains.end())
+                if(!strains.contains(selection.value()))
                 {
                     std::string available;
                     for(const auto &[key_value, _] : strains)
@@ -993,8 +1007,7 @@ public:
                         continue;
                     // Skip entries belonging to the chosen strain when it is
                     // extend-wide: they must survive to compose via relay_strain.
-                    if(wide_extend && path.str().compare(0, chosen_prefix.size(),
-                                                         chosen_prefix) == 0)
+                    if(wide_extend && path.str().starts_with(chosen_prefix))
                         continue;
                     m_building.remove(path);
                     m_provenance.forget(path.str());
@@ -1039,7 +1052,7 @@ public:
         std::size_t substitution_counter = 0;
 
         // Snapshot paths (resolving writes back via m_building.set()).
-        std::vector<key_path> all_paths = m_building.paths();
+        std::vector<key_path> const all_paths = m_building.paths();
 
         for(const key_path &kp : all_paths)
         {
@@ -1089,7 +1102,7 @@ public:
             for(const key_path &path : m_building.paths())
                 if(const value *v = m_building.find(path))
                     owned.emplace(path.str(), std::string(v->text()));
-            config snapshot(std::move(owned), m_provenance);
+            config const snapshot(std::move(owned), m_provenance);
             group_violations = group_enforcer::validate(m_schema, snapshot);
         }
 
@@ -1211,7 +1224,7 @@ public:
             if(const value *v = m_building.find(path))
                 owned.emplace(path.str(), std::string(v->text()));
         }
-        return config(std::move(owned), m_typed, m_provenance);
+        return {std::move(owned), m_typed, m_provenance};
     }
 
     // Sets the pass-2 reference substitution budget. 0 maps to the engine default (never zero-cap).
@@ -1236,7 +1249,7 @@ private:
         const std::string path_str = kp.str();
 
         // Already resolved in this pass.
-        if(resolved_cache.count(path_str))
+        if(resolved_cache.contains(path_str))
             return {};
 
         const value *v = m_building.find(kp);
@@ -1304,7 +1317,7 @@ private:
         for(const key_path &keyed : keyed_paths)
         {
             const origin *from = m_provenance.of(keyed.str());
-            std::size_t entry_rank = from != nullptr ? from->rank : 0;
+            std::size_t const entry_rank = from != nullptr ? from->rank : 0;
             // A keyed-merge collection was already finalised across layers by
             // merge_keyed_collections(); its instances legitimately span ranks, so the
             // scope-policy rank pruning and the wholesale-displacement logic below must
@@ -1353,7 +1366,7 @@ private:
             {
                 // Canonical base: strip ordinals from all segments.
                 const std::string canonical_base = m_schema.canonical_text(unified.value());
-                if(displaced_bases.count(canonical_base))
+                if(displaced_bases.contains(canonical_base))
                 {
                     // Already determined the whole base is displaced; skip.
                     m_building.remove(keyed);
@@ -1425,7 +1438,7 @@ private:
         {
             const std::string cslash = cpath + key_path::separator;
             if(canonical_path == cpath
-               || canonical_path.compare(0, cslash.size(), cslash) == 0)
+               || canonical_path.starts_with(cslash))
                 return true;
         }
         return false;
@@ -1437,9 +1450,8 @@ private:
     std::string relay_canonical(const key_path &path) const
     {
         std::string canonical;
-        for(std::size_t i = 0; i < path.segments().size(); ++i)
+        for(const auto & segment : path.segments())
         {
-            const std::string &segment = path.segments()[i];
             std::string extended = canonical;
             if(!extended.empty())
                 extended += key_path::separator;

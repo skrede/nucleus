@@ -40,7 +40,7 @@ public:
 
     bool contains(const key_path &path) const
     {
-        if(m_values.find(path.str()) != m_values.end())
+        if(m_values.contains(path.str()))
             return true;
         auto cit = m_collections.find(path.str());
         return cit != m_collections.end() && !cit->second.empty();
@@ -87,7 +87,7 @@ public:
     // Whether the path holds a collection (as opposed to a scalar or nothing).
     bool is_collection(const key_path &path) const
     {
-        return m_collections.find(path.str()) != m_collections.end();
+        return m_collections.contains(path.str());
     }
 
     std::size_t size() const noexcept
@@ -134,12 +134,12 @@ public:
         const std::string below = at + key_path::separator;
         for(const auto &[text, _] : m_values)
         {
-            if(text == at || text.compare(0, below.size(), below) == 0)
+            if(text == at || text.starts_with(below))
                 return true;
         }
         for(const auto &[text, _] : m_collections)
         {
-            if(text == at || text.compare(0, below.size(), below) == 0)
+            if(text == at || text.starts_with(below))
                 return true;
         }
         return false;
@@ -158,7 +158,7 @@ public:
         std::vector<std::string> out;
 
         auto collect_child = [&](const std::string &text) {
-            if(!below.empty() && text.compare(0, below.size(), below) != 0)
+            if(!below.empty() && !text.starts_with(below))
                 return;
             auto parsed = key_path::parse(text);
             if(!parsed)

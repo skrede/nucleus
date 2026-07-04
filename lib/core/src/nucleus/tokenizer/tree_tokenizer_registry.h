@@ -8,6 +8,7 @@
 #include "nucleus/tokenizer/tree_tokenizer.h"
 
 #include <cstddef>
+#include <ranges>
 #include <string_view>
 #include <vector>
 
@@ -34,9 +35,9 @@ public:
     // earlier built-in for the same category name.
     const tree_tokenizer *find(std::string_view category) const noexcept
     {
-        for(auto it = m_entries.rbegin(); it != m_entries.rend(); ++it)
-            if(it->spec.category() == category)
-                return &it->spec;
+        for(const auto & m_entrie : std::views::reverse(m_entries))
+            if(m_entrie.spec.category() == category)
+                return &m_entrie.spec;
         return nullptr;
     }
 

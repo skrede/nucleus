@@ -78,6 +78,7 @@ public:
 
     tokenizer(tokenizer &&) noexcept = default;
     tokenizer &operator=(tokenizer &&) noexcept = default;
+    ~tokenizer() = default;
 
     std::string_view category() const noexcept { return m_category; }
 

@@ -139,6 +139,27 @@ jobs:
       - name: Test
         run: cd build-san && ctest --output-on-failure --timeout 300
 
+  clang-tidy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-tidy
+        run: sudo apt-get update && sudo apt-get install -y clang-tidy-18
+
+      # compile_commands.json is exported by buildflags.cmake, so run-clang-tidy
+      # reads the flags straight from the database -- no compiler flags are
+      # restated here. The .clang-tidy WarningsAsErrors: '*' turns any finding
+      # into a non-zero exit, so this step fails the build on a new finding.
+      - name: Configure
+        run: >-
+          cmake . -B build
+          -DNUCLEUS_BUILD_TESTS=ON
+          -DNUCLEUS_BUILD_SOURCE_XML=ON
+
+      - name: Run clang-tidy
+        run: run-clang-tidy-18 -p build -quiet -clang-tidy-binary clang-tidy-18 'lib/.*/nucleus/'
+
   core-purity:
     runs-on: ubuntu-24.04
     steps:

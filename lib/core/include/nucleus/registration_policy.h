@@ -38,7 +38,7 @@ constexpr std::string_view to_string(registration_kind kind) noexcept
 // of either.
 struct registration_request
 {
-    registration_kind kind;
+    registration_kind kind{};
     owner_token owner;
 };
 
@@ -74,6 +74,7 @@ private:
 class registration_policy
 {
 public:
+    registration_policy() = default;
     virtual ~registration_policy() = default;
 
     virtual policy_verdict review(const registration_request &request)
@@ -81,6 +82,12 @@ public:
         (void)request;
         return policy_verdict::accept();
     }
+
+protected:
+    registration_policy(const registration_policy &) = default;
+    registration_policy &operator=(const registration_policy &) = default;
+    registration_policy(registration_policy &&) = default;
+    registration_policy &operator=(registration_policy &&) = default;
 };
 
 }

@@ -42,8 +42,8 @@ public:
 
     tokenizer build() &&
     {
-        return tokenizer(std::move(m_category), std::move(m_fields),
-                         std::move(m_functions), std::move(m_wildcard));
+        return {std::move(m_category), std::move(m_fields),
+                         std::move(m_functions), std::move(m_wildcard)};
     }
 
 private:

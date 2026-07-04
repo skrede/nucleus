@@ -34,7 +34,7 @@ std::string escape(std::string_view text)
 {
     std::string out;
     out.reserve(text.size());
-    for(char c : text)
+    for(char const c : text)
     {
         switch(c)
         {
@@ -194,7 +194,7 @@ numeric_sort_key(const std::string &key)
     {
         if(i == key.size() || key[i] == key_path::separator)
         {
-            std::string_view seg(key.data() + start, i - start);
+            std::string_view const seg(key.data() + start, i - start);
             if(key_path::is_indexed_segment(seg))
                 parts.emplace_back(std::string(key_path::base_name(seg)),
                                    key_path::ordinal_of(seg));
@@ -251,6 +251,7 @@ void emit_document(const config &config, std::ostream &out,
 
         // Descend through every segment but the leaf. Track parent_canonical in
         // parallel (base names joined by separator) for the pkey attribute check.
+        // NOLINTNEXTLINE(cppcoreguidelines-slicing): pugixml's xml_node is a non-owning handle; taking the document as a node view is the library's intended idiom and copies only the handle, not owned state.
         pugi::xml_node node = doc;
         std::string parent_canonical;
         for(std::size_t i = 0; i + 1 < segments.size(); ++i)
@@ -304,7 +305,7 @@ void emit_document(const config &config, std::ostream &out,
         for(pugi::xml_node child = doc.first_child(); child; child = child.next_sibling())
             top_level.push_back(child);
         pugi::xml_node wrapper = doc.append_child(std::string(space_name).c_str());
-        for(pugi::xml_node &child : top_level)
+        for(pugi::xml_node  const&child : top_level)
             wrapper.append_move(child);
     }
 

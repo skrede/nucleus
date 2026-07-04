@@ -96,6 +96,7 @@ completion_model project(const schema_registry &schema,
         opt.flag = flag_of(effective, delimiter);
         if(auto it = values.find(path.str()); it != values.end())
             opt.values = it->second;
+        const auto option_values = opt.values;
         model.options.push_back(std::move(opt));
 
         // Emit an additional wildcard entry when the path crosses a repeated
@@ -104,8 +105,10 @@ completion_model project(const schema_registry &schema,
         for(std::size_t depth = 1; depth < path.size(); ++depth)
         {
             const std::string &seg = path.segments()[depth - 1];
-            prefix = prefix.empty() ? seg : prefix + key_path::separator + seg;
-            if(repeated_containers.count(prefix) && depth < path.size())
+            if(!prefix.empty())
+                prefix += key_path::separator;
+            prefix += seg;
+            if(repeated_containers.contains(prefix) && depth < path.size())
             {
                 // Compute the container depth in the effective path (accounting for
                 // anchor stripping and space_name prepend).
@@ -117,8 +120,8 @@ completion_model project(const schema_registry &schema,
                 completion_option wild;
                 wild.flag = wildcard_flag(effective, effective_depth, delimiter);
                 wild.has_ordinal_wildcard = true;
-                if(!opt.values.empty())
-                    wild.values = opt.values;
+                if(!option_values.empty())
+                    wild.values = option_values;
                 model.options.push_back(std::move(wild));
                 break; // one wildcard entry per crossing
             }

@@ -138,7 +138,7 @@ public:
         // Reject leading zeros (except a lone "0").
         if(digits.size() > 1 && digits[0] == '0')
             return false;
-        for(char c : digits)
+        for(char const c : digits)
             if(c < '0' || c > '9')
                 return false;
         return true;
@@ -159,8 +159,8 @@ public:
         auto lb = seg.find('[');
         auto digits = seg.substr(lb + 1, seg.size() - lb - 2);
         std::size_t value = 0;
-        for(char c : digits)
-            value = value * 10 + static_cast<std::size_t>(c - '0');
+        for(char const c : digits)
+            value = (value * 10) + static_cast<std::size_t>(c - '0');
         return value;
     }
 

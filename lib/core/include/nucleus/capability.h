@@ -56,7 +56,7 @@ public:
     // listed is unsupported.
     constexpr capability_descriptor(std::initializer_list<capability> supported)
     {
-        for(capability cap : supported)
+        for(capability const cap : supported)
             m_flags[index(cap)] = true;
     }
 

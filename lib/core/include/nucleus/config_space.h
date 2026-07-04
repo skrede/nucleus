@@ -60,7 +60,7 @@ using registration_result = expected<void, error>;
 
 inline registration_result registration_ok()
 {
-    return registration_result();
+    return {};
 }
 
 // The outcome of load_config: the immutable config, or an error whose code
@@ -111,19 +111,19 @@ public:
     // identity), making the schema authoritative over content: the load_config path
     // validates the resolved keyspace against these elements and enforces
     // referential integrity at attach time. Same state-machine/policy seam as above.
-    registration_result register_element(schema_element element, owner_token owner = {});
+    registration_result register_element(schema_element element, const owner_token& owner = {});
 
     // Registers a container-scoped exclusion/choice constraint group (cardinality
     // over the active members of one container instance, or a host validator).
     // Enforced on the resolved/sliced tree by load_config; a violation is loud.
     // Same state-machine/policy seam as register_element.
-    registration_result register_constraint_group(constraint_group group, owner_token owner = {});
+    registration_result register_constraint_group(constraint_group group, const owner_token& owner = {});
 
     // Registers an identity (key) group: a namespace pooling one identifier field
     // across the instances of several member element-types under a parent container,
     // required present and unique within a slice. The identifier is a handle (the
     // keyed-composition merge key and the keyref target), never a slice selector.
-    registration_result register_identity_group(identity_group_spec group, owner_token owner = {});
+    registration_result register_identity_group(identity_group_spec group, const owner_token& owner = {});
 
     registration_result register_tokenizer(std::string name, owner_token owner = {});
 
@@ -146,15 +146,15 @@ public:
     // state-machine/policy seam as the other registrations.
     registration_result register_converter(std::type_index id,
         std::function<expected<std::any, std::string>(std::string_view)> conv,
-        owner_token owner = {});
+        const owner_token& owner = {});
 
     // Convenience: register a converter for T (keyed by typeid(T)).
     template<typename T>
     registration_result register_converter(
         std::function<expected<std::any, std::string>(std::string_view)> conv,
-        owner_token owner = {})
+        const owner_token &owner = {})
     {
-        return register_converter(std::type_index(typeid(T)), std::move(conv), std::move(owner));
+        return register_converter(std::type_index(typeid(T)), std::move(conv), owner);
     }
 
     std::size_t schema_count() const noexcept;

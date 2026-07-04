@@ -36,7 +36,7 @@ std::string replace_all(std::string_view in, std::string_view from, std::string_
         return std::string(in);
     std::string out;
     std::size_t pos = 0;
-    for(std::size_t found; (found = in.find(from, pos)) != std::string_view::npos;)
+    for(std::size_t found = 0; (found = in.find(from, pos)) != std::string_view::npos;)
     {
         out.append(in.substr(pos, found - pos));
         out.append(to);

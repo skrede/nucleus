@@ -136,7 +136,7 @@ private:
         const std::filesystem::path &absolute)
     {
         std::string key = absolute.generic_string();
-        if(m_visited.count(key))
+        if(m_visited.contains(key))
             return unexpected(error{errc::invalid_inheritance, nucleus::format(
                 "inheritance cycle detected at '{}': this file was already visited "
                 "in the current chain",
@@ -193,7 +193,7 @@ private:
                 "inheritance chain: source '{}': {}", path, pulled.error().message)});
 
         // Query the inheritance declaration AFTER pull() (arena is populated).
-        inherit_declaration decl = handle.inheritance();
+        inherit_declaration const decl = handle.inheritance();
 
         // Recurse into the parent BEFORE appending this source (root-first order).
         if(decl.which == inherit_declaration::kind::parent_path)

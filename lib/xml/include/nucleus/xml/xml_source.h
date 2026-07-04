@@ -67,10 +67,10 @@ public:
     {
         const kind k = options.kind == xml_source_options::input_kind::file
                            ? kind::file : kind::string;
-        return xml_source(k, std::move(options.data));
+        return {k, std::move(options.data)};
     }
 
-    capability_descriptor capabilities() const;
+    static capability_descriptor capabilities() ;
 
     config_source_result pull();
 

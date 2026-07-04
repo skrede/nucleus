@@ -21,6 +21,13 @@ public:
     virtual ~shell_emitter() = default;
 
     virtual std::string emit(const completion_model &model) const = 0;
+
+protected:
+    shell_emitter() = default;
+    shell_emitter(const shell_emitter &) = default;
+    shell_emitter &operator=(const shell_emitter &) = default;
+    shell_emitter(shell_emitter &&) = default;
+    shell_emitter &operator=(shell_emitter &&) = default;
 };
 
 }

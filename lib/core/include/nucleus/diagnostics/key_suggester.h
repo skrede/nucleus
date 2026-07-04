@@ -40,7 +40,8 @@ inline double weighted_levenshtein(std::string_view a, std::string_view b)
 {
     const std::size_t m = a.size();
     const std::size_t n = b.size();
-    std::vector<double> prev(n + 1), curr(n + 1);
+    std::vector<double> prev(n + 1);
+    std::vector<double> curr(n + 1);
     for(std::size_t j = 0; j <= n; ++j)
         prev[j] = static_cast<double>(j);
     for(std::size_t i = 1; i <= m; ++i)
@@ -52,9 +53,13 @@ inline double weighted_levenshtein(std::string_view a, std::string_view b)
             const char cb = b[j - 1];
             const int ka = key_char_class(ca);
             const int kb = key_char_class(cb);
-            const double sub = (ca == cb) ? 0.0
-                             : (ka != 0 && ka == kb) ? 0.5
-                             : 1.0;
+            const double sub = [&] {
+                if(ca == cb)
+                    return 0.0;
+                if(ka != 0 && ka == kb)
+                    return 0.5;
+                return 1.0;
+            }();
             curr[j] = std::min({prev[j] + 1.0, curr[j - 1] + 1.0, prev[j - 1] + sub});
         }
         std::swap(prev, curr);

@@ -235,7 +235,7 @@ private:
             if(!kp || schema.canonical_text(*kp) != declared)
                 continue;
             auto v = resolved.get(key);
-            if(!v.has_value() || valid.count(*v) != 0)
+            if(!v.has_value() || valid.contains(*v))
                 continue;
             std::string reason = nucleus::format(
                 "keyref '{}'='{}' matches no identifier in namespace '{}'",
@@ -272,7 +272,7 @@ private:
                         g.name, m, mi, g.field)});
                     continue;
                 }
-                pool[*v].push_back({m, field_path});
+                pool[*v].emplace_back(m, field_path);
             }
         }
 

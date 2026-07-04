@@ -76,12 +76,12 @@ token_result tree_resolver_scope::resolve_value(std::string_view value_text)
         pos = i;
 
         // Split on top-level '??' to get fallback arms.
-        std::vector<std::string_view> arms = split_fallback_arms(token_body);
+        std::vector<std::string_view> const arms = split_fallback_arms(token_body);
 
         token_result last = unexpected(resolve_error(
             resolve_errc::missing_field, "all fallback arms absent"));
         bool succeeded = false;
-        for(std::string_view arm : arms)
+        for(std::string_view const arm : arms)
         {
             auto r = resolve_one_arm(arm);
             if(r)
@@ -156,7 +156,7 @@ token_result tree_resolver_scope::resolve_one_arm(std::string_view arm)
                                         m_budget)));
 
                 const tree_tokenizer *tok = m_tree_tokenizer->find(category);
-                tree_access access{m_building, m_current_path, category, field};
+                tree_access const access{m_building, m_current_path, category, field};
                 return tok->resolve(access);
             }
         }
@@ -204,7 +204,7 @@ token_result tree_resolver_scope::resolve_absolute(std::string_view path_body)
 
 token_result tree_resolver_scope::resolve_relative(std::string_view rel_body)
 {
-    key_path target = resolve_relative_path(rel_body);
+    key_path const target = resolve_relative_path(rel_body);
 
     ++m_substitution_counter;
     if(m_substitution_counter > m_budget)

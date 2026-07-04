@@ -39,6 +39,7 @@ constexpr std::string_view to_string(log_level level) noexcept
 class log_sink
 {
 public:
+    log_sink() = default;
     virtual ~log_sink() = default;
 
     virtual void log(log_level level, std::string_view message)
@@ -46,6 +47,12 @@ public:
         (void)level;
         (void)message;
     }
+
+protected:
+    log_sink(const log_sink &) = default;
+    log_sink &operator=(const log_sink &) = default;
+    log_sink(log_sink &&) = default;
+    log_sink &operator=(log_sink &&) = default;
 };
 
 // Bridges the seam to any callable invocable as f(log_level, std::string_view) --

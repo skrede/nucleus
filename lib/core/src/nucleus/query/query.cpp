@@ -24,7 +24,7 @@ selector selector::children() const
 {
     const std::string anchor_path{m_anchor.path()};
     return with_predicate([anchor_path](const config_node &node, const schema_query_context *) {
-        std::string_view np = node.path();
+        std::string_view const np = node.path();
         if(np == anchor_path)
             return false;
         // The node is a direct child when its path is exactly anchor + one segment.
@@ -39,7 +39,7 @@ selector selector::children() const
         else if(np.starts_with(anchor_path))
         {
             // Could be "a/b/x" (child via '/') or "a/b[n]" (ordinal instance).
-            std::string_view after = np.substr(anchor_path.size());
+            std::string_view const after = np.substr(anchor_path.size());
             if(after.empty())
                 return false;
             if(after[0] == '/')
@@ -73,7 +73,7 @@ selector selector::at_depth(std::size_t depth) const
     const std::string anchor_path{m_anchor.path()};
     return with_predicate([anchor_path, depth](const config_node &node,
                                                const schema_query_context *) {
-        std::string_view np = node.path();
+        std::string_view const np = node.path();
         if(np == anchor_path)
             return false;
 
@@ -86,7 +86,7 @@ selector selector::at_depth(std::size_t depth) const
         }
         else if(np.starts_with(anchor_path))
         {
-            std::string_view after = np.substr(anchor_path.size());
+            std::string_view const after = np.substr(anchor_path.size());
             if(after.empty())
                 return false;
             // Repeated instance: "cluster/node[0]" after "cluster/node" → "[0]"
@@ -101,7 +101,7 @@ selector selector::at_depth(std::size_t depth) const
         }
 
         // The number of '/' separators in the suffix equals the relative depth.
-        std::size_t seps = static_cast<std::size_t>(
+        std::size_t const seps = static_cast<std::size_t>(
             std::count(suffix.begin(), suffix.end(), '/'));
         return seps == depth;
     });
@@ -111,7 +111,7 @@ selector selector::under(std::string_view subpath) const
 {
     const std::string prefix{subpath};
     return with_predicate([prefix](const config_node &node, const schema_query_context *) {
-        std::string_view p = node.path();
+        std::string_view const p = node.path();
         if(!p.starts_with(prefix))
             return false;
         // Ensure the match is a full segment boundary, not a partial name.
@@ -199,7 +199,7 @@ selector selector::in_strain() const
                 return true;
             // Child or descendant: path continues with '/' after the strain prefix.
             return p.size() > strain_prefix.size()
-                && p.substr(0, strain_prefix.size()) == strain_prefix
+                && p.starts_with(strain_prefix)
                 && p[strain_prefix.size()] == '/';
         });
 }
@@ -316,7 +316,7 @@ follow_keyref(const config_node &keyref_leaf, const schema_query_context &ctx)
     std::vector<config_node> matches;
     for(const std::string &member : ns->members)
     {
-        config_node collection = container[member];
+        config_node const collection = container[member];
         if(!collection.exists())
             continue;
         if(collection.kind() == node_kind::repeated)

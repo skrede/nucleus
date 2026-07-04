@@ -43,6 +43,7 @@ namespace nucleus {
 // host-owned behavior (not mutable state that can diverge), so sharing it across a
 // base and its expand()-derived builder is intentional -- NO shared_ptr links the
 // config_space objects themselves.
+// NOLINTNEXTLINE(misc-use-internal-linkage): base of the externally-linked config_space::impl / config_space_builder::impl defined in this translation unit; an anonymous namespace would give it internal linkage that mismatches the derived types.
 struct space_core
 {
     // The generic core tokenizers are MECHANISM, not policy: ${env.*} and
@@ -51,15 +52,15 @@ struct space_core
     // unresolved ${...}). Host vocabulary is the host's to inject via install_tokenizer.
     space_core()
     {
-        owner_token core;
+        owner_token const core;
         tokenizer.add(make_env_tokenizer(), core);
         tokenizer.add(make_string_tokenizer(), core);
     }
 
-    registration_result review(registration_kind kind, const owner_token &owner)
+    registration_result review(registration_kind kind, const owner_token &owner) const
     {
-        registration_request request{kind, owner};
-        policy_verdict verdict = m_policy->review(request);
+        registration_request const request{kind, owner};
+        policy_verdict const verdict = m_policy->review(request);
         if(!verdict.accepted())
             return unexpected(error{errc::rejected_registration, verdict.reason()});
         return registration_ok();
@@ -139,15 +140,15 @@ inline bool is_reserved_tree_tokenizer_name(std::string_view name) noexcept
 tree_tokenizer make_pkey_tree_tokenizer(const schema_element &el)
 {
     std::string category = std::string(key_path::base_name(el.container().leaf()));
-    key_path pkey_container = el.container();
-    std::string identity_field = el.name;
+    key_path const pkey_container = el.container();
+    std::string const identity_field = el.name;
 
     return tree_tokenizer(
         std::move(category),
         [pkey_container, identity_field](const tree_access &access) -> token_result
         {
             // Verify an instance is selected by checking the identity leaf.
-            key_path identity_path = pkey_container.child(identity_field);
+            key_path const identity_path = pkey_container.child(identity_field);
             if(access.building.find(identity_path) == nullptr)
                 return unexpected(resolve_error(resolve_errc::missing_field,
                     nucleus::format("${{{}}} requires a selected primary-key instance; "
@@ -156,7 +157,7 @@ tree_tokenizer make_pkey_tree_tokenizer(const schema_element &el)
                                     std::string(access.field_name))));
 
             // Resolve the requested field within the pkey container.
-            key_path field_path = pkey_container.child(std::string(access.field_name));
+            key_path const field_path = pkey_container.child(std::string(access.field_name));
             const value *v = access.building.find(field_path);
             if(v == nullptr)
                 return unexpected(resolve_error(resolve_errc::missing_field,
@@ -206,7 +207,7 @@ assemble_handles(const space_core &state,
         entries = std::move(expanded).value();
     }
 
-    std::span<source_handle> layers = stack.layers();
+    std::span<source_handle> const layers = stack.layers();
 
     std::vector<resolution_context::layered_handle> handles;
     handles.reserve(entries.size() + layers.size());
@@ -280,7 +281,7 @@ registration_result config_space_builder::register_schema(std::string key_path, 
     return registration_ok();
 }
 
-registration_result config_space_builder::register_element(schema_element element, owner_token owner)
+registration_result config_space_builder::register_element(schema_element element, const owner_token& owner)
 {
     if(auto guard = reject_if_built(m_impl->built, "register_element"); !guard)
         return guard;
@@ -308,7 +309,7 @@ registration_result config_space_builder::register_element(schema_element elemen
 }
 
 registration_result config_space_builder::register_constraint_group(constraint_group group,
-                                                                     owner_token owner)
+                                                                     const owner_token& owner)
 {
     if(auto guard = reject_if_built(m_impl->built, "register_constraint_group"); !guard)
         return guard;
@@ -320,7 +321,7 @@ registration_result config_space_builder::register_constraint_group(constraint_g
 }
 
 registration_result config_space_builder::register_identity_group(identity_group_spec group,
-                                                                  owner_token owner)
+                                                                  const owner_token& owner)
 {
     if(auto guard = reject_if_built(m_impl->built, "register_identity_group"); !guard)
         return guard;
@@ -329,7 +330,7 @@ registration_result config_space_builder::register_identity_group(identity_group
     // Reserved-prefix carve-out: a namespace name colliding with a builtin (a
     // reserved tree-tokenizer category or the engine's own 'nucleus' prefix) is
     // rejected so host identifiers can never shadow a builtin.
-    if(is_reserved_tree_tokenizer_name(group.name) || group.name.rfind("nucleus", 0) == 0)
+    if(is_reserved_tree_tokenizer_name(group.name) || group.name.starts_with("nucleus"))
         return unexpected(error{errc::rejected_registration, nucleus::format(
             "identity group namespace '{}' collides with a reserved name", group.name)});
     if(auto attached = m_impl->schema.attach_identity_group(std::move(group)); !attached)
@@ -378,7 +379,7 @@ registration_result config_space_builder::install_tree_tokenizer(tree_tokenizer 
 registration_result config_space_builder::register_converter(
     std::type_index id,
     std::function<expected<std::any, std::string>(std::string_view)> conv,
-    owner_token owner)
+    const owner_token& owner)
 {
     if(auto guard = reject_if_built(m_impl->built, "register_converter"); !guard)
         return guard;
@@ -409,12 +410,12 @@ config_space config_space_builder::build()
     // auto-registration so the host's registration wins (last-registration-wins
     // is implemented by the host calling install_tree_tokenizer before build()).
     // Reserved names cannot reach here — register_element is the enforcement gate.
-    owner_token core;
+    owner_token const core;
     for(const schema_element &el : m_impl->schema.elements())
     {
         if(!el.identity || el.container().empty())
             continue;
-        std::string category = std::string(key_path::base_name(el.container().leaf()));
+        std::string const category = std::string(key_path::base_name(el.container().leaf()));
         if(m_impl->tree_tokenizer.find(category) != nullptr)
             continue; // host shadow wins
         m_impl->tree_tokenizer.add(make_pkey_tree_tokenizer(el), core);
@@ -560,7 +561,7 @@ load_result load_config(const config_space &space,
 }
 
 load_result load_config(const config_space &space,
-                 source_stack &&stack,
+                 source_stack &&stack,  // NOLINT(cppcoreguidelines-rvalue-reference-param-not-moved): the rvalue overload exists only to bind a temporary stack and delegate to the lvalue overload which consumes it in place; no move is needed.
                  const load_options &options)
 {
     return load_config(space, stack, options);

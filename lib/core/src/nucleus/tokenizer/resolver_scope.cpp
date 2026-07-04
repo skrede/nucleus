@@ -32,14 +32,14 @@ struct token_span
 std::optional<std::string> body_head_has_nested_token(std::string_view token)
 {
     if(token.size() < 3) return std::nullopt;
-    std::string_view body = token.substr(2, token.size() - 3);
+    std::string_view const body = token.substr(2, token.size() - 3);
 
     char quote_char = '\0';
     int brace_depth = 0;
     bool saw_nested = false;
     for(std::size_t i = 0; i < body.size(); ++i)
     {
-        char c = body[i];
+        char const c = body[i];
         if(quote_char != '\0')
         {
             if(c == quote_char) quote_char = '\0';
@@ -66,7 +66,7 @@ std::optional<token_span> find_next_token(std::string_view input, std::size_t po
     char quote_char = '\0';
     for(std::size_t i = start + 2; i < input.size(); ++i)
     {
-        char c = input[i];
+        char const c = input[i];
         if(quote_char != '\0')
         {
             if(c == quote_char) quote_char = '\0';

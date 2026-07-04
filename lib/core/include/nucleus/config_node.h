@@ -41,6 +41,13 @@ public:
 
     // Called on ascent from a node, after all children have been visited.
     virtual void leave(const class config_node &node) = 0;
+
+protected:
+    config_tree_walker() = default;
+    config_tree_walker(const config_tree_walker &) = default;
+    config_tree_walker &operator=(const config_tree_walker &) = default;
+    config_tree_walker(config_tree_walker &&) = default;
+    config_tree_walker &operator=(config_tree_walker &&) = default;
 };
 
 // A cheap, value-semantic cursor into the resolved configuration tree.
@@ -108,7 +115,7 @@ public:
 
     // Pre-order depth-first visit. Calls fn(*this); if fn returns false, stops.
     // Otherwise recurses into children() in ordinal/canonical order.
-    void visit(std::function<bool(const config_node &)> fn) const
+    void visit(const std::function<bool(const config_node &)>& fn) const
     {
         if(!fn(*this))
             return;

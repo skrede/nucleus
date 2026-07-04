@@ -26,13 +26,12 @@ public:
     constexpr unexpected(unexpected &&) = default;
     constexpr unexpected &operator=(const unexpected &) = default;
     constexpr unexpected &operator=(unexpected &&) = default;
+    ~unexpected() = default;
 
-    template <typename Err = E,
-              typename = std::enable_if_t<
-                  !std::is_same_v<std::remove_cvref_t<Err>, unexpected> &&
+    template <typename Err = E>
+    constexpr explicit unexpected(Err &&error) requires (!std::is_same_v<std::remove_cvref_t<Err>, unexpected> &&
                   !std::is_same_v<std::remove_cvref_t<Err>, std::in_place_t> &&
-                  std::is_constructible_v<E, Err>>>
-    constexpr explicit unexpected(Err &&error) : m_error(std::forward<Err>(error)) {}
+                  std::is_constructible_v<E, Err>) : m_error(std::forward<Err>(error)) {}
 
     template <typename... Args>
     constexpr explicit unexpected(std::in_place_t, Args &&...args)
@@ -103,30 +102,27 @@ public:
     constexpr expected(expected &&) = default;
     constexpr expected &operator=(const expected &) = default;
     constexpr expected &operator=(expected &&) = default;
+    ~expected() = default;
 
-    template <typename U = T,
-              typename = std::enable_if_t<
-                  !std::is_same_v<std::remove_cvref_t<U>, expected> &&
+    template <typename U = T>
+    constexpr explicit(!std::is_convertible_v<U, T>) expected(U &&value)
+        requires (!std::is_same_v<std::remove_cvref_t<U>, expected> &&
                   !std::is_same_v<std::remove_cvref_t<U>, std::in_place_t> &&
                   !std::is_same_v<std::remove_cvref_t<U>, unexpect_t> &&
                   !is_unexpected<std::remove_cvref_t<U>>::value &&
-                  std::is_constructible_v<T, U>>>
-    constexpr explicit(!std::is_convertible_v<U, T>) expected(U &&value)
-        : m_data(std::in_place_index<0>, std::forward<U>(value))
+                  std::is_constructible_v<T, U>) : m_data(std::in_place_index<0>, std::forward<U>(value))
     {
     }
 
-    template <typename G,
-              typename = std::enable_if_t<std::is_constructible_v<E, const G &>>>
+    template <typename G>
     constexpr explicit(!std::is_convertible_v<const G &, E>) expected(const unexpected<G> &error)
-        : m_data(std::in_place_index<1>, error.error())
+        requires (std::is_constructible_v<E, const G &>) : m_data(std::in_place_index<1>, error.error())
     {
     }
 
-    template <typename G,
-              typename = std::enable_if_t<std::is_constructible_v<E, G>>>
+    template <typename G>
     constexpr explicit(!std::is_convertible_v<G, E>) expected(unexpected<G> &&error)
-        : m_data(std::in_place_index<1>, std::move(error).error())
+        requires (std::is_constructible_v<E, G>) : m_data(std::in_place_index<1>, std::move(error).error())
     {
     }
 
@@ -352,20 +348,19 @@ public:
     constexpr expected(expected &&) = default;
     constexpr expected &operator=(const expected &) = default;
     constexpr expected &operator=(expected &&) = default;
+    ~expected() = default;
 
     constexpr explicit expected(std::in_place_t) noexcept : m_data(std::in_place_index<0>) {}
 
-    template <typename G,
-              typename = std::enable_if_t<std::is_constructible_v<E, const G &>>>
+    template <typename G>
     constexpr explicit(!std::is_convertible_v<const G &, E>) expected(const unexpected<G> &error)
-        : m_data(std::in_place_index<1>, error.error())
+        requires (std::is_constructible_v<E, const G &>) : m_data(std::in_place_index<1>, error.error())
     {
     }
 
-    template <typename G,
-              typename = std::enable_if_t<std::is_constructible_v<E, G>>>
+    template <typename G>
     constexpr explicit(!std::is_convertible_v<G, E>) expected(unexpected<G> &&error)
-        : m_data(std::in_place_index<1>, std::move(error).error())
+        requires (std::is_constructible_v<E, G>) : m_data(std::in_place_index<1>, std::move(error).error())
     {
     }
 

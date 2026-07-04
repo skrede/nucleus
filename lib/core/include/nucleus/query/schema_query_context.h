@@ -104,7 +104,7 @@ public:
     // True when the canonical path is a declared repeated container.
     bool is_repeated_container(std::string_view canonical_path) const
     {
-        return m_repeated_containers.count(std::string(canonical_path)) != 0;
+        return m_repeated_containers.contains(std::string(canonical_path));
     }
 
     // The identity group a keyref leaf (by canonical declared path) points into, or
@@ -135,7 +135,7 @@ public:
         while(!remaining.empty())
         {
             auto sep = remaining.find(key_path::separator);
-            std::string_view segment = (sep == std::string_view::npos)
+            std::string_view const segment = (sep == std::string_view::npos)
                 ? remaining
                 : remaining.substr(0, sep);
 
@@ -159,8 +159,8 @@ public:
                     extended += key_path::separator;
                 extended += std::string(segment);
 
-                bool parent_is_keyed = m_keyed_containers.count(canonical) != 0;
-                bool is_declared = m_roles.count(extended) != 0;
+                bool const parent_is_keyed = m_keyed_containers.contains(canonical);
+                bool const is_declared = m_roles.contains(extended);
                 if(parent_is_keyed && !is_declared)
                 {
                     // Transient key-value segment: skip without advancing canonical.

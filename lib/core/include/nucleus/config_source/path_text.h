@@ -19,7 +19,7 @@ namespace nucleus {
 inline std::string path_to_text(const std::filesystem::path &p)
 {
     const std::u8string u8 = p.generic_u8string();
-    return std::string(u8.begin(), u8.end());
+    return {u8.begin(), u8.end()};
 }
 
 }

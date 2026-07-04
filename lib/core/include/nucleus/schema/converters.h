@@ -98,6 +98,7 @@ inline fp_parse_result fp_from_chars(std::string_view sv, Float &out)
     const char lead = sv.front();
     if(lead == '+' || lead == ' ' || lead == '\t' || lead == '\n'
        || lead == '\v' || lead == '\f' || lead == '\r')
+        // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): data() marks the zero-consumed position in the view's coordinate space; it is never read as a null-terminated string.
         return {sv.data(), std::errc::invalid_argument};
 
     // strtof/strtod scan to a NUL terminator and would read past a view that is
@@ -114,6 +115,7 @@ inline fp_parse_result fp_from_chars(std::string_view sv, Float &out)
         value = std::strtod(begin, &end);
 
     if(end == begin)
+        // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): data() marks the zero-consumed position in the view's coordinate space; it is never read as a null-terminated string.
         return {sv.data(), std::errc::invalid_argument};
     const auto consumed = static_cast<std::size_t>(end - begin);
     if(errno == ERANGE)

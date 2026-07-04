@@ -27,6 +27,8 @@ public:
     source_handle(const source_handle &)            = delete;
     source_handle & operator=(const source_handle &) = delete;
 
+    ~source_handle() = default;
+
     capability_descriptor capabilities() const { return m_self->do_caps(); }
 
     void apply_projection(const schema_projection & p) { m_self->do_project(p); }
@@ -38,6 +40,11 @@ public:
 private:
     struct concept_t
     {
+        concept_t()                                              = default;
+        concept_t(const concept_t &)                            = default;
+        concept_t & operator=(const concept_t &)                = default;
+        concept_t(concept_t &&)                                 = default;
+        concept_t & operator=(concept_t &&)                     = default;
         virtual ~concept_t()                                     = default;
         virtual capability_descriptor    do_caps() const         = 0;
         virtual void                     do_project(const schema_projection &) = 0;

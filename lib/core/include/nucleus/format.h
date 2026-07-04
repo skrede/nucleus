@@ -10,7 +10,7 @@
 // library, which is the reference implementation and API-compatible. The seam's
 // signature never changes regardless of which backend is active.
 
-#if defined(__cpp_lib_format)
+#ifdef __cpp_lib_format
 
 #include <string>
 #include <format>

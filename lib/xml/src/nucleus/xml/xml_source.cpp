@@ -48,7 +48,7 @@ std::string declared_path(std::string_view path, const schema_projection &proj)
     std::string result;
     std::string current;  // declared path built so far (for projection key lookups)
     bool skip_next = false; // true when the immediately next segment is a key value
-    for(std::string_view seg : raw_segs)
+    for(std::string_view const seg : raw_segs)
     {
         if(skip_next)
         {
@@ -110,14 +110,14 @@ bool is_text_leaf(const pugi::xml_node &node)
 // element is an anonymous (keyless) instance of its container.
 std::string_view keyed_value(const pugi::xml_node &node, const std::string &key_field)
 {
-    if(pugi::xml_attribute attr = node.attribute(key_field.c_str()))
-        return std::string_view(attr.value());
+    if(pugi::xml_attribute const attr = node.attribute(key_field.c_str()))
+        return {attr.value()};
 
-    pugi::xml_node child = node.child(key_field.c_str());
+    pugi::xml_node const child = node.child(key_field.c_str());
     if(child && child.first_child()
             && child.first_child() == child.last_child()
             && is_value_node(child.first_child()))
-        return std::string_view(child.child_value());
+        return {child.child_value()};
 
     return {};
 }
@@ -131,7 +131,7 @@ validate_root_attrs(const pugi::xml_node &root)
 {
     for(const pugi::xml_attribute &attr : root.attributes())
     {
-        std::string_view name = std::string_view(attr.name());
+        auto const name = std::string_view(attr.name());
         if(name == "inherit")
             continue; // consumed by inheritance()
         if(name == "extend")
@@ -189,7 +189,7 @@ walk(const pugi::xml_node &node, std::string_view path,
 
     for(const pugi::xml_attribute &attr : node.attributes())
     {
-        std::string_view attr_name = std::string_view(attr.name());
+        auto const attr_name = std::string_view(attr.name());
 
         // "inherit" is a grammar attribute: suppress on root (consumed by
         // inheritance()), reject loudly on non-root elements.
@@ -254,7 +254,7 @@ walk(const pugi::xml_node &node, std::string_view path,
                 // Same-layer duplicate primary-key detection: two instances with
                 // the same key value in one document are an error.
                 auto &seen = seen_keys[child_path];
-                if(seen.count(std::string(key_val)))
+                if(seen.contains(std::string(key_val)))
                     return unexpected(config_source_error{errc::malformed_source,
                         nucleus::format(
                             "duplicate primary-key value '{}' in container '{}': "
@@ -263,7 +263,7 @@ walk(const pugi::xml_node &node, std::string_view path,
                 seen.insert(std::string(key_val));
 
                 // extend= on this instance element: parse the disposition.
-                if(pugi::xml_attribute ext_attr = child.attribute("extend"))
+                if(pugi::xml_attribute const ext_attr = child.attribute("extend"))
                 {
                     std::string_view ext_val = ext_attr.value();
                     if(ext_val == "narrow")
@@ -305,8 +305,8 @@ walk(const pugi::xml_node &node, std::string_view path,
         // attribute entry in the keyspace.
         if(proj.is_repeated_container(declared_path(child_path, proj)))
         {
-            static constexpr std::string_view kExtend = "extend";
-            if(pugi::xml_attribute ext_attr = child.attribute(kExtend.data()))
+            static constexpr const char *kExtend = "extend";
+            if(pugi::xml_attribute const ext_attr = child.attribute(kExtend))
             {
                 // Record a sentinel disposition using the declared path (key segments
                 // stripped) so fold() can match it against repeated_container_prefixes.
@@ -315,7 +315,7 @@ walk(const pugi::xml_node &node, std::string_view path,
                 (void)ext_attr; // value ignored; fold rejects all extend= on repeated
             }
             std::size_t &ordinal = ordinal_counters[child_path];
-            std::string indexed_path =
+            std::string const indexed_path =
                 child_path + "[" + std::to_string(ordinal++) + "]";
             // Pass "extend" as skip so the recursive walk suppresses the grammar
             // attribute rather than treating it as an unknown entry.
@@ -336,7 +336,7 @@ walk(const pugi::xml_node &node, std::string_view path,
 
 }
 
-capability_descriptor xml_source::capabilities() const
+capability_descriptor xml_source::capabilities() 
 {
     // XML is tree-structured, preserves document order, allows repeated sibling
     // elements, and carries comments. It does not, on its own, type its scalars
@@ -374,7 +374,7 @@ config_source_result xml_source::pull()
         }
     }
 
-    pugi::xml_node root = m_arena->root();
+    pugi::xml_node const root = m_arena->root();
     if(!root)
         return unexpected(config_source_error{errc::malformed_source,
             std::string("xml source: document has no root element")});
@@ -426,13 +426,13 @@ inherit_declaration xml_source::inheritance() const
 {
     if(!m_arena)
         return {}; // pull() not yet called; safe default (inherit_default)
-    pugi::xml_node root = m_arena->root();
+    pugi::xml_node const root = m_arena->root();
     if(!root)
         return {};
-    pugi::xml_attribute attr = root.attribute("inherit");
+    pugi::xml_attribute const attr = root.attribute("inherit");
     if(!attr)
         return {}; // absence = inherit_default
-    std::string_view val = attr.value();
+    std::string_view const val = attr.value();
     if(val == "none")
     {
         inherit_declaration d;

@@ -35,7 +35,7 @@ public:
     std::string emit(const completion_model &model) const override
     {
         const std::string fn = "_" + sanitize_ident(model.prog) + "_complete";
-        std::string all_flags = join_flags(model.options);
+        std::string const all_flags = join_flags(model.options);
 
         std::string out;
         out += "# bash completion for " + model.prog + "\n";
@@ -91,7 +91,7 @@ private:
     static std::string single_quote(const std::string &text)
     {
         std::string out = "'";
-        for(char c : text)
+        for(char const c : text)
         {
             if(c == '\'')
                 out += "'\\''";
@@ -107,7 +107,7 @@ private:
     {
         std::string out;
         out.reserve(text.size());
-        for(char c : text)
+        for(char const c : text)
         {
             const bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
                          || (c >= '0' && c <= '9') || c == '_';
