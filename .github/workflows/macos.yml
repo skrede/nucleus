@@ -38,6 +38,19 @@ jobs:
       - name: Select Xcode ${{ matrix.xcode }}
         run: sudo xcode-select -s /Applications/Xcode_${{ matrix.xcode }}.app
 
+      # Report whether this runner's libc++ ships std::format. When it does not,
+      # the diagnostic seam falls back to {fmt} and its header enters the maxed
+      # warning surface -- so the answer records which code path the -Werror gate
+      # actually covers here. Informational only; never fails the job.
+      - name: Probe std::format availability
+        run: |
+          printf '#include <version>\n#ifdef __cpp_lib_format\n#error FORMAT_PRESENT\n#endif\nint main(){}\n' > fmtprobe.cpp
+          if clang++ -std=c++20 -fsyntax-only fmtprobe.cpp 2>&1 | grep -q FORMAT_PRESENT; then
+            echo "__cpp_lib_format defined: std::format present, {fmt} fallback INACTIVE"
+          else
+            echo "__cpp_lib_format undefined: std::format absent, {fmt} fallback ACTIVE"
+          fi
+
       - name: Configure
         run: |
           cmake . -B build -DCMAKE_BUILD_TYPE=Release \
