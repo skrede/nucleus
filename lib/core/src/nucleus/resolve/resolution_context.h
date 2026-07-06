@@ -276,7 +276,9 @@ public:
 
                 auto path_res = key_path::parse(entry.path);
                 if(!path_res)
-                    continue;
+                    return unexpected(error{errc::malformed_source, nucleus::format(
+                        "source '{}': malformed key path '{}': {}",
+                        lh->label, entry.path, path_res.error())});
                 key_path path = std::move(path_res).value();
 
                 const std::string canonical_path = m_schema.canonical_text(path);
@@ -549,7 +551,9 @@ public:
                         actual_path_str + "[" + std::to_string(ordinal) + "]";
                     auto indexed_kp = key_path::parse(indexed_path);
                     if(!indexed_kp)
-                        continue;
+                        return unexpected(error{errc::malformed_source, nucleus::format(
+                            "internal invariant violation: re-parsed path failed to parse "
+                            "in fold()'s Case A re-indexing: '{}'", indexed_path)});
                     m_building.set(indexed_kp.value(),
                                    value::owned(std::move(expanded).value()));
                     m_provenance.record(indexed_path,
@@ -716,7 +720,9 @@ public:
                         ? base : base + key_path::separator + leaf->suffix;
                     auto kp = key_path::parse(new_path);
                     if(!kp)
-                        continue;
+                        return unexpected(error{errc::malformed_source, nucleus::format(
+                            "internal invariant violation: re-parsed path failed to parse "
+                            "in merge_keyed_collections()'s rebuild: '{}'", new_path)});
                     m_building.set(kp.value(), value::owned(leaf->value));
                     m_provenance.record(new_path, leaf->prov);
                 }
@@ -1393,7 +1399,9 @@ private:
             const std::string unified_str = relay_canonical(keyed);
             auto unified = key_path::parse(unified_str);
             if(!unified)
-                continue;
+                return unexpected(error{errc::malformed_source, nucleus::format(
+                    "internal invariant violation: re-parsed path failed to parse "
+                    "in relay_strain()'s unification: '{}'", unified_str)});
 
             const value *v = m_building.find(keyed);
             if(v == nullptr)
