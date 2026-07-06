@@ -292,71 +292,15 @@ public:
                     return false;
                 }();
 
-                // Keyed-composition divert: if this entry sits under a
-                // keyed-merge container, accumulate it (by identity-group key, merged
-                // post-fold) instead of storing it now -- the wholesale sweep is
-                // bypassed for these containers. The container is matched on the ACTUAL
-                // path (key segments still present pre-slice) by canonicalizing each
-                // prefix; the merge rebuilds at the actual path and slice() strips keys.
-                if(!m_keyed_modes.empty())
-                {
-                    const std::vector<std::string> &segs = path.segments();
-                    bool diverted = false;
-                    for(std::size_t len = 1; len <= segs.size() && !diverted; ++len)
-                    {
-                        std::string prefix;
-                        for(std::size_t i = 0; i < len; ++i)
-                        {
-                            if(!prefix.empty())
-                                prefix += key_path::separator;
-                            prefix += segs[i];
-                        }
-                        auto prefix_kp = key_path::parse(prefix);
-                        if(!prefix_kp)
-                            continue;
-                        const std::string canon = m_schema.canonical_text(*prefix_kp);
-                        auto mode_it = m_keyed_modes.find(canon);
-                        if(mode_it == m_keyed_modes.end())
-                            continue;
-                        // segs[len-1] is the container-level segment (e.g. "output[0]").
-                        const std::string &cseg = segs[len - 1];
-                        std::string actual_container;
-                        for(std::size_t i = 0; i + 1 < len; ++i)
-                        {
-                            if(!actual_container.empty())
-                                actual_container += key_path::separator;
-                            actual_container += segs[i];
-                        }
-                        if(!actual_container.empty())
-                            actual_container += key_path::separator;
-                        actual_container += key_path::base_name(cseg);
-                        const std::size_t ordinal = key_path::is_indexed_segment(cseg)
-                            ? key_path::ordinal_of(cseg)
-                            : keyed_flat_counter[actual_container]++;
-                        std::string suffix;
-                        for(std::size_t i = len; i < segs.size(); ++i)
-                        {
-                            if(!suffix.empty())
-                                suffix += key_path::separator;
-                            suffix += segs[i];
-                        }
-                        m_actual_to_canonical[actual_container] = canon;
-                        m_keyed_accumulator[actual_container].push_back(keyed_instance_entry{
-                            lh->rank, ordinal, std::move(suffix),
-                            // NOLINTNEXTLINE(bugprone-use-after-move): the move runs only on the diverted branch which immediately continues to the next entry, so expanded is never read afterward.
-                            std::move(expanded).value(),
-                            origin{lh->rank, lh->label, lh->owner, lh->inheritance_layer}});
-                        diverted = true;
-                    }
-                    if(diverted)
-                        continue;
-                }
-
                 // Detect a CLI plain-ordinal path: a digit-only segment
                 // following a repeated container prefix is an ordinal index from
                 // "--cluster-node-0-endpoint-port=90" -> "cluster/node/0/endpoint/port".
                 // Re-bracket to "cluster/node[0]/endpoint/port" and enforce
-                // (override-only: ordinal must be < existing instance count).
+                // (override-only: ordinal must be < existing instance count). This
+                // check runs before the keyed-composition divert below so an
+                // ordinal-shaped path targeting a keyed-merge container is recognized
+                // as an override attempt, not swallowed into the divert as a flat
+                // leaf with a literal digit-shaped suffix.
                 const auto plain_ordinal_rebracketed = [&]()
                     -> expected<std::optional<key_path>, resolve_fold_error>
                 {
@@ -423,6 +367,66 @@ public:
 
                 if(cli_deferred_this_entry)
                     continue; // storage and the ordinal-range check deferred to post-fold pass
+
+                // Keyed-composition divert: if this entry sits under a
+                // keyed-merge container, accumulate it (by identity-group key, merged
+                // post-fold) instead of storing it now -- the wholesale sweep is
+                // bypassed for these containers. The container is matched on the ACTUAL
+                // path (key segments still present pre-slice) by canonicalizing each
+                // prefix; the merge rebuilds at the actual path and slice() strips keys.
+                if(!m_keyed_modes.empty())
+                {
+                    const std::vector<std::string> &segs = path.segments();
+                    bool diverted = false;
+                    for(std::size_t len = 1; len <= segs.size() && !diverted; ++len)
+                    {
+                        std::string prefix;
+                        for(std::size_t i = 0; i < len; ++i)
+                        {
+                            if(!prefix.empty())
+                                prefix += key_path::separator;
+                            prefix += segs[i];
+                        }
+                        auto prefix_kp = key_path::parse(prefix);
+                        if(!prefix_kp)
+                            continue;
+                        const std::string canon = m_schema.canonical_text(*prefix_kp);
+                        auto mode_it = m_keyed_modes.find(canon);
+                        if(mode_it == m_keyed_modes.end())
+                            continue;
+                        // segs[len-1] is the container-level segment (e.g. "output[0]").
+                        const std::string &cseg = segs[len - 1];
+                        std::string actual_container;
+                        for(std::size_t i = 0; i + 1 < len; ++i)
+                        {
+                            if(!actual_container.empty())
+                                actual_container += key_path::separator;
+                            actual_container += segs[i];
+                        }
+                        if(!actual_container.empty())
+                            actual_container += key_path::separator;
+                        actual_container += key_path::base_name(cseg);
+                        const std::size_t ordinal = key_path::is_indexed_segment(cseg)
+                            ? key_path::ordinal_of(cseg)
+                            : keyed_flat_counter[actual_container]++;
+                        std::string suffix;
+                        for(std::size_t i = len; i < segs.size(); ++i)
+                        {
+                            if(!suffix.empty())
+                                suffix += key_path::separator;
+                            suffix += segs[i];
+                        }
+                        m_actual_to_canonical[actual_container] = canon;
+                        m_keyed_accumulator[actual_container].push_back(keyed_instance_entry{
+                            lh->rank, ordinal, std::move(suffix),
+                            // NOLINTNEXTLINE(bugprone-use-after-move): the move runs only on the diverted branch which immediately continues to the next entry, so expanded is never read afterward.
+                            std::move(expanded).value(),
+                            origin{lh->rank, lh->label, lh->owner, lh->inheritance_layer}});
+                        diverted = true;
+                    }
+                    if(diverted)
+                        continue;
+                }
 
                 if(plain_ordinal_rebracketed.value().has_value())
                 {
