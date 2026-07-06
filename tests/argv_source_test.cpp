@@ -20,6 +20,8 @@
 
 #include "nucleus/xml/xml_source.h"
 
+#include "nucleus/runtime/runtime_source.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <set>
@@ -467,4 +469,89 @@ TEST_CASE("argv lower-rank than document with valid ordinal 0 succeeds",
     REQUIRE(loaded);
     // XML wins (higher rank), port for node[0] is still 80.
     REQUIRE(loaded.value().get("cluster/node[0]/endpoint/port") == "80");
+}
+
+// ---------------------------------------------------------------------------
+// CLI ordinal addressing for a repeated container nested inside a keyed
+// container -- proves the deferred-override apply pass, moved to run after
+// slice(), reaches the load's selected strain instead of always reporting
+// zero existing instances (the pre-slice keyed path never starts with the
+// declared, key-stripped container prefix).
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Schema: cluster -> server (keyed by name) -> route (repeated) -> port.
+nucleus::config_space make_keyed_cluster_space()
+{
+    nucleus::config_space_builder builder;
+    REQUIRE(builder.register_element(
+        nucleus::element("cluster", nucleus::anchor::root())));
+    REQUIRE(builder.register_element(
+        nucleus::element("server", nucleus::anchor::keyspace("cluster"))));
+    REQUIRE(builder.register_element(
+        nucleus::primary_key_element("name", nucleus::anchor::keyspace("cluster/server"))));
+    REQUIRE(builder.register_element(
+        nucleus::repeated_element("route", nucleus::anchor::keyspace("cluster/server"))));
+    REQUIRE(builder.register_element(
+        nucleus::element("port", nucleus::anchor::keyspace("cluster/server/route"))));
+    return builder.build();
+}
+
+}
+
+TEST_CASE("cli ordinal addressing reaches the selected strain's instance of a "
+          "repeated container nested inside a keyed container",
+          "[argv][keyed]")
+{
+    const nucleus::config_space space = make_keyed_cluster_space();
+
+    auto xml = xml_of_cluster(
+        "<cluster>"
+        "<server name=\"primary\">"
+        "<route><port>80</port></route>"
+        "<route><port>443</port></route>"
+        "</server>"
+        "</cluster>");
+
+    argv_source argv(std::vector<std::string>{"--cluster-server-route-0-port=90"});
+    argv.recognize_with(nucleus::recognizer_of(space));
+
+    nucleus::load_options opts;
+    opts.selection = "primary";
+    auto loaded = nucleus::load_config(
+        space,
+        nucleus::source_stack{std::move(xml), std::move(argv)},
+        opts);
+    REQUIRE(loaded);
+    const nucleus::config &cfg = loaded.value();
+
+    // route[0] overridden by argv; route[1] unchanged from XML.
+    REQUIRE(cfg.get("cluster/server/route[0]/port") == "90");
+    REQUIRE(cfg.get("cluster/server/route[1]/port") == "443");
+}
+
+TEST_CASE("cli ordinal override of a sparse layer's nonexistent slot cannot "
+          "mint a new instance",
+          "[argv][keyed]")
+{
+    const nucleus::config_space space = make_keyed_cluster_space();
+
+    // Sparse layer: only route[5] exists for strain "primary". No route[0..4].
+    nucleus::runtime_source src;
+    src.set("cluster/server/primary/name", "primary")
+       .set("cluster/server/primary/route[5]/port", "8080");
+
+    // Ordinal 3 has no existing instance -- the override must not mint one.
+    argv_source argv(std::vector<std::string>{"--cluster-server-route-3-port=90"});
+    argv.recognize_with(nucleus::recognizer_of(space));
+
+    nucleus::load_options opts;
+    opts.selection = "primary";
+    auto loaded = nucleus::load_config(
+        space,
+        nucleus::source_stack{std::move(src), std::move(argv)},
+        opts);
+    REQUIRE_FALSE(loaded);
+    REQUIRE(loaded.error().code == nucleus::errc::schema_violation);
 }
