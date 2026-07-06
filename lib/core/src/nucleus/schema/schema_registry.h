@@ -483,12 +483,16 @@ private:
         return node.empty() || is_defined_text(node.str());
     }
 
+    // m_defined is a sorted std::set, so any entry starting with a given prefix
+    // sorts contiguously starting at lower_bound(prefix); checking the single
+    // candidate there is equivalent to the prior any_of prefix scan.
     bool is_defined_text(const std::string &at) const
     {
+        if(m_defined.contains(at))
+            return true;
         const std::string below = at + key_path::separator;
-        return std::ranges::any_of(m_defined, [&](const std::string &defined) {
-            return defined == at || defined.starts_with(below);
-        });
+        const auto it = m_defined.lower_bound(below);
+        return it != m_defined.end() && it->starts_with(below);
     }
 
     // Whether a container path has a declared primary key -- the test that makes

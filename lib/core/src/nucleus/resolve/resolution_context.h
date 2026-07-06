@@ -1294,12 +1294,16 @@ public:
             // when node is repeated) has no scalar at the plain declared path; its
             // values live at cluster/node[0]/port, cluster/node[1]/port, etc.
             bool found_any_indexed = false;
+            bool has_plain_scalar = false;
             for(const key_path &kp : m_building.paths())
             {
                 if(m_schema.canonical_text(kp) != path_str)
                     continue;
                 if(kp.str() == path_str)
-                    continue; // handled by the direct path branch below
+                {
+                    has_plain_scalar = true;
+                    continue; // handled below, once we know whether indexed siblings coexist
+                }
                 found_any_indexed = true;
                 const value *v = m_building.find(kp);
                 if(v == nullptr)
@@ -1317,6 +1321,26 @@ public:
                             kp.str(), res.error(), layer_label)});
                 }
                 m_typed.emplace(kp.str(), std::move(res).value());
+            }
+
+            // A scalar written directly at the plain declared path cannot coexist with
+            // properly-indexed sibling instances of the same repeated field: it bypasses
+            // the fold's own ordinal-indexing machinery and would otherwise sit in the
+            // resolved keyspace unconverted and unvalidated.
+            if(found_any_indexed && has_plain_scalar)
+            {
+                std::string repeated_ancestor;
+                for(const std::string &rc : m_schema.repeated_container_paths())
+                {
+                    if(path_str.starts_with(rc + key_path::separator)
+                       && rc.size() > repeated_ancestor.size())
+                        repeated_ancestor = rc;
+                }
+                return unexpected(error{errc::schema_violation, nucleus::format(
+                    "path '{}' has both an unindexed value and indexed sibling instances "
+                    "under repeated container '{}'; a scalar may not coexist with indexed "
+                    "instances of the same repeated field",
+                    path_str, repeated_ancestor)});
             }
 
             // Direct path lookup: plain (non-indexed) scalar at the declared path.

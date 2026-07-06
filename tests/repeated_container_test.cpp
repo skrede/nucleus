@@ -710,3 +710,61 @@ TEST_CASE("get_as index_required reports instance count not entry count",
     // The message must say "2 instance(s)", not "4 instance(s)".
     REQUIRE(result.error().message.find("2 instance") != std::string::npos);
 }
+
+TEST_CASE("A flat scalar coexisting with indexed repeated-container siblings is "
+          "rejected loudly",
+          "[repeated_container][convert]")
+{
+    // Schema: cluster -> node (repeated) -> port (typed, so convert() visits it).
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(engine.register_element(
+        nucleus::repeated_element("node", anchor::keyspace("cluster"))));
+    nucleus::schema_element port_el =
+        nucleus::typed_element<int>("port", anchor::keyspace("cluster/node"));
+    REQUIRE(engine.register_element(std::move(port_el)));
+    nucleus::config_space space = engine.build();
+
+    // Two properly-indexed instances from a document source...
+    auto src = xml_of(
+        "<cluster>"
+        "<node><port>80</port></node>"
+        "<node><port>90</port></node>"
+        "</cluster>");
+    // ...plus a value written directly at the plain declared path, bypassing the
+    // fold's own ordinal-indexing machinery entirely.
+    nucleus::runtime_source malformed;
+    malformed.set("cluster/node/port", "99");
+
+    auto loaded = nucleus::load_config(space,
+        nucleus::source_stack{std::move(src), std::move(malformed)}, {});
+    REQUIRE_FALSE(loaded);
+    REQUIRE(loaded.error().code == nucleus::errc::schema_violation);
+    REQUIRE(loaded.error().message.find("cluster/node/port") != std::string::npos);
+    REQUIRE(loaded.error().message.find("cluster/node") != std::string::npos);
+}
+
+TEST_CASE("Indexed-only instances under a repeated container convert without error",
+          "[repeated_container][convert]")
+{
+    // The legitimate, overwhelmingly common shape: no coexisting plain scalar.
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(engine.register_element(
+        nucleus::repeated_element("node", anchor::keyspace("cluster"))));
+    nucleus::schema_element port_el =
+        nucleus::typed_element<int>("port", anchor::keyspace("cluster/node"));
+    REQUIRE(engine.register_element(std::move(port_el)));
+    nucleus::config_space space = engine.build();
+
+    auto src = xml_of(
+        "<cluster>"
+        "<node><port>80</port></node>"
+        "<node><port>90</port></node>"
+        "</cluster>");
+    auto loaded = nucleus::load_config(space,
+        nucleus::source_stack{std::move(src)}, {});
+    REQUIRE(loaded);
+    REQUIRE(loaded.value().get_as<int>("cluster/node[0]/port").value() == 80);
+    REQUIRE(loaded.value().get_as<int>("cluster/node[1]/port").value() == 90);
+}
