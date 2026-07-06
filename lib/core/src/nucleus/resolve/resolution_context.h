@@ -149,6 +149,21 @@ public:
         const std::set<std::string> repeated_container_prefixes =
             m_schema.repeated_container_paths();
 
+        // A space has at most one primary key (schema_registry::attach() rejects a
+        // second), so its container fixes a single, constant key-segment index the
+        // Case B sweep below uses to stay strain-aware -- never a per-entry or
+        // nested-ancestor computation.
+        std::optional<key_path> keyed_container_path;
+        for(const schema_element &el : m_schema.elements())
+        {
+            if(!el.identity)
+                continue;
+            keyed_container_path = el.container();
+            break;
+        }
+        const std::size_t keyed_len =
+            keyed_container_path ? keyed_container_path->size() : 0;
+
         // Keyed-composition setup: for every repeated element declaring a
         // non-default merge mode, find the identity-group field that keys it. A keyed
         // mode with no covering identity group has no merge key -- a loud error.
@@ -413,6 +428,22 @@ public:
                     if(container_prefix.empty() && repeated_paths.contains(canonical_path))
                         container_prefix = canonical_path;
 
+                    // canonical_text() strips the key segment, so two different
+                    // strains' entries under the same keyed container collide on
+                    // `under` below. When the container is nested under the
+                    // schema's keyed container, additionally require the same key
+                    // segment at the fixed keyed_len index before sweeping.
+                    bool nested_in_keyed = false;
+                    std::string this_key_seg;
+                    if(keyed_container_path && !container_prefix.empty())
+                    {
+                        const std::string kcp = keyed_container_path->str();
+                        nested_in_keyed = container_prefix == kcp
+                            || container_prefix.starts_with(kcp + key_path::separator);
+                        if(nested_in_keyed && path.size() > keyed_len)
+                            this_key_seg = path.segments()[keyed_len];
+                    }
+
                     if(!container_prefix.empty()
                        && !swept_containers_this_layer.contains(container_prefix))
                     {
@@ -431,11 +462,14 @@ public:
                             const bool under =
                                 ec == container_prefix
                                 || ec.starts_with(cp_slash);
-                            if(under)
-                            {
-                                m_building.remove(existing);
-                                m_provenance.forget(es);
-                            }
+                            if(!under)
+                                continue;
+                            if(nested_in_keyed
+                               && (existing.size() <= keyed_len
+                                   || existing.segments()[keyed_len] != this_key_seg))
+                                continue;
+                            m_building.remove(existing);
+                            m_provenance.forget(es);
                         }
                     }
 

@@ -527,6 +527,59 @@ TEST_CASE("Repeated container inside keyed container -- ordinals survive slice",
     REQUIRE_FALSE(cfg.contains("cluster/server/primary/route"));
 }
 
+TEST_CASE("Repeated container inside keyed container -- later layer's new strain "
+          "does not delete an earlier strain's route",
+          "[repeated_container]")
+{
+    // Same schema as above: cluster -> server (keyed by name) -> route
+    // (repeated) -> port. base.xml declares strain "a"; derived.xml inherits
+    // from it and introduces a DIFFERENT strain "b" with its own route -- a
+    // legal, brand-new strain, not an extend= of "a".
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(engine.register_element(
+        nucleus::element("server", anchor::keyspace("cluster"))));
+    REQUIRE(engine.register_element(
+        nucleus::primary_key_element("name", anchor::keyspace("cluster/server"))));
+    REQUIRE(engine.register_element(
+        nucleus::repeated_element("route", anchor::keyspace("cluster/server"))));
+    REQUIRE(engine.register_element(
+        nucleus::element("port", anchor::keyspace("cluster/server/route"))));
+    nucleus::config_space space = engine.build();
+
+    const char *base_doc =
+        "<cluster>"
+        "<server name=\"a\"><route><port>80</port></route></server>"
+        "</cluster>";
+    const char *derived_doc =
+        "<cluster inherit=\"base.xml\">"
+        "<server name=\"b\"><route><port>443</port></route></server>"
+        "</cluster>";
+
+    nucleus::load_options opts;
+    opts.document_paths = {"derived.xml"};
+    opts.make_document = [&](const std::string &path) -> nucleus::source_handle {
+        if(path == "base.xml")
+            return nucleus::source_handle(xml_of(base_doc));
+        return nucleus::source_handle(xml_of(derived_doc));
+    };
+
+    // Selecting the EARLIER strain ("a") must not lose its route to the
+    // later layer's introduction of a different strain's route.
+    opts.selection = "a";
+    auto loaded_a = nucleus::load_config(space, nucleus::source_stack{}, opts);
+    REQUIRE(loaded_a);
+    REQUIRE(loaded_a.value().get("cluster/server/route[0]/port") == "80");
+
+    // Selecting the later strain ("b") sees its own route and no leakage
+    // from strain "a".
+    opts.selection = "b";
+    auto loaded_b = nucleus::load_config(space, nucleus::source_stack{}, opts);
+    REQUIRE(loaded_b);
+    REQUIRE(loaded_b.value().get("cluster/server/route[0]/port") == "443");
+    REQUIRE_FALSE(loaded_b.value().contains("cluster/server/a/route"));
+}
+
 // ---------------------------------------------------------------------------
 // extend= targeting repeated container via inheritance chain
 // ---------------------------------------------------------------------------
