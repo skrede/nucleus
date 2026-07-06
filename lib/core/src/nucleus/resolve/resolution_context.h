@@ -200,18 +200,13 @@ public:
             m_keyed_fields[cpath] = field;
         }
 
-        // Deferred checks: CLI plain-ordinal overrides deferred until after
-        // all layers fold so the document layer is present in m_building regardless
-        // of its rank relative to the argv layer.
-        struct pending_cli_ordinal
-        {
-            std::size_t     ordinal;
-            std::string     container_prefix;
-            key_path        rebracketed;
-            value           val;
-            origin          prov;
-        };
-        std::vector<pending_cli_ordinal> deferred_cli_overrides;
+        // Deferred checks: CLI plain-ordinal overrides recognized here but
+        // validated/applied only by apply_deferred_cli_overrides(), which the
+        // caller runs after slice() (and therefore after
+        // merge_keyed_collections()) so the check sees the load's fully
+        // materialized, selected-strain keyspace regardless of a keyed or
+        // keyed-merge container standing between the fold and the argv layer's rank.
+        m_deferred_cli_overrides.clear();
 
         for(layered_handle *lh : ordered)
         {
@@ -350,9 +345,10 @@ public:
                         auto kp = key_path::parse(rebracketed_str);
                         if(!kp)
                             return unexpected(error{errc::malformed_source, std::move(kp).error()});
-                        // Defer storage and check until all layers are folded
-                        // so the document source is in m_building regardless of rank.
-                        deferred_cli_overrides.push_back(
+                        // Defer storage and check until apply_deferred_cli_overrides()
+                        // runs after slice(), so the document source is in
+                        // m_building regardless of rank.
+                        m_deferred_cli_overrides.push_back(
                             {ordinal, prefix, std::move(kp).value(),
                              value::owned(std::move(expanded).value()),
                              origin{lh->rank, lh->label, lh->owner, lh->inheritance_layer}});
@@ -618,41 +614,6 @@ public:
                 m_dispositions.push_back(d);
 
             m_buffers.push_back(std::move(batch.buffer));
-        }
-
-        //  post-fold: validate and store all deferred CLI plain-ordinal overrides
-        // now that all document layers are present in m_building.
-        for(pending_cli_ordinal &override : deferred_cli_overrides)
-        {
-            const std::string bracket_prefix = override.container_prefix + "[";
-            std::size_t instance_count = 0;
-            for(const key_path &bp : m_building.paths())
-            {
-                const std::string bps = bp.str();
-                if(!bps.starts_with(bracket_prefix))
-                    continue;
-                const auto lb = bps.find('[', override.container_prefix.size());
-                const auto rb = bps.find(']', lb);
-                if(lb == std::string::npos || rb == std::string::npos)
-                    continue;
-                std::size_t slot = 0;
-                for(std::size_t k = lb + 1; k < rb; ++k)
-                    slot = (slot * 10) + static_cast<std::size_t>(bps[k] - '0');
-                instance_count = std::max(slot + 1, instance_count);
-            }
-            if(override.ordinal >= instance_count)
-                return unexpected(error{errc::schema_violation, nucleus::format(
-                    "argv ordinal {} for '{}' is out of range: "
-                    "{} instance(s) exist; out of range",
-                    override.ordinal, override.container_prefix, instance_count)});
-            // Ordinal is valid; store only if no higher-rank entry already exists
-            // at this path (rank-precedence: higher-rank wins even over deferred entries).
-            const origin *existing = m_provenance.of(override.rebracketed.str());
-            if(existing == nullptr || existing->rank < override.prov.rank)
-            {
-                m_building.set(override.rebracketed, override.val);
-                m_provenance.record(override.rebracketed.str(), override.prov);
-            }
         }
 
         return {};
@@ -1150,6 +1111,52 @@ public:
             m_keyed_satisfied.push_back(container.str());
         }
 
+        return {};
+    }
+
+    // Validates and stores every CLI plain-ordinal override deferred during
+    // fold(). MUST run after slice() (and therefore after
+    // merge_keyed_collections(), which itself runs before slice()) so a
+    // keyed container's override unambiguously targets the load's own
+    // selected strain at its already-unified path, and a keyed-merge
+    // container's override sees the container's real, merged instance count
+    // rather than zero (the accumulator, not m_building, holds those entries
+    // until merge_keyed_collections() runs).
+    expected<void, resolve_fold_error> apply_deferred_cli_overrides()
+    {
+        for(pending_cli_ordinal &override : m_deferred_cli_overrides)
+        {
+            const std::string bracket_prefix = override.container_prefix + "[";
+            std::set<std::size_t> existing_ordinals;
+            for(const key_path &bp : m_building.paths())
+            {
+                const std::string bps = bp.str();
+                if(!bps.starts_with(bracket_prefix))
+                    continue;
+                const auto lb = bps.find('[', override.container_prefix.size());
+                const auto rb = bps.find(']', lb);
+                if(lb == std::string::npos || rb == std::string::npos)
+                    continue;
+                std::size_t slot = 0;
+                for(std::size_t k = lb + 1; k < rb; ++k)
+                    slot = (slot * 10) + static_cast<std::size_t>(bps[k] - '0');
+                existing_ordinals.insert(slot);
+            }
+            if(!existing_ordinals.contains(override.ordinal))
+                return unexpected(error{errc::schema_violation, nucleus::format(
+                    "argv ordinal {} for '{}' is out of range: "
+                    "{} instance(s) exist; out of range",
+                    override.ordinal, override.container_prefix,
+                    existing_ordinals.size())});
+            // Ordinal exists; store only if no higher-rank entry already exists
+            // at this path (rank-precedence: higher-rank wins even over deferred entries).
+            const origin *existing = m_provenance.of(override.rebracketed.str());
+            if(existing == nullptr || existing->rank < override.prov.rank)
+            {
+                m_building.set(override.rebracketed, override.val);
+                m_provenance.record(override.rebracketed.str(), override.prov);
+            }
+        }
         return {};
     }
 
@@ -1651,6 +1658,18 @@ private:
     // and its canonical form (to look up mode/field).
     std::map<std::string, std::vector<keyed_instance_entry>> m_keyed_accumulator;
     std::map<std::string, std::string> m_actual_to_canonical;
+
+    // A CLI plain-ordinal override recognized during fold(), held here until
+    // apply_deferred_cli_overrides() validates and stores it after slice().
+    struct pending_cli_ordinal
+    {
+        std::size_t     ordinal;
+        std::string     container_prefix;
+        key_path        rebracketed;
+        value           val;
+        origin          prov;
+    };
+    std::vector<pending_cli_ordinal> m_deferred_cli_overrides;
 };
 
 }
