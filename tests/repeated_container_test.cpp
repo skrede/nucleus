@@ -13,13 +13,10 @@
 
 #include "nucleus/config.h"
 #include "nucleus/error.h"
-#include "nucleus/capability.h"
 
 #include "nucleus/keyspace/value.h"
 #include "nucleus/keyspace/key_path.h"
 #include "nucleus/keyspace/keyspace.h"
-
-#include "nucleus/config_source/config_source.h"
 
 #include "nucleus/xml/xml_source.h"
 #include "nucleus/runtime/runtime_source.h"
@@ -355,7 +352,7 @@ TEST_CASE("get_as on unindexed repeated container path returns errc::index_requi
     REQUIRE_FALSE(result.has_value());
     REQUIRE(result.error().code == nucleus::errc::index_required);
     REQUIRE(result.error().message.find("cluster/node") != std::string::npos);
-    REQUIRE(result.error().message.find("2") != std::string::npos);
+    REQUIRE(result.error().message.find('2') != std::string::npos);
 
     // Indexed path must succeed (port is typed only if converter registered,
     // otherwise absent_key for untyped; but cluster/node[0]/port IS present).
