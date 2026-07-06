@@ -98,11 +98,15 @@ function(nucleus_warnings target)
                 -Wno-poison-system-directories
                 # Experimental -fbounds-safety hardening family; extremely noisy
                 # and aimed at adopters of that model, not general libraries.
+                # Covers its -in-container/-in-libc-call subgroups too; naming a
+                # subgroup directly would be an unknown-warning-option error on
+                # compilers older than the subgroup (e.g. Apple clang 15).
                 -Wno-unsafe-buffer-usage
-                -Wno-unsafe-buffer-usage-in-container
                 # Same designated-initializer pattern as GCC's equivalent
-                # opt-out above, under Clang's differently-named flag.
-                -Wno-missing-designated-field-initializers)
+                # opt-out above. The group form also disables clang 19+'s
+                # -Wmissing-designated-field-initializers subgroup, and unlike
+                # that spelling it is recognized by every clang/AppleClang.
+                -Wno-missing-field-initializers)
 
             if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND
                CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 21)
