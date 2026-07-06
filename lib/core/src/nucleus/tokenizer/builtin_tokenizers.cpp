@@ -52,17 +52,7 @@ tokenizer make_env_tokenizer()
 {
     tokenizer_builder builder("env");
     builder.set_wildcard([](std::string_view name) -> token_result {
-        // std::getenv is the only portable lookup; MSVC's C4996 deprecation
-        // pushes the non-standard _dupenv_s instead, so it is suppressed here.
-#if defined(_MSC_VER)
-#pragma warning(push)
-#pragma warning(disable : 4996)
-#endif
-        const char *value = std::getenv(std::string(name).c_str());
-#if defined(_MSC_VER)
-#pragma warning(pop)
-#endif
-        if(value != nullptr)
+        if(const char *value = std::getenv(std::string(name).c_str()))
             return std::string(value);
         return unexpected(resolve_error(resolve_errc::missing_field,
                                   nucleus::format("environment variable '{}' is not set", name)));

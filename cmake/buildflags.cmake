@@ -32,6 +32,11 @@ function(nucleus_warnings target)
         # /utf-8: MSVC otherwise reads source as the active code page, silently
         # double-encoding any non-ASCII byte in a u8 literal.
         target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8)
+        # The CRT-secure C4996 subfamily deprecates standard, portable C and C++
+        # (std::getenv, std::gmtime, ...) in favor of the non-portable _s
+        # variants; this define removes only those declarations, so C4996 still
+        # fires for genuine [[deprecated]] APIs.
+        target_compile_definitions(${target} PRIVATE _CRT_SECURE_NO_WARNINGS)
         if(NUCLEUS_WERROR)
             target_compile_options(${target} PRIVATE /WX)
         endif()
