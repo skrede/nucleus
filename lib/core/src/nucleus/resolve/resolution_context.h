@@ -1117,7 +1117,7 @@ public:
                     // documented contract; exempt them from the rank-bounded prune.
                     if(orig != nullptr && !orig->inheritance_layer.has_value())
                         continue;
-                    std::size_t path_rank = orig != nullptr ? orig->rank : 0;
+                    const std::size_t path_rank = orig != nullptr ? orig->rank : 0;
                     if(path_rank == 0 || path_rank <= Ld)
                         continue;
                     // Keyed-merge collections were finalised across layers already;
