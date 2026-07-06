@@ -263,6 +263,12 @@ public:
             // (non-indexed) under a keyed-merge container. Keyed by actual container path.
             std::map<std::string, std::size_t> keyed_flat_counter;
 
+            // Per-layer, per-actual_container record of which leaf suffixes have
+            // already been seen for the CURRENT flat instance. A suffix repeating
+            // signals a new instance starting (mirrors leaf_ordinal_counters'
+            // duplicate_keys-gated advance-on-repeat, applied to the keyed divert).
+            std::map<std::string, std::set<std::string>> keyed_flat_suffixes_seen;
+
             for(keyspace_entry &entry : batch.entries)
             {
                 token_result expanded = lh->origin_file
@@ -406,9 +412,6 @@ public:
                         if(!actual_container.empty())
                             actual_container += key_path::separator;
                         actual_container += key_path::base_name(cseg);
-                        const std::size_t ordinal = key_path::is_indexed_segment(cseg)
-                            ? key_path::ordinal_of(cseg)
-                            : keyed_flat_counter[actual_container]++;
                         std::string suffix;
                         for(std::size_t i = len; i < segs.size(); ++i)
                         {
@@ -416,9 +419,41 @@ public:
                                 suffix += key_path::separator;
                             suffix += segs[i];
                         }
+                        std::size_t ordinal;
+                        if(key_path::is_indexed_segment(cseg))
+                        {
+                            ordinal = key_path::ordinal_of(cseg);
+                        }
+                        else
+                        {
+                            // Flat (non-indexed) entry: group per (rank, container) --
+                            // a suffix repeating within the current instance means a
+                            // NEW instance is starting, gated on duplicate_keys exactly
+                            // as leaf_ordinal_counters gates Case A's analogous repeat.
+                            std::set<std::string> &seen = keyed_flat_suffixes_seen[actual_container];
+                            if(!seen.contains(suffix))
+                            {
+                                ordinal = keyed_flat_counter[actual_container];
+                                seen.insert(suffix);
+                            }
+                            else if(entry.capabilities.supports(capability::duplicate_keys))
+                            {
+                                ordinal = ++keyed_flat_counter[actual_container];
+                                seen.clear();
+                                seen.insert(suffix);
+                            }
+                            else
+                            {
+                                return unexpected(error{errc::layering_violation, nucleus::format(
+                                    "source '{}': flat entry '{}' cannot address keyed "
+                                    "collection '{}': a source without duplicate_keys can "
+                                    "supply at most one instance's worth of leaves per layer",
+                                    lh->label, entry.path, canon)});
+                            }
+                        }
                         m_actual_to_canonical[actual_container] = canon;
                         m_keyed_accumulator[actual_container].push_back(keyed_instance_entry{
-                            lh->rank, ordinal, std::move(suffix),
+                            lh->rank, ordinal, suffix,
                             // NOLINTNEXTLINE(bugprone-use-after-move): the move runs only on the diverted branch which immediately continues to the next entry, so expanded is never read afterward.
                             std::move(expanded).value(),
                             origin{lh->rank, lh->label, lh->owner, lh->inheritance_layer}});
