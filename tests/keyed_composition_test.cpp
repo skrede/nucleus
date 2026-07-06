@@ -100,6 +100,18 @@ TEST_CASE("Unite — layers union; a duplicate identifier across layers is loud"
         REQUIRE(mentions(r.error(), "strict-additive"));
         REQUIRE(mentions(r.error(), "'a'"));
     }
+    SECTION("a duplicate identifier WITHIN one layer is also a strict-additive error")
+    {
+        auto space = make_space(merge_mode::unite);
+        runtime_source dup;
+        dup.set("endpoints/output[0]/name", "a");
+        dup.set("endpoints/output[1]/name", "a");  // same key, SAME layer
+
+        auto r = load_config(space, source_stack{std::move(dup)}, {});
+        REQUIRE_FALSE(r.has_value());
+        REQUIRE(mentions(r.error(), "strict-additive"));
+        REQUIRE(mentions(r.error(), "'a'"));
+    }
 }
 
 TEST_CASE("replace_by_key — a matching identifier replaces the whole element",

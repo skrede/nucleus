@@ -683,7 +683,13 @@ public:
                 for(merged_instance *mi : instances)
                 {
                     auto it = by_key.find(mi->key);
-                    if(it != by_key.end() && it->second->rank != mi->rank)
+                    if(it != by_key.end() && it->second->rank == mi->rank)
+                        return unexpected(error{errc::layering_violation, nucleus::format(
+                            "keyed collection '{}': identifier '{}'='{}' is duplicated "
+                            "within layer '{}'; unite is strict-additive (no duplicate "
+                            "identifiers within one layer)",
+                            canon, field, mi->key, mi->prov.layer)});
+                    if(it != by_key.end())
                         return unexpected(error{errc::layering_violation, nucleus::format(
                             "keyed collection '{}': identifier '{}'='{}' is introduced at "
                             "two layers ('{}' and '{}'); unite is strict-additive "
