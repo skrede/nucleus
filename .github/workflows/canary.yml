@@ -1,0 +1,78 @@
+name: Canary
+
+on:
+  push:
+    branches:
+      - develop
+      - milestone/**
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".gitignore"
+  pull_request:
+    branches: [ master ]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".gitignore"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  canary-gcc:
+    runs-on: ubuntu-24.04
+    container: gcc:latest
+    # Advisory drift detection against the newest packaged GCC -- never a merge gate.
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # gcc:latest is a bare Debian image; neither cmake nor git ship by default.
+      - name: Install cmake
+        run: apt-get update && apt-get install -y cmake
+
+      - name: Configure
+        run: cmake . -B build -DNUCLEUS_BUILD_TESTS=ON -DNUCLEUS_BUILD_EXAMPLES=ON -DNUCLEUS_BUILD_SOURCE_XML=ON
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: cd build && ctest --output-on-failure --timeout 300
+
+  canary-clang:
+    runs-on: ubuntu-24.04
+    # Advisory drift detection against the current LLVM stable release -- never a
+    # merge gate. No version pinned deliberately.
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install latest clang (apt.llvm.org)
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh
+
+      - name: Configure
+        # llvm.sh may install versioned binaries (clang-NN) rather than a bare
+        # clang symlink on some codenames; this may need a version suffix once
+        # observed live in Actions.
+        env:
+          CC: clang
+          CXX: clang++
+        run: cmake . -B build -DNUCLEUS_BUILD_TESTS=ON -DNUCLEUS_BUILD_EXAMPLES=ON -DNUCLEUS_BUILD_SOURCE_XML=ON
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: cd build && ctest --output-on-failure --timeout 300
