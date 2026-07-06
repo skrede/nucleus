@@ -13,12 +13,14 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 # The single gate for treating warnings as errors on first-party targets.
-# Default ON: the first-party surface is clean under the curated warning set, so
-# the gate is enforced by default for every local and CI build. This is the ONLY
-# switch that injects -Werror / /WX -- no per-job or per-target duplication --
-# so a warning cannot be fatal under one compiler while silently green under
-# another. Pass -DNUCLEUS_WERROR=OFF to demote warnings to non-fatal locally.
-option(NUCLEUS_WERROR "Treat warnings as errors for first-party targets" ON)
+# Default is ${nucleus_IS_TOP_LEVEL}: ON for nucleus's own build/CI, OFF
+# automatically for any project that pulls nucleus in via add_subdirectory()/
+# FetchContent, so nucleus's own warning drift can never break a consumer's
+# build. This is the ONLY switch that injects -Werror / /WX -- no per-job or
+# per-target duplication -- so a warning cannot be fatal under one compiler
+# while silently green under another. A consumer can still opt in deliberately
+# with -DNUCLEUS_WERROR=ON.
+option(NUCLEUS_WERROR "Treat warnings as errors for first-party targets" ${nucleus_IS_TOP_LEVEL})
 
 # Warnings are applied PER TARGET, never directory-globally: a directory-scope
 # add_compile_options at the root would leak /W4 / -Wpedantic (and on MSVC
@@ -49,7 +51,11 @@ function(nucleus_warnings target)
                 -Wimplicit-fallthrough -Wsuggest-override -Wextra-semi
                 -Wzero-as-null-pointer-constant
                 -Wuseless-cast -Wlogical-op -Wduplicated-cond
-                -Wduplicated-branches -Wmisleading-indentation)
+                -Wduplicated-branches -Wmisleading-indentation
+                # GCC 16+ flags C++20 designated-initializer omissions (e.g.
+                # nucleus::load_options{...}) that rely on a working default for
+                # the omitted member; the pattern is intentional, not a bug.
+                -Wno-missing-field-initializers)
         elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")  # AppleClang + upstream Clang
             # Curated -Weverything: opt in to the whole clang diagnostic
             # universe, then subtract the categories that are pure noise for a
@@ -93,11 +99,34 @@ function(nucleus_warnings target)
                 # Experimental -fbounds-safety hardening family; extremely noisy
                 # and aimed at adopters of that model, not general libraries.
                 -Wno-unsafe-buffer-usage
-                -Wno-unsafe-buffer-usage-in-container)
+                -Wno-unsafe-buffer-usage-in-container
+                # Same designated-initializer pattern as GCC's equivalent
+                # opt-out above, under Clang's differently-named flag.
+                -Wno-missing-designated-field-initializers)
+
+            if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND
+               CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 21)
+                # -Wnrvo (added Clang 21) flags roughly ninety return sites
+                # across the tree where NRVO isn't guaranteed by the standard --
+                # an optimization-hint diagnostic, not a correctness defect, not
+                # worth restructuring the resolution/tokenizer core to satisfy.
+                # STREQUAL (not MATCHES) deliberately excludes AppleClang, whose
+                # version numbers do not track upstream LLVM.
+                target_compile_options(${target} PRIVATE -Wno-nrvo)
+            endif()
         endif()
 
         if(NUCLEUS_WERROR)
             target_compile_options(${target} PRIVATE -Werror)
+        endif()
+
+        if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+            # Chronic GCC false-positive family: -O2/-O3 inlining of
+            # std::function's own internals (std_function.h's _M_empty())
+            # trips this inside libstdc++ headers, not first-party code -- also
+            # reported against nlohmann/json, googletest, and curl/ngtcp2. Kept
+            # as a live warning, only dropped from -Werror's scope.
+            target_compile_options(${target} PRIVATE -Wno-error=null-dereference)
         endif()
     endif()
 endfunction()

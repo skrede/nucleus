@@ -298,7 +298,7 @@ TEST_CASE("xml emitter -- repeated container round-trip with N >= 11 instances",
     nucleus::load_options reload_opts;
     reload_opts.document_paths = {"doc.xml"};
     reload_opts.make_document = [&](const std::string &) {
-        return nucleus::source_handle(xml_source_of(emitted));
+        return xml_source_of(emitted);
     };
     auto reloaded = nucleus::load_config(space, nucleus::source_stack{}, reload_opts);
     REQUIRE(reloaded);
