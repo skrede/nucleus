@@ -26,7 +26,6 @@ using nucleus::source_stack;
 using nucleus::tree_tokenizer;
 using nucleus::tree_access;
 using nucleus::token_result;
-using nucleus::unexpected;
 using nucleus::resolve_error;
 using nucleus::resolve_errc;
 using nucleus::key_path;
@@ -202,11 +201,11 @@ TEST_CASE("Host-defined tree tokenizer equivalent to built-in",
                 auto field_path = key_path::parse(
                     "cluster/server/" + std::string(access.field_name));
                 if(!field_path)
-                    return unexpected(resolve_error(resolve_errc::missing_field,
+                    return nucleus::unexpected(resolve_error(resolve_errc::missing_field,
                         "invalid field path"));
                 const nucleus::value *v = access.building.find(field_path.value());
                 if(v == nullptr)
-                    return unexpected(resolve_error(resolve_errc::missing_field,
+                    return nucleus::unexpected(resolve_error(resolve_errc::missing_field,
                         nucleus::format("${{server.{}}} not found", access.field_name)));
                 return std::string(v->text());
             }));

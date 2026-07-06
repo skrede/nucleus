@@ -48,12 +48,16 @@ nucleus::token_result render(std::chrono::system_clock::time_point instant,
     std::tm parts = utc ? *std::gmtime(&epoch) : *std::localtime(&epoch);
 
     std::array<char, 128> buffer{};
+#if defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-nonliteral"
+#endif
     // format is a host-supplied named tokenizer argument (${time.utc(format=...)}),
     // genuinely not a compile-time literal by design.
     std::size_t written = std::strftime(buffer.data(), buffer.size(), format.c_str(), &parts);
+#if defined(__GNUC__)
 #pragma GCC diagnostic pop
+#endif
     if(written == 0)
         return nucleus::unexpected(nucleus::resolve_error(
             nucleus::resolve_errc::parse_error,
