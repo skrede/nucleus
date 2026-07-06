@@ -3,6 +3,7 @@ name: macOS
 on:
   push:
     branches:
+      - master
       - develop
       - milestone/**
     paths-ignore:
