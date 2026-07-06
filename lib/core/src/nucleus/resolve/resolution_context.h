@@ -474,16 +474,20 @@ public:
                 {
                     // Case B: already-indexed path (from a tree source's ordinal emission).
                     // Find the container prefix (the declared repeated container path).
+                    // A repeated container may nest inside another repeated container
+                    // (e.g. "cluster/node" holding "cluster/node/tags"), so more than one
+                    // declared prefix can match the same canonical path; select the
+                    // LONGEST (most specific) match rather than the first one found, or
+                    // the sweep below would operate at the wrong, too-shallow scope.
                     std::string container_prefix;
                     for(const std::string &prefix : repeated_container_prefixes)
                     {
                         // The canonical of this path must start with prefix + separator.
                         const std::string p_slash = prefix + key_path::separator;
-                        if(canonical_path == prefix
-                           || canonical_path.starts_with(p_slash))
+                        if((canonical_path == prefix || canonical_path.starts_with(p_slash))
+                           && prefix.size() > container_prefix.size())
                         {
                             container_prefix = prefix;
-                            break;
                         }
                     }
                     // Also handle repeated leaves with indexed paths (config/tags[0]).

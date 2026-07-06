@@ -137,6 +137,55 @@ TEST_CASE("wholesale-replace -- layer 2 with 2 nodes replaces layer 1 three-node
     REQUIRE(cfg.get("cluster/node[2]/port") == std::nullopt);
 }
 
+TEST_CASE("wholesale-replace -- nested repeated-in-repeated sweep operates at "
+          "the innermost container, not the outer one",
+          "[repeated_container][wholesale_replace][nested]")
+{
+    // Schema: cluster -> node (repeated) -> label (leaf), tags (repeated) -> name.
+    // "node" and "node/tags" are BOTH declared repeated containers, one nested
+    // inside the other; "cluster/node" is a prefix of "cluster/node/tags" so a
+    // container-prefix selection that stops at the first (shortest) match picks
+    // the wrong, outer container for any entry actually belonging to "tags".
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(engine.register_element(
+        nucleus::repeated_element("node", anchor::keyspace("cluster"))));
+    REQUIRE(engine.register_element(
+        nucleus::element("label", anchor::keyspace("cluster/node"))));
+    REQUIRE(engine.register_element(
+        nucleus::repeated_element("tags", anchor::keyspace("cluster/node"))));
+    REQUIRE(engine.register_element(
+        nucleus::element("name", anchor::keyspace("cluster/node/tags"))));
+    nucleus::config_space space = engine.build();
+
+    // Layer 1 supplies both label and a tag under node[0].
+    auto src1 = xml_of(
+        "<cluster>"
+        "<node><label>keep</label><tags><name>a</name></tags></node>"
+        "</cluster>");
+    // Layer 2 (higher precedence) touches ONLY the nested "tags" container --
+    // it never mentions "label" at all.
+    auto src2 = xml_of(
+        "<cluster>"
+        "<node><tags><name>z</name></tags></node>"
+        "</cluster>");
+
+    auto loaded = nucleus::load_config(space,
+        nucleus::source_stack{std::move(src1), std::move(src2)},
+        {});
+    REQUIRE(loaded);
+    const nucleus::config &cfg = loaded.value();
+
+    // A too-shallow sweep (at "cluster/node" instead of "cluster/node/tags")
+    // would wipe "label" as collateral damage even though layer 2 never
+    // touched it; the innermost sweep must leave it untouched.
+    REQUIRE(cfg.get("cluster/node[0]/label") == "keep");
+    // The nested "tags" container itself must still wholesale-replace: layer
+    // 2's single tag replaces layer 1's, not merges alongside it.
+    REQUIRE(cfg.get("cluster/node[0]/tags[0]/name") == "z");
+    REQUIRE_FALSE(cfg.get("cluster/node[0]/tags[1]/name").has_value());
+}
+
 TEST_CASE("extend= on repeated container returns layering_violation",
           "[repeated_container][extend_guard]")
 {
