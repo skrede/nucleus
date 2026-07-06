@@ -289,7 +289,7 @@ TEST_CASE("depth cap exceeded returns loud error naming the limit", "[chain]")
     auto loaded = load_chain(space, {"a.xml"}, factory, std::nullopt, std::move(policy));
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().message.find("depth") != std::string::npos);
-    REQUIRE(loaded.error().message.find("2") != std::string::npos);
+    REQUIRE(loaded.error().message.find('2') != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------
@@ -826,7 +826,7 @@ TEST_CASE("depth-cap boundary: exactly at the cap loads, one beyond fails", "[ch
         auto loaded = load_chain(space, {"a.xml"}, factory, std::nullopt, std::move(policy));
         REQUIRE_FALSE(loaded);
         REQUIRE(loaded.error().message.find("depth") != std::string::npos);
-        REQUIRE(loaded.error().message.find("2") != std::string::npos);
+        REQUIRE(loaded.error().message.find('2') != std::string::npos);
     }
 }
 
