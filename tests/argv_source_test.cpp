@@ -156,7 +156,7 @@ TEST_CASE("the recognizer sees the full anchored path", "[argv][anchor]")
     argv_source src(std::vector<std::string>{"--udp-auth_mode=auth"});
     src.anchor_at(key_path::parse("plexus").value())
         .recognize_with([&](const key_path &p)
-                        { return declared.count(p.str()) != 0; });
+                        { return declared.contains(p.str()); });
 
     REQUIRE(src.pull());
 
@@ -164,7 +164,7 @@ TEST_CASE("the recognizer sees the full anchored path", "[argv][anchor]")
     // declare: strict validation rejects it.
     argv_source unanchored(std::vector<std::string>{"--udp-auth_mode=auth"});
     unanchored.recognize_with([&](const key_path &p)
-                              { return declared.count(p.str()) != 0; });
+                              { return declared.contains(p.str()); });
     REQUIRE_FALSE(unanchored.pull());
 }
 
@@ -198,7 +198,7 @@ TEST_CASE("schema validation is a separate step after mapping (strict)", "[argv]
     std::set<std::string> declared{"plexus/udp/auth_mode"};
     argv_source src(std::vector<std::string>{"--plexus-udp-bogus=x"});
     src.recognize_with([&](const key_path &p)
-                       { return declared.count(p.str()) != 0; });
+                       { return declared.contains(p.str()); });
 
     auto batch = src.pull();
     REQUIRE_FALSE(batch); // strict by default: unknown path is an error
@@ -211,7 +211,7 @@ TEST_CASE("lenient mode stores unknown flags as strings with a warning", "[argv]
     capturing_sink sink;
     argv_source src(std::vector<std::string>{"--plexus-udp-bogus=x"});
     src.recognize_with([&](const key_path &p)
-                       { return declared.count(p.str()) != 0; })
+                       { return declared.contains(p.str()); })
         .policy(nucleus::unknown_key_policy::lenient)
         .log_to(sink);
 
@@ -227,7 +227,7 @@ TEST_CASE("a recognized flag passes strict validation", "[argv]")
     std::set<std::string> declared{"plexus/udp/auth_mode"};
     argv_source src(std::vector<std::string>{"--plexus-udp-auth_mode=auth"});
     src.recognize_with([&](const key_path &p)
-                       { return declared.count(p.str()) != 0; });
+                       { return declared.contains(p.str()); });
 
     auto batch = src.pull();
     REQUIRE(batch);
@@ -365,7 +365,7 @@ TEST_CASE("argv out-of-range ordinal -- loud error", "[argv][repeated_container]
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().message.find("out of range") != std::string::npos);
     // The error names the actual count of instances (2).
-    REQUIRE(loaded.error().message.find("2") != std::string::npos);
+    REQUIRE(loaded.error().message.find('2') != std::string::npos);
 }
 
 TEST_CASE("cli ordinal digit run over 18 digits is rejected, not silently wrapped",
@@ -437,7 +437,7 @@ TEST_CASE("argv ordinal == count is out of range -- cannot append",
         {});
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().message.find("out of range") != std::string::npos);
-    REQUIRE(loaded.error().message.find("2") != std::string::npos);
+    REQUIRE(loaded.error().message.find('2') != std::string::npos);
 }
 
 TEST_CASE("argv lower-rank than document with valid ordinal 0 succeeds",
