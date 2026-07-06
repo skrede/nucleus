@@ -79,7 +79,7 @@ nucleus_add_test(completion_smoke_test)
 # tell CTest that is a skip, not a failure.
 set_tests_properties(completion_smoke_test PROPERTIES SKIP_RETURN_CODE 4)
 nucleus_add_test(facade_completion_test)
-nucleus_add_test(strain_scope_policy_test nucleus::runtime)
+nucleus_add_test(strain_scope_policy_test nucleus::runtime nucleus::xml)
 nucleus_add_test(converter_registry_test nucleus::env)
 nucleus_add_test(builder_lifecycle_test)
 nucleus_add_test(expand_independence_test nucleus::env)
