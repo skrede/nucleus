@@ -493,18 +493,7 @@ public:
                         continue;
                 }
 
-                if(plain_ordinal_rebracketed.value().has_value())
-                {
-                    // Case C: CLI plain-ordinal override. The path has
-                    // been re-bracketed; store directly without wholesale-replace so
-                    // only this specific instance is overridden (rank-precedence wins).
-                    const key_path &rebracketed_path = plain_ordinal_rebracketed.value().value();
-                    m_building.set(rebracketed_path, value::owned(std::move(expanded).value()));
-                    m_provenance.record(rebracketed_path.str(),
-                                        origin{lh->rank, lh->label, lh->owner,
-                                               lh->inheritance_layer});
-                }
-                else if(is_already_indexed)
+                if(is_already_indexed)
                 {
                     // Case B: already-indexed path (from a tree source's ordinal emission).
                     // Find the container prefix (the declared repeated container path).
