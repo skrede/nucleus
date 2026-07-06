@@ -5,7 +5,6 @@
 
 #include <map>
 #include <string>
-#include <vector>
 #include <cstddef>
 #include <utility>
 #include <optional>
@@ -55,13 +54,12 @@ public:
 
     // Drops the origin at `key` (no-op when absent) -- the counterpart of record()
     // for entries the load re-lays under a different path, so provenance never names
-    // a key the keyspace no longer holds. Clears scalar and collection origins.
+    // a key the keyspace no longer holds.
     void forget(const std::string &key)
     {
         m_origins.erase(key);
         m_first_ranks.erase(key);
         m_first_inheritance_layers.erase(key);
-        m_collection_origins.erase(key);
     }
 
     const origin *of(const std::string &key) const
@@ -88,38 +86,10 @@ public:
         return it == m_first_inheritance_layers.end() ? nullptr : &it->second;
     }
 
-    // Records per-element origins for a repeated-path collection, replacing any
-    // previously stored collection origins for this key. The first-introduction
-    // rank for the path is also maintained (used by slice's Ld computation).
-    void record_collection(const std::string &key, std::vector<origin> element_origins)
-    {
-        // Capture first rank and inheritance layer BEFORE the move.
-        const std::size_t first_rank =
-            element_origins.empty() ? 0 : element_origins.front().rank;
-        const std::optional<std::size_t> first_layer =
-            element_origins.empty() ? std::nullopt
-                                    : element_origins.front().inheritance_layer;
-        m_collection_origins[key] = std::move(element_origins);
-        m_first_ranks.try_emplace(key, first_rank);
-        if(first_layer.has_value())
-            m_first_inheritance_layers.try_emplace(key, first_layer.value());
-    }
-
-    // The per-element origins for a repeated-path collection, or nullptr when
-    // none are recorded. Distinct from of(), which covers scalar origins only.
-    const std::vector<origin> *
-    collection_origins_of(const std::string &key) const
-    {
-        auto it = m_collection_origins.find(key);
-        return it == m_collection_origins.end() ? nullptr : &it->second;
-    }
-
-    // scalar origin count; collection_origins_of() is the separate surface for
-    // repeated paths.
+    // Number of origins recorded.
     std::size_t size() const noexcept { return m_origins.size(); }
 
-    // Returns the scalar winning-origins map. For repeated paths, scalar origins
-    // are absent -- use collection_origins_of() instead.
+    // Returns the winning-origins map for every key recorded.
     const std::map<std::string, origin> &all() const noexcept
     {
         return m_origins;
@@ -134,9 +104,6 @@ private:
     // keys an inheritance-chain entry introduced. Drives the slice step's
     // re-open detection independently of cross-source precedence rank.
     std::map<std::string, std::size_t> m_first_inheritance_layers;
-    // Per-element origins for repeated-path collections. A path appears here
-    // instead of m_origins when its values are collected, not last-won.
-    std::map<std::string, std::vector<origin>> m_collection_origins;
 };
 
 }

@@ -1079,15 +1079,12 @@ public:
                 for(const key_path &path : snapshot)
                 {
                     const origin *orig = m_provenance.of(path.str());
+                    // Flat unified-path writes (argv/env) carry no inheritance_layer
+                    // and always win by plain stack precedence, per strain_scope.h's
+                    // documented contract; exempt them from the rank-bounded prune.
+                    if(orig != nullptr && !orig->inheritance_layer.has_value())
+                        continue;
                     std::size_t path_rank = orig != nullptr ? orig->rank : 0;
-                    if(orig == nullptr)
-                    {
-                        // Check collection origins for repeated leaves.
-                        const std::vector<origin> *col_orig =
-                            m_provenance.collection_origins_of(path.str());
-                        if(col_orig != nullptr && !col_orig->empty())
-                            path_rank = col_orig->front().rank;
-                    }
                     if(path_rank == 0 || path_rank <= Ld)
                         continue;
                     // Keyed-merge collections were finalised across layers already;
