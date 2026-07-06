@@ -240,6 +240,30 @@ TEST_CASE("flat multi-leaf entries under a keyed-merge container group per "
     REQUIRE(r->get("endpoints/output[1]/addr") == "10.0.0.1");
 }
 
+TEST_CASE("flat multi-leaf entries under a keyed-merge container arriving "
+          "field-major fail loudly instead of silently mis-pairing leaves",
+          "[keyed]")
+{
+    auto space = make_space(merge_mode::unite);
+
+    // Field-major order: both instances' "name" leaves arrive before either
+    // instance's "addr" leaf. The grouping's instance-major contract cannot
+    // disambiguate which "addr" belongs to which "name" from suffix repeats
+    // alone, so this must fail loudly rather than mis-pair "10.0.0.2" onto
+    // "x"'s instance (or fabricate a spurious third instance).
+    runtime_source flat_field_major;
+    flat_field_major.set("endpoints/output/name", "x")
+                    .set("endpoints/output/name", "y")
+                    .set("endpoints/output/addr", "10.0.0.1")
+                    .set("endpoints/output/addr", "10.0.0.2");
+
+    auto r = load_config(space, source_stack{std::move(flat_field_major)}, {});
+    REQUIRE_FALSE(r.has_value());
+    REQUIRE(r.error().code == errc::layering_violation);
+    REQUIRE(mentions(r.error(), "instance-major"));
+    REQUIRE(mentions(r.error(), "endpoints/output"));
+}
+
 TEST_CASE("a flat source without duplicate_keys cannot address two keyed "
           "instances in one layer", "[keyed]")
 {

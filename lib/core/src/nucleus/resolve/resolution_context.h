@@ -200,6 +200,23 @@ public:
             m_keyed_fields[cpath] = field;
         }
 
+        // Declared leaf names per keyed-merge container, used by the flat
+        // multi-leaf grouping below to detect field-major arrival (schema-known,
+        // not incrementally learned from the data -- see the grouping's own
+        // comment for why that distinction matters). Computed once per fold(),
+        // shared across every layer.
+        std::map<std::string, std::set<std::string>> keyed_declared_suffixes;
+        for(const auto &[cpath, mode] : m_keyed_modes)
+        {
+            auto container_kp = key_path::parse(cpath);
+            if(!container_kp)
+                continue;
+            std::set<std::string> &declared = keyed_declared_suffixes[cpath];
+            for(const schema_element &child : m_schema.elements())
+                if(child.container() == container_kp.value())
+                    declared.insert(child.name);
+        }
+
         // Deferred checks: CLI plain-ordinal overrides recognized here but
         // validated/applied only by apply_deferred_cli_overrides(), which the
         // caller runs after slice() (and therefore after
@@ -426,6 +443,13 @@ public:
                             // a suffix repeating within the current instance means a
                             // NEW instance is starting, gated on duplicate_keys exactly
                             // as leaf_ordinal_counters gates Case A's analogous repeat.
+                            // This grouping REQUIRES instance-major arrival (all of one
+                            // instance's fields before the next instance's fields begin);
+                            // a suffix reappearing before every declared field has been
+                            // seen for the current instance means the source emitted
+                            // fields field-major instead, which this grouping cannot
+                            // safely disambiguate -- fail loudly rather than silently
+                            // mis-pairing leaves across instances.
                             std::set<std::string> &seen = keyed_flat_suffixes_seen[actual_container];
                             if(!seen.contains(suffix))
                             {
@@ -434,6 +458,16 @@ public:
                             }
                             else if(entry.capabilities.supports(capability::duplicate_keys))
                             {
+                                const std::set<std::string> &declared =
+                                    keyed_declared_suffixes[canon];
+                                if(!declared.empty() && seen != declared)
+                                    return unexpected(error{errc::layering_violation, nucleus::format(
+                                        "source '{}': flat entries for keyed collection '{}' "
+                                        "must supply every field of one instance before the "
+                                        "next instance begins (instance-major order); field "
+                                        "'{}' repeated after only {} of {} declared fields were "
+                                        "seen for the current instance",
+                                        lh->label, canon, suffix, seen.size(), declared.size())});
                                 ordinal = ++keyed_flat_counter[actual_container];
                                 seen.clear();
                                 seen.insert(suffix);
