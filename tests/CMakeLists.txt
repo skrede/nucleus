@@ -62,7 +62,9 @@ nucleus_add_test(constraint_group_test nucleus::runtime)
 nucleus_add_test(identity_group_test nucleus::runtime)
 nucleus_add_test(keyed_composition_test nucleus::runtime)
 nucleus_add_test(keyref_test nucleus::runtime)
-nucleus_add_test(argv_source_test nucleus::argv nucleus::xml)
+if(NUCLEUS_BUILD_SOURCE_XML)
+    nucleus_add_test(argv_source_test nucleus::argv nucleus::xml)
+endif()
 nucleus_add_test(schema_cli_bijection_test nucleus::argv)
 nucleus_add_test(multispace_argv_test nucleus::argv)
 nucleus_add_test(token_lexer_test)
@@ -486,6 +488,23 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
 endif()
+
+# ---------------------------------------------------------------------------
+# NUCLEUS_WERROR top-level-only default: proves nucleus_IS_TOP_LEVEL-derived
+# default resolves OFF for a nested add_subdirectory() consumer whose own
+# project() call precedes nucleus's. Unconditional (not clang-gated) since the
+# check is compiler-independent. A bare "configure succeeds" check would be
+# insufficient -- it must also confirm the SPECIFIC cache value, not merely
+# that configure didn't crash.
+# ---------------------------------------------------------------------------
+add_test(
+    NAME nested_consumer_werror_default_off
+    COMMAND ${CMAKE_COMMAND}
+        -DNUCLEUS_FIXTURE_SOURCE_DIR=${CMAKE_SOURCE_DIR}/tests/nested_consumer_fixture
+        -DNUCLEUS_FIXTURE_BINARY_DIR=${CMAKE_BINARY_DIR}/nested_consumer_fixture_build
+        -P ${CMAKE_SOURCE_DIR}/scripts/expect_nested_consumer_werror_off.cmake
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
 
 # ---------------------------------------------------------------------------
 # Core-purity check: the core must carry no format/host vocabulary. Greps the
