@@ -419,7 +419,7 @@ public:
                                 suffix += key_path::separator;
                             suffix += segs[i];
                         }
-                        std::size_t ordinal;
+                        std::size_t ordinal = 0;
                         if(key_path::is_indexed_segment(cseg))
                         {
                             ordinal = key_path::ordinal_of(cseg);
