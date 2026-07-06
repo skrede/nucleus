@@ -111,6 +111,11 @@ public:
         std::optional<std::size_t>          inheritance_layer;
         // Set for document sources (derives from entries[i].path); absent for stack/argv/env sources.
         std::optional<std::filesystem::path> origin_file;
+        // Set for chain-layer handles: points at the batch chain_walker already
+        // pulled during the inheritance walk, so fold() consumes it instead of
+        // pulling the same handle a second time. Null for stack/argv/env layers,
+        // which have no walk phase and are pulled here for the first time.
+        config_source_batch *cached_batch = nullptr;
     };
 
     // Fold overload that consumes a sequence of layered_handle descriptors.
@@ -210,14 +215,28 @@ public:
 
         for(layered_handle *lh : ordered)
         {
-            lh->handle->apply_projection(projection);
-            config_source_result pulled = lh->handle->pull();
-            if(!pulled)
-                return unexpected(error{pulled.error().code,
-                                        nucleus::format("source '{}': {}",
-                                            lh->label, pulled.error().message)});
+            // A chain layer's batch was already pulled during the inheritance
+            // walk; consume the cached batch here instead of pulling the same
+            // handle again. Stack/argv/env layers have no walk phase and are
+            // pulled for the first (and only) time here.
+            config_source_result pulled;
+            config_source_batch *batch_ptr = nullptr;
+            if(lh->cached_batch != nullptr)
+            {
+                batch_ptr = lh->cached_batch;
+            }
+            else
+            {
+                lh->handle->apply_projection(projection);
+                pulled = lh->handle->pull();
+                if(!pulled)
+                    return unexpected(error{pulled.error().code,
+                                            nucleus::format("source '{}': {}",
+                                                lh->label, pulled.error().message)});
+                batch_ptr = &pulled.value();
+            }
 
-            config_source_batch &batch = pulled.value();
+            config_source_batch &batch = *batch_ptr;
 
             // Extend= targeting a repeated container is not supported.
             for(const extend_disposition &d : batch.dispositions)

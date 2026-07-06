@@ -213,19 +213,22 @@ assemble_handles(const space_core &state,
     handles.reserve(entries.size() + layers.size());
 
     // The chain occupies the base ranks [0, m), base-first; each entry carries
-    // its inheritance-chain layer ordinal equal to its chain index.
+    // its inheritance-chain layer ordinal equal to its chain index, plus a
+    // pointer to the batch chain_walker already pulled for it during the walk.
     for(std::size_t i = 0; i < entries.size(); ++i)
         handles.push_back({&entries[i].src, i,
                            nucleus::format("path:{}", entries[i].path), {}, i,
-                           std::filesystem::path(entries[i].path)});
+                           std::filesystem::path(entries[i].path),
+                           &entries[i].cached_batch});
 
     // Stack handles sit ABOVE the whole chain: rank = chain size + stack index.
-    // Their label keeps the bare stack index so provenance reads stack[N].
+    // Their label keeps the bare stack index so provenance reads stack[N]. They
+    // have no walk phase, so cached_batch stays nullptr (fold() pulls them).
     const std::size_t base_offset = entries.size();
     for(std::size_t i = 0; i < layers.size(); ++i)
         handles.push_back({&layers[i], base_offset + i,
                            nucleus::format("stack[{}]", i), {}, std::nullopt,
-                           std::nullopt});
+                           std::nullopt, nullptr});
 
     return handles;
 }
