@@ -16,6 +16,7 @@
 #include <utility>
 #include <filesystem>
 #include <functional>
+#include <system_error>
 #include <unordered_set>
 
 namespace nucleus {
@@ -111,18 +112,16 @@ public:
         // expansion begins, so the admissibility exemption below is keyed on
         // "was this ever directly requested" rather than on visit order --
         // the same document must be exempt whether it is walked as a request
-        // first or reached as another request's inherited parent first.
+        // first or reached as another request's inherited parent first. The
+        // non-throwing overload skips an unnormalizable path here; expand_one()
+        // reports it as a typed error below.
         for(const std::string &path : requested_paths)
         {
-            try
-            {
-                walker.m_requested.insert(
-                    std::filesystem::weakly_canonical(path).generic_string());
-            }
-            catch(...)
-            {
-                // Unnormalizable paths are reported by expand_one() itself below.
-            }
+            std::error_code ec;
+            std::string norm =
+                std::filesystem::weakly_canonical(path, ec).generic_string();
+            if(!ec)
+                walker.m_requested.insert(std::move(norm));
         }
         std::vector<chain_entry> out;
         for(const std::string &path : requested_paths)
