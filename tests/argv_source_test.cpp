@@ -6,6 +6,7 @@
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
+#include "nucleus/schema/identity_group.h"
 
 #include "nucleus/config_source/source_handle.h"
 #include "nucleus/config_source/config_source.h"
@@ -554,4 +555,61 @@ TEST_CASE("cli ordinal override of a sparse layer's nonexistent slot cannot "
         opts);
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().code == nucleus::errc::schema_violation);
+}
+
+// ---------------------------------------------------------------------------
+// CLI ordinal addressing for a keyed-merge (`unite`) container -- the full
+// positive round trip: 32-04's dispatch reorder recognizes the argv path as
+// an ordinal override instead of diverting it as a flat leaf, and this
+// plan's defer-past-slice timing fix lets the override actually reach the
+// merged instance (merge_keyed_collections() runs before slice(), which runs
+// before this apply pass, so m_building already holds the merged collection).
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// endpoints/output (repeated, unite merge) keyed by `name` via an identity group.
+nucleus::config_space make_unite_endpoints_space()
+{
+    nucleus::config_space_builder builder;
+    REQUIRE(builder.register_element(
+        nucleus::element("endpoints", nucleus::anchor::root())));
+    REQUIRE(builder.register_element(
+        nucleus::merging(nucleus::repeated_element("output", nucleus::anchor::keyspace("endpoints")),
+                          nucleus::merge_mode::unite)));
+    REQUIRE(builder.register_element(
+        nucleus::element("name", nucleus::anchor::keyspace("endpoints/output"))));
+    REQUIRE(builder.register_element(
+        nucleus::element("addr", nucleus::anchor::keyspace("endpoints/output"))));
+    REQUIRE(builder.register_identity_group(
+        nucleus::identity_group("output_names", nucleus::anchor::keyspace("endpoints"))
+            .members({"output"}).field("name")));
+    return builder.build();
+}
+
+}
+
+TEST_CASE("cli ordinal override of a keyed-merge (unite) container reaches "
+          "the merged instance",
+          "[argv][keyed]")
+{
+    const nucleus::config_space space = make_unite_endpoints_space();
+
+    nucleus::runtime_source base;
+    base.set("endpoints/output[0]/name", "a")
+        .set("endpoints/output[0]/addr", "10.0.0.1");
+
+    argv_source argv(std::vector<std::string>{"--endpoints-output-0-name=x"});
+    argv.recognize_with(nucleus::recognizer_of(space));
+
+    auto loaded = nucleus::load_config(
+        space,
+        nucleus::source_stack{std::move(base), std::move(argv)},
+        {});
+    REQUIRE(loaded);
+
+    // The override reaches the merged instance's "name" leaf; the untouched
+    // sibling leaf survives.
+    REQUIRE(loaded.value().get("endpoints/output[0]/name") == "x");
+    REQUIRE(loaded.value().get("endpoints/output[0]/addr") == "10.0.0.1");
 }
