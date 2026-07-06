@@ -107,6 +107,23 @@ public:
            const inherit_policy &policy)
     {
         chain_walker walker(policy);
+        // Collect the normalized form of every initially-requested path before
+        // expansion begins, so the admissibility exemption below is keyed on
+        // "was this ever directly requested" rather than on visit order --
+        // the same document must be exempt whether it is walked as a request
+        // first or reached as another request's inherited parent first.
+        for(const std::string &path : requested_paths)
+        {
+            try
+            {
+                walker.m_requested.insert(
+                    std::filesystem::weakly_canonical(path).generic_string());
+            }
+            catch(...)
+            {
+                // Unnormalizable paths are reported by expand_one() itself below.
+            }
+        }
         std::vector<chain_entry> out;
         for(const std::string &path : requested_paths)
         {
@@ -227,9 +244,11 @@ private:
         // kind::opt_out terminates the chain below this file (no recursion).
         // kind::inherit_default means "no parent declared" -- the chain terminates here.
 
-        // Admissibility check: invoked only for candidate parent sources; the
-        // initially requested source is never subject to the admissibility policy.
-        if(is_parent && m_admissibility)
+        // Admissibility check: invoked only for candidate parent sources; a
+        // source that appears anywhere in the initially-requested set is exempt
+        // regardless of the order or role it is first reached in, so the outcome
+        // does not depend on whether it is walked as a request or as a parent first.
+        if(is_parent && m_admissibility && !m_requested.contains(norm))
         {
             // Pull capabilities for the admissibility check via the handle.
             std::string reason = m_admissibility(handle.capabilities());
@@ -254,6 +273,11 @@ private:
     // path), this set is never erased -- it spans all requested_paths so the
     // same document reached via two different routes is walked/pulled once.
     std::unordered_set<std::string> m_expanded;
+    // Normalized paths of every source in the initially-requested set, populated
+    // once before expansion begins (see expand()). Order-independent: a document
+    // is exempt from admissibility whenever it is a member of this set, regardless
+    // of which role (request or parent) reaches it first during the walk.
+    std::unordered_set<std::string> m_requested;
     std::function<std::string(capability_descriptor)> m_admissibility;
 };
 

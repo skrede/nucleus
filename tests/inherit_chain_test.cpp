@@ -429,6 +429,92 @@ TEST_CASE("admissibility reject-all fails naming the parent in a two-file chain"
 }
 
 // ---------------------------------------------------------------------------
+// 8d. A source directly requested AND reached as another request's inherited
+//     parent is exempt from admissibility regardless of visit order: the
+//     chain-expansion dedupe must not make the exemption depend on which role
+//     (request or parent) the shared document happens to be visited under first.
+// ---------------------------------------------------------------------------
+TEST_CASE("directly-requested source reached as an inherited parent is exempt "
+          "from admissibility regardless of request order", "[chain]")
+{
+    // Wraps an xml_source but reports a caller-supplied capability descriptor
+    // instead of xml_source's own, so the admissibility policy below can be
+    // made to reject exactly the documents the test targets.
+    struct capped_xml_source
+    {
+        nucleus::xml_source src;
+        nucleus::capability_descriptor caps;
+
+        nucleus::capability_descriptor capabilities() const { return caps; }
+        void apply_projection(const nucleus::schema_projection &p) { src.apply_projection(p); }
+        nucleus::inherit_declaration inheritance() const { return src.inheritance(); }
+        nucleus::config_source_result pull() { return src.pull(); }
+    };
+
+    const char *a_doc = R"(<cluster><server name="web"><port>80</port></server></cluster>)";
+    const char *b_doc =
+        R"(<cluster inherit="a.xml"><server name="web" extend="wide"><protocol>tcp</protocol></server></cluster>)";
+    const char *c_doc = R"(<cluster><server name="orphan"><port>1</port></server></cluster>)";
+    const char *d_doc =
+        R"(<cluster inherit="c.xml"><server name="orphan" extend="wide"><protocol>udp</protocol></server></cluster>)";
+
+    nucleus::config_space_builder engine;
+    declare_cluster(engine);
+    nucleus::config_space space = engine.build();
+
+    // Rejects any source that lacks nesting. a.xml and c.xml are both built
+    // without it, so the policy would reject either if it ran against them.
+    nucleus::inherit_policy policy;
+    policy.admissibility = [](nucleus::capability_descriptor caps) -> std::string {
+        return caps.supports(nucleus::capability::nesting) ? std::string{} : "lacks nesting";
+    };
+
+    const nucleus::capability_descriptor bare{};
+    const nucleus::capability_descriptor nested{nucleus::capability::nesting};
+
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
+        const std::string name = filename_of(path);
+        if(name == "a.xml")
+            return nucleus::source_handle(capped_xml_source{
+                nucleus::xml_source::from(nucleus::xml_source_options::of_string(a_doc)), bare});
+        if(name == "b.xml")
+            return nucleus::source_handle(capped_xml_source{
+                nucleus::xml_source::from(nucleus::xml_source_options::of_string(b_doc)), nested});
+        if(name == "c.xml")
+            return nucleus::source_handle(capped_xml_source{
+                nucleus::xml_source::from(nucleus::xml_source_options::of_string(c_doc)), bare});
+        if(name == "d.xml")
+            return nucleus::source_handle(capped_xml_source{
+                nucleus::xml_source::from(nucleus::xml_source_options::of_string(d_doc)), nested});
+        return nucleus::source_handle(nucleus::env_source{});
+    };
+
+    // a.xml is directly requested AND reached as b.xml's inherited parent. The
+    // policy would reject it as a parent, but its direct-request membership
+    // exempts it -- regardless of which order the two paths are listed in.
+    auto loaded_b_first = load_chain(space, {"b.xml", "a.xml"}, factory, "web", policy);
+    REQUIRE(loaded_b_first);
+    REQUIRE(loaded_b_first.value().get("cluster/server/port") == "80");
+    REQUIRE(loaded_b_first.value().get("cluster/server/protocol") == "tcp");
+
+    auto loaded_a_first = load_chain(space, {"a.xml", "b.xml"}, factory, "web", policy);
+    REQUIRE(loaded_a_first);
+    REQUIRE(loaded_a_first.value().get("cluster/server/port") == "80");
+    REQUIRE(loaded_a_first.value().get("cluster/server/protocol") == "tcp");
+
+    // Negative control: c.xml is a genuinely transitive-only parent (never
+    // directly requested), so the same policy must still reject it -- the
+    // exemption above must not have disabled the admissibility check entirely.
+    auto loaded_transitive_only = load_chain(space, {"d.xml"}, factory, "orphan", policy);
+    REQUIRE_FALSE(loaded_transitive_only);
+    const bool has_rejected =
+        loaded_transitive_only.error().message.find("admissibility") != std::string::npos
+        || loaded_transitive_only.error().message.find("rejected") != std::string::npos;
+    REQUIRE(has_rejected);
+    REQUIRE(loaded_transitive_only.error().message.find("c.xml") != std::string::npos);
+}
+
+// ---------------------------------------------------------------------------
 // 9. Default admit-all policy allows all parents.
 // ---------------------------------------------------------------------------
 TEST_CASE("default admit-all policy allows all parents", "[chain]")
