@@ -378,7 +378,13 @@ public:
                         }
                         if(!repeated_container_prefixes.contains(prefix))
                             continue;
-                        // Found: "prefix/N/..." is a CLI ordinal path.
+                        // Found: "prefix/N/..." is a CLI ordinal path. Cap the digit
+                        // run at 18 (mirroring key_path::is_indexed_segment's own bound)
+                        // so a crafted, absurdly long digit run cannot wrap a size_t.
+                        if(seg.size() > 18)
+                            return unexpected(error{errc::malformed_source, nucleus::format(
+                                "CLI ordinal segment '{}' exceeds the maximum of 18 digits",
+                                seg)});
                         const std::size_t ordinal = [&]() {
                             std::size_t v = 0;
                             for(char const c : seg) v = (v * 10) + static_cast<std::size_t>(c - '0');
@@ -791,9 +797,33 @@ public:
             {
                 // Skip paths where the segment after the container is an ordinal
                 // index -- those are flat-source repeated leaves, not keyed instances.
+                // An indexed-shaped segment is only a legitimate ordinal when a
+                // repeated element is genuinely declared directly at this container
+                // under that base name; otherwise it is a strain whose primary-key
+                // value merely happens to be bracket-shaped, and must not vanish here.
                 if(path.size() > container.size()
                    && key_path::is_indexed_segment(path.segments()[container.size()]))
-                    continue;
+                {
+                    const std::string base = std::string(
+                        key_path::base_name(path.segments()[container.size()]));
+                    const key_path declared_child = container.child(base);
+                    bool declared_repeated_child = false;
+                    for(const schema_element &child_el : m_schema.elements())
+                    {
+                        if(child_el.repeated && child_el.declared_path() == declared_child)
+                        {
+                            declared_repeated_child = true;
+                            break;
+                        }
+                    }
+                    if(declared_repeated_child)
+                        continue;
+                    return unexpected(error{errc::schema_violation, nucleus::format(
+                        "primary-key value '{}' in container '{}' is shaped like a "
+                        "repeated-instance ordinal ('[n]'), which this container does "
+                        "not declare a repeated child at; rename the key value",
+                        path.segments()[container.size()], container.str())});
+                }
 
                 if(m_schema.keyed_instance_path(container, path))
                     strains[path.segments()[container.size()]].push_back(path);

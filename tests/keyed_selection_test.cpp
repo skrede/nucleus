@@ -3,6 +3,7 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
+#include "nucleus/error.h"
 #include "nucleus/config.h"
 
 #include "nucleus/xml/xml_source.h"
@@ -185,6 +186,27 @@ TEST_CASE("a selection against anonymous-only content fails loudly",
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().message.find("web") != std::string::npos);
     REQUIRE(loaded.error().message.find("no primary-keyed instances") != std::string::npos);
+}
+
+TEST_CASE("a bracket-shaped primary-key value is rejected loudly, never silently dropped",
+          "[selection][keyed]")
+{
+    // "cluster/server" declares no repeated child, so a strain literally keyed
+    // "node[3]" is not a legitimate CLI-style ordinal -- it must not silently
+    // vanish from the strain bucketing in slice().
+    const char *doc = R"(
+        <cluster>
+            <server name="node[3]"><port>80</port></server>
+        </cluster>)";
+
+    nucleus::config_space_builder engine;
+    declare_cluster(engine);
+    nucleus::config_space space = engine.build();
+
+    auto loaded = load_doc(space, doc, "node[3]");
+    REQUIRE_FALSE(loaded);
+    REQUIRE(loaded.error().code == nucleus::errc::schema_violation);
+    REQUIRE(loaded.error().message.find("node[3]") != std::string::npos);
 }
 
 TEST_CASE("a key value shadowing a declared element name is a loud error",

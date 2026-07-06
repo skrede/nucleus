@@ -2,6 +2,7 @@
 #include "nucleus/capability.h"
 #include "nucleus/config.h"
 #include "nucleus/config_space.h"
+#include "nucleus/error.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -365,6 +366,54 @@ TEST_CASE("argv out-of-range ordinal -- loud error", "[argv][repeated_container]
     REQUIRE(loaded.error().message.find("out of range") != std::string::npos);
     // The error names the actual count of instances (2).
     REQUIRE(loaded.error().message.find("2") != std::string::npos);
+}
+
+TEST_CASE("cli ordinal digit run over 18 digits is rejected, not silently wrapped",
+          "[argv][repeated_container]")
+{
+    const nucleus::config_space space = make_cluster_space();
+
+    auto xml = xml_of_cluster(
+        "<cluster>"
+        "<node><endpoint><port>80</port></endpoint></node>"
+        "</cluster>");
+
+    // 19 digits: one past the 18-digit cap key_path::is_indexed_segment also enforces.
+    argv_source argv(std::vector<std::string>{
+        "--cluster-node-9999999999999999999-endpoint-port=90"});
+    argv.recognize_with(nucleus::recognizer_of(space));
+
+    auto loaded = nucleus::load_config(
+        space,
+        nucleus::source_stack{std::move(xml), std::move(argv)},
+        {});
+    REQUIRE_FALSE(loaded);
+    REQUIRE(loaded.error().code == nucleus::errc::malformed_source);
+}
+
+TEST_CASE("cli ordinal digit run at 18 digits is still accepted (boundary)",
+          "[argv][repeated_container]")
+{
+    const nucleus::config_space space = make_cluster_space();
+
+    auto xml = xml_of_cluster(
+        "<cluster>"
+        "<node><endpoint><port>80</port></endpoint></node>"
+        "</cluster>");
+
+    // 18 digits, out of instance range (only 1 exists) -- must fail on range,
+    // not on the digit cap, proving the boundary itself is not rejected.
+    argv_source argv(std::vector<std::string>{
+        "--cluster-node-999999999999999999-endpoint-port=90"});
+    argv.recognize_with(nucleus::recognizer_of(space));
+
+    auto loaded = nucleus::load_config(
+        space,
+        nucleus::source_stack{std::move(xml), std::move(argv)},
+        {});
+    REQUIRE_FALSE(loaded);
+    REQUIRE(loaded.error().code == nucleus::errc::schema_violation);
+    REQUIRE(loaded.error().message.find("out of range") != std::string::npos);
 }
 
 TEST_CASE("argv ordinal == count is out of range -- cannot append",
