@@ -29,7 +29,9 @@ std::string format(std::format_string<Args...> spec, Args &&...args)
 
 #include <string>
 
-#include <fmt/core.h>
+// fmt/format.h, not fmt/core.h: since fmt 11 the core header aliases fmt/base.h,
+// which no longer declares fmt::format itself.
+#include <fmt/format.h>
 
 namespace nucleus {
 

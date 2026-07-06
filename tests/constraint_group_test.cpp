@@ -183,7 +183,7 @@ TEST_CASE("validate_group valve runs a host predicate", "[constraint]")
         [](const config_node &cache) -> expected<void, std::string> {
             auto ttl = cache["ttl"].value();
             if(ttl.has_value() && *ttl == "0")
-                return unexpected(std::string("ttl must not be zero"));
+                return nucleus::unexpected(std::string("ttl must not be zero"));
             return {};
         })));
     auto space = std::move(b).build();

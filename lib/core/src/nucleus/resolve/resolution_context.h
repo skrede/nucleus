@@ -373,7 +373,7 @@ public:
                     return std::optional<key_path>{std::nullopt};
                 }();
                 if(!plain_ordinal_rebracketed)
-                    return unexpected(std::move(plain_ordinal_rebracketed).error());
+                    return unexpected(plain_ordinal_rebracketed.error());
 
                 const bool cli_deferred_this_entry =
                     plain_ordinal_rebracketed.value().has_value()

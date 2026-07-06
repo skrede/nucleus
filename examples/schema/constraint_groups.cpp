@@ -45,7 +45,7 @@ static config_space make_space()
         [](const config_node &cache) -> expected<void, std::string> {
             auto ttl = cache["ttl"].value();
             if(ttl.has_value() && *ttl == "0")
-                return unexpected(std::string("ttl must be greater than zero"));
+                return nucleus::unexpected(std::string("ttl must be greater than zero"));
             return {};
         }));
 
