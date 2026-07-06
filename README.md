@@ -107,7 +107,13 @@ Catch2 and pugixml are fetched automatically via `FetchContent`. `std::format` i
 the diagnostic vocabulary; on a toolchain that lacks it, `{fmt}` is fetched as the
 fallback. Options: `NUCLEUS_BUILD_TESTS`, `NUCLEUS_BUILD_EXAMPLES`,
 `NUCLEUS_BUILD_SOURCE_XML` (on by default), `NUCLEUS_BUILD_SANITIZER`,
-`NUCLEUS_COVERAGE`.
+`NUCLEUS_COVERAGE`, `NUCLEUS_FETCH_TEST_DEPS` (fetch Catch2 via `FetchContent`, on
+by default), and `NUCLEUS_SANITIZER` (the sanitizer flavor &mdash; `address`,
+`thread`, or `undefined` &mdash; for `NUCLEUS_BUILD_SANITIZER` builds). `NUCLEUS_WERROR`
+treats warnings as errors on first-party targets; it defaults on only when nucleus
+is the top-level project, so a `FetchContent`/`add_subdirectory` consumer never
+inherits `-Werror` from a vendored nucleus. Pass `-DNUCLEUS_WERROR=OFF` to demote
+warnings to non-fatal locally, or `-DNUCLEUS_WERROR=ON` to opt in as a consumer.
 
 ## Consuming nucleus
 
