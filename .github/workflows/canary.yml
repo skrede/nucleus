@@ -57,18 +57,18 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install latest clang (apt.llvm.org)
+        # llvm.sh installs only versioned binaries (clang-NN, no bare clang
+        # symlink), and a bare CC=clang silently falls back to the runner's
+        # distro clang -- so resolve the newest installed version explicitly.
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh
+          LLVM_VER=$(ls /usr/bin/clang-* | grep -oE '[0-9]+$' | sort -n | tail -1)
+          echo "CC=clang-${LLVM_VER}" >> "$GITHUB_ENV"
+          echo "CXX=clang++-${LLVM_VER}" >> "$GITHUB_ENV"
 
       - name: Configure
-        # llvm.sh may install versioned binaries (clang-NN) rather than a bare
-        # clang symlink on some codenames; this may need a version suffix once
-        # observed live in Actions.
-        env:
-          CC: clang
-          CXX: clang++
         run: cmake . -B build -DNUCLEUS_BUILD_TESTS=ON -DNUCLEUS_BUILD_EXAMPLES=ON -DNUCLEUS_BUILD_SOURCE_XML=ON
 
       - name: Build
