@@ -122,12 +122,15 @@ public:
                                       declared_str)});
             }
 
-            // Closed-value check: a present value must be one of the declared
-            // allowed values. An unconstrained element (empty set) skips this.
-            // For repeated elements, the check applies to each indexed instance value.
+            // Closed-value check: every concrete instance value must be one of
+            // the declared allowed values. An unconstrained element (empty set)
+            // skips this. A non-repeated leaf under a repeated or keyed container
+            // carries no value at the plain declared path, so the indexed
+            // instances are matched canonically (mirroring the presence check).
             if(!el.allowed_values.empty())
             {
-                auto check_value = [&](const std::string &actual) {
+                auto check_value = [&](const std::string &instance_path,
+                                       const std::string &actual) {
                     const bool admissible = std::any_of(
                         el.allowed_values.begin(), el.allowed_values.end(),
                         [&](const std::string &a) { return a == actual; });
@@ -135,34 +138,31 @@ public:
                     {
                         std::string reason = nucleus::format(
                             "field '{}' value '{}' is not one of the allowed values",
-                            declared_str, actual);
+                            instance_path, actual);
                         const std::span<const std::string> candidates(
                             el.allowed_values.data(), el.allowed_values.size());
                         auto nearest = suggest_keys(actual, candidates, 1);
                         if(!nearest.empty())
                             reason += nucleus::format(" (did you mean '{}'?)",
                                                       nearest.front());
-                        violations.push_back(schema_violation{declared_str,
+                        violations.push_back(schema_violation{instance_path,
                                                               std::move(reason)});
                     }
                 };
 
-                if(el.repeated)
+                if(const value *direct = resolved.find(declared))
                 {
-                    // Check each indexed instance scalar.
+                    check_value(declared_str, std::string(direct->text()));
+                }
+                else
+                {
                     for(const key_path &kp : resolved.paths())
                     {
                         if(schema.canonical_text(kp) != declared_str)
                             continue;
                         if(const value *v = resolved.find(kp))
-                            check_value(std::string(v->text()));
+                            check_value(kp.str(), std::string(v->text()));
                     }
-                }
-                else if(present)
-                {
-                    const value *v = resolved.find(declared);
-                    if(v)
-                        check_value(std::string(v->text()));
                 }
             }
         }
