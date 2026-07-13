@@ -165,8 +165,20 @@ private:
                 bool is_active = false;
                 if(m.active_value.has_value())
                 {
-                    auto v = resolved.get(member_path);
-                    is_active = v.has_value() && *v == *m.active_value;
+                    // The member may live at an indexed instance path (member[n]) when
+                    // it is a repeated element, where the plain path carries no scalar;
+                    // the canonical scan finds every such instance. when_value matching
+                    // is an exact-string compare -- unlike the case-insensitive bool
+                    // converter, a value differing only in case does not activate it.
+                    if(auto member_kp = key_path::parse(member_path); member_kp)
+                        for(const std::string &mi :
+                            instances_of(schema, resolved, *member_kp))
+                            if(auto v = resolved.get(mi);
+                               v.has_value() && *v == *m.active_value)
+                            {
+                                is_active = true;
+                                break;
+                            }
                 }
                 else
                     is_active = present(resolved, member_path);

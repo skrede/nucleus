@@ -43,6 +43,13 @@ exclusion_group("cache_policy", anchor::keyspace("server/cache"))
     .at_most(1);
 ```
 
+`when_value` matching is an **exact-string** compare &mdash; the resolved value must
+equal the given string byte-for-byte. This is deliberately distinct from the
+case-insensitive bool converter: `when_value("true")` activates on `true` but not on
+`True` or `TRUE`. A member that resolves to an indexed instance path (a repeated
+element, whose value lives at `member[0]` rather than the plain path) is matched at its
+concrete instance.
+
 `mutually_exclusive("name", anchor, {"a", "b"})` is sugar for a two-member `at_most(1)`.
 
 ### Choice over `all_of` bundles
