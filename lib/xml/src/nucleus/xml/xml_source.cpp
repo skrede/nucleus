@@ -17,6 +17,7 @@
 #include <set>
 #include <memory>
 #include <string>
+#include <optional>
 #include <string_view>
 
 namespace nucleus {
@@ -125,17 +126,21 @@ value read_leaf_value(const pugi::xml_node &node)
 
 // The value of an element's primary-key field: the attribute named `key_field`,
 // or a text child element of that name (whose value may be split across text and
-// CDATA nodes). A keyless instance -- neither present -- yields an empty value.
-value keyed_value(const pugi::xml_node &node, const std::string &key_field)
+// CDATA nodes). Returns nullopt when the key field is absent entirely (neither the
+// attribute nor a text child of that name exists) so the caller can walk the
+// instance anonymously. A present field yields its value, which may be the empty
+// string when the field is present but empty (`name=""` or `<name></name>`) -- the
+// caller rejects that empty identity rather than degrading it to anonymous.
+std::optional<value> keyed_value(const pugi::xml_node &node, const std::string &key_field)
 {
     if(pugi::xml_attribute const attr = node.attribute(key_field.c_str()))
         return value::view(std::string_view(attr.value()));
 
-    pugi::xml_node const child = node.child(key_field.c_str());
-    if(child && !has_element_child(child) && child.first_child())
+    if(pugi::xml_node const child = node.child(key_field.c_str());
+       child && !has_element_child(child))
         return read_leaf_value(child);
 
-    return value::view(std::string_view{});
+    return std::nullopt;
 }
 
 // Validates grammar attributes on a transparent named-space root without emitting
@@ -304,14 +309,27 @@ walk(const pugi::xml_node &node, std::string_view path,
         }
 
         // A keyed container: distinguish this instance by its primary-key value
-        // and consume the key field. A keyless instance (no key value) falls
-        // through to the plain structural walk.
+        // and consume the key field; a keyless instance (no key field at all)
+        // falls through to the plain structural walk. The lookup uses the raw
+        // child_path: the schema admits exactly one primary key and forbids it
+        // beneath a repeated or keyed ancestor, so a keyed container's path never
+        // carries an ordinal or an enclosing key-value segment. (declared_path is
+        // deliberately NOT used here -- under an anonymous instance the walk emits
+        // no key-value segment, so declared_path would over-strip a real nested
+        // child, e.g. "cluster/server/logger" -> "cluster/server", and mistake
+        // that child for a keyed container.)
         if(const std::string *key = proj.key_of(child_path))
         {
-            const value key_value = keyed_value(child, *key);
-            const std::string_view key_val = key_value.text();
-            if(!key_val.empty())
+            if(std::optional<value> const key_value = keyed_value(child, *key))
             {
+                const std::string_view key_val = key_value->text();
+                if(key_val.empty())
+                    return unexpected(config_source_error{errc::malformed_source,
+                        nucleus::format(
+                            "explicit empty primary-key value in container '{}': "
+                            "an empty primary-key value is not a valid identity",
+                            child_path)});
+
                 // Same-layer duplicate primary-key detection: two instances with
                 // the same key value in one document are an error.
                 auto &seen = seen_keys[child_path];
@@ -348,7 +366,7 @@ walk(const pugi::xml_node &node, std::string_view path,
                 // this entry is already recorded before suppression fires.
                 batch.entries.push_back(make_entry(
                     join(join(child_path, key_val), *key),
-                    key_value, caps));
+                    *key_value, caps));
 
                 if(auto r = walk(child, join(child_path, key_val), caps, proj,
                                  batch, *key, seen_keys, ordinal_counters,
