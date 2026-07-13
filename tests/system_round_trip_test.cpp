@@ -81,7 +81,7 @@ TEST_CASE("round-trip: runtime_source + XML repeated field -> emit -> reload is 
 
     // Emit C1 through the XML emitter into an in-memory stream.
     std::ostringstream emitted;
-    xml::emit_document(c1, emitted);
+    REQUIRE(xml::emit_document(c1, emitted));
 
     REQUIRE_FALSE(emitted.str().empty());
 
@@ -132,7 +132,7 @@ TEST_CASE("round-trip: all scalar values survive emit -> reload unchanged",
     const config &c1 = first.value();
 
     std::ostringstream emitted;
-    xml::emit_document(c1, emitted);
+    REQUIRE(xml::emit_document(c1, emitted));
     REQUIRE_FALSE(emitted.str().empty());
 
     const std::string xml_text = emitted.str();
@@ -176,7 +176,7 @@ TEST_CASE("round-trip via env emitter: scalar subset reloads its keys",
 
     // Emit via env emitter.
     std::ostringstream env_out;
-    env::emit_document(c1, env_out);
+    REQUIRE(env::emit_document(c1, env_out));
     const std::string env_text = env_out.str();
     REQUIRE_FALSE(env_text.empty());
 

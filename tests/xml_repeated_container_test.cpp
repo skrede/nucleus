@@ -215,7 +215,7 @@ TEST_CASE("xml emitter -- repeated container bracket strip", "[xml][xml_emitter]
     REQUIRE(loaded);
 
     std::ostringstream out;
-    nucleus::xml::emit_document(loaded.value(), out);
+    REQUIRE(nucleus::xml::emit_document(loaded.value(), out));
     const std::string emitted = out.str();
 
     // No bracket-suffixed element names in the output.
@@ -254,7 +254,7 @@ TEST_CASE("xml emitter -- repeated container round-trip", "[xml][xml_emitter][ro
 
     // Emit to a string, then re-load.
     std::ostringstream out;
-    nucleus::xml::emit_document(original.value(), out);
+    REQUIRE(nucleus::xml::emit_document(original.value(), out));
 
     auto reloaded = nucleus::load_config(space, nucleus::source_stack{}, doc_opts(out.str()));
     REQUIRE(reloaded);
@@ -290,7 +290,7 @@ TEST_CASE("xml emitter -- repeated container round-trip with N >= 11 instances",
 
     // Emit to XML string, then re-load.
     std::ostringstream out;
-    nucleus::xml::emit_document(original.value(), out);
+    REQUIRE(nucleus::xml::emit_document(original.value(), out));
 
     const std::string emitted = out.str();
 

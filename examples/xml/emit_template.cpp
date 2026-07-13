@@ -37,6 +37,10 @@ int main()
         return 1;
 
     nucleus::config_space space = builder.build();
-    nucleus::xml::emit_template(space, std::cout);
+    if(auto emitted = nucleus::xml::emit_template(space, std::cout); !emitted)
+    {
+        std::cerr << "emit failed: " << emitted.error() << '\n';
+        return 1;
+    }
     return 0;
 }

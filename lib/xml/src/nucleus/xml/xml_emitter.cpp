@@ -136,7 +136,7 @@ pugi::xml_node indexed_child(pugi::xml_node parent,
 // hand-built projection (no values -- template only).
 // When space_name is non-empty, all roots are wrapped under <space_name>...</space_name>
 // for symmetric round-trip with xml_source::with_space_name().
-void emit_template(const config_space &space, std::ostream &out,
+expected<void, error> emit_template(const config_space &space, std::ostream &out,
                    std::string_view space_name)
 {
     std::vector<tree_node> roots;
@@ -176,6 +176,7 @@ void emit_template(const config_space &space, std::ostream &out,
             emit_node(r, out, 1);
         out << "</config>\n";
     }
+    return {};
 }
 
 namespace {
@@ -208,10 +209,10 @@ numeric_sort_key(const std::string &key)
 
 } // namespace
 
-void emit_document(const config &config, std::ostream &out,
+expected<void, error> emit_document(const config &config, std::ostream &out,
                    std::string_view space_name)
 {
-    emit_document(config, out, schema_projection{}, space_name);
+    return emit_document(config, out, schema_projection{}, space_name);
 }
 
 // Projects a resolved config into a populated XML document: each '/'-separated
@@ -225,7 +226,7 @@ void emit_document(const config &config, std::ostream &out,
 // wrapper element named space_name for symmetric round-trip with with_space_name().
 // When proj is non-empty, pkey leaves are rendered as attributes on their parent
 // container element (preventing double-write on round-trip); empty proj is schema-blind.
-void emit_document(const config &config, std::ostream &out,
+expected<void, error> emit_document(const config &config, std::ostream &out,
                    const schema_projection &proj,
                    std::string_view space_name)
 {
@@ -310,6 +311,7 @@ void emit_document(const config &config, std::ostream &out,
     }
 
     doc.save(out, "  ");
+    return {};
 }
 
 }

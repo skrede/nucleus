@@ -1,7 +1,9 @@
 #ifndef HPP_GUARD_NUCLEUS_DETAIL_FLAT_EMITTER_H
 #define HPP_GUARD_NUCLEUS_DETAIL_FLAT_EMITTER_H
 
+#include "nucleus/error.h"
 #include "nucleus/config.h"
+#include "nucleus/expected.h"
 #include "nucleus/config_space.h"
 
 #include "nucleus/schema/schema.h"
@@ -79,7 +81,7 @@ inline std::string render_flat_key(std::string_view key,
 // LEAF path (its path joined by `key_separator`), blank value (template only), with
 // `key_prefix` prepended to every key. A constrained leaf annotates its allowed
 // set as a trailing `# allowed: a|b|c`.
-inline void emit_flat_template(const config_space &space, std::ostream &out,
+inline expected<void, error> emit_flat_template(const config_space &space, std::ostream &out,
                                std::string_view key_prefix,
                                std::string_view key_separator = "/",
                                std::string_view anchor = {})
@@ -106,13 +108,14 @@ inline void emit_flat_template(const config_space &space, std::ostream &out,
         }
         out << '\n';
     }
+    return {};
 }
 
 // Projects a resolved config into flat KEY=value lines: one line per
 // resolved value, so a repeated path emits one line per value in order, with
 // `key_prefix` prepended to every key. The flat line contract carries no embedded
 // newline; values are written verbatim otherwise.
-inline void emit_flat_document(const config &config, std::ostream &out,
+inline expected<void, error> emit_flat_document(const config &config, std::ostream &out,
                                std::string_view key_prefix,
                                std::string_view key_separator = "/",
                                std::string_view anchor = {})
@@ -126,6 +129,7 @@ inline void emit_flat_document(const config &config, std::ostream &out,
             out << key_prefix << render_flat_key(rendered, key_separator) << '='
                 << value << '\n';
     }
+    return {};
 }
 
 }

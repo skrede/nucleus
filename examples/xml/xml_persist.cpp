@@ -46,6 +46,10 @@ int main()
         return 1;
     }
 
-    nucleus::xml::emit_document(loaded.value(), std::cout);
+    if(auto emitted = nucleus::xml::emit_document(loaded.value(), std::cout); !emitted)
+    {
+        std::cerr << "emit failed: " << emitted.error() << '\n';
+        return 1;
+    }
     return 0;
 }

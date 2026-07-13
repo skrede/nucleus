@@ -62,7 +62,11 @@ int main()
     // The emitter renders the SAME grammar back: every template line is a flag
     // the source above would accept verbatim.
     std::cout << "\nflag template under the same delimiter:\n";
-    nucleus::argv::emit_template(space, std::cout, delim.value());
+    if(auto emitted = nucleus::argv::emit_template(space, std::cout, delim.value()); !emitted)
+    {
+        std::cerr << "emit failed: " << emitted.error() << '\n';
+        return 1;
+    }
 
     // Completion follows the same delimiter, so the completed flags are
     // identical to the parsed ones.

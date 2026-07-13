@@ -259,10 +259,17 @@ See [`examples/composition/source_stack.cpp`](../examples/composition/source_sta
 Each format module ships the output pair as free functions in its own
 namespace, plus a `struct emitter` whose members forward to them so the module
 satisfies the [`config_emitter`](api-using.md#emit) concept by type as well as
-by call surface. Both operations write into a caller-owned `std::ostream`; the
-caller owns persistence. The argv pair takes an optional `cli_delimiter` and
-`key_path` anchor (`argv::emitter` carries both as its only state), which must
-match the `argv_source` it round-trips with.
+by call surface. Both operations write into a caller-owned `std::ostream` and
+return `expected<void, error>`; the caller owns persistence. The argv pair takes
+an optional `cli_delimiter` and `key_path` anchor (`argv::emitter` carries both
+as its only state), which must match the `argv_source` it round-trips with.
+
+Both operations honor an **all-or-nothing partial-write contract**: on any emit
+failure nothing is written to the caller-owned stream, so a returned `error`
+leaves the stream exactly as it was on entry. A failure carries the shared
+`error` vocabulary (`errc::malformed_source` for a value or name the format
+cannot represent) — the emit side speaks the same result channel as the load
+side.
 
 | Header | Free functions | Rendering |
 |--------|----------------|-----------|

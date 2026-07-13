@@ -195,7 +195,7 @@ TEST_CASE("emit_document renders pkey as XML attribute not child element",
     const nucleus::config &config = loaded.value();
 
     std::ostringstream out;
-    nucleus::xml::emit_document(config, out, projection_of(space));
+    REQUIRE(nucleus::xml::emit_document(config, out, projection_of(space)));
     const std::string emitted = out.str();
 
     // The pkey value appears as an attribute on <server>, not as a child element.
@@ -219,7 +219,7 @@ TEST_CASE("load→emit→load round-trip is a byte-stable fixpoint",
 
     // Emit C1 with schema projection so the pkey renders as an attribute.
     std::ostringstream out;
-    nucleus::xml::emit_document(c1, out, projection_of(space));
+    REQUIRE(nucleus::xml::emit_document(c1, out, projection_of(space)));
     const std::string emitted = out.str();
     REQUIRE_FALSE(emitted.empty());
 

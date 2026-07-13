@@ -142,7 +142,7 @@ TEST_CASE("xml::emit_template with space_name wraps output in a named root eleme
     // emit_template projects schema_elements(), so we need register_element.
     auto space = make_plugin_space_typed();
     std::ostringstream out;
-    nucleus::xml::emit_template(space, out, "engine");
+    REQUIRE(nucleus::xml::emit_template(space, out, "engine"));
     const std::string xml = out.str();
 
     REQUIRE(xml.find("<engine>") != std::string::npos);
@@ -162,7 +162,7 @@ TEST_CASE("xml::emit_document with space_name wraps the document in a named root
     REQUIRE(config_result);
 
     std::ostringstream out;
-    nucleus::xml::emit_document(config_result.value(), out, "engine");
+    REQUIRE(nucleus::xml::emit_document(config_result.value(), out, "engine"));
     const std::string xml = out.str();
 
     REQUIRE(xml.find("<engine>") != std::string::npos);
@@ -177,7 +177,7 @@ TEST_CASE("emit_template + xml_source round-trip with space_name reproduces keys
     auto space = make_plugin_space_typed();
 
     std::ostringstream tmpl_out;
-    nucleus::xml::emit_template(space, tmpl_out, "engine");
+    REQUIRE(nucleus::xml::emit_template(space, tmpl_out, "engine"));
     const std::string tmpl = tmpl_out.str();
 
     // The template is valid XML parseable by xml_source with the same space name.

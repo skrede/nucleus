@@ -21,7 +21,7 @@ namespace nucleus::argv {
 // address them. When space_name is non-empty, it is prepended as the leading
 // segment so the emitted flags match what multispace_argv_source parses, e.g.
 // `--engine-plugin-x=` for key `plugin/x` in space `engine`.
-inline void emit_template(const config_space &space, std::ostream &out,
+inline expected<void, error> emit_template(const config_space &space, std::ostream &out,
                           const cli_delimiter &delimiter = {},
                           const key_path &anchor = {},
                           std::string_view space_name = {})
@@ -31,7 +31,7 @@ inline void emit_template(const config_space &space, std::ostream &out,
     const std::string effective_prefix = space_name.empty()
         ? std::string("--")
         : std::string("--") + std::string(space_name) + delimiter.str();
-    detail::emit_flat_template(space, out, effective_prefix, delimiter.str(), anchor.str());
+    return detail::emit_flat_template(space, out, effective_prefix, delimiter.str(), anchor.str());
 }
 
 // Projects a resolved config into flat `--KEY=value` lines: one line per
@@ -39,7 +39,7 @@ inline void emit_template(const config_space &space, std::ostream &out,
 // flag contract carries no embedded newline; values are written verbatim otherwise.
 // When space_name is non-empty, it is prepended as the leading segment to match
 // the multispace_argv_source grammar.
-inline void emit_document(const config &config, std::ostream &out,
+inline expected<void, error> emit_document(const config &config, std::ostream &out,
                           const cli_delimiter &delimiter = {},
                           const key_path &anchor = {},
                           std::string_view space_name = {})
@@ -47,7 +47,7 @@ inline void emit_document(const config &config, std::ostream &out,
     const std::string effective_prefix = space_name.empty()
         ? std::string("--")
         : std::string("--") + std::string(space_name) + delimiter.str();
-    detail::emit_flat_document(config, out, effective_prefix, delimiter.str(), anchor.str());
+    return detail::emit_flat_document(config, out, effective_prefix, delimiter.str(), anchor.str());
 }
 
 // The emitter modeling nucleus::config_emitter. Its state is the flag grammar
@@ -59,13 +59,13 @@ struct emitter
     key_path anchor;
     std::string space_name;
 
-    void emit_template(const config_space &space, std::ostream &out) const
+    expected<void, error> emit_template(const config_space &space, std::ostream &out) const
     {
-        nucleus::argv::emit_template(space, out, delimiter, anchor, space_name);
+        return nucleus::argv::emit_template(space, out, delimiter, anchor, space_name);
     }
-    void emit_document(const config &config, std::ostream &out) const
+    expected<void, error> emit_document(const config &config, std::ostream &out) const
     {
-        nucleus::argv::emit_document(config, out, delimiter, anchor, space_name);
+        return nucleus::argv::emit_document(config, out, delimiter, anchor, space_name);
     }
 };
 

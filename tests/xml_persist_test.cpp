@@ -67,7 +67,7 @@ TEST_CASE("a resolved config round-trips through XML persistence", "[persist]")
     const nucleus::config &original = first.value();
 
     std::ostringstream serialized;
-    nucleus::xml::emit_document(original, serialized);
+    REQUIRE(nucleus::xml::emit_document(original, serialized));
 
     auto second = nucleus::load_config(space, nucleus::source_stack{}, document_options(serialized.str()));
     REQUIRE(second);
@@ -97,7 +97,7 @@ TEST_CASE("emit_document to a file persists a config that re-reads identically",
         std::filesystem::temp_directory_path() / "nucleus_xml_persist_test.xml";
     {
         std::ofstream out(path);
-        nucleus::xml::emit_document(first.value(), out);
+        REQUIRE(nucleus::xml::emit_document(first.value(), out));
     }
 
     std::ifstream in(path);

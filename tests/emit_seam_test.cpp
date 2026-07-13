@@ -71,7 +71,7 @@ TEST_CASE("env and args project a schema into flat KEY= templates", "[emit][seam
     const nucleus::config_space space = make_server_space();
 
     std::ostringstream env_out;
-    nucleus::env::emit_template(space, env_out);
+    REQUIRE(nucleus::env::emit_template(space, env_out));
     const std::string env = env_out.str();
 
     // Flat leaf paths are present, the container is not a line of its own, the
@@ -84,7 +84,7 @@ TEST_CASE("env and args project a schema into flat KEY= templates", "[emit][seam
     // The argv template lines are REAL flags: the key joined by the delimiter,
     // exactly what argv_source parses back.
     std::ostringstream args_out;
-    nucleus::argv::emit_template(space, args_out);
+    REQUIRE(nucleus::argv::emit_template(space, args_out));
     const std::string args = args_out.str();
     REQUIRE(args.find("--server-host=") != std::string::npos);
     REQUIRE(args.find("--server-mode=") != std::string::npos);
@@ -93,13 +93,13 @@ TEST_CASE("env and args project a schema into flat KEY= templates", "[emit][seam
     // A custom delimiter re-renders the same surface under the host's grammar.
     const auto delim = nucleus::cli_delimiter::parse("__").value();
     std::ostringstream custom_out;
-    nucleus::argv::emit_template(space, custom_out, delim);
+    REQUIRE(nucleus::argv::emit_template(space, custom_out, delim));
     REQUIRE(custom_out.str().find("--server__host=") != std::string::npos);
 
     // An anchored grammar drops the never-changing root from every flag.
     std::ostringstream anchored_out;
-    nucleus::argv::emit_template(space, anchored_out, {},
-                                 nucleus::key_path::parse("server").value());
+    REQUIRE(nucleus::argv::emit_template(space, anchored_out, {},
+                                 nucleus::key_path::parse("server").value()));
     const std::string anchored = anchored_out.str();
     REQUIRE(anchored.find("--host=") != std::string::npos);
     REQUIRE(anchored.find("--server") == std::string::npos);
@@ -110,8 +110,8 @@ TEST_CASE("an anchored argv document renders keys relative to the anchor", "[emi
     const nucleus::config config = make_server_config();
 
     std::ostringstream out;
-    nucleus::argv::emit_document(config, out, {},
-                                 nucleus::key_path::parse("server").value());
+    REQUIRE(nucleus::argv::emit_document(config, out, {},
+                                 nucleus::key_path::parse("server").value()));
     const std::string args = out.str();
     REQUIRE(args.find("--host=localhost") != std::string::npos);
     REQUIRE(count_occurrences(args, "--tag=") == 2);
@@ -123,7 +123,7 @@ TEST_CASE("env and args emit one flat line per resolved value", "[emit][seam]")
     const nucleus::config config = make_server_config();
 
     std::ostringstream env_out;
-    nucleus::env::emit_document(config, env_out);
+    REQUIRE(nucleus::env::emit_document(config, env_out));
     const std::string env = env_out.str();
     REQUIRE(env.find("server/host=localhost") != std::string::npos);
     // The repeated path persists ALL its values, one line each (no last-wins loss).
@@ -132,7 +132,7 @@ TEST_CASE("env and args emit one flat line per resolved value", "[emit][seam]")
     REQUIRE(env.find("server/tag=beta") != std::string::npos);
 
     std::ostringstream args_out;
-    nucleus::argv::emit_document(config, args_out);
+    REQUIRE(nucleus::argv::emit_document(config, args_out));
     const std::string args = args_out.str();
     REQUIRE(count_occurrences(args, "--server-tag=") == 2);
 }
@@ -142,7 +142,7 @@ TEST_CASE("xml projects the SAME space into nested tree markup", "[emit][seam]")
     const nucleus::config_space space = make_server_space();
 
     std::ostringstream xml_out;
-    nucleus::xml::emit_template(space, xml_out);
+    REQUIRE(nucleus::xml::emit_template(space, xml_out));
     const std::string xml = xml_out.str();
 
     // The same data the flat sources rendered as KEY= lines becomes a nested tree.
