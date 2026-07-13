@@ -77,7 +77,7 @@ public:
     }
 
     // Per-load entry: borrows a substitution budget shared across every value in
-    // one fold pass (Option B), so a fanout bomb spanning several values still trips.
+    // one fold pass, so a fanout bomb spanning several values still trips.
     resolver_scope(const tokenizer_registry &registry,
                    substitution_budget &budget,
                    std::size_t depth_cap = default_expansion_depth_cap,

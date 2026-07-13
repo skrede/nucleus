@@ -18,7 +18,7 @@ inline constexpr std::size_t default_expansion_budget = 2500;
 // charge() is called once per substitution; when the running count passes the
 // cap it fails loudly with budget_exceeded, bounding fanout amplification that a
 // depth cap alone cannot stop. Borrowed by reference so every value in a load
-// shares one count (Option B, per-load scope).
+// shares one count: the ceiling is per-load, not per-value.
 struct substitution_budget
 {
     std::size_t count = 0;

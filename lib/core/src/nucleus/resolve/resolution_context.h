@@ -226,7 +226,7 @@ public:
         // keyed-merge container standing between the fold and the argv layer's rank.
         m_deferred_cli_overrides.clear();
 
-        // One pass-1 budget shared by every value in this load (Option B): a
+        // One pass-1 budget shared by every value in this load: a
         // bounded-depth fanout spanning several values is charged against a single
         // running count, so the total-substitution ceiling holds across the load.
         substitution_budget budget(m_expansion_budget);
