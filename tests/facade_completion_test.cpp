@@ -63,3 +63,35 @@ TEST_CASE("the facade generates a zsh completion script from the registered sche
     REQUIRE(zsh.find("--logging-level") != std::string::npos);
     REQUIRE(zsh.find("(debug info warn error)") != std::string::npos);
 }
+
+TEST_CASE("the facade generates --help text with description, values and required marker",
+          "[facade][help]")
+{
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
+    REQUIRE(engine.register_element(nucleus::described(
+        nucleus::enum_element("level", nucleus::anchor::keyspace(path_of("logging")),
+                              {"debug", "info", "warn", "error"}),
+        "set the logging level")));
+    REQUIRE(engine.register_element(nucleus::element("server", nucleus::anchor::root())));
+    REQUIRE(engine.register_element(nucleus::described(
+        nucleus::required_element("host", nucleus::anchor::keyspace(path_of("server"))),
+        "the address to bind")));
+    nucleus::config_space space = engine.build();
+
+    const std::string help = space.generate_help("mytool");
+
+    // The flag line carries its schema description -- the single source both the
+    // completions and the help text read.
+    REQUIRE(help.find("--logging-level") != std::string::npos);
+    REQUIRE(help.find("set the logging level") != std::string::npos);
+    // The allowed-values list is projected onto the same line.
+    REQUIRE(help.find("[values: debug, info, warn, error]") != std::string::npos);
+    // A required element gets a marker the completion model cannot supply.
+    REQUIRE(help.find("--server-host") != std::string::npos);
+    REQUIRE(help.find("the address to bind") != std::string::npos);
+    REQUIRE(help.find("(required)") != std::string::npos);
+    // Lines are grouped by the top-level keyspace segment.
+    REQUIRE(help.find("logging:") != std::string::npos);
+    REQUIRE(help.find("server:") != std::string::npos);
+}

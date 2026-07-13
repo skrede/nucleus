@@ -225,6 +225,15 @@ public:
                                                   const key_path &anchor = {},
                                                   std::string_view space_name = {}) const;
 
+    // Generates plain --help text projected from the sealed schema and bound to
+    // `prog`: one line per flag with its description, allowed-values, and a
+    // required marker, grouped by top-level keyspace. Flags render under
+    // `delimiter` and relative to `anchor`. Only the string crosses the boundary;
+    // the host owns how it is surfaced.
+    std::string generate_help(std::string_view prog,
+                                            const cli_delimiter &delimiter = {},
+                                            const key_path &anchor = {}) const;
+
     // The declared schema elements, the neutral data a format emitter projects into
     // a template. A pure read of the sealed schema; the registry stays encapsulated.
     std::span<const schema_element> schema_elements() const;

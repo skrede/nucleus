@@ -505,6 +505,15 @@ std::string config_space::generate_completion(shell which, std::string_view prog
     return nucleus::generate_completion(which, m_impl->schema, prog, delimiter, anchor, space_name);
 }
 
+std::string config_space::generate_help(std::string_view prog,
+                                                    const cli_delimiter &delimiter,
+                                                    const key_path &anchor) const
+{
+    // Project the sealed schema through the free generator. Only the help string
+    // crosses the boundary; the registry stays encapsulated.
+    return nucleus::generate_help(m_impl->schema, prog, delimiter, anchor);
+}
+
 std::span<const schema_element> config_space::schema_elements() const
 {
     // Project the sealed schema's declared elements as a read-only view; the
