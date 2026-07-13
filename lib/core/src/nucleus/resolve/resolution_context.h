@@ -226,6 +226,11 @@ public:
         // keyed-merge container standing between the fold and the argv layer's rank.
         m_deferred_cli_overrides.clear();
 
+        // One pass-1 budget shared by every value in this load (Option B): a
+        // bounded-depth fanout spanning several values is charged against a single
+        // running count, so the total-substitution ceiling holds across the load.
+        substitution_budget budget(m_expansion_budget);
+
         for(layered_handle *lh : ordered)
         {
             // A chain layer's batch was already pulled during the inheritance
@@ -286,8 +291,9 @@ public:
             {
                 token_result expanded = lh->origin_file
                     ? resolve_tokens(entry.value.text(), m_tokenizer, *lh->origin_file,
-                                     &m_tree_tokenizer)
-                    : resolve_tokens(entry.value.text(), m_tokenizer, &m_tree_tokenizer);
+                                     budget, &m_tree_tokenizer)
+                    : resolve_tokens(entry.value.text(), m_tokenizer, budget,
+                                     &m_tree_tokenizer);
                 if(!expanded)
                     return unexpected(error{errc::unresolved_token, nucleus::format(
                         "source '{}': token resolution failed for key '{}': {}",
@@ -1424,6 +1430,14 @@ public:
             m_reference_budget = budget;
     }
 
+    // Sets the pass-1 expansion substitution budget. 0 maps to the engine default (never zero-cap).
+    // Must be called before fold(), which is where pass-1 expansion runs.
+    void set_expansion_budget(std::size_t budget) noexcept
+    {
+        if(budget != 0)
+            m_expansion_budget = budget;
+    }
+
 private:
     // Recursive single-leaf resolver for pass-2. Resolves `kp`'s value by first
     // ensuring all leaves it references are themselves resolved (depth-first).
@@ -1677,6 +1691,7 @@ private:
     const tree_tokenizer_registry   &m_tree_tokenizer;
 
     std::size_t m_reference_budget = default_reference_budget;
+    std::size_t m_expansion_budget = default_expansion_budget;
 
     keyspace m_building;
     provenance m_provenance;

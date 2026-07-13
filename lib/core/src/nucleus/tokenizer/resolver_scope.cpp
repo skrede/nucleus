@@ -182,6 +182,11 @@ token_result resolver_scope::resolve_one(std::string_view token)
     auto guard = m_guard.enter(std::string(token));
     if(!guard) return unexpected(std::move(guard).error());
 
+    // Bound total substitutions across the whole load (orthogonal to the depth
+    // cap): a bounded-depth exponential fanout is stopped by count, not depth.
+    if(auto charged = m_budget.charge(); !charged)
+        return unexpected(std::move(charged).error());
+
     // Field-form nesting (${env.${var}}): a nested ${...} that sits OUTSIDE any
     // argument list is resolved into the head before lexing, so the lexer sees a
     // flat category.name. Function-argument nesting (${f.g(${b})}) is left to the

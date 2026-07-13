@@ -547,6 +547,7 @@ load_result load_config(const config_space &space,
 
     resolution_context ctx(state.schema, state.tokenizer, state.converters,
                            state.tree_tokenizer);
+    ctx.set_expansion_budget(options.expansion_budget);
     if(auto folded = ctx.fold(handles); !folded)
         return unexpected(std::move(folded).error());
     if(auto merged = ctx.merge_keyed_collections(); !merged)

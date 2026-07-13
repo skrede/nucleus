@@ -7,6 +7,7 @@
 #include "nucleus/tokenizer/scope_frame.h"
 #include "nucleus/tokenizer/resolve_error.h"
 #include "nucleus/tokenizer/expansion_guard.h"
+#include "nucleus/tokenizer/substitution_budget.h"
 
 #include <span>
 #include <string>
@@ -66,10 +67,23 @@ private:
 class resolver_scope
 {
 public:
+    // Standalone/test entry: owns a default-capped substitution budget.
     explicit resolver_scope(const tokenizer_registry &registry,
                             std::size_t depth_cap = default_expansion_depth_cap,
                             const tree_tokenizer_registry *tree_reg = nullptr)
-        : m_registry(registry), m_guard(depth_cap), m_tree_reg(tree_reg)
+        : m_registry(registry), m_owned_budget(default_expansion_budget),
+          m_budget(m_owned_budget), m_guard(depth_cap), m_tree_reg(tree_reg)
+    {
+    }
+
+    // Per-load entry: borrows a substitution budget shared across every value in
+    // one fold pass (Option B), so a fanout bomb spanning several values still trips.
+    resolver_scope(const tokenizer_registry &registry,
+                   substitution_budget &budget,
+                   std::size_t depth_cap = default_expansion_depth_cap,
+                   const tree_tokenizer_registry *tree_reg = nullptr)
+        : m_registry(registry), m_owned_budget(default_expansion_budget),
+          m_budget(budget), m_guard(depth_cap), m_tree_reg(tree_reg)
     {
     }
 
@@ -108,6 +122,8 @@ public:
 
 private:
     const tokenizer_registry          &m_registry;
+    substitution_budget                m_owned_budget;
+    substitution_budget               &m_budget;
     expansion_guard                    m_guard;
     std::vector<scope_frame>           m_frames;
     const tree_tokenizer_registry     *m_tree_reg = nullptr;

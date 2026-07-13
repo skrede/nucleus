@@ -7,6 +7,7 @@
 #include "nucleus/tokenizer/resolve_error.h"
 #include "nucleus/tokenizer/resolver_scope.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
+#include "nucleus/tokenizer/substitution_budget.h"
 #include "nucleus/tokenizer/tree_tokenizer_registry.h"
 
 #include <utility>
@@ -39,6 +40,28 @@ inline token_result resolve_tokens(std::string_view value,
                                    const tree_tokenizer_registry *tree_reg = nullptr)
 {
     resolver_scope scope(registry, default_expansion_depth_cap, tree_reg);
+    auto frame = scope.push_file_frame(std::move(source_location));
+    return scope.resolve_all(value);
+}
+
+// Per-load entry points that borrow a shared substitution budget, so the count
+// is charged across every value in one fold pass rather than reset per value.
+inline token_result resolve_tokens(std::string_view value,
+                                   const tokenizer_registry &registry,
+                                   substitution_budget &budget,
+                                   const tree_tokenizer_registry *tree_reg = nullptr)
+{
+    resolver_scope scope(registry, budget, default_expansion_depth_cap, tree_reg);
+    return scope.resolve_all(value);
+}
+
+inline token_result resolve_tokens(std::string_view value,
+                                   const tokenizer_registry &registry,
+                                   std::filesystem::path source_location,
+                                   substitution_budget &budget,
+                                   const tree_tokenizer_registry *tree_reg = nullptr)
+{
+    resolver_scope scope(registry, budget, default_expansion_depth_cap, tree_reg);
     auto frame = scope.push_file_frame(std::move(source_location));
     return scope.resolve_all(value);
 }

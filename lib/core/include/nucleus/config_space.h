@@ -82,6 +82,8 @@ struct load_options
     std::function<source_handle(const std::string &)>   make_document;
     // Maximum tree-reference substitutions in one pass-2 resolve. 0 = engine default (10000).
     std::size_t                                         reference_budget = 0;
+    // Maximum token-expansion substitutions in one pass-1 fold. 0 = engine default (2500).
+    std::size_t                                         expansion_budget = 0;
 };
 
 // The mutable, free-standing builder: sole owner of the three flat sibling
