@@ -27,7 +27,10 @@ public:
 
     template <typename T>
     explicit owner_token(T value)
-        requires (!std::is_same_v<std::decay_t<T>, owner_token>) : m_payload(std::make_shared<model<std::decay_t<T>>>(std::move(value)))
+        requires (!std::is_same_v<std::decay_t<T>, owner_token>
+                  && noexcept(std::declval<const std::decay_t<T> &>()
+                              == std::declval<const std::decay_t<T> &>()))
+        : m_payload(std::make_shared<model<std::decay_t<T>>>(std::move(value)))
     {
     }
 

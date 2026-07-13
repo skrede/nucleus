@@ -3,6 +3,28 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
+#include <type_traits>
+
+namespace {
+
+struct noexcept_comparable
+{
+    bool operator==(const noexcept_comparable &) const noexcept { return true; }
+};
+
+struct throwing_comparable
+{
+    bool operator==(const throwing_comparable &) const { return true; }
+};
+
+}
+
+// owner_token::model<T>::equals is noexcept but forwards to T::operator==; a
+// throwing comparator would std::terminate inside the noexcept virtual. The ctor
+// is constrained to noexcept-comparable payloads, so a throwing comparator is a
+// compile-time break rather than a runtime hazard.
+static_assert(std::is_constructible_v<nucleus::owner_token, noexcept_comparable>);
+static_assert(!std::is_constructible_v<nucleus::owner_token, throwing_comparable>);
 
 TEST_CASE("tokens wrapping equal payloads compare equal", "[identity]")
 {
