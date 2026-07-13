@@ -53,7 +53,7 @@ public:
 private:
     token_result resolve_absolute(std::string_view path_body);
     token_result resolve_relative(std::string_view rel_body);
-    key_path     resolve_relative_path(std::string_view rel_body);
+    expected<key_path, resolve_error> resolve_relative_path(std::string_view rel_body);
 
     const keyspace                  &m_building;
     key_path                         m_current_path;

@@ -197,7 +197,10 @@ token_result tree_resolver_scope::resolve_absolute(std::string_view path_body)
 
 token_result tree_resolver_scope::resolve_relative(std::string_view rel_body)
 {
-    key_path const target = resolve_relative_path(rel_body);
+    auto resolved = resolve_relative_path(rel_body);
+    if(!resolved)
+        return unexpected(std::move(resolved).error());
+    key_path const target = std::move(resolved).value();
 
     if(auto charged = m_budget.charge(); !charged)
         return unexpected(std::move(charged).error());
@@ -226,7 +229,8 @@ token_result tree_resolver_scope::resolve_relative(std::string_view rel_body)
 //          => "cluster/server/x"
 // rel:../x from "cluster/server/port" -> starts at "cluster/server" (parent of leaf),
 //          then ".." => "cluster", then "x" => "cluster/x"
-key_path tree_resolver_scope::resolve_relative_path(std::string_view rel_body)
+expected<key_path, resolve_error>
+tree_resolver_scope::resolve_relative_path(std::string_view rel_body)
 {
     // Base: the containing scope (parent of the current leaf).
     key_path base = m_current_path.parent();
@@ -252,7 +256,9 @@ key_path tree_resolver_scope::resolve_relative_path(std::string_view rel_body)
         {
             // Walk upward. If already at root (empty), further .. is above root.
             if(base.empty())
-                return key_path{};
+                return unexpected(resolve_error(resolve_errc::parse_error,
+                    nucleus::format("relative reference '{}' walks above the "
+                                    "configuration root", rel_body)));
             base = base.parent();
         }
         else if(seg == ".")

@@ -106,6 +106,37 @@ TEST_CASE("budget_exceeded does NOT trigger ?? fallthrough",
     CHECK(loaded.error().message.find("budget") != std::string::npos);
 }
 
+TEST_CASE("rel: reference walking above the root reports a distinct error",
+          "[reference][rel]")
+{
+    // ${rel:../../x} from cluster/alias walks above the configuration root:
+    // base = cluster (parent of alias), ".." -> root, ".." -> above root.
+    // The error must name the offending rel body, not a misleading empty target.
+    auto space = config_space_builder{}.build();
+    runtime_source src;
+    src.set("cluster/alias", "${rel:../../x}");
+
+    auto loaded = load_config(space, source_stack{std::move(src)}, {});
+    REQUIRE_FALSE(loaded.has_value());
+    const std::string &msg = loaded.error().message;
+    CHECK(msg.find("above") != std::string::npos);
+    CHECK(msg.find("../../x") != std::string::npos);
+    CHECK(msg.find("absent") == std::string::npos);
+}
+
+TEST_CASE("an in-bounds rel: reference still resolves after the above-root guard",
+          "[reference][rel]")
+{
+    auto space = config_space_builder{}.build();
+    runtime_source src;
+    src.set("cluster/sibling/port", "5050");
+    src.set("cluster/server/alias", "${rel:../sibling/port}");
+
+    auto loaded = load_config(space, source_stack{std::move(src)}, {});
+    REQUIRE(loaded.has_value());
+    CHECK(loaded.value().get("cluster/server/alias") == "5050");
+}
+
 TEST_CASE("diamond fan-in resolves without exponential substitution count",
           "[reference][budget][diamond]")
 {
