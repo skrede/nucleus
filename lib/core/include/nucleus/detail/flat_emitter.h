@@ -32,7 +32,7 @@ inline bool is_flat_leaf(const schema_element &el,
     for(const schema_element &other : all)
     {
         const std::string path = other.declared_path().str();
-        if(path.size() > prefix.size() && path.compare(0, prefix.size(), prefix) == 0)
+        if(path.size() > prefix.size() && path.starts_with(prefix))
             return false;
     }
     return true;
@@ -69,8 +69,8 @@ inline std::string render_flat_key(std::string_view key,
     {
         if(i == key.size() || key[i] == key_path::separator)
         {
-            std::string_view seg = key.substr(start, i - start);
-            std::string_view base = key_path::base_name(seg);
+            const std::string_view seg = key.substr(start, i - start);
+            const std::string_view base = key_path::base_name(seg);
             if(!first_seg)
                 out.append(key_separator);
             out.append(base);

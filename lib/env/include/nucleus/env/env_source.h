@@ -55,7 +55,7 @@ public:
         return capability_descriptor{};
     }
 
-    capability_descriptor capabilities() const
+    static capability_descriptor capabilities()
     {
         return descriptor();
     }

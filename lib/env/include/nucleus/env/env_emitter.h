@@ -31,11 +31,11 @@ inline expected<void, error> emit_document(const config &config, std::ostream &o
 // free functions above, so env satisfies the output contract by type as well.
 struct emitter
 {
-    expected<void, error> emit_template(const config_space &space, std::ostream &out) const
+    static expected<void, error> emit_template(const config_space &space, std::ostream &out)
     {
         return nucleus::env::emit_template(space, out);
     }
-    expected<void, error> emit_document(const config &config, std::ostream &out) const
+    static expected<void, error> emit_document(const config &config, std::ostream &out)
     {
         return nucleus::env::emit_document(config, out);
     }

@@ -110,7 +110,7 @@ public:
                                      capability::duplicate_keys};
     }
 
-    capability_descriptor capabilities() const
+    static capability_descriptor capabilities()
     {
         return descriptor();
     }

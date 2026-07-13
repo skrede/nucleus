@@ -55,7 +55,7 @@ inline cli_normalize_result normalize_arg(std::string_view raw,
         return unexpected(std::string("CLI argument '") + std::string(raw)
                     + "' does not start with '--'");
 
-    std::string_view body = raw.substr(2);
+    const std::string_view body = raw.substr(2);
     if(body.empty())
         return unexpected(std::string("CLI argument '--' has no flag body"));
 

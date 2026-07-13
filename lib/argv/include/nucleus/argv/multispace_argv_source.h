@@ -90,7 +90,7 @@ public:
             return capability_descriptor{capability::nesting, capability::duplicate_keys};
         }
 
-        capability_descriptor capabilities() const { return descriptor(); }
+        static capability_descriptor capabilities() { return descriptor(); }
 
         config_source_result pull()
         {

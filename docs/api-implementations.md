@@ -148,7 +148,7 @@ explicit env_source(std::vector<std::pair<std::string, std::string>> entries);
 env_source &set(std::string path, std::string text);   // fluent
 
 static capability_descriptor descriptor() noexcept;     // empty
-capability_descriptor capabilities() const;              // == descriptor()
+static capability_descriptor capabilities();             // == descriptor()
 config_source_result pull();                      // owned values, no retained buffer
 ```
 
@@ -188,7 +188,7 @@ argv_source &policy(unknown_key_policy policy) noexcept;   // strict (default) |
 argv_source &log_to(log_sink &sink) noexcept;
 
 static capability_descriptor descriptor() noexcept;        // { nesting, duplicate_keys }
-capability_descriptor capabilities() const;
+static capability_descriptor capabilities();
 config_source_result pull();                        // owned values
 ```
 
@@ -250,7 +250,7 @@ runtime_source();
 explicit runtime_source(std::vector<std::pair<std::string, std::string>> entries);
 runtime_source &set(std::string path, std::string text);   // fluent
 
-capability_descriptor capabilities() const;   // { nesting, duplicate_keys, typed_scalars }
+static capability_descriptor capabilities();   // { nesting, duplicate_keys, typed_scalars }
 config_source_result pull();            // owned values
 ```
 

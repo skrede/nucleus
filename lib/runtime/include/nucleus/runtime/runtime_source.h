@@ -44,7 +44,7 @@ public:
         return *this;
     }
 
-    capability_descriptor capabilities() const
+    static capability_descriptor capabilities()
     {
         return capability_descriptor{capability::nesting,
                                      capability::duplicate_keys,

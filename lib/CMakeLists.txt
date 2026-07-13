@@ -114,6 +114,28 @@ nucleus_add_module(argv
     ALIASES nucleus::argv
     LINK_PUBLIC nucleus::nucleus)
 
+# Tidy anchors for the header-only modules (runtime/env/argv). Those modules ship
+# no compiled translation unit, so their public headers never enter
+# compile_commands.json and escape clang-tidy. One OBJECT TU per module includes
+# those headers, landing a lib/<module>/src/nucleus/<module>/ database entry the
+# tidy header filter matches. Plain OBJECT targets, never routed through
+# nucleus_add_module (which installs and exports); they are internal-only and gated
+# to the dev/test configure so a downstream add_subdirectory consumer never
+# compiles them, while CI (configured with tests on) still lands the DB entries.
+if(NUCLEUS_BUILD_TESTS)
+    add_library(nucleus_runtime_tidy_anchor OBJECT
+        runtime/src/nucleus/runtime/tidy_anchor.cpp)
+    target_link_libraries(nucleus_runtime_tidy_anchor PRIVATE nucleus::runtime)
+
+    add_library(nucleus_env_tidy_anchor OBJECT
+        env/src/nucleus/env/tidy_anchor.cpp)
+    target_link_libraries(nucleus_env_tidy_anchor PRIVATE nucleus::env)
+
+    add_library(nucleus_argv_tidy_anchor OBJECT
+        argv/src/nucleus/argv/tidy_anchor.cpp)
+    target_link_libraries(nucleus_argv_tidy_anchor PRIVATE nucleus::argv)
+endif()
+
 # Diagnostic formatting backend: when the standard library lacks std::format the
 # format() seam falls back to {fmt} in a public header, so the link is PUBLIC. The
 # probe + fetch run in the root before add_subdirectory(lib); here we only wire the
