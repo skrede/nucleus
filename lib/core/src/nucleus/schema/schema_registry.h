@@ -179,6 +179,20 @@ public:
                     el.name, el.keyref_into));
         }
 
+        // An element path may be declared once. Re-declaring it would let a later
+        // element silently override the first's role by declaration order (a pkey
+        // smuggled under a repeated container, a second typed element dropped at the
+        // typed store). Membership is over declared ELEMENTS by exact path -- prefix
+        // nodes stay admissible so children still attach under a declared container,
+        // and a path-tagged registration is a separate surface adjudicated as a
+        // conflict rather than rejected here.
+        if(std::ranges::any_of(m_elements, [&](const schema_element &e) {
+               return e.declared_path() == el.declared_path();
+           }))
+            return unexpected(nucleus::format(
+                "schema element '{}' re-declares already-declared path '{}'",
+                el.name, el.declared_path().str()));
+
         m_defined.insert(el.declared_path().str());
         m_elements.push_back(std::move(el));
         return {};
