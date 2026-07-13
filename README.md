@@ -155,7 +155,7 @@ cmake --install build --prefix /your/prefix
 ```
 
 ```cmake
-find_package(nucleus 0.2 REQUIRED)
+find_package(nucleus 0.4 REQUIRED)
 target_link_libraries(app PRIVATE nucleus::nucleus nucleus::xml)
 ```
 
@@ -166,7 +166,7 @@ the same targets:
 include(FetchContent)
 FetchContent_Declare(nucleus
     GIT_REPOSITORY https://github.com/skrede/nucleus.git
-    GIT_TAG v0.2.0)
+    GIT_TAG v0.4.1)
 FetchContent_MakeAvailable(nucleus)
 ```
 
