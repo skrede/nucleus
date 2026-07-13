@@ -18,6 +18,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <map>
 #include <algorithm>
 #include <sstream>
 #include <string>
@@ -317,4 +318,22 @@ TEST_CASE("xml emitter -- repeated container round-trip with N >= 11 instances",
     REQUIRE(ports.size() == 12);
     for(int i = 0; i < 12; ++i)
         REQUIRE(ports[static_cast<std::size_t>(i)] == std::to_string(i * 10));
+}
+
+TEST_CASE("xml emitter -- a sparse ordinal fails loudly and writes nothing",
+          "[xml][xml_emitter]")
+{
+    // An instance at ordinal 2 with ordinals 0 and 1 absent: the emitter must not
+    // merge it into slot 0 nor drop it on a null node -- it reports the gap.
+    std::map<std::string, std::string> values{{"cluster/node[2]/port", "9"}};
+    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+
+    std::ostringstream out;
+    auto result = nucleus::xml::emit_document(cfg, out);
+
+    REQUIRE_FALSE(result);
+    REQUIRE(result.error().code == nucleus::errc::malformed_source);
+    REQUIRE(result.error().message.find("cluster/node") != std::string::npos);
+    // All-or-nothing: nothing reached the stream.
+    REQUIRE(out.str().empty());
 }

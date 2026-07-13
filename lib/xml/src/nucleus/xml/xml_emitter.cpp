@@ -1,6 +1,7 @@
 #include "nucleus/xml/xml_emitter.h"
 
 #include "nucleus/config.h"
+#include "nucleus/format.h"
 #include "nucleus/config_emitter.h"
 #include "nucleus/config_space.h"
 
@@ -28,8 +29,9 @@ static_assert(config_emitter<emitter>,
 namespace {
 
 // Escapes the five XML metacharacters in embedded text/attribute content. Element
-// names are host-authored identifiers and are emitted verbatim; only the allowed-
-// value annotation carries arbitrary content, so it is escaped here.
+// names are not escaped -- they are validated against the XML Name production by
+// is_valid_xml_name below; only the allowed-value annotation carries arbitrary
+// content, so it is escaped here.
 std::string escape(std::string_view text)
 {
     std::string out;
@@ -47,6 +49,60 @@ std::string escape(std::string_view text)
         }
     }
     return out;
+}
+
+bool is_name_start_byte(unsigned char b)
+{
+    return b >= 0x80
+        || (b >= 'A' && b <= 'Z')
+        || (b >= 'a' && b <= 'z')
+        || b == '_' || b == ':';
+}
+
+bool is_name_byte(unsigned char b)
+{
+    return is_name_start_byte(b)
+        || (b >= '0' && b <= '9')
+        || b == '-' || b == '.';
+}
+
+// Validates a config key segment as an XML Name at the byte level: the first byte
+// an ASCII NameStartChar or any high-bit (>= 0x80) UTF-8 byte, each later byte an
+// ASCII NameChar or high-bit. High bytes are permitted un-decoded -- a deliberate
+// tradeoff that accepts every legal international name without a UTF-8 decoder
+// while still rejecting every hostile ASCII name (a space, '<', '"', a leading
+// digit). [W3C XML 1.0 (Fifth Edition) 2.3, https://www.w3.org/TR/xml/#NT-Name]
+bool is_valid_xml_name(std::string_view name)
+{
+    if(name.empty())
+        return false;
+    if(!is_name_start_byte(static_cast<unsigned char>(name.front())))
+        return false;
+    return std::all_of(name.begin() + 1, name.end(), [](char c) {
+        return is_name_byte(static_cast<unsigned char>(c));
+    });
+}
+
+// A byte a config value must not carry into XML text: the C0 control range (which
+// XML 1.0 2.2 Char forbids) minus tab and newline. A bare carriage return (0x0D)
+// falls in this range and is refused too -- it is legal XML but silently
+// normalized to a newline on round-trip, which would mutate the value.
+// [W3C XML 1.0 (Fifth Edition) 2.2]
+bool is_forbidden_value_byte(char ch)
+{
+    auto const b = static_cast<unsigned char>(ch);
+    if(b == 0x09 || b == 0x0A)
+        return false;
+    return b < 0x20;
+}
+
+expected<void, error> check_value_bytes(const std::string &key, std::string_view value)
+{
+    if(std::any_of(value.begin(), value.end(), is_forbidden_value_byte))
+        return unexpected(error{errc::malformed_source, nucleus::format(
+            "xml emit: value for key '{}' contains a control byte XML cannot "
+            "represent (or a bare carriage return that would not round-trip)", key)});
+    return {};
 }
 
 // One tree_node of the reconstructed element tree: a path segment, the allowed-value
@@ -106,12 +162,15 @@ pugi::xml_node child_or_append(pugi::xml_node parent, const std::string &name)
 }
 
 // Finds or appends the Nth child of `parent` with `name` (zero-based ordinal).
-// Keys are sorted so ordinals ascend; when ordinal == existing count, a new sibling
-// is appended; otherwise the last existing child with that name is returned (still
-// within the same ordinal group, additional fields of the same instance).
-pugi::xml_node indexed_child(pugi::xml_node parent,
-                                            const std::string &name,
-                                            std::size_t ordinal)
+// Keys are sorted so ordinals ascend: ordinal == count appends a new sibling;
+// ordinal < count returns the last existing sibling (a further field of the
+// instance just emitted). ordinal > count is a gap -- a requested instance whose
+// predecessors were never emitted -- and fails loudly: contiguity is the emit
+// invariant and the emitter does not invent padding.
+expected<pugi::xml_node, error> indexed_child(pugi::xml_node parent,
+                                              const std::string &name,
+                                              std::size_t ordinal,
+                                              const std::string &container_path)
 {
     std::size_t count = 0;
     pugi::xml_node last;
@@ -123,9 +182,14 @@ pugi::xml_node indexed_child(pugi::xml_node parent,
             ++count;
         }
     }
-    if(count == ordinal)
+    if(ordinal > count)
+        return unexpected(error{errc::malformed_source, nucleus::format(
+            "xml emit: repeated container '{}' has a gap -- instance {} was "
+            "requested but only {} contiguous instance(s) precede it; the emitter "
+            "does not pad missing ordinals", container_path, ordinal, count)});
+    if(ordinal == count)
         return parent.append_child(name.c_str());
-    return last; // still within the same ordinal group
+    return last;
 }
 
 }
@@ -221,7 +285,9 @@ expected<void, error> emit_document(const config &config, std::ostream &out,
 // Indexed scalar keys (e.g. "cluster/node[0]/port") produce N sibling elements for
 // the repeated container (e.g. two <node> siblings in ordinal order). Bracket
 // suffixes never appear in the output element names.
-// A malformed key is skipped (never thrown), consistent with the read path.
+// An unparseable key is skipped (never thrown), consistent with the read path;
+// a key whose segments form an invalid XML name, a sparse ordinal, or a value
+// carrying a control byte fails loudly through the emit channel.
 // When space_name is non-empty, all top-level elements are re-parented under a new
 // wrapper element named space_name for symmetric round-trip with with_space_name().
 // When proj is non-empty, pkey leaves are rendered as attributes on their parent
@@ -262,8 +328,18 @@ expected<void, error> emit_document(const config &config, std::ostream &out,
             if(!parent_canonical.empty())
                 parent_canonical += key_path::separator;
             parent_canonical += base;
+            if(!is_valid_xml_name(base))
+                return unexpected(error{errc::malformed_source, nucleus::format(
+                    "xml emit: key segment '{}' (in key '{}') is not a valid XML "
+                    "element name", base, key)});
             if(key_path::is_indexed_segment(seg))
-                node = indexed_child(node, base, key_path::ordinal_of(seg));
+            {
+                auto child = indexed_child(node, base, key_path::ordinal_of(seg),
+                                           parent_canonical);
+                if(!child)
+                    return unexpected(std::move(child).error());
+                node = child.value();
+            }
             else
                 node = child_or_append(node, base);
         }
@@ -276,6 +352,10 @@ expected<void, error> emit_document(const config &config, std::ostream &out,
         const std::string leaf_name = key_path::is_indexed_segment(leaf_seg)
             ? std::string(key_path::base_name(leaf_seg))
             : leaf_seg;
+        if(!is_valid_xml_name(leaf_name))
+            return unexpected(error{errc::malformed_source, nucleus::format(
+                "xml emit: key segment '{}' (in key '{}') is not a valid XML "
+                "element/attribute name", leaf_name, key)});
 
         // When proj identifies this leaf as the pkey field of its parent container,
         // render it as an XML attribute on the parent node to prevent double-write.
@@ -285,13 +365,19 @@ expected<void, error> emit_document(const config &config, std::ostream &out,
             if(pkey_field != nullptr && *pkey_field == leaf_name)
             {
                 for(const std::string &value : config.get_all(key))
+                {
+                    if(auto ok = check_value_bytes(key, value); !ok)
+                        return unexpected(std::move(ok).error());
                     node.append_attribute(leaf_name.c_str()).set_value(value.c_str());
+                }
                 continue;
             }
         }
 
         for(const std::string &value : config.get_all(key))
         {
+            if(auto ok = check_value_bytes(key, value); !ok)
+                return unexpected(std::move(ok).error());
             pugi::xml_node leaf_node = node.append_child(leaf_name.c_str());
             leaf_node.append_child(pugi::node_pcdata).set_value(value.c_str());
         }
