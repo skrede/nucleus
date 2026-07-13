@@ -23,6 +23,7 @@
 
 #include "nucleus/tokenizer/token_resolution.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
+#include "nucleus/tokenizer/substitution_budget.h"
 #include "nucleus/tokenizer/tree_resolver_scope.h"
 #include "nucleus/tokenizer/tree_tokenizer_registry.h"
 
@@ -1214,7 +1215,7 @@ public:
 
         expansion_guard leaf_guard(default_reference_depth_cap);
         std::unordered_map<std::string, std::string> resolved_cache;
-        std::size_t substitution_counter = 0;
+        substitution_budget budget(m_reference_budget);
 
         // Snapshot paths (resolving writes back via m_building.set()).
         std::vector<key_path> const all_paths = m_building.paths();
@@ -1228,7 +1229,7 @@ public:
             if(text.find("${") == std::string_view::npos)
                 continue;
 
-            auto r = resolve_one_leaf(kp, leaf_guard, resolved_cache, substitution_counter);
+            auto r = resolve_one_leaf(kp, leaf_guard, resolved_cache, budget);
             if(!r)
             {
                 const resolve_error &re = r.error();
@@ -1433,7 +1434,7 @@ private:
     resolve_one_leaf(const key_path &kp,
                      expansion_guard &leaf_guard,
                      std::unordered_map<std::string, std::string> &resolved_cache,
-                     std::size_t &substitution_counter)
+                     substitution_budget &budget)
     {
         const std::string path_str = kp.str();
 
@@ -1462,16 +1463,14 @@ private:
             return unexpected(std::move(guard_scope).error());
 
         // Build the ensure_resolved callback for depth-first recursive resolution.
-        // Captures this, leaf_guard, resolved_cache, and substitution_counter by ref.
+        // Captures this, leaf_guard, resolved_cache, and budget by ref.
         ensure_resolved_fn ensure = [&](const key_path &target)
             -> expected<void, resolve_error>
         {
-            return resolve_one_leaf(target, leaf_guard, resolved_cache,
-                                    substitution_counter);
+            return resolve_one_leaf(target, leaf_guard, resolved_cache, budget);
         };
 
-        tree_resolver_scope scope(m_building, kp,
-                                  substitution_counter, m_reference_budget,
+        tree_resolver_scope scope(m_building, kp, budget,
                                   std::move(ensure), &m_tree_tokenizer);
         auto resolved = scope.resolve_value(text);
         if(!resolved)

@@ -11,13 +11,11 @@ namespace nucleus {
 
 tree_resolver_scope::tree_resolver_scope(const keyspace &building,
                                          key_path current_path,
-                                         std::size_t &substitution_counter,
-                                         std::size_t budget,
+                                         substitution_budget &budget,
                                          ensure_resolved_fn ensure_resolved,
                                          const tree_tokenizer_registry *tree_reg) noexcept
     : m_building(building)
     , m_current_path(std::move(current_path))
-    , m_substitution_counter(substitution_counter)
     , m_budget(budget)
     , m_ensure_resolved(std::move(ensure_resolved))
     , m_tree_tokenizer(tree_reg)
@@ -149,11 +147,8 @@ token_result tree_resolver_scope::resolve_one_arm(std::string_view arm)
                                         category)));
                 }
 
-                ++m_substitution_counter;
-                if(m_substitution_counter > m_budget)
-                    return unexpected(resolve_error(resolve_errc::budget_exceeded,
-                        nucleus::format("reference substitution budget ({}) exceeded",
-                                        m_budget)));
+                if(auto charged = m_budget.charge(); !charged)
+                    return unexpected(std::move(charged).error());
 
                 const tree_tokenizer *tok = m_tree_tokenizer->find(category);
                 tree_access const access{m_building, m_current_path, category, field};
@@ -181,10 +176,8 @@ token_result tree_resolver_scope::resolve_absolute(std::string_view path_body)
         return unexpected(resolve_error(resolve_errc::parse_error,
                               nucleus::format("invalid abs: path '{}': {}", path_body, kp.error())));
 
-    ++m_substitution_counter;
-    if(m_substitution_counter > m_budget)
-        return unexpected(resolve_error(resolve_errc::budget_exceeded,
-                              nucleus::format("reference substitution budget ({}) exceeded", m_budget)));
+    if(auto charged = m_budget.charge(); !charged)
+        return unexpected(std::move(charged).error());
 
     // Ensure the target leaf is resolved before reading its value (depth-first).
     if(m_ensure_resolved)
@@ -206,10 +199,8 @@ token_result tree_resolver_scope::resolve_relative(std::string_view rel_body)
 {
     key_path const target = resolve_relative_path(rel_body);
 
-    ++m_substitution_counter;
-    if(m_substitution_counter > m_budget)
-        return unexpected(resolve_error(resolve_errc::budget_exceeded,
-                              nucleus::format("reference substitution budget ({}) exceeded", m_budget)));
+    if(auto charged = m_budget.charge(); !charged)
+        return unexpected(std::move(charged).error());
 
     // Ensure the target leaf is resolved before reading its value (depth-first).
     if(m_ensure_resolved)
