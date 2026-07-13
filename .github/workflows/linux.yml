@@ -184,7 +184,9 @@ jobs:
       # appends. If the variable is unset the file is empty and the gate runs the
       # committed format-only default.
       - name: Materialize host-token list
-        run: printf '%s\n' "${{ vars.PURITY_HOST_TOKENS }}" > scripts/purity_tokens.local
+        env:
+          PURITY_HOST_TOKENS: ${{ vars.PURITY_HOST_TOKENS }}
+        run: printf '%s\n' "$PURITY_HOST_TOKENS" > scripts/purity_tokens.local
 
       - name: Core-purity check
         run: bash scripts/core_purity_check.sh

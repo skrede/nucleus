@@ -7,11 +7,12 @@ why. Entries describe behavior, not internals.
 
 ## 0.4.1
 
-This release closes a large backlog of silent failure modes. In every case the
-old behavior accepted, dropped, or mis-resolved something without a diagnostic;
-the new behavior reports it. A load, a schema attach, an emit, or a build that
-was previously accepted may now fail with a clear error &mdash; that is the point of
-the release. Read the group that matches what you use before you upgrade.
+This release closes a large backlog of silent failure modes. In almost every case
+the old behavior accepted, dropped, or mis-resolved something without a diagnostic
+and the new behavior now reports it &mdash; a load, a schema build, an emit, or a
+build that was previously accepted may now fail with a clear error. One entry (the
+precedence-inversion fix) instead changes resolved values silently; it is called
+out as such. Read the group that matches what you use before you upgrade.
 
 ### Tokenizer
 
@@ -25,6 +26,11 @@ the release. Read the group that matches what you use before you upgrade.
 - **A duplicate named tokenizer argument is now rejected.** Passing the same
   argument name twice was previously accepted silently, with the last occurrence
   winning. It is now an error at the call site.
+- **An unterminated `${` token now fails loudly.** A first-pass value containing an
+  opening `${` with no closing brace was previously passed through as raw literal
+  text; it is now a parse error. There is no literal-brace escape yet, so a value
+  that legitimately contained the characters `${` now fails &mdash; rewrite it to
+  avoid the sequence until an escape mechanism lands.
 
 ### Schema and validation
 
@@ -36,8 +42,8 @@ the release. Read the group that matches what you use before you upgrade.
   instances are now rejected.
 - **Re-declaring an element on schema attach is now rejected.** A second
   declaration of the same element was previously absorbed silently. It is now an
-  error, so a load that used to be clean can now fail &mdash; remove the redundant
-  declaration.
+  error at schema-build time, so a schema build that used to be clean can now fail
+  &mdash; remove the redundant declaration.
 - **Float parsing is now locale-independent and rejects hexadecimal.** On the
   Apple libc++ path, a floating-point value was parsed through the active C
   locale and would silently accept a hexadecimal float. Parsing is now fixed to
@@ -81,9 +87,11 @@ the release. Read the group that matches what you use before you upgrade.
   address a target previously returned silently; it now reports the condition.
 - **A malformed key path is now an error.** A key path that could not be parsed
   was previously ignored silently; it now fails with a diagnostic.
-- **A precedence inversion is corrected and reported.** Two sources at the same
-  layer could resolve in the wrong precedence order silently; the ordering is now
-  correct and the resolution is reported.
+- **A precedence inversion is corrected.** Two sources at the same layer could
+  resolve in the wrong precedence order; the ordering is now correct. Unlike the
+  other entries here this one changes resolved values *silently* &mdash; no
+  diagnostic is emitted &mdash; so re-verify the resolved output of any
+  configuration that layers two sources at the same rank.
 - **A same-rank duplicate under a uniting merge is now handled loudly.** Merging
   two same-rank entries under the `unite` mode previously resolved silently; the
   collision is now surfaced.
