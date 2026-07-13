@@ -13,6 +13,7 @@
 #include "nucleus/keyspace/key_path.h"
 #include "nucleus/keyspace/keyspace.h"
 
+#include <map>
 #include <span>
 #include <string>
 #include <vector>
@@ -164,6 +165,44 @@ public:
                             check_value(kp.str(), std::string(v->text()));
                     }
                 }
+            }
+        }
+
+        // Unique check: a non-identity `unique` leaf's value must be distinct
+        // across the ordinal siblings of its repeated container. A keyed (pkey)
+        // container is already reconciled to a single surviving strain by slice
+        // time, so this pass sees at most one value per keyed field and cannot
+        // collide with the disjoint slice-time strain uniqueness check.
+        for(const schema_element &el : schema.elements())
+        {
+            if(!el.unique || el.identity)
+                continue;
+
+            const std::string declared_str = el.declared_path().str();
+            std::map<std::string, std::vector<std::string>> by_value;
+            for(const key_path &kp : resolved.paths())
+            {
+                if(schema.canonical_text(kp) != declared_str)
+                    continue;
+                if(const value *v = resolved.find(kp))
+                    by_value[std::string(v->text())].push_back(kp.str());
+            }
+
+            for(const auto &[text, instances] : by_value)
+            {
+                if(instances.size() <= 1)
+                    continue;
+                std::string parties;
+                for(std::size_t i = 0; i < instances.size(); ++i)
+                {
+                    if(i)
+                        parties += ", ";
+                    parties += nucleus::format("'{}'", instances[i]);
+                }
+                violations.push_back(schema_violation{instances.front(), nucleus::format(
+                    "unique field '{}' has duplicate value '{}' across sibling "
+                    "instances {}",
+                    declared_str, text, parties)});
             }
         }
 
