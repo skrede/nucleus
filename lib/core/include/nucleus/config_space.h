@@ -263,10 +263,11 @@ load_result load_config(const config_space &space,
                                source_stack &&stack,
                                const load_options &options = {});
 
-// Capability pre-flight for the source_stack-based load_config. Reads capabilities
-// only -- no pull, no fold -- so the stack is borrowed const and stays intact
-// for the load_config() that follows it. Consistent with load_config() over the same
-// stack+options.
+// Capability pre-flight for the source_stack-based load_config. Expands the
+// inheritance chain -- reading and parsing every chain document -- so a missing
+// chain document fails the capability check. The stack is borrowed const and stays
+// intact for the load_config() that follows it. Consistent with load_config() over
+// the same stack+options.
 gate_result check_capabilities(const config_space &space,
                                              const source_stack &stack,
                                              const load_options &options = {});
