@@ -1257,18 +1257,27 @@ public:
     // actionable; missing required fields are reported by the enforcer.
     expected<void, resolve_fold_error> validate()
     {
-        if(m_schema.surface().empty())
+        const bool has_groups = !m_schema.constraint_groups().empty()
+                             || !m_schema.identity_groups().empty();
+
+        // The unknown-path/required checks only apply when the schema declares a
+        // surface (an empty schema is not a claim that nothing is allowed), so they
+        // short-circuit here. The group/identity pass is orthogonal: it runs whenever
+        // any group is registered, independent of the surface -- a root-anchored
+        // host-validator valve carries no element surface yet must still enforce.
+        if(m_schema.surface().empty() && !has_groups)
             return {};
 
-        schema_validation checked = schema_enforcer::validate(m_schema, m_building,
-                                                              m_keyed_satisfied);
+        schema_validation checked = m_schema.surface().empty()
+            ? schema_validation{}
+            : schema_enforcer::validate(m_schema, m_building, m_keyed_satisfied);
 
         // Container-scoped constraint + identity groups enforce over the resolved,
         // sliced tree -- run on a transient config snapshot so the host-validator valve and
         // member navigation use the real config_node walk. Skipped when no group is
         // declared (the common case pays nothing).
         std::vector<schema_violation> group_violations;
-        if(!m_schema.constraint_groups().empty() || !m_schema.identity_groups().empty())
+        if(has_groups)
         {
             std::map<std::string, std::string> owned;
             for(const key_path &path : m_building.paths())

@@ -59,6 +59,11 @@ private:
                  const key_path &declared)
     {
         const std::size_t depth = declared.segments().size();
+        // A root-anchored container has exactly one instance: the config root. The
+        // prefix scan below cannot express it (an empty prefix is not a parseable
+        // key), so it is named explicitly.
+        if(depth == 0)
+            return {std::string{}};
         std::set<std::string> prefixes;
         for(const std::string &key : resolved.keys())
         {

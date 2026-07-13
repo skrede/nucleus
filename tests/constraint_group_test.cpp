@@ -199,6 +199,38 @@ TEST_CASE("validate_group valve runs a host predicate", "[constraint]")
     REQUIRE(mentions(r.error(), "ttl must not be zero"));
 }
 
+TEST_CASE("Root-anchored group-only schema enforces on an empty surface", "[constraint]")
+{
+    auto make = [](bool reject) {
+        config_space_builder b;
+        REQUIRE(b.register_constraint_group(validate_group(
+            "root_valve", anchor::root(),
+            [reject](const config_node &) -> expected<void, std::string> {
+                if(reject)
+                    return nucleus::unexpected(std::string("host rejected the root"));
+                return {};
+            })));
+        return std::move(b).build();
+    };
+
+    SECTION("rejecting validator fails the load")
+    {
+        auto space = make(true);
+        runtime_source src;
+        src.set("anything", "x");
+        auto r = load_config(space, source_stack{std::move(src)}, {});
+        REQUIRE_FALSE(r.has_value());
+        REQUIRE(mentions(r.error(), "host rejected the root"));
+    }
+    SECTION("passing validator loads clean")
+    {
+        auto space = make(false);
+        runtime_source src;
+        src.set("anything", "x");
+        REQUIRE(load_config(space, source_stack{std::move(src)}, {}).has_value());
+    }
+}
+
 TEST_CASE("Registration rejects an undefined member loudly", "[constraint]")
 {
     auto b = cache_builder();
