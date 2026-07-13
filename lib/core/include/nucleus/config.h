@@ -19,6 +19,8 @@
 #include <optional>
 #include <algorithm>
 #include <typeindex>
+#include <functional>
+#include <string_view>
 
 namespace nucleus {
 
@@ -47,7 +49,9 @@ public:
     }
 
     config(std::map<std::string, std::string> values, provenance origins)
-        : m_values(std::move(values)), m_provenance(std::move(origins))
+        : m_values(std::make_move_iterator(values.begin()),
+                   std::make_move_iterator(values.end())),
+          m_provenance(std::move(origins))
     {
     }
 
@@ -55,8 +59,10 @@ public:
     config(std::map<std::string, std::string> values,
            std::map<std::string, std::any> typed,
            provenance origins)
-        : m_values(std::move(values)),
-          m_typed(std::move(typed)),
+        : m_values(std::make_move_iterator(values.begin()),
+                   std::make_move_iterator(values.end())),
+          m_typed(std::make_move_iterator(typed.begin()),
+                  std::make_move_iterator(typed.end())),
           m_provenance(std::move(origins))
     {
     }
@@ -67,7 +73,7 @@ public:
     // container (legacy untyped surface). Use get_as() for the typed loud error
     // naming the container and instance count, or get("path[N]") / get_all() for
     // indexed access.
-    std::optional<std::string> get(const std::string &key) const
+    std::optional<std::string> get(std::string_view key) const
     {
         auto it = m_values.find(key);
         if(it != m_values.end())
@@ -79,7 +85,7 @@ public:
     // indexed instances (cluster/node[0]/port, cluster/node[1]/port, ...) whose
     // canonical form matches, sorted by numeric ordinal. For single-value paths
     // returns a one-element vector; for absent paths returns an empty vector.
-    std::vector<std::string> get_all(const std::string &key) const
+    std::vector<std::string> get_all(std::string_view key) const
     {
         // Direct single-value hit (non-repeated path).
         auto direct = m_values.find(key);
@@ -121,7 +127,7 @@ public:
         return out;
     }
 
-    bool contains(const std::string &key) const
+    bool contains(std::string_view key) const
     {
         return m_values.contains(key);
     }
@@ -129,9 +135,9 @@ public:
     // "Why is this value X?" -- the winning source's origin for a scalar key, or
     // nullptr. For indexed paths (e.g. "cluster/node[0]/port"), returns the origin
     // for that specific indexed path.
-    const origin *provenance_of(const std::string &key) const
+    const origin *provenance_of(std::string_view key) const
     {
-        return m_provenance.of(key);
+        return m_provenance.of(std::string(key));
     }
 
     // Returns the typed value at `key` converted by the registered converter.
@@ -145,16 +151,16 @@ public:
     //                              type_index equality; no widening or coercion)
     // Note: any_cast<T> produces a copy of the stored value.
     template<typename T>
-    expected<T, error> get_as(const std::string &key) const
+    expected<T, error> get_as(std::string_view key) const
     {
         auto it = m_typed.find(key);
         if(it == m_typed.end())
         {
             if(contains(key))
                 return unexpected(error{errc::missing_converter,
-                            std::string("path '") + key + "' declares no type converter"});
+                            "path '" + std::string(key) + "' declares no type converter"});
             // Detect unindexed path crossing a repeated container (loud error).
-            if(auto container = crossing_repeated_container(key); container)
+            if(auto container = crossing_repeated_container(std::string(key)); container)
             {
                 // Count distinct ordinals at the container -- one per instance,
                 // not one per field entry.
@@ -179,11 +185,11 @@ public:
                         key, *container, ordinals.size())});
             }
             return unexpected(error{errc::absent_key,
-                        std::string("path '") + key + "' is absent"});
+                        "path '" + std::string(key) + "' is absent"});
         }
         if(it->second.type() != typeid(T))
             return unexpected(error{errc::mismatched_type,
-                        std::string("type mismatch for path '") + key
+                        "type mismatch for path '" + std::string(key)
                         + "': stored type does not match requested type"});
         return std::any_cast<T>(it->second);
     }
@@ -251,6 +257,17 @@ public:
     }
 
 private:
+    friend class config_node;
+
+    // The eager, already-sorted value map, shared with config_node navigation so
+    // it reaches keys through ordered lower_bound range scans instead of copying
+    // every key out via keys(). Not exposed publicly.
+    const std::map<std::string, std::string, std::less<>> &
+    ordered_values() const noexcept
+    {
+        return m_values;
+    }
+
     // Returns the repeated container path if `key` crosses a repeated container
     // without an ordinal index; otherwise std::nullopt. Two cases:
     //   (a) key IS the container path: m_values has "key[N]/..." entries.
@@ -337,10 +354,10 @@ private:
         return 0;
     }
 
-    std::map<std::string, std::string> m_values;
+    std::map<std::string, std::string, std::less<>> m_values;
     // Typed values produced by the convert() pass. Indexed paths are keyed by
     // their full indexed path string (e.g. "cluster/node[0]/port").
-    std::map<std::string, std::any> m_typed;
+    std::map<std::string, std::any, std::less<>> m_typed;
     provenance m_provenance;
 };
 
@@ -367,20 +384,22 @@ inline bool config_node::exists() const noexcept
 {
     if(!m_config)
         return false;
+    const auto &values = m_config->ordered_values();
     // Root node (empty path) exists when the config has at least one key.
     if(m_path.empty())
-        return !m_config->keys().empty();
-    if(m_config->contains(m_path))
+        return !values.empty();
+    if(values.contains(m_path))
         return true;
+    // A container/repeated node owns no key of its own; it exists iff some key
+    // begins with its bracket or child prefix. Prefixed keys are contiguous and
+    // are the smallest keys >= the prefix, so one lower_bound probe suffices.
     const std::string indexed_prefix = m_path + "[";
-    for(const std::string &k : m_config->keys())
-        if(k.starts_with(indexed_prefix))
-            return true;
+    auto it = values.lower_bound(indexed_prefix);
+    if(it != values.end() && it->first.starts_with(indexed_prefix))
+        return true;
     const std::string child_prefix = m_path + key_path::separator;
-    for(const std::string &k : m_config->keys())
-        if(k.starts_with(child_prefix))
-            return true;
-    return false;
+    it = values.lower_bound(child_prefix);
+    return it != values.end() && it->first.starts_with(child_prefix);
 }
 
 inline node_kind config_node::kind() const noexcept
@@ -390,14 +409,15 @@ inline node_kind config_node::kind() const noexcept
     // Root (empty path) is always a container -- it has no index.
     if(m_path.empty())
         return node_kind::container;
+    const auto &values = m_config->ordered_values();
     const std::string indexed_prefix = m_path + "[";
-    for(const std::string &k : m_config->keys())
-        if(k.starts_with(indexed_prefix))
-            return node_kind::repeated;
+    auto it = values.lower_bound(indexed_prefix);
+    if(it != values.end() && it->first.starts_with(indexed_prefix))
+        return node_kind::repeated;
     const std::string child_prefix = m_path + key_path::separator;
-    for(const std::string &k : m_config->keys())
-        if(k.starts_with(child_prefix))
-            return node_kind::container;
+    it = values.lower_bound(child_prefix);
+    if(it != values.end() && it->first.starts_with(child_prefix))
+        return node_kind::container;
     return node_kind::scalar;
 }
 
@@ -431,14 +451,15 @@ inline std::vector<config_node> config_node::children() const
     if(k == node_kind::container)
     {
         // For the root node (empty path), every key is a direct child.
-        // Otherwise, filter keys that start with m_path + '/'.
+        // Otherwise, walk only the contiguous m_path + '/' prefix range.
+        const auto &values = m_config->ordered_values();
         const bool is_root = m_path.empty();
         const std::string child_prefix = is_root ? std::string{} : (m_path + key_path::separator);
         std::set<std::string> seen_names;
-        for(const std::string &key : m_config->keys())
+        for(auto it = values.lower_bound(child_prefix);
+            it != values.end() && it->first.starts_with(child_prefix); ++it)
         {
-            if(!is_root && !key.starts_with(child_prefix))
-                continue;
+            const std::string &key = it->first;
             std::string_view const remainder(key.data() + child_prefix.size(),
                                        key.size() - child_prefix.size());
             // Take only the first segment (stop at separator or '[').
@@ -490,12 +511,13 @@ inline expected<T, error> config_node::as() const
 
 inline std::vector<std::size_t> config_node::distinct_ordinals() const
 {
+    const auto &values = m_config->ordered_values();
     const std::string indexed_prefix = m_path + "[";
     std::set<std::size_t> ordinal_set;
-    for(const std::string &k : m_config->keys())
+    for(auto it = values.lower_bound(indexed_prefix);
+        it != values.end() && it->first.starts_with(indexed_prefix); ++it)
     {
-        if(!k.starts_with(indexed_prefix))
-            continue;
+        const std::string &k = it->first;
         // Remainder after m_path: "[N]" or "[N]/...".
         std::string_view const remainder(k.data() + m_path.size(),
                                    k.size() - m_path.size());

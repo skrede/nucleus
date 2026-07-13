@@ -443,6 +443,98 @@ TEST_CASE("config_node deep navigation reaches scalar value", "[config_node][nav
 }
 
 // ---------------------------------------------------------------------------
+// large-tree navigation exercises the ordered-map lower_bound range scans:
+// a deep container chain, a repeated container with >= 12 ordinals (so [10]/[11]
+// are reached), a container mixing a scalar and a repeated child, and plain
+// leaves surrounding the ranges. Built directly from an ordered value map so the
+// scans see many neighboring keys, not just the handful a small config yields.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+nucleus::config make_large_tree()
+{
+    std::map<std::string, std::string> values;
+    values.emplace("alpha", "1");
+    values.emplace("cluster/name", "c1");
+    for(int i = 0; i < 12; ++i)
+        values.emplace("cluster/node[" + std::to_string(i) + "]/port",
+                       std::to_string(i * 10));
+    values.emplace("deep/a/b/c/d/leaf", "x");
+    values.emplace("deep/a/b/sibling", "y");
+    values.emplace("zed", "9");
+    return nucleus::config(std::move(values), nucleus::provenance{});
+}
+
+std::vector<std::string> child_paths(const std::vector<nucleus::config_node> &nodes)
+{
+    std::vector<std::string> out;
+    out.reserve(nodes.size());
+    for(const auto &n : nodes)
+        out.push_back(std::string(n.path()));
+    return out;
+}
+
+} // namespace
+
+TEST_CASE("config_node large-tree navigation matches shapes via lower_bound scans",
+          "[config_node][navigation][range_scan]")
+{
+    const nucleus::config cfg = make_large_tree();
+
+    REQUIRE(cfg.root().exists());
+    REQUIRE(cfg.root().kind() == nucleus::node_kind::container);
+    REQUIRE(child_paths(cfg.root().children())
+            == std::vector<std::string>{"alpha", "cluster", "deep", "zed"});
+
+    // Plain leaves surrounding the ranges are scalars with no children.
+    REQUIRE(cfg.root()["alpha"].kind() == nucleus::node_kind::scalar);
+    REQUIRE(cfg.root()["alpha"].count() == 1);
+    REQUIRE(cfg.root()["alpha"].children().empty());
+    REQUIRE(cfg.root()["zed"].kind() == nucleus::node_kind::scalar);
+    REQUIRE_FALSE(cfg.root()["missing"].exists());
+
+    // Container mixing a scalar child and a repeated child.
+    auto cluster = cfg.root()["cluster"];
+    REQUIRE(cluster.kind() == nucleus::node_kind::container);
+    REQUIRE(child_paths(cluster.children())
+            == std::vector<std::string>{"cluster/name", "cluster/node"});
+    REQUIRE(cluster["name"].kind() == nucleus::node_kind::scalar);
+    REQUIRE(*cluster["name"].value() == "c1");
+
+    // Repeated container: 12 instances, ordinals 0..11 in numeric order, [10]/[11]
+    // reachable via operator[] and out-of-range null-view above the span.
+    auto node = cluster["node"];
+    REQUIRE(node.kind() == nucleus::node_kind::repeated);
+    REQUIRE(node.count() == 12);
+    const auto instances = node.children();
+    REQUIRE(instances.size() == 12);
+    for(std::size_t i = 0; i < 12; ++i)
+        REQUIRE(instances[i].path() == "cluster/node[" + std::to_string(i) + "]");
+
+    REQUIRE(node[10].exists());
+    REQUIRE(node[10].path() == "cluster/node[10]");
+    REQUIRE(node[10].kind() == nucleus::node_kind::container);
+    REQUIRE(node[11].exists());
+    REQUIRE_FALSE(node[12].exists());
+    REQUIRE_FALSE(node[99].exists());
+    REQUIRE(child_paths(node[10].children())
+            == std::vector<std::string>{"cluster/node[10]/port"});
+    REQUIRE(*node[10]["port"].value() == "100");
+
+    // Deep container chain: an intermediate container with two children, and a
+    // scalar reached through six navigation hops.
+    auto b = cfg.root()["deep"]["a"]["b"];
+    REQUIRE(b.kind() == nucleus::node_kind::container);
+    REQUIRE(child_paths(b.children())
+            == std::vector<std::string>{"deep/a/b/c", "deep/a/b/sibling"});
+    auto leaf = cfg.root()["deep"]["a"]["b"]["c"]["d"]["leaf"];
+    REQUIRE(leaf.exists());
+    REQUIRE(leaf.kind() == nucleus::node_kind::scalar);
+    REQUIRE(*leaf.value() == "x");
+}
+
+// ---------------------------------------------------------------------------
 // integration: visit() pre-order and walker enter/leave over loaded config
 // ---------------------------------------------------------------------------
 
