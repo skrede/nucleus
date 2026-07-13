@@ -354,6 +354,83 @@ TEST_CASE("xml emitter -- a sparse indexed LEAF ordinal fails loudly",
     REQUIRE(out.str().empty());
 }
 
+TEST_CASE("a declared repeated container carrying only text is rejected on read",
+          "[xml][repeated_container][malformed]")
+{
+    // cluster/node is a repeated CONTAINER (port/metrics anchor under it). A <node>
+    // holding only character data is not a valid instance: walk() reads only a node's
+    // attributes and leaf children, so the text would vanish per-instance and
+    // invisibly (the sibling node's port still loads). Reject it loudly instead.
+    const nucleus::config_space space = make_cluster_space_for_emitter();
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{},
+        doc_opts("<cluster><node>oops</node><node><port>90</port></node></cluster>"));
+    REQUIRE_FALSE(loaded);
+    CHECK(loaded.error().code == nucleus::errc::malformed_source);
+    CHECK(loaded.error().message.find("character data") != std::string::npos);
+}
+
+TEST_CASE("a repeated-container top-level child carrying only text is rejected "
+          "on the named-space path", "[xml][repeated_container][malformed]")
+{
+    // The same drop must be caught when the repeated container is a top-level child
+    // of a transparent named-space root (the root name is stripped, so the child
+    // reaches walk() the same way).
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::repeated_element("node", anchor::root())));
+    REQUIRE(reg.attach(nucleus::element("port", anchor::keyspace("node"))));
+    nucleus::schema_projection proj = reg.projection();
+
+    auto src = xml_of("<cfg><node>oops</node></cfg>");
+    src.with_space_name("cfg");
+    src.apply_projection(proj);
+
+    auto result = src.pull();
+    REQUIRE_FALSE(result);
+    CHECK(result.error().code == nucleus::errc::malformed_source);
+    CHECK(result.error().message.find("character data") != std::string::npos);
+}
+
+TEST_CASE("emit refuses a value placed on a declared repeated container",
+          "[xml][xml_emitter][malformed]")
+{
+    // A config key that puts a value directly on a repeated container path
+    // ({cluster/node[0]="oops"}) would emit <cluster><node>oops</node></cluster>,
+    // which the reader now rejects. The emitter must refuse rather than produce a
+    // document its own reader cannot consume -- closing the emit->load silent loss.
+    schema_registry reg = cluster_nodes_registry();
+    nucleus::schema_projection proj = reg.projection();
+
+    std::map<std::string, std::string> values{{"cluster/node[0]", "oops"}};
+    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+
+    std::ostringstream out;
+    auto result = nucleus::xml::emit_document(cfg, out, proj);
+    REQUIRE_FALSE(result);
+    CHECK(result.error().code == nucleus::errc::malformed_source);
+    CHECK(result.error().message.find("cluster/node") != std::string::npos);
+    CHECK(out.str().empty());
+}
+
+TEST_CASE("emit still writes a repeated scalar leaf value", "[xml][xml_emitter]")
+{
+    // The repeated-container emit guard must NOT catch a repeated scalar LEAF: tags
+    // has no children, so it is not a repeated container and its values still emit.
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::element("cluster", anchor::root())));
+    REQUIRE(reg.attach(nucleus::repeated_element("tags", anchor::keyspace("cluster"))));
+    nucleus::schema_projection proj = reg.projection();
+
+    std::map<std::string, std::string> values{
+        {"cluster/tags[0]", "a"}, {"cluster/tags[1]", "b"}};
+    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+
+    std::ostringstream out;
+    REQUIRE(nucleus::xml::emit_document(cfg, out, proj));
+    const std::string emitted = out.str();
+    REQUIRE(emitted.find(">a<") != std::string::npos);
+    REQUIRE(emitted.find(">b<") != std::string::npos);
+}
+
 TEST_CASE("xml emitter -- contiguous indexed leaves round-trip in order",
           "[xml][xml_emitter][round_trip]")
 {

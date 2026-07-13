@@ -161,6 +161,20 @@ pugi::xml_node child_or_append(pugi::xml_node parent, const std::string &name)
     return parent.append_child(name.c_str());
 }
 
+// Appends a config value as the character-data child of a leaf element. A value
+// that is entirely XML whitespace (space/tab/newline) is written as a CDATA section
+// rather than plain pcdata: pugixml's default parse flags discard whitespace-only
+// pcdata, so a plain-text " " would reload as "". CDATA is retained verbatim and the
+// reader accepts node_cdata, so the exact value round-trips. (A bare carriage return
+// is already refused by check_value_bytes, so the whitespace set omits it.)
+void append_value_text(pugi::xml_node leaf, const std::string &value)
+{
+    const bool whitespace_only =
+        !value.empty() && value.find_first_not_of(" \t\n") == std::string::npos;
+    leaf.append_child(whitespace_only ? pugi::node_cdata : pugi::node_pcdata)
+        .set_value(value.c_str());
+}
+
 // Finds or appends the Nth child of `parent` with `name` (zero-based ordinal).
 // Keys are sorted so ordinals ascend: ordinal == count appends a new sibling;
 // ordinal < count returns the last existing sibling (a further field of the
@@ -360,6 +374,25 @@ expected<void, error> emit_document(const config &config, std::ostream &out,
             }
         }
 
+        // A value on a path the schema declares a repeated CONTAINER (an element with
+        // child elements anchored under it) is unrepresentable as element text: it
+        // would emit a container carrying only character data, which the reader now
+        // refuses. Refuse it here too so emit never produces what read cannot consume.
+        // A repeated scalar LEAF is not a repeated container (the projection lists only
+        // containers), so repeated leaves still emit their values.
+        if(!proj.empty())
+        {
+            std::string leaf_canonical = parent_canonical;
+            if(!leaf_canonical.empty())
+                leaf_canonical.push_back(key_path::separator);
+            leaf_canonical += leaf_name;
+            if(proj.is_repeated_container(leaf_canonical))
+                return unexpected(error{errc::malformed_source, nucleus::format(
+                    "xml emit: key '{}' places a value on repeated container '{}', "
+                    "which carries child elements, not character data",
+                    key, leaf_canonical)});
+        }
+
         // An indexed leaf carries its own ordinal (e.g. "cluster/tags[2]"). Route
         // it through indexed_child so the same contiguity invariant the container
         // path enforces applies here too: a gap fails loudly instead of silently
@@ -379,7 +412,7 @@ expected<void, error> emit_document(const config &config, std::ostream &out,
                                                leaf_canonical);
                 if(!leaf_node)
                     return unexpected(std::move(leaf_node).error());
-                leaf_node.value().append_child(pugi::node_pcdata).set_value(value.c_str());
+                append_value_text(leaf_node.value(), value);
             }
             continue;
         }
@@ -388,8 +421,8 @@ expected<void, error> emit_document(const config &config, std::ostream &out,
         {
             if(auto ok = check_value_bytes(key, value); !ok)
                 return unexpected(std::move(ok).error());
-            pugi::xml_node leaf_node = node.append_child(leaf_name.c_str());
-            leaf_node.append_child(pugi::node_pcdata).set_value(value.c_str());
+            const pugi::xml_node leaf_node = node.append_child(leaf_name.c_str());
+            append_value_text(leaf_node, value);
         }
     }
 

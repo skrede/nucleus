@@ -18,6 +18,7 @@
 #include <fstream>
 #include <sstream>
 #include <filesystem>
+#include <string_view>
 
 // Round-trip proof: a config loaded from XML, persisted via the stream-based
 // emit_document inside the xml module, and re-loaded yields the same keys and values
@@ -242,6 +243,79 @@ TEST_CASE("emit_document wraps an empty config so its own reader accepts it",
     auto reloaded = nucleus::load_config(space, nucleus::source_stack{},
         document_options(out.str()));
     REQUIRE(reloaded);
+}
+
+TEST_CASE("emit_document + load round-trip preserves a whitespace-only value",
+          "[persist][emit][fidelity]")
+{
+    // pugixml's default parse flags discard whitespace-only pcdata, so a plain-text
+    // " " would reload as "". The emitter writes a whitespace-only value as a CDATA
+    // section, which is retained verbatim and read back intact.
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("port", anchor::root())));
+    nucleus::config_space space = engine.build();
+
+    for(const std::string &ws : {std::string(" "), std::string("\t"), std::string("\n")})
+    {
+        std::map<std::string, std::string> values{{"port", ws}};
+        const nucleus::config cfg(std::move(values), nucleus::provenance{});
+
+        std::ostringstream out;
+        REQUIRE(nucleus::xml::emit_document(cfg, out));
+
+        auto reloaded = nucleus::load_config(space, nucleus::source_stack{},
+            document_options(out.str()));
+        REQUIRE(reloaded);
+        CHECK(reloaded.value().get("port") == ws);
+    }
+}
+
+TEST_CASE("emit_document + load round-trip preserves a whitespace-only repeated-leaf value",
+          "[persist][emit][fidelity]")
+{
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(engine.register_element(
+        nucleus::repeated_element("tags", anchor::keyspace("cluster"))));
+    nucleus::config_space space = engine.build();
+
+    std::map<std::string, std::string> values{
+        {"cluster/tags[0]", " "}, {"cluster/tags[1]", "x"}};
+    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+
+    std::ostringstream out;
+    REQUIRE(nucleus::xml::emit_document(cfg, out));
+
+    auto reloaded = nucleus::load_config(space, nucleus::source_stack{},
+        document_options(out.str()));
+    REQUIRE(reloaded);
+    REQUIRE(reloaded.value().get_all("cluster/tags")
+            == std::vector<std::string>{" ", "x"});
+}
+
+TEST_CASE("a whitespace-only value round-trips on the named-space path",
+          "[persist][emit][fidelity]")
+{
+    std::map<std::string, std::string> values{{"motd", " "}};
+    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+
+    std::ostringstream out;
+    REQUIRE(nucleus::xml::emit_document(cfg, out, std::string_view("server")));
+
+    auto src = nucleus::xml_source::from(
+        nucleus::xml_source_options::of_string(out.str()));
+    src.with_space_name("server");
+    auto result = src.pull();
+    REQUIRE(result);
+
+    bool found = false;
+    for(const auto &e : result.value().entries)
+        if(e.path == "motd")
+        {
+            CHECK(std::string(e.value.text()) == " ");
+            found = true;
+        }
+    CHECK(found);
 }
 
 TEST_CASE("emit_document to a file persists a config that re-reads identically", "[persist]")

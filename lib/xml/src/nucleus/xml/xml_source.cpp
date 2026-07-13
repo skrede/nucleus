@@ -274,6 +274,18 @@ walk(const pugi::xml_node &node, std::string_view path,
     if(auto r = reject_mixed_content(node); !r)
         return r;
 
+    // A node reaching walk() is structural -- its caller classified it as a non-leaf
+    // (a container, a keyed instance, or a declared repeated container). walk() reads
+    // only a node's attributes and its leaf children, never the node's own text, so
+    // character data directly on a structural node is unrepresentable and would vanish
+    // silently. reject_mixed_content above already rejects text that coexists with a
+    // child or attribute; what remains here is a container carrying ONLY text (e.g. a
+    // declared repeated container written as `<node>oops</node>`). Reject it loudly.
+    if(!has_element_child(node) && node.attributes().empty() && has_text_content(node))
+        return unexpected(config_source_error{errc::malformed_source, nucleus::format(
+            "element '{}' is a declared container but carries only character data",
+            path)});
+
     std::set<std::string_view> seen_attrs;
     for(const pugi::xml_attribute &attr : node.attributes())
     {
@@ -539,12 +551,13 @@ config_source_result xml_source::pull()
         if(auto r = reject_mixed_content(root); !r)
             return unexpected(r.error());
 
-        // A transparent root that carries only character data (no child elements, no
-        // attributes -- so it passes reject_mixed_content) has no representable key:
-        // stripping the root name leaves the text unkeyed. Reject it loudly rather
-        // than let the child loop skip the text node and discard it silently.
-        if(is_leaf_element(root, std::string_view(root.name()), m_projection)
-           && has_text_content(root))
+        // A transparent root that carries character data has no representable key:
+        // stripping the root name leaves the text unkeyed. reject_mixed_content above
+        // guarantees any text here coexists with neither a child nor an attribute, so
+        // has_text_content is sufficient -- it also catches a root the projection
+        // declares a repeated container (which is_leaf_element would exclude, letting
+        // the child loop drop the text silently).
+        if(has_text_content(root))
             return unexpected(config_source_error{errc::malformed_source,
                 nucleus::format(
                     "xml source: named-space root element '{}' carries character "
