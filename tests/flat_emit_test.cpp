@@ -105,3 +105,41 @@ TEST_CASE("argv emit inherits the shared newline-rejection fix",
     REQUIRE(result.error().code == nucleus::errc::malformed_source);
     REQUIRE(out.str().empty());
 }
+
+TEST_CASE("flat emit rejects an embedded newline in a KEY, writing nothing",
+          "[flat][emit][env][injection]")
+{
+    // A key -- not just a value -- carrying a line break would forge a second
+    // well-formed assignment line on the flat grammar. The pre-scan must reject
+    // it before anything reaches the stream.
+    std::map<std::string, std::string> values{
+        {std::string("server/host\n--server-admin"), std::string("true")}};
+    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+
+    std::ostringstream out;
+    const auto result = nucleus::env::emit_document(cfg, out);
+    REQUIRE_FALSE(result);
+    REQUIRE(result.error().code == nucleus::errc::malformed_source);
+    REQUIRE(result.error().message.find("key") != std::string::npos);
+    REQUIRE(out.str().empty());
+
+    std::ostringstream args_out;
+    const auto args_result = nucleus::argv::emit_document(cfg, args_out);
+    REQUIRE_FALSE(args_result);
+    REQUIRE(args_result.error().code == nucleus::errc::malformed_source);
+    REQUIRE(args_out.str().empty());
+}
+
+TEST_CASE("flat emit rejects an embedded carriage return in a KEY",
+          "[flat][emit][env][injection]")
+{
+    std::map<std::string, std::string> values{
+        {std::string("server/host\r--server-admin"), std::string("true")}};
+    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+
+    std::ostringstream out;
+    const auto result = nucleus::env::emit_document(cfg, out);
+    REQUIRE_FALSE(result);
+    REQUIRE(result.error().code == nucleus::errc::malformed_source);
+    REQUIRE(out.str().empty());
+}

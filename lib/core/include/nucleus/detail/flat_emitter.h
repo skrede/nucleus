@@ -119,9 +119,9 @@ inline expected<void, error> emit_flat_template(const config_space &space, std::
 // value, so a repeated path emits one line per value in order, with `key_prefix`
 // prepended to every key. Keys are sorted by numeric ordinal so repeated
 // instances round-trip in order (node[2] before node[10]) at N >= 11 rather than
-// in lexicographic map order. A value carrying an embedded newline or carriage
-// return is rejected before any write: the line-oriented flat grammar would let
-// such a value forge an extra flag/var line on round-trip.
+// in lexicographic map order. A key OR value carrying an embedded newline or
+// carriage return is rejected before any write: the line-oriented flat grammar
+// would let such text forge an extra flag/var line on round-trip.
 inline expected<void, error> emit_flat_document(const config &config, std::ostream &out,
                                std::string_view key_prefix,
                                std::string_view key_separator = "/",
@@ -138,6 +138,12 @@ inline expected<void, error> emit_flat_document(const config &config, std::ostre
         std::string_view rendered = key;
         if(!strip_flat_anchor(rendered, anchor))
             continue;
+        if(key.find('\n') != std::string::npos
+           || key.find('\r') != std::string::npos)
+            return unexpected(error{errc::malformed_source, nucleus::format(
+                "flat emit: key '{}' carries an embedded newline or carriage "
+                "return, which the line-oriented flat format cannot represent "
+                "without forging an extra line", key)});
         for(const std::string &value : config.get_all(key))
             if(value.find('\n') != std::string::npos
                || value.find('\r') != std::string::npos)
