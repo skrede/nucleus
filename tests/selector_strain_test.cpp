@@ -149,22 +149,6 @@ TEST_CASE("in_strain() on container-level anchor yields empty",
 }
 
 // -------------------------------------------------------------------------
-// in_strain() with null ctx yields empty (not error)
-// -------------------------------------------------------------------------
-
-TEST_CASE("in_strain() with null ctx yields empty", "[selector]")
-{
-    const auto space = build_server_space();
-    const auto cfg   = load_two_ordinal_strains(space);
-
-    const auto anchor0 = cfg.root()["cluster"]["server"][std::size_t{0}];
-    REQUIRE(anchor0.exists());
-
-    selector sel{anchor0, nullptr};
-    CHECK(sel.in_strain().count() == 0);
-}
-
-// -------------------------------------------------------------------------
 // Root-level anchor: in_strain() still correctly filters by [N] instance
 // -------------------------------------------------------------------------
 

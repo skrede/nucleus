@@ -168,17 +168,3 @@ TEST_CASE("role(repeated_container) returns nodes when instances exist",
     for(const auto &n : nodes)
         CHECK(n.path().find("cluster/node") != std::string::npos);
 }
-
-// -------------------------------------------------------------------------
-// role() with null ctx returns false (no crash)
-// -------------------------------------------------------------------------
-
-TEST_CASE("role() with null ctx yields empty result", "[selector]")
-{
-    const auto space = build_server_space();
-    const auto cfg   = load_ordinal(space);
-
-    // Construct selector without a ctx (structural-only mode).
-    auto sel = selector{cfg.root(), nullptr}.role(node_role::primary_key);
-    CHECK(sel.count() == 0);
-}

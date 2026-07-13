@@ -16,9 +16,9 @@
 
 namespace nucleus {
 
-// Transient join facade that carries schema authority into a query without
-// storing any cross-registry pointer. Built once by config_space::query_context()
-// and borrowed by the selector; must not outlive the config_space it was built from.
+// Self-contained join snapshot that carries schema authority into a query without
+// storing any cross-registry pointer; copied into the selector by value, it may
+// safely outlive the config_space it was built from.
 class schema_query_context
 {
 public:

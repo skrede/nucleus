@@ -19,7 +19,8 @@
 // a dangling pointer once the config is destroyed.
 //
 // The schema_query_context lifetime test always passes; it serves as executable
-// documentation of the ctx-must-not-outlive-space contract.
+// documentation that a selector owns its context by value and so may be built
+// from a temporary schema_query_context that is gone before the query runs.
 
 using namespace nucleus;
 
@@ -76,29 +77,27 @@ TEST_CASE("lifetime: results must not outlive the config (ASan guard)",
 }
 
 // -------------------------------------------------------------------------
-// Always-passing documentation test: ctx-must-not-outlive-space contract.
-//
-// The schema_query_context borrows the config_space. The correct usage
-// demonstrated in all selector tests is to keep both alive for the duration
-// of the query, then let them go out of scope together. This test formalises
-// that contract as executable documentation.
+// A selector owns its schema_query_context by value, so it can be built from a
+// TEMPORARY query_context() and used after the full expression ends. The old
+// pointer-storing selector could not survive this — the context dangled.
 // -------------------------------------------------------------------------
 
-TEST_CASE("lifetime: schema_query_context must not outlive config_space (contract doc)",
+TEST_CASE("lifetime: selector survives a temporary schema_query_context",
           "[selector][lifetime]")
 {
-    // Correct usage: ctx is always destroyed before or with space.
     const auto space = make_space();
-    {
-        const auto ctx = space.query_context();
-        const auto cfg = make_config(space);
+    const auto cfg   = make_config(space);
 
-        // ctx, cfg, space are all valid here — query is safe.
-        auto nodes = query(cfg.root(), ctx).leaves().collect();
-        CHECK_FALSE(nodes.empty());
-    }
-    // ctx and cfg are gone; space is still alive — correct tear-down order.
-    // No assertion needed: the fact that this compiles and runs without UB
-    // documents the expected lifetime order.
-    SUCCEED("Correct lifetime order: ctx and cfg destroyed before space");
+    // space.query_context() is a temporary; the selector copies it in by value,
+    // so it is safe to use after the temporary has been destroyed.
+    auto s = query(cfg.root(), space.query_context());
+
+    auto nodes = s.leaves().collect();
+    CHECK_FALSE(nodes.empty());
+
+    // or_() captures a context copy, so a union of two temporaries is safe too.
+    auto both = query(cfg.root(), space.query_context()).leaves()
+                    .or_(query(cfg.root(), space.query_context()).containers())
+                    .collect();
+    CHECK_FALSE(both.empty());
 }

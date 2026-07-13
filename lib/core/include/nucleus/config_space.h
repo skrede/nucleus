@@ -229,8 +229,8 @@ public:
     // a template. A pure read of the sealed schema; the registry stays encapsulated.
     std::span<const schema_element> schema_elements() const;
 
-    // Builds a transient schema_query_context for use with query(). Borrows this
-    // config_space; the returned context must not outlive this space.
+    // Builds a schema_query_context snapshot for use with query(). The returned
+    // context is an owned snapshot the caller may keep past this space's lifetime.
     schema_query_context query_context() const;
 
     // Returns a NEW builder pre-populated with a DEEP COPY of this sealed space's

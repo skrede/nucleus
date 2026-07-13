@@ -158,10 +158,10 @@ TEST_CASE("owned_by(same_anon_token) matches the registered element",
 }
 
 // -------------------------------------------------------------------------
-// owned_by() with null ctx returns empty (not error)
+// owned_by() over a schema that registers no owners yields empty (not error)
 // -------------------------------------------------------------------------
 
-TEST_CASE("owned_by() with null ctx yields empty", "[selector]")
+TEST_CASE("owned_by() with no registered owners yields empty", "[selector]")
 {
     auto space = config_space_builder{}.build();
 
@@ -170,6 +170,6 @@ TEST_CASE("owned_by() with null ctx yields empty", "[selector]")
     auto res = load_config(space, source_stack{std::move(src)}, {});
     REQUIRE(res.has_value());
 
-    selector sel{res->root(), nullptr};
+    selector sel{res->root(), space.query_context()};
     CHECK(sel.owned_by(owner_token(std::string("any"))).count() == 0);
 }
