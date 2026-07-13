@@ -23,6 +23,8 @@
 #include <string>
 #include <string_view>
 
+// <clocale> lacks newlocale/uselocale/strtod_l and the MSVC _l equivalents.
+// NOLINTNEXTLINE(modernize-deprecated-headers)
 #include <locale.h>
 
 using nucleus::make_scalar_converter;

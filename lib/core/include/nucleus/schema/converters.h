@@ -46,6 +46,9 @@
 // the POSIX/CRT _l primitives and newlocale/_create_locale; those are not exposed
 // by the <cxxx> C++ wrapper headers, so pull the C header on the fallback path.
 #if !defined(__cpp_lib_to_chars) || defined(NUCLEUS_FORCE_FP_FROM_CHARS_FALLBACK)
+// <clocale> cannot replace this: newlocale/strtod_l and the MSVC _l equivalents
+// are POSIX/CRT extensions absent from the C++ wrapper header.
+// NOLINTNEXTLINE(modernize-deprecated-headers)
 #include <locale.h>
 #endif
 
@@ -149,7 +152,7 @@ inline fp_parse_result fp_from_chars(std::string_view sv, Float &out)
     // ptr at the 'x' -- so the classifier yields the identical trailing-characters
     // outcome on both paths.
     {
-        const std::size_t digit = (lead == '-') ? 1u : 0u;
+        const std::size_t digit = (lead == '-') ? 1U : 0U;
         if(digit + 1 < sv.size() && sv[digit] == '0'
            && (sv[digit + 1] == 'x' || sv[digit + 1] == 'X'))
         {
@@ -167,7 +170,7 @@ inline fp_parse_result fp_from_chars(std::string_view sv, Float &out)
     char *end = nullptr;
     errno = 0;
     Float value{};
-    const auto loc = cached_c_numeric_locale().handle;
+    auto *const loc = cached_c_numeric_locale().handle;
     if constexpr(std::is_same_v<Float, float>)
 #if defined(_MSC_VER)
         value = _strtof_l(begin, &end, loc);
