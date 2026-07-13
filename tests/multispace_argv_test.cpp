@@ -95,6 +95,41 @@ TEST_CASE("multispace_argv_source: bare space name flag is skipped (not an addre
     REQUIRE(result.value().entries.empty());
 }
 
+TEST_CASE("multispace_argv_source: bare space flag carrying a value is rejected loudly",
+          "[multispace_argv][argv]")
+{
+    // --alpha=oops attaches a value to the bare space name; a space name is
+    // addressing, not an assignable key, so the value has nowhere to bind.
+    std::vector<std::string> tokens{"--alpha=oops"};
+    multispace_argv_source src(tokens);
+    src.register_space("alpha").register_space("beta");
+
+    auto alpha = src.for_space("alpha");
+    auto result = alpha.pull();
+    REQUIRE_FALSE(result);
+    REQUIRE(result.error().code == errc::schema_violation);
+    REQUIRE(result.error().message.find("alpha") != std::string::npos);
+}
+
+TEST_CASE("multispace_argv_source: a space registered after a view is created is addressable",
+          "[multispace_argv][argv]")
+{
+    std::vector<std::string> tokens{"--alpha-x=1", "--beta-y=2"};
+    multispace_argv_source src(tokens);
+    src.register_space("alpha");
+
+    // View obtained BEFORE beta is registered. The space list is shared live, so
+    // beta is addressable to this view without a re-fetch: the beta-addressed
+    // flag is skipped, not reported as unaddressed.
+    auto alpha = src.for_space("alpha");
+    src.register_space("beta");
+
+    auto result = alpha.pull();
+    REQUIRE(result);
+    REQUIRE(result.value().entries.size() == 1);
+    REQUIRE(result.value().entries[0].path == "x");
+}
+
 TEST_CASE("multispace_argv_source: malformed token propagates malformed_source",
           "[multispace_argv][argv]")
 {

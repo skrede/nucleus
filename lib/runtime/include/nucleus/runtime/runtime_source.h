@@ -23,6 +23,10 @@ namespace nucleus {
 // (duplicate_keys in particular) can never disagree: two .set() calls on a repeated
 // path compose instead of failing as a flat-source violation.
 //
+// Not synchronized: confine one instance to a single thread, or finish building it
+// before it is shared. Concurrent set()/pull() on the same instance is a data race
+// on its entries.
+//
 // Plain struct satisfying the source concept by duck typing.
 class runtime_source final
 {

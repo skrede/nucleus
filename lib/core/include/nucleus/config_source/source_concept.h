@@ -9,6 +9,10 @@ namespace nucleus {
 
 // The compile-time contract a source must satisfy: declare capabilities and produce a batch.
 //
+// pull() re-callability: pull() MUST be callable more than once on the same source and produce
+// a valid batch each time. A single load can pull one source twice -- the inheritance chain
+// walker re-pulls a parent -- so pull() must not consume or invalidate the source's state.
+//
 // Buffer-lifetime rule for document-backed sources: if pull() returns entries whose values are
 // VIEWS into a parser-owned arena, the batch MUST carry ownership of that arena in its
 // retained_buffer. Resolution copies values out and drops the batch only then; a source

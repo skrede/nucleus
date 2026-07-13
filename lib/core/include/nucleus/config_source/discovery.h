@@ -51,6 +51,10 @@ public:
             {
                 std::filesystem::path candidate = dir / (std::string(base_name) + ext);
                 std::error_code ec;
+                // A filesystem error (e.g. permission-denied) reports the
+                // ec-overload as not-a-regular-file, so the candidate is treated
+                // as absent rather than surfaced. Documented as known behavior in
+                // docs/api-implementations.md.
                 if(std::filesystem::is_regular_file(candidate, ec))
                     found.push_back({path_to_text(candidate), ext});
             }

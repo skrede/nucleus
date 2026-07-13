@@ -106,6 +106,27 @@ See [`examples/xml/xml.cpp`](../examples/xml/xml.cpp),
 [`examples/schema/strains.cpp`](../examples/schema/strains.cpp), and
 [`tests/inherit_chain_test.cpp`](../tests/inherit_chain_test.cpp).
 
+### Well-formedness and discovery stances
+
+Three edge behaviors are deliberate and documented rather than defended against
+in code:
+
+- **Undeclared XML entities load as literal text.** pugixml does not expand
+  entity references, so an undeclared `&foo;` reaches the keyspace as the
+  literal characters `&foo;` rather than being expanded or rejected. This is
+  XXE-safe by construction — no external entity is ever fetched — which is the
+  right posture for hostile input; it is imperfect for honest input that meant a
+  declared entity, and dedicated detection is deferred.
+- **Extension matching is case-sensitive.** A parser registered for `.xml`
+  does not match a file named `config.XML`. On case-insensitive filesystems
+  (Windows, default macOS) the on-disk name and the registered extension can
+  differ in case and silently fail to pair. Normalization to a single case is
+  deferred; register the exact case a host expects to encounter.
+- **A discovery filesystem error reads as absent.** When probing a candidate
+  path, a filesystem error (for example permission-denied) is treated the same
+  as the file not existing: the candidate is skipped, not surfaced as an error.
+  Discovery reports what it could positively confirm as a regular file.
+
 ---
 
 <a id="env_source"></a>
@@ -247,6 +268,10 @@ flat-source violation.
 nucleus::runtime_source defaults;
 defaults.set("server/host", "localhost").set("server/port", "8080");
 ```
+
+It is not synchronized: confine one instance to a single thread, or finish
+building it before sharing it. Concurrent `set()`/`pull()` on the same instance
+is a data race on its entries.
 
 See [`examples/composition/source_stack.cpp`](../examples/composition/source_stack.cpp) and
 [`examples/composition/reusable_space.cpp`](../examples/composition/reusable_space.cpp).

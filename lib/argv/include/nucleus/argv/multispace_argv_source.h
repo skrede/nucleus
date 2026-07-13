@@ -49,11 +49,8 @@ public:
     class space_view
     {
     public:
-        space_view(const multispace_argv_source *owner,
-                   std::vector<std::string> spaces,
-                   std::string target)
+        space_view(const multispace_argv_source *owner, std::string target)
             : m_owner(owner)
-            , m_spaces(std::move(spaces))
             , m_target(std::move(target))
         {
         }
@@ -113,7 +110,22 @@ public:
                 if(path.size() < 2)
                 {
                     if(!path.empty() && is_registered_space(path.front()))
-                        continue; // bare space name -- belongs to this or another space, skip
+                    {
+                        // A space name is addressing, not an assignable key: a
+                        // value attached to it (`--alpha=x`) has nowhere to bind,
+                        // so it is unambiguous misuse rather than a skippable
+                        // presence flag. `normalize_arg` collapses the no-value
+                        // case to "true", so the raw token's `=` is what tells a
+                        // supplied value apart from a bare presence flag.
+                        if(token.find('=') != std::string::npos)
+                            return unexpected(config_source_error{errc::schema_violation,
+                                nucleus::format(
+                                    "CLI flag '{}' attaches a value to the bare space "
+                                    "name '{}': a space name is addressing, not an "
+                                    "assignable key",
+                                    token, path.front())});
+                        continue; // bare presence flag -- belongs to a space, skip
+                    }
                     return unexpected(config_source_error{errc::schema_violation,
                         nucleus::format(
                             "unaddressed CLI flag '{}': first segment '{}' is not a "
@@ -168,9 +180,11 @@ public:
         }
 
     private:
+        // Reads the owner's registered-space list live, so a space registered
+        // after this view was obtained is addressable without a re-fetch.
         bool is_registered_space(const std::string &segment) const
         {
-            for(const std::string &s : m_spaces)
+            for(const std::string &s : m_owner->m_spaces)
                 if(s == segment)
                     return true;
             return false;
@@ -179,17 +193,17 @@ public:
         std::string comma_list() const
         {
             std::string out;
-            for(std::size_t i = 0; i < m_spaces.size(); ++i)
+            const std::vector<std::string> &spaces = m_owner->m_spaces;
+            for(std::size_t i = 0; i < spaces.size(); ++i)
             {
                 if(i != 0)
                     out += ", ";
-                out += m_spaces[i];
+                out += spaces[i];
             }
             return out;
         }
 
         const multispace_argv_source *m_owner;
-        std::vector<std::string> m_spaces;
         std::string m_target;
         cli_delimiter m_delimiter;
         key_path m_anchor;
@@ -204,7 +218,7 @@ public:
     {
         for(const std::string &s : m_spaces)
             if(s == name)
-                return space_view(this, m_spaces, std::string(name));
+                return space_view(this, std::string(name));
         throw std::invalid_argument(
             nucleus::format("multispace_argv_source: '{}' is not a registered space name", name));
     }
