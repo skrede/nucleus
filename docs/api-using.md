@@ -74,6 +74,8 @@ template<typename T>
 registration_result register_converter(/* conv */, owner_token owner = {});  // keyed by typeid(T)
 registration_result set_registration_policy(std::shared_ptr<registration_policy> policy);
 
+config_space_builder &name(std::string space_name);  // the identity each source validates at its boundary; empty = unnamed
+
 std::size_t schema_count() const noexcept;
 std::size_t tokenizer_count() const noexcept;
 std::size_t converter_count() const noexcept;
@@ -427,9 +429,11 @@ std::size_t schema_count() const noexcept;
 std::size_t tokenizer_count() const noexcept;   // includes the auto-installed core tokenizers
 std::size_t converter_count() const noexcept;
 std::vector<conflict_report> conflicts() const;
+std::string_view space_name() const noexcept;   // the name set via config_space_builder::name(); empty if unnamed
 std::string generate_completion(shell which, std::string_view prog,
                                 const cli_delimiter &delimiter = {},
-                                const key_path &anchor = {}) const;
+                                const key_path &anchor = {},
+                                std::string_view space_name = {}) const;
 std::span<const schema_element> schema_elements() const;  // the declared schema, for emitters/derivation
 config_space_builder expand() const;  // a NEW builder seeded with a deep copy of this space
 ```
@@ -506,6 +510,9 @@ struct load_options {
     inherit_policy                                    inherit;     // chain admissibility + depth cap (default 16)
     std::vector<std::string>                          document_paths;
     std::function<source_handle(const std::string &)> make_document;
+    std::size_t                                       reference_budget = 0;  // max tree-reference substitutions per pass-2 resolve; 0 = engine default (10000)
+    std::size_t                                       expansion_budget = 0;  // max token-expansion substitutions per pass-1 fold; 0 = engine default (2500)
+    log_sink*                                         log = nullptr;         // optional host sink for load-time warnings; nullptr = no logging
 };
 ```
 
@@ -876,6 +883,7 @@ enum class errc {
     layering_violation, unresolved_token, invalid_selection, schema_violation,
     failed_conversion, rejected_registration, sealed_builder,
     absent_key, index_required, missing_converter, mismatched_type,
+    ambiguous_result,
 };
 constexpr std::string_view to_string(errc code) noexcept;
 
@@ -971,12 +979,15 @@ same flag mapping the CLI surface uses, so completion cannot drift from the CLI.
 enum class shell { bash, zsh };
 std::string config_space::generate_completion(shell which, std::string_view prog,
                                                      const cli_delimiter &delimiter = {},
-                                                     const key_path &anchor = {}) const;
+                                                     const key_path &anchor = {},
+                                                     std::string_view space_name = {}) const;
 ```
 
 A host that re-delimits its CLI (`argv_source::delimit_with`) or anchors it
 (`argv_source::anchor_at`) passes the same `cli_delimiter` and anchor here,
-keeping the completed flags identical to the parsed ones.
+keeping the completed flags identical to the parsed ones. When `space_name` is
+non-empty, every completion entry is prefixed with the space name, matching a
+`multispace_argv_source` that routes tokens by their first segment.
 An `enum_element`'s value set becomes that flag's completion candidates. A pure
 read of the sealed schema. nucleus is a library, not a CLI — it returns the
 script as a string and the host decides how to surface it. See

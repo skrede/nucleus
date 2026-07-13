@@ -52,7 +52,7 @@ class xml_source final {
 public:
     static xml_source from(xml_source_options options);
 
-    capability_descriptor capabilities() const;
+    static capability_descriptor capabilities();
     config_source_result pull();
     void apply_projection(const schema_projection &projection);
     inherit_declaration inheritance() const;   // callable after pull()
