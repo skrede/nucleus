@@ -15,6 +15,8 @@
 
 #include <cstdint>
 #include <string>
+#include <utility>
+#include <stdexcept>
 
 using nucleus::anchor;
 
@@ -63,4 +65,42 @@ TEST_CASE("registering on an already-built builder is a loud state-machine error
     check(builder.install_tokenizer(nucleus::tokenizer_builder("late").build()),
           "install_tokenizer");
     check(builder.set_registration_policy(nullptr), "set_registration_policy");
+}
+
+TEST_CASE("name() and a second build() on a spent builder throw loudly",
+          "[builder][lifecycle]")
+{
+    nucleus::config_space_builder builder;
+    REQUIRE(builder.register_element(nucleus::element("server", anchor::root())));
+    nucleus::config_space space = builder.build();
+    (void)space;
+
+    // These doors return config_space_builder& / config_space, not an expected, so
+    // the loud channel is a throw -- REQUIRE_THROWS_AS, not REQUIRE_FALSE.
+    REQUIRE_THROWS_AS(builder.name("late"), std::invalid_argument);
+    REQUIRE_THROWS_AS(builder.build(), std::invalid_argument);
+}
+
+TEST_CASE("config_space_builder move transfers builder state to the moved-to builder",
+          "[builder][lifecycle]")
+{
+    // Move-construct: the moved-to builder owns the registrations and seals them.
+    nucleus::config_space_builder source;
+    REQUIRE(source.register_schema("server"));
+    REQUIRE(source.register_schema("server/port"));
+
+    nucleus::config_space_builder moved_ctor(std::move(source));
+    REQUIRE(moved_ctor.schema_count() == 2);
+    nucleus::config_space from_ctor = moved_ctor.build();
+    REQUIRE(from_ctor.schema_count() == 2);
+
+    // Move-assign: the moved-to builder likewise carries the source's state.
+    nucleus::config_space_builder assign_source;
+    REQUIRE(assign_source.register_schema("client"));
+
+    nucleus::config_space_builder moved_assign;
+    moved_assign = std::move(assign_source);
+    REQUIRE(moved_assign.schema_count() == 1);
+    nucleus::config_space from_assign = moved_assign.build();
+    REQUIRE(from_assign.schema_count() == 1);
 }

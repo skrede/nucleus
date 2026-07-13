@@ -29,6 +29,7 @@
 #include <vector>
 #include <utility>
 #include <optional>
+#include <stdexcept>
 #include <filesystem>
 #include <string_view>
 
@@ -410,6 +411,11 @@ registration_result config_space_builder::register_converter(
 
 config_space_builder &config_space_builder::name(std::string space_name)
 {
+    // Sealed-state door: name() has no expected return, so the loud channel is a
+    // throw (mirrors multispace_argv_source::for_space); message shape matches
+    // reject_if_built so all sealed-state rejections read consistently.
+    if(m_impl->built)
+        throw std::invalid_argument("name() is not allowed: the builder has already been built");
     m_impl->name = std::move(space_name);
     return *this;
 }
@@ -424,6 +430,12 @@ std::vector<conflict_report> config_space_builder::conflicts() const { return m_
 
 config_space config_space_builder::build()
 {
+    // Sealed-state door: a second build() would produce a divergent sealed space,
+    // so reject a spent builder loudly before doing any work (throw, not expected --
+    // build() returns config_space); message shape matches reject_if_built.
+    if(m_impl->built)
+        throw std::invalid_argument("build() is not allowed: the builder has already been built");
+
     // Auto-register a pkey tree tokenizer for every identity element.
     // If the host already registered a tokenizer for this category, skip
     // auto-registration so the host's registration wins (last-registration-wins

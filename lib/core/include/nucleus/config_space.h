@@ -175,11 +175,11 @@ public:
     // (document root element, env prefix, argv first segment). Empty = unnamed.
     config_space_builder &name(std::string space_name);
 
-    // Seals the builder into an immutable config_space. Infallible (it never
-    // returns an error); it copies the three registries + policy + ledger into the
+    // Seals the builder into an immutable config_space: the first build() never
+    // returns an error; it copies the three registries + policy + ledger into the
     // sealed product and marks the builder spent. After build(), every register_* /
-    // install_* / set_registration_policy is a LOUD state-machine error, never a
-    // silent no-op.
+    // install_* / set_registration_policy is a LOUD state-machine error, name() and
+    // a second build() throw std::invalid_argument -- never a silent no-op.
     config_space build();
 
 private:
