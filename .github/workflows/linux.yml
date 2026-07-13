@@ -179,6 +179,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Host-application tokens are not committed; they live only in repository
+      # settings and are materialized into the uncommitted local file the gate
+      # appends. If the variable is unset the file is empty and the gate runs the
+      # committed format-only default.
+      - name: Materialize host-token list
+        run: printf '%s\n' "${{ vars.PURITY_HOST_TOKENS }}" > scripts/purity_tokens.local
+
       - name: Core-purity check
         run: bash scripts/core_purity_check.sh
 
