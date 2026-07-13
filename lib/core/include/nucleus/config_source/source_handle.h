@@ -32,7 +32,9 @@ public:
 
     // A moved-from handle is empty: move defaults m_self to null. Every dispatch
     // member requires a live handle; calling one on a moved-from handle is a
-    // contract violation, guarded here so it is diagnosable instead of a null deref.
+    // contract violation. The dispatch members assert valid() in debug builds so
+    // the violation is diagnosable there; under NDEBUG the assert is compiled out
+    // and the dispatch is a plain null dereference.
     bool valid() const noexcept { return m_self != nullptr; }
 
     capability_descriptor capabilities() const
