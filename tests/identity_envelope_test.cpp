@@ -80,6 +80,62 @@ TEST_CASE("xml_source: named-space transparency strips root from key paths",
     REQUIRE_FALSE(result.value().get("engine/plugin/x"));
 }
 
+TEST_CASE("xml_source: a root-anchored leaf under a named space keeps its value",
+          "[identity_envelope][xml]")
+{
+    // motd is a single-segment key: under a named space its element is a direct
+    // child of the transparent root. The read path must classify it as a leaf and
+    // read its text, not walk it as a container (which would drop the value).
+    config_space_builder b;
+    REQUIRE(b.register_schema("motd"));
+    REQUIRE(b.register_schema("plugin/x"));
+    auto space = b.build();
+    auto opts = make_opts(
+        "<engine><motd>hello</motd><plugin><x>1</x></plugin></engine>", "engine");
+
+    auto result = load_config(space, source_stack{}, opts);
+    REQUIRE(result);
+    REQUIRE(result.value().get("motd") == "hello");
+    REQUIRE(result.value().get("plugin/x") == "1");
+}
+
+TEST_CASE("emit_document + load round-trip preserves a root-anchored leaf under a named space",
+          "[identity_envelope][xml][round-trip]")
+{
+    config_space_builder b;
+    REQUIRE(b.register_schema("motd"));
+    auto space = b.build();
+
+    auto opts = make_opts("<engine><motd>hello</motd></engine>", "engine");
+    auto loaded = load_config(space, source_stack{}, opts);
+    REQUIRE(loaded);
+    REQUIRE(loaded.value().get("motd") == "hello");
+
+    std::ostringstream out;
+    REQUIRE(nucleus::xml::emit_document(loaded.value(), out, "engine"));
+
+    auto reopts = make_opts(out.str(), "engine");
+    auto reloaded = load_config(space, source_stack{}, reopts);
+    REQUIRE(reloaded);
+    REQUIRE(reloaded.value().get("motd") == "hello");
+}
+
+TEST_CASE("xml_source: mixed content on a named-space root is rejected loudly",
+          "[identity_envelope][xml]")
+{
+    // The transparent root carries character data alongside its child elements.
+    // The same shape on any non-root element is a loud error; enforce it here too
+    // rather than silently discarding the stray text.
+    auto space = make_plugin_space();
+    auto opts = make_opts(
+        "<engine>stray text<plugin><x>1</x></plugin></engine>", "engine");
+
+    auto result = load_config(space, source_stack{}, opts);
+    REQUIRE_FALSE(result);
+    REQUIRE(result.error().code == errc::malformed_source);
+    REQUIRE(result.error().message.find("mixes character data") != std::string::npos);
+}
+
 TEST_CASE("xml_source: unnamed space keeps root name as first key segment",
           "[identity_envelope][xml]")
 {

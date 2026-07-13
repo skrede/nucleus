@@ -4,11 +4,14 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
+#include "nucleus/keyspace/provenance.h"
+
 #include "nucleus/xml/xml_source.h"
 #include "nucleus/xml/xml_emitter.h"
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <map>
 #include <string>
 #include <vector>
 #include <cstdio>
@@ -122,7 +125,65 @@ TEST_CASE("trailing content after the root element is rejected as malformed_sour
         document_options("<server><host>a</host></server><![CDATA[trailing]]>"));
     REQUIRE_FALSE(loaded);
     CHECK(loaded.error().code == nucleus::errc::malformed_source);
-    CHECK(loaded.error().message.find("trailing content") != std::string::npos);
+    CHECK(loaded.error().message.find("outside the root element") != std::string::npos);
+}
+
+TEST_CASE("content before the root element is rejected as malformed_source",
+          "[persist][malformed]")
+{
+    nucleus::config_space_builder engine;
+    declare_server(engine);
+    nucleus::config_space space = engine.build();
+
+    // Retained CDATA ahead of the root is as ill-formed as trailing content; the
+    // sweep must catch it on both sides of the root, not just after.
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{},
+        document_options("<![CDATA[leading]]><server><host>a</host></server>"));
+    REQUIRE_FALSE(loaded);
+    CHECK(loaded.error().code == nucleus::errc::malformed_source);
+    CHECK(loaded.error().message.find("outside the root element") != std::string::npos);
+}
+
+TEST_CASE("an attribute-bearing text element is rejected as mixed content",
+          "[persist][malformed]")
+{
+    nucleus::config_space_builder engine;
+    declare_server(engine);
+    nucleus::config_space space = engine.build();
+
+    // <host attr="x">8080</host> carries both an attribute and text: reading the
+    // attribute while dropping the text would be silent value loss, so it is
+    // rejected as mixed content.
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{},
+        document_options("<server><host attr=\"x\">8080</host></server>"));
+    REQUIRE_FALSE(loaded);
+    CHECK(loaded.error().code == nucleus::errc::malformed_source);
+    CHECK(loaded.error().message.find("mixes character data") != std::string::npos);
+}
+
+TEST_CASE("emit_document wraps a multi-root config so its own reader accepts it",
+          "[persist][emit]")
+{
+    // A config with more than one top-level key segment is not a single-root XML
+    // document. The emitter must wrap it (as emit_template does) rather than write
+    // a multi-root document the hardened reader now refuses on re-read.
+    std::map<std::string, std::string> values{
+        {"alpha/x", "1"}, {"beta/y", "2"}};
+    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+
+    std::ostringstream out;
+    REQUIRE(nucleus::xml::emit_document(cfg, out));
+
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_schema("config/alpha/x"));
+    REQUIRE(engine.register_schema("config/beta/y"));
+    nucleus::config_space space = engine.build();
+
+    auto reloaded = nucleus::load_config(space, nucleus::source_stack{},
+        document_options(out.str()));
+    REQUIRE(reloaded);
+    REQUIRE(reloaded.value().get("config/alpha/x") == "1");
+    REQUIRE(reloaded.value().get("config/beta/y") == "2");
 }
 
 TEST_CASE("emit_document to a file persists a config that re-reads identically", "[persist]")

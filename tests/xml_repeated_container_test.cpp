@@ -337,3 +337,41 @@ TEST_CASE("xml emitter -- a sparse ordinal fails loudly and writes nothing",
     // All-or-nothing: nothing reached the stream.
     REQUIRE(out.str().empty());
 }
+
+TEST_CASE("xml emitter -- a sparse indexed LEAF ordinal fails loudly",
+          "[xml][xml_emitter]")
+{
+    // The same contiguity invariant applies to an indexed leaf: tags[2] with 0/1
+    // absent must not silently renumber to slot 0 on re-read -- it reports the gap.
+    std::map<std::string, std::string> values{{"cluster/tags[2]", "9"}};
+    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+
+    std::ostringstream out;
+    auto result = nucleus::xml::emit_document(cfg, out);
+
+    REQUIRE_FALSE(result);
+    REQUIRE(result.error().code == nucleus::errc::malformed_source);
+    REQUIRE(out.str().empty());
+}
+
+TEST_CASE("xml emitter -- contiguous indexed leaves round-trip in order",
+          "[xml][xml_emitter][round_trip]")
+{
+    nucleus::config_space_builder builder;
+    REQUIRE(builder.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(builder.register_element(
+        nucleus::repeated_element("tags", anchor::keyspace("cluster"))));
+    nucleus::config_space space = builder.build();
+
+    std::map<std::string, std::string> values{
+        {"cluster/tags[0]", "a"}, {"cluster/tags[1]", "b"}};
+    const nucleus::config original(std::move(values), nucleus::provenance{});
+
+    std::ostringstream out;
+    REQUIRE(nucleus::xml::emit_document(original, out));
+
+    auto reloaded = nucleus::load_config(space, nucleus::source_stack{}, doc_opts(out.str()));
+    REQUIRE(reloaded);
+    REQUIRE(reloaded.value().get_all("cluster/tags")
+            == std::vector<std::string>{"a", "b"});
+}

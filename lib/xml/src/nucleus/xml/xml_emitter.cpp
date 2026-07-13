@@ -19,7 +19,6 @@
 #include <cstddef>
 #include <string_view>
 #include <algorithm>
-#include <tuple>
 
 namespace nucleus::xml {
 
@@ -261,6 +260,9 @@ expected<void, error> emit_document(const config &config, std::ostream &out,
 // carrying a control byte fails loudly through the emit channel.
 // When space_name is non-empty, all top-level elements are re-parented under a new
 // wrapper element named space_name for symmetric round-trip with with_space_name().
+// With an empty space_name and more than one top-level element, the roots are
+// wrapped in a single <config> element (as emit_template does) so the output stays
+// a well-formed single-root document the reader accepts.
 // When proj is non-empty, pkey leaves are rendered as attributes on their parent
 // container element (preventing double-write on round-trip); empty proj is schema-blind.
 expected<void, error> emit_document(const config &config, std::ostream &out,
@@ -335,7 +337,19 @@ expected<void, error> emit_document(const config &config, std::ostream &out,
             const std::string *pkey_field = proj.key_of(parent_canonical);
             if(pkey_field != nullptr && *pkey_field == leaf_name)
             {
-                for(const std::string &value : config.get_all(key))
+                // A primary key renders as a single attribute on its parent. More
+                // than one value -- several values under one key, or several indexed
+                // keys sharing the parent -- would emit a repeated attribute, which
+                // the reader refuses on re-read. Reject rather than emit a document
+                // our own reader would reject.
+                const std::vector<std::string> values = config.get_all(key);
+                if(values.size() > 1 || node.attribute(leaf_name.c_str()))
+                    return unexpected(error{errc::malformed_source, nucleus::format(
+                        "xml emit: primary-key field '{}' on container '{}' carries "
+                        "more than one value; a primary key renders as a single "
+                        "attribute and a repeated attribute would be refused on "
+                        "re-read", leaf_name, parent_canonical)});
+                for(const std::string &value : values)
                 {
                     if(auto ok = check_value_bytes(key, value); !ok)
                         return unexpected(std::move(ok).error());
@@ -343,6 +357,30 @@ expected<void, error> emit_document(const config &config, std::ostream &out,
                 }
                 continue;
             }
+        }
+
+        // An indexed leaf carries its own ordinal (e.g. "cluster/tags[2]"). Route
+        // it through indexed_child so the same contiguity invariant the container
+        // path enforces applies here too: a gap fails loudly instead of silently
+        // collapsing the ordinal to 0 on re-read.
+        if(key_path::is_indexed_segment(leaf_seg))
+        {
+            std::string leaf_canonical = parent_canonical;
+            if(!leaf_canonical.empty())
+                leaf_canonical.push_back(key_path::separator);
+            leaf_canonical += leaf_name;
+            for(const std::string &value : config.get_all(key))
+            {
+                if(auto ok = check_value_bytes(key, value); !ok)
+                    return unexpected(std::move(ok).error());
+                auto leaf_node = indexed_child(node, leaf_name,
+                                               key_path::ordinal_of(leaf_seg),
+                                               leaf_canonical);
+                if(!leaf_node)
+                    return unexpected(std::move(leaf_node).error());
+                leaf_node.value().append_child(pugi::node_pcdata).set_value(value.c_str());
+            }
+            continue;
         }
 
         for(const std::string &value : config.get_all(key))
@@ -354,16 +392,32 @@ expected<void, error> emit_document(const config &config, std::ostream &out,
         }
     }
 
-    if(!space_name.empty())
+    // Choose the wrapper element. A named space always wraps its roots (symmetric
+    // with with_space_name()). An unnamed space with more than one top-level
+    // element must also wrap -- exactly as emit_template does -- because a
+    // multi-root document is not well-formed and the reader rejects a second root;
+    // emitting it unwrapped would produce output the reader refuses.
+    std::string wrapper_name(space_name);
+    if(wrapper_name.empty())
+    {
+        std::size_t top_level_elements = 0;
+        for(pugi::xml_node child = doc.first_child(); child; child = child.next_sibling())
+            if(child.type() == pugi::node_element)
+                ++top_level_elements;
+        if(top_level_elements > 1)
+            wrapper_name = "config";
+    }
+
+    if(!wrapper_name.empty())
     {
         // Collect top-level children before mutation, then re-parent them under
-        // the space-name wrapper. pugixml's append_move removes the node from its
-        // current parent as it adds it to the new one.
+        // the wrapper. pugixml's append_move removes the node from its current
+        // parent as it adds it to the new one.
         std::vector<pugi::xml_node> top_level;
         for(pugi::xml_node child = doc.first_child(); child; child = child.next_sibling())
             top_level.push_back(child);
-        pugi::xml_node wrapper = doc.append_child(std::string(space_name).c_str());
-        for(pugi::xml_node  const&child : top_level)
+        pugi::xml_node wrapper = doc.append_child(wrapper_name.c_str());
+        for(pugi::xml_node const &child : top_level)
             wrapper.append_move(child);
     }
 

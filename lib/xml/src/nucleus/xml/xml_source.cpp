@@ -172,6 +172,36 @@ validate_root_attrs(const pugi::xml_node &root)
     return {};
 }
 
+// Rejects mixed content: non-whitespace character data on a node that also carries
+// structure (a child element or an attribute). A modeled value is either a leaf's
+// text or a container's attributes/children, never both, so text on a container
+// would be silently dropped by the structural walk. Whitespace between elements is
+// discarded by pugixml's default parse flags and so never trips this. A pure text
+// leaf (no children, no attributes) is not a container and is handled elsewhere.
+expected<void, config_source_error>
+reject_mixed_content(const pugi::xml_node &node)
+{
+    bool has_child_element = false;
+    bool has_text = false;
+    for(const pugi::xml_node &content : node.children())
+    {
+        if(content.type() == pugi::node_element)
+            has_child_element = true;
+        else if(is_value_node(content)
+                && std::string_view(content.value())
+                       .find_first_not_of(" \t\r\n") != std::string_view::npos)
+            has_text = true;
+    }
+    if(has_text && (has_child_element || !node.attributes().empty()))
+        return unexpected(config_source_error{errc::malformed_source,
+            nucleus::format(
+                "element '{}' mixes character data with {}; "
+                "mixed content is not a supported configuration shape",
+                node.name(),
+                has_child_element ? "child elements" : "attributes")});
+    return {};
+}
+
 // Walks one element into keyspace entries under `path`. Attributes and pure-text
 // leaf children become value entries; nested elements recurse. Every value is a
 // string_view into the document arena -- never copied here -- so the batch must
@@ -215,30 +245,8 @@ walk(const pugi::xml_node &node, std::string_view path,
                 "element nesting exceeds the depth cap ({}) at '{}'",
                 max_element_depth, path)});
 
-    // Mixed content -- non-whitespace character data alongside a child element --
-    // is not a modeled configuration shape (a value is either a leaf's text or a
-    // container's children, never both). Reject it rather than silently dropping
-    // the text via the structural walk. Whitespace between elements is discarded
-    // by pugixml's default parse flags and so never trips this.
-    {
-        bool has_child_element = false;
-        bool has_text = false;
-        for(const pugi::xml_node &content : node.children())
-        {
-            if(content.type() == pugi::node_element)
-                has_child_element = true;
-            else if(is_value_node(content)
-                    && std::string_view(content.value())
-                           .find_first_not_of(" \t\r\n") != std::string_view::npos)
-                has_text = true;
-        }
-        if(has_child_element && has_text)
-            return unexpected(config_source_error{errc::malformed_source,
-                nucleus::format(
-                    "element '{}' mixes character data and child elements; "
-                    "mixed content is not a supported configuration shape",
-                    node.name())});
-    }
+    if(auto r = reject_mixed_content(node); !r)
+        return r;
 
     std::set<std::string_view> seen_attrs;
     for(const pugi::xml_attribute &attr : node.attributes())
@@ -458,14 +466,18 @@ config_source_result xml_source::pull()
         return unexpected(config_source_error{errc::malformed_source,
             std::string("xml source: document has no root element")});
 
-    // XML 1.0 permits exactly one root element and no character data after it.
-    // pugixml is lenient: it parses trailing sibling elements into the document
-    // (a hidden second root) and retains trailing CDATA. Reject both here, once,
-    // so the named-space and unnamed walks below are covered. (Trailing plain
-    // text is discarded by pugixml before it reaches the tree, so it cannot enter
-    // the keyspace; only retained top-level nodes are observable here.)
-    for(pugi::xml_node sib = root.next_sibling(); sib; sib = sib.next_sibling())
+    // XML 1.0 permits exactly one root element and no character data on either
+    // side of it. pugixml is lenient: it parses sibling elements into the document
+    // (a hidden second root) and retains top-level CDATA before or after the root.
+    // Scan every top-level node (the root's siblings in both directions) so the
+    // named-space and unnamed walks below are covered. (Plain top-level text is
+    // discarded by pugixml before it reaches the tree, so it cannot enter the
+    // keyspace; only retained CDATA/element nodes are observable here.)
+    const pugi::xml_node document_node = root.parent();
+    for(pugi::xml_node sib = document_node.first_child(); sib; sib = sib.next_sibling())
     {
+        if(sib == root)
+            continue;
         if(sib.type() == pugi::node_element)
             return unexpected(config_source_error{errc::malformed_source,
                 nucleus::format(
@@ -477,8 +489,8 @@ config_source_result xml_source::pull()
                   != std::string_view::npos)
             return unexpected(config_source_error{errc::malformed_source,
                 nucleus::format(
-                    "xml source: trailing content after the root element '{}'",
-                    root.name())});
+                    "xml source: character data outside the root element '{}' "
+                    "is not permitted", root.name())});
     }
 
     config_source_batch batch;
@@ -499,11 +511,33 @@ config_source_result xml_source::pull()
         if(auto r = validate_root_attrs(root); !r)
             return unexpected(r.error());
 
+        // The transparent root is not passed to walk(), so run the mixed-content
+        // check here too -- otherwise stray character data on a named-space root is
+        // silently discarded while the same shape on any other element is rejected.
+        if(auto r = reject_mixed_content(root); !r)
+            return unexpected(r.error());
+
         // Walk each direct child as a top-level keyspace entry (root is transparent).
         for(const pugi::xml_node &child : root.children())
         {
             if(child.type() != pugi::node_element)
                 continue;
+
+            // A root-anchored leaf (no attributes, no child elements, not a
+            // repeated container) carries its own text. walk() only reads a
+            // node's attributes and its leaf children, never the walked node's
+            // own text, so passing such a leaf to walk() would drop its value.
+            // Classify it the same way walk()'s child loop does before recursing.
+            const std::string child_path(child.name());
+            if(child.attributes().empty() && !has_element_child(child)
+               && !m_projection.is_repeated_container(
+                      declared_path(child_path, m_projection)))
+            {
+                batch.entries.push_back(
+                    make_entry(child_path, read_leaf_value(child), capabilities()));
+                continue;
+            }
+
             if(auto r = walk(child, std::string_view(child.name()), capabilities(), m_projection,
                              batch, {}, seen_keys, ordinal_counters, false, 1); !r)
                 return unexpected(r.error());
