@@ -200,12 +200,12 @@ inline fp_parse_result fp_from_chars(std::string_view sv, Float &out)
 //   success but ptr short of the end  -> "trailing characters after value"
 //   errc::result_out_of_range         -> "value out of range for type"
 //   errc::invalid_argument, zero characters consumed:
-//        leading '-'                  -> "value out of range for type"
-//                                        (only reachable for unsigned targets: a
-//                                        signed out-of-range negative is already
-//                                        result_out_of_range)
-//        anything else (incl. '+')    -> "invalid characters in value"
-//                                        (from_chars never accepts a leading '+';
+//        leading '-', unsigned target -> "value out of range for type"
+//                                        (a '-' is a value below the type's floor;
+//                                        for signed/float it is instead syntax,
+//                                        e.g. "-abc", so those fall through below)
+//        anything else (incl. '+',    -> "invalid characters in value"
+//        and '-' for signed/float)       (from_chars never accepts a leading '+';
 //                                        that is syntax, not range)
 //   errc::invalid_argument, partial consume -> "trailing characters after value"
 namespace detail {
@@ -225,8 +225,9 @@ classify_numeric_parse(std::string_view sv, const char *ptr, std::errc ec, T out
     // errc::invalid_argument
     if(ptr == sv.data())
     {
-        if(sv.front() == '-')
-            return unexpected(std::string("value out of range for type"));
+        if constexpr(std::is_unsigned_v<T> && !std::is_same_v<T, bool>)
+            if(sv.front() == '-')
+                return unexpected(std::string("value out of range for type"));
         return unexpected(std::string("invalid characters in value"));
     }
     return unexpected(std::string("trailing characters after value"));
