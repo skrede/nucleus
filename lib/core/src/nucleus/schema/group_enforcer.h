@@ -85,6 +85,26 @@ private:
         return config_node(&resolved, path).exists();
     }
 
+    // Whether key names member_path exactly, or an indexed instance of it
+    // (member_path[<digits>]) -- the storage shape of a repeated member. Matches
+    // by the concrete instance path, so it is correct when member_path itself
+    // carries an ordinal/key segment (a member under a repeated/keyed container),
+    // unlike instances_of, whose canonical compare expects an ordinal-free path.
+    static bool names_member_instance(const std::string &key,
+                                      const std::string &member_path)
+    {
+        if(key == member_path)
+            return true;
+        if(key.size() < member_path.size() + 3
+           || key.compare(0, member_path.size(), member_path) != 0
+           || key[member_path.size()] != '[' || key.back() != ']')
+            return false;
+        for(std::size_t i = member_path.size() + 1; i + 1 < key.size(); ++i)
+            if(key[i] < '0' || key[i] > '9')
+                return false;
+        return true;
+    }
+
     static std::string bundle_label(const std::vector<std::string> &names)
     {
         std::string s = "{";
@@ -166,16 +186,17 @@ private:
                 if(m.active_value.has_value())
                 {
                     const std::string &want = *m.active_value;
-                    // The member may live at an indexed instance path (member[n]) when
-                    // it is a repeated element, where the plain path carries no scalar;
-                    // the canonical scan finds every such instance. when_value matching
-                    // is an exact-string compare -- unlike the case-insensitive bool
-                    // converter, a value differing only in case does not activate it.
-                    if(auto member_kp = key_path::parse(member_path); member_kp)
-                        for(const std::string &mi :
-                            instances_of(schema, resolved, *member_kp))
-                            if(auto v = resolved.get(mi);
-                               v.has_value() && *v == want)
+                    // Resolve the member's value(s) for THIS instance directly: the
+                    // scalar member at member_path, or -- when it is a repeated element
+                    // whose plain path carries no scalar -- its indexed instances
+                    // member_path[n]. Routing member_path back through instances_of is
+                    // wrong here: under a repeated/keyed container member_path already
+                    // carries the ordinal/key, which the canonical compare strips. when_value
+                    // matching is an exact-string compare -- unlike the case-insensitive
+                    // bool converter, a value differing only in case does not activate it.
+                    for(const std::string &k : resolved.keys())
+                        if(names_member_instance(k, member_path))
+                            if(auto v = resolved.get(k); v.has_value() && *v == want)
                             {
                                 is_active = true;
                                 break;

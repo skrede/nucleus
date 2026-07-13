@@ -121,6 +121,31 @@ TEST_CASE("when_value activation finds a member at an indexed instance path", "[
     }
 }
 
+TEST_CASE("when_value activation fires per-instance under a repeated container", "[constraint]")
+{
+    config_space_builder b;
+    REQUIRE(b.register_element(repeated_element("pool", anchor::root())));
+    REQUIRE(b.register_element(element("mode", anchor::keyspace("pool"))));
+    REQUIRE(b.register_element(element("lru", anchor::keyspace("pool"))));
+    REQUIRE(b.register_constraint_group(
+        exclusion_group("pool_policy", anchor::keyspace("pool"))
+            .member("mode", when_value("active"))
+            .member("lru")
+            .at_most(1)));
+    auto space = std::move(b).build();
+
+    // pool[0]: mode=active + lru=on -> two active -> violation on this instance.
+    // pool[1]: mode=idle   + lru=on -> mode inactive -> one active -> fine.
+    runtime_source src;
+    src.set("pool[0]/mode", "active").set("pool[0]/lru", "on")
+       .set("pool[1]/mode", "idle").set("pool[1]/lru", "on");
+    auto r = load_config(space, source_stack{std::move(src)}, {});
+    REQUIRE_FALSE(r.has_value());
+    REQUIRE(mentions(r.error(), "pool_policy"));
+    REQUIRE(mentions(r.error(), "'mode'"));
+    REQUIRE(mentions(r.error(), "pool[0]"));
+}
+
 TEST_CASE("exactly(1) and at_least(1) cardinality", "[constraint]")
 {
     SECTION("exactly(1): one active satisfies, two active violates")
