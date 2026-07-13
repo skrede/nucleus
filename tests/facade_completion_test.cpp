@@ -95,3 +95,22 @@ TEST_CASE("the facade generates --help text with description, values and require
     REQUIRE(help.find("logging:") != std::string::npos);
     REQUIRE(help.find("server:") != std::string::npos);
 }
+
+TEST_CASE("the facade --help lists a bare path-tagged flag alongside typed elements",
+          "[facade][help]")
+{
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
+    // A path-tagged registration is a recognized flag carrying no typed metadata;
+    // it must still appear in --help -- the same surface the completions project,
+    // so the two never disagree on which flags exist.
+    REQUIRE(engine.register_schema("logging/verbose"));
+    nucleus::config_space space = engine.build();
+
+    const std::string help = space.generate_help("mytool");
+    const std::string completion = space.generate_completion(nucleus::shell::bash, "mytool");
+
+    REQUIRE(help.find("--logging") != std::string::npos);
+    REQUIRE(help.find("--logging-verbose") != std::string::npos);
+    REQUIRE(completion.find("--logging-verbose") != std::string::npos);
+}

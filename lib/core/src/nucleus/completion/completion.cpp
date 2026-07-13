@@ -200,14 +200,19 @@ std::string generate_completion(shell which, const schema_registry &schema,
 std::string generate_help(const schema_registry &schema, std::string_view prog,
                           const cli_delimiter &delimiter, const key_path &anchor)
 {
-    // Project directly from the declared elements -- not the completion model --
-    // because a help line needs the `required` flag the completion model drops.
-    // Group by the top-level keyspace segment; the map keeps the groups in a
-    // stable alphabetical order so the help text is reproducible.
-    std::map<std::string, std::vector<std::string>> groups;
+    // Iterate the same projected surface the completions use so the two never
+    // disagree on which flags exist; join each path to its element for the
+    // description/values/required a help line adds. A path registered as a bare
+    // recognized target (no typed element) still gets its flag line. Group by the
+    // top-level keyspace segment; the map keeps groups in stable alphabetical
+    // order so the help text is reproducible.
+    std::map<std::string, const schema_element *> by_path;
     for(const schema_element &el : schema.elements())
+        by_path.emplace(el.declared_path().str(), &el);
+
+    std::map<std::string, std::vector<std::string>> groups;
+    for(const key_path &path : schema.surface())
     {
-        const key_path path = el.declared_path();
         if(!anchor.empty()
            && (!path.starts_with(anchor) || path.size() == anchor.size()))
             continue;
@@ -216,7 +221,10 @@ std::string generate_help(const schema_registry &schema, std::string_view prog,
         if(relative.segments().empty())
             continue;
         const std::string &group = relative.segments().front();
-        groups[group].push_back(help_line(flag_of(relative, delimiter), el));
+        const std::string flag = flag_of(relative, delimiter);
+        const auto it = by_path.find(path.str());
+        groups[group].push_back(it != by_path.end() ? help_line(flag, *it->second)
+                                                     : "  " + flag);
     }
 
     std::string out = std::string(prog) + " options:\n";

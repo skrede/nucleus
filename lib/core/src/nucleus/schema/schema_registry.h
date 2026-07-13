@@ -85,6 +85,11 @@ public:
     // rejected and the element is not stored.
     schema_attach_result attach(schema_element el)
     {
+        if(el.at.is_invalid())
+            return unexpected(nucleus::format(
+                "schema element '{}' has a malformed keyspace anchor '{}'",
+                el.name, el.at.invalid_path()));
+
         if(!el.at.is_root())
         {
             const key_path &under = el.at.under();

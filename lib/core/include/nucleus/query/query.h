@@ -16,8 +16,9 @@
 
 namespace nucleus {
 
-// Composed per-node predicate for the selector. Both arguments are stable
-// for the lifetime of the visit; ctx may be nullptr for structural/kind queries.
+// Composed per-node predicate for the selector. Both arguments are stable for
+// the lifetime of the visit; the selector always passes the address of its owned
+// context snapshot (structural/kind predicates simply ignore it).
 using node_predicate = std::function<bool(const config_node &, const schema_query_context *)>;
 
 // Composable, value-semantic predicate composer over the config_node walk.

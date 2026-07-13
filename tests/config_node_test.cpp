@@ -101,7 +101,7 @@ struct no_recurse_walker : nucleus::config_tree_walker
     void leave(const nucleus::config_node &) override {}
 };
 
-} // namespace
+}
 
 // ---------------------------------------------------------------------------
 // exists() + root
@@ -475,7 +475,7 @@ std::vector<std::string> child_paths(const std::vector<nucleus::config_node> &no
     return out;
 }
 
-} // namespace
+}
 
 TEST_CASE("config_node large-tree navigation matches shapes via lower_bound scans",
           "[config_node][navigation][range_scan]")
