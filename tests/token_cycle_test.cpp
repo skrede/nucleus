@@ -32,6 +32,20 @@ tokenizer_registry self_referential_registry()
     return r;
 }
 
+// A wildcard whose emission carries a literal prefix before the self-reference
+// (x${loop.x}): the splice-point re-expansion resumes past the "x" but must still
+// re-enter under the live guard, so the self-reference stays a named cycle.
+tokenizer_registry prefixed_self_referential_registry()
+{
+    tokenizer_registry r;
+    tokenizer_builder b("loop");
+    b.set_wildcard([](std::string_view name) -> nucleus::token_result {
+        return std::string("x${loop.") + std::string(name) + "}";
+    });
+    r.add(std::move(b).build(), owner_token{});
+    return r;
+}
+
 // Two categories that bounce between each other: ${ping.x} -> ${pong.x} ->
 // ${ping.x}, an a -> b -> a cycle the chain message must name.
 tokenizer_registry mutual_registry()
@@ -96,6 +110,16 @@ TEST_CASE("a self-referential token fails loudly with a named cycle error", "[re
     CHECK(r.error().code == resolve_errc::cyclic_reference);
     CHECK(r.error().message.find("cyclic reference") != std::string::npos);
     CHECK(r.error().message.find("${loop.x}") != std::string::npos);
+}
+
+TEST_CASE("a self-reference behind a literal prefix still fails as a named cycle", "[resolve][cycle]")
+{
+    // The splice-point resume must keep re-expanding the produced tail under the
+    // producing token's live guard; if it did not, this would recurse forever.
+    auto reg = prefixed_self_referential_registry();
+    auto r = resolve_tokens("${loop.x}", reg);
+    REQUIRE_FALSE(r.has_value());
+    CHECK(r.error().code == resolve_errc::cyclic_reference);
 }
 
 TEST_CASE("a mutual cycle names the ordered chain", "[resolve][cycle]")

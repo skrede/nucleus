@@ -230,10 +230,17 @@ token_result resolver_scope::resolve_one(std::string_view token)
 
     // Recursive-to-fixpoint: the produced text may itself still contain ${...}
     // (a binding whose value is a token, or the outer of a ${a${b}} once the
-    // inner resolved). Re-scan it while this token's guard is still live.
-    if(produced.value().find("${") != std::string::npos)
-        return resolve_all(produced.value());
-    return produced;
+    // inner resolved). Resume from the first ${ so the already-literal prefix is
+    // not rescanned; the re-expansion still runs under this token's live guard,
+    // so a token that re-emits itself (splice at offset 0) stays a named cycle.
+    const std::string &out = produced.value();
+    const auto splice = out.find("${");
+    if(splice == std::string::npos)
+        return produced;
+
+    auto tail = resolve_all(std::string_view(out).substr(splice));
+    if(!tail) return unexpected(std::move(tail).error());
+    return out.substr(0, splice) + std::move(tail).value();
 }
 
 token_result resolver_scope::resolve_all(std::string_view input)

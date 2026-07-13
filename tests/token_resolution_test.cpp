@@ -106,6 +106,24 @@ TEST_CASE("field-form nesting resolves the head to a fixpoint", "[resolve][neste
     CHECK(r.value() == "value");
 }
 
+TEST_CASE("a chained value carrying a further token past a literal prefix resolves identically",
+          "[resolve][nested]")
+{
+#ifdef _WIN32
+    _putenv_s("CHAIN_HEAD", "head ${env.CHAIN_TAIL}");
+    _putenv_s("CHAIN_TAIL", "tail");
+#else
+    setenv("CHAIN_HEAD", "head ${env.CHAIN_TAIL}", 1);
+    setenv("CHAIN_TAIL", "tail", 1);
+#endif
+    auto reg = core_registry();
+    // The produced value is "head ${env.CHAIN_TAIL}": the splice-point resume
+    // must skip the literal "head " yet still yield the whole fixpoint.
+    auto r = resolve_tokens("${env.CHAIN_HEAD}", reg);
+    REQUIRE(r.has_value());
+    CHECK(r.value() == "head tail");
+}
+
 TEST_CASE("scope file-frame keys resolve against the file frame", "[resolve][scope]")
 {
     auto reg = core_registry();
