@@ -6,12 +6,15 @@
 #include "nucleus/format.h"
 #include "nucleus/expected.h"
 
+#include "nucleus/config_source/degradation.h"
+
 #include "nucleus/keyspace/key_path.h"
 #include "nucleus/keyspace/provenance.h"
 
 #include <any>
 #include <map>
 #include <set>
+#include <span>
 #include <string>
 #include <vector>
 #include <cstddef>
@@ -55,15 +58,18 @@ public:
     {
     }
 
-    // Extended constructor carrying the typed parallel map produced by convert().
+    // Extended constructor carrying the typed parallel map produced by convert()
+    // and the soft-capability degradations recorded during load.
     config(std::map<std::string, std::string> values,
            std::map<std::string, std::any> typed,
-           provenance origins)
+           provenance origins,
+           std::vector<degradation> degraded = {})
         : m_values(std::make_move_iterator(values.begin()),
                    std::make_move_iterator(values.end())),
           m_typed(std::make_move_iterator(typed.begin()),
                   std::make_move_iterator(typed.end())),
-          m_provenance(std::move(origins))
+          m_provenance(std::move(origins)),
+          m_degradations(std::move(degraded))
     {
     }
 
@@ -256,6 +262,13 @@ public:
         return out;
     }
 
+    // The soft-capability degradations recorded during load -- load-level
+    // provenance for why a value's shape changed. Empty when nothing degraded.
+    std::span<const degradation> degradations() const noexcept
+    {
+        return m_degradations;
+    }
+
 private:
     friend class config_node;
 
@@ -359,6 +372,7 @@ private:
     // their full indexed path string (e.g. "cluster/node[0]/port").
     std::map<std::string, std::any, std::less<>> m_typed;
     provenance m_provenance;
+    std::vector<degradation> m_degradations;
 };
 
 }

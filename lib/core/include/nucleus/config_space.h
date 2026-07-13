@@ -84,6 +84,9 @@ struct load_options
     std::size_t                                         reference_budget = 0;
     // Maximum token-expansion substitutions in one pass-1 fold. 0 = engine default (2500).
     std::size_t                                         expansion_budget = 0;
+    // Optional host sink for load-time warnings (soft-capability degradations).
+    // nullptr = no logging; degradations are still recorded on config::degradations().
+    log_sink*                                           log = nullptr;
 };
 
 // The mutable, free-standing builder: sole owner of the three flat sibling

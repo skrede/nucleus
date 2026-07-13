@@ -1421,7 +1421,7 @@ public:
     // Copies every building value OUT into an owned snapshot and pairs it with the
     // provenance recorded alongside it, producing the immutable, self-owning config.
     // All repeated paths are indexed scalars in m_building; no collection branch needed.
-    config freeze() const
+    config freeze(std::vector<degradation> degraded = {}) const
     {
         std::map<std::string, std::string> owned;
         for(const key_path &path : m_building.paths())
@@ -1429,7 +1429,7 @@ public:
             if(const value *v = m_building.find(path))
                 owned.emplace(path.str(), std::string(v->text()));
         }
-        return {std::move(owned), m_typed, m_provenance};
+        return {std::move(owned), m_typed, m_provenance, std::move(degraded)};
     }
 
     // Sets the pass-2 reference substitution budget. 0 maps to the engine default (never zero-cap).

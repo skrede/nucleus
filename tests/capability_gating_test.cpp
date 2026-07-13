@@ -1,5 +1,11 @@
+#include "nucleus/config.h"
 #include "nucleus/log_sink.h"
 #include "nucleus/capability.h"
+#include "nucleus/config_space.h"
+
+#include "nucleus/schema/anchor.h"
+#include "nucleus/schema/schema.h"
+#include "nucleus/schema/converters.h"
 
 #include "nucleus/config_source/config_source.h"
 #include "nucleus/config_source/feature_gate.h"
@@ -8,8 +14,10 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <span>
 #include <string>
 #include <vector>
+#include <cstdint>
 #include <utility>
 
 namespace {
@@ -106,6 +114,60 @@ TEST_CASE("the descriptor changes behavior: the same requirement passes for a ca
     REQUIRE(cap_gate);                           // capable source -> honored.
     REQUIRE(cap_gate.value().honored.size() == 1);
     REQUIRE(cap_gate.value().honored[0] == nucleus::capability::nesting);
+}
+
+TEST_CASE("a load-time degradation reaches both the host sink and config::degradations()",
+          "[capability]")
+{
+    // A typed root element implies a SOFT typed_scalars requirement; env declares
+    // no such capability, so loading a typed field from env degrades observably.
+    nucleus::config_space_builder builder;
+    REQUIRE(builder.register_element(
+        nucleus::typed_element<std::int32_t>("port", nucleus::anchor::root())));
+    const nucleus::config_space space = builder.build();
+
+    recording_sink log;
+    nucleus::env_source env;
+    env.set("port", "7000");
+
+    nucleus::load_options options;
+    options.log = &log;
+
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(env)}, options);
+    REQUIRE(loaded);
+
+    // Channel 1: the host sink received the warn-level degradation notice.
+    REQUIRE(log.messages.size() == 1);
+    REQUIRE(log.messages[0].first == nucleus::log_level::warn);
+    REQUIRE(log.messages[0].second.find("typed_scalars") != std::string::npos);
+
+    // Channel 2: the frozen config carries the same degradation as provenance.
+    const std::span<const nucleus::degradation> degraded = loaded.value().degradations();
+    REQUIRE(degraded.size() == 1);
+    REQUIRE(degraded[0].cap == nucleus::capability::typed_scalars);
+
+    // The two channels are the SAME list: the recorded note equals the logged text.
+    REQUIRE(degraded[0].note == log.messages[0].second);
+}
+
+TEST_CASE("the provenance channel records the degradation even without a host sink",
+          "[capability]")
+{
+    nucleus::config_space_builder builder;
+    REQUIRE(builder.register_element(
+        nucleus::typed_element<std::int32_t>("port", nucleus::anchor::root())));
+    const nucleus::config_space space = builder.build();
+
+    nucleus::env_source env;
+    env.set("port", "7000");
+
+    // No options.log supplied (nullptr): provenance does not depend on a host sink.
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(env)}, {});
+    REQUIRE(loaded);
+
+    const std::span<const nucleus::degradation> degraded = loaded.value().degradations();
+    REQUIRE(degraded.size() == 1);
+    REQUIRE(degraded[0].cap == nucleus::capability::typed_scalars);
 }
 
 TEST_CASE("env emits keyspace entries directly with no document model", "[capability]")

@@ -542,8 +542,13 @@ load_result load_config(const config_space &space,
     std::vector<resolution_context::layered_handle> handles = std::move(assembled).value();
 
     log_sink default_log;
-    if(auto gated = gate_assembled_handles(state.schema, handles, default_log); !gated)
+    log_sink &log = options.log ? *options.log : default_log;
+    auto gated = gate_assembled_handles(state.schema, handles, log);
+    if(!gated)
         return unexpected(std::move(gated).error());
+    // The SAME list is both logged (inside gate_stack) and carried onto the frozen
+    // config as load-level provenance -- moved, never recomputed, so they cannot diverge.
+    std::vector<degradation> degraded = std::move(gated.value().degraded);
 
     resolution_context ctx(state.schema, state.tokenizer, state.converters,
                            state.tree_tokenizer);
@@ -563,7 +568,7 @@ load_result load_config(const config_space &space,
         return unexpected(std::move(checked).error());
     if(auto converted = ctx.convert(); !converted)
         return unexpected(std::move(converted).error());
-    return ctx.freeze();
+    return ctx.freeze(std::move(degraded));
 }
 
 load_result load_config(const config_space &space,
@@ -606,8 +611,9 @@ gate_result check_capabilities(const config_space &space,
         descriptors.emplace_back(nucleus::format("stack[{}]", i), layers[i].capabilities());
 
     log_sink default_log;
+    log_sink &log = options.log ? *options.log : default_log;
     return gate_stack("schema", descriptors,
-                      derive_capability_requirements(state.schema.elements()), default_log);
+                      derive_capability_requirements(state.schema.elements()), log);
 }
 
 }
