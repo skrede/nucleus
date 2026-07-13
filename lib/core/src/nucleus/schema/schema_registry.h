@@ -5,8 +5,6 @@
 #include "nucleus/expected.h"
 #include "nucleus/identity.h"
 
-#include <cctype>
-
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/projection.h"
@@ -18,6 +16,7 @@
 #include "nucleus/registry/registration.h"
 
 #include <set>
+#include <cctype>
 #include <string>
 #include <vector>
 #include <cstddef>
