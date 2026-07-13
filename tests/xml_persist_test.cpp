@@ -186,6 +186,64 @@ TEST_CASE("emit_document wraps a multi-root config so its own reader accepts it"
     REQUIRE(reloaded.value().get("config/beta/y") == "2");
 }
 
+TEST_CASE("emit_document + load round-trip preserves a bare single-root leaf",
+          "[persist][emit][fidelity]")
+{
+    // A config with exactly one single-segment key emits as a bare single-root leaf
+    // (<port>8080</port>, unwrapped). The unnamed read path must read the root's own
+    // text -- the structural walk reads only attributes and leaf children, never the
+    // walked node's own text -- or the value vanishes on reload.
+    std::map<std::string, std::string> values{{"port", "8080"}};
+    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+
+    std::ostringstream out;
+    REQUIRE(nucleus::xml::emit_document(cfg, out));
+
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("port", anchor::root())));
+    nucleus::config_space space = engine.build();
+
+    auto reloaded = nucleus::load_config(space, nucleus::source_stack{},
+        document_options(out.str()));
+    REQUIRE(reloaded);
+    REQUIRE(reloaded.value().get("port") == "8080");
+}
+
+TEST_CASE("a hand-written single-root leaf reads its own text on the unnamed path",
+          "[persist][fidelity]")
+{
+    // A single-root leaf authored by hand (not via the emitter) reads its text too:
+    // the reader honors the DOM text() of a bare root element.
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("port", anchor::root())));
+    nucleus::config_space space = engine.build();
+
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{},
+        document_options("<port>8080</port>"));
+    REQUIRE(loaded);
+    REQUIRE(loaded.value().get("port") == "8080");
+}
+
+TEST_CASE("emit_document wraps an empty config so its own reader accepts it",
+          "[persist][emit]")
+{
+    // An empty config previously emitted only the XML declaration -- a rootless
+    // document the reader rejects ("no root element"). emit_document must wrap zero
+    // top-level elements in <config/>, symmetric with emit_template.
+    const nucleus::config cfg(std::map<std::string, std::string>{}, nucleus::provenance{});
+
+    std::ostringstream out;
+    REQUIRE(nucleus::xml::emit_document(cfg, out));
+
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("config", anchor::root())));
+    nucleus::config_space space = engine.build();
+
+    auto reloaded = nucleus::load_config(space, nucleus::source_stack{},
+        document_options(out.str()));
+    REQUIRE(reloaded);
+}
+
 TEST_CASE("emit_document to a file persists a config that re-reads identically", "[persist]")
 {
     nucleus::config_space_builder engine;

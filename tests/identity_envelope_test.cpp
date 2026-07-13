@@ -136,6 +136,22 @@ TEST_CASE("xml_source: mixed content on a named-space root is rejected loudly",
     REQUIRE(result.error().message.find("mixes character data") != std::string::npos);
 }
 
+TEST_CASE("xml_source: pure character data as a named-space root body is rejected loudly",
+          "[identity_envelope][xml]")
+{
+    // <engine>hello</engine> under space "engine": the root's text has no
+    // representable key (the transparent root name is stripped). It passes the
+    // mixed-content check (no structure alongside the text) but must not be silently
+    // discarded -- it is the last silent-discard path on the named-space root.
+    auto space = make_plugin_space();
+    auto opts = make_opts("<engine>hello</engine>", "engine");
+
+    auto result = load_config(space, source_stack{}, opts);
+    REQUIRE_FALSE(result);
+    REQUIRE(result.error().code == errc::malformed_source);
+    REQUIRE(result.error().message.find("no representable key") != std::string::npos);
+}
+
 TEST_CASE("xml_source: unnamed space keeps root name as first key segment",
           "[identity_envelope][xml]")
 {

@@ -260,9 +260,10 @@ expected<void, error> emit_document(const config &config, std::ostream &out,
 // carrying a control byte fails loudly through the emit channel.
 // When space_name is non-empty, all top-level elements are re-parented under a new
 // wrapper element named space_name for symmetric round-trip with with_space_name().
-// With an empty space_name and more than one top-level element, the roots are
-// wrapped in a single <config> element (as emit_template does) so the output stays
-// a well-formed single-root document the reader accepts.
+// With an empty space_name and a top-level element count other than one (zero or
+// more than one), the roots are wrapped in a single <config> element (as
+// emit_template does) so the output stays a well-formed single-root document the
+// reader accepts.
 // When proj is non-empty, pkey leaves are rendered as attributes on their parent
 // container element (preventing double-write on round-trip); empty proj is schema-blind.
 expected<void, error> emit_document(const config &config, std::ostream &out,
@@ -393,10 +394,11 @@ expected<void, error> emit_document(const config &config, std::ostream &out,
     }
 
     // Choose the wrapper element. A named space always wraps its roots (symmetric
-    // with with_space_name()). An unnamed space with more than one top-level
-    // element must also wrap -- exactly as emit_template does -- because a
-    // multi-root document is not well-formed and the reader rejects a second root;
-    // emitting it unwrapped would produce output the reader refuses.
+    // with with_space_name()). An unnamed space wraps unless it has exactly one
+    // top-level element -- exactly as emit_template does -- because neither a
+    // multi-root document (a hidden second root the reader rejects) nor a rootless
+    // one (only the XML declaration, which the reader refuses as "no root element")
+    // is well-formed; both must become a single <config> root the reader accepts.
     std::string wrapper_name(space_name);
     if(wrapper_name.empty())
     {
@@ -404,7 +406,7 @@ expected<void, error> emit_document(const config &config, std::ostream &out,
         for(pugi::xml_node child = doc.first_child(); child; child = child.next_sibling())
             if(child.type() == pugi::node_element)
                 ++top_level_elements;
-        if(top_level_elements > 1)
+        if(top_level_elements != 1)
             wrapper_name = "config";
     }
 

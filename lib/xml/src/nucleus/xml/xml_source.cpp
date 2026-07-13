@@ -105,6 +105,18 @@ bool has_element_child(const pugi::xml_node &node)
     return false;
 }
 
+// True when a node carries non-whitespace character data of its own (plain text or
+// a CDATA section directly beneath it).
+bool has_text_content(const pugi::xml_node &node)
+{
+    for(const pugi::xml_node &content : node.children())
+        if(is_value_node(content)
+           && std::string_view(content.value()).find_first_not_of(" \t\r\n")
+                  != std::string_view::npos)
+            return true;
+    return false;
+}
+
 // Reads a leaf element's value as the concatenation of all its text/CDATA
 // children, per pugixml text()/DOM semantics: a comment or CDATA boundary splits
 // character data into adjacent text nodes and every piece belongs to the value
@@ -122,6 +134,20 @@ value read_leaf_value(const pugi::xml_node &node)
         if(is_value_node(child))
             joined.append(child.value());
     return value::owned(std::move(joined));
+}
+
+// True when an element is a value leaf: no attributes, no child elements, and not a
+// declared repeated container (a repeated container is structural even when
+// momentarily empty). Such a node carries its own text; the structural walk reads
+// only a node's attributes and its leaf children, never the walked node's own text,
+// so a leaf must be read directly by whoever holds it. `node_path` is the raw
+// walk-time path (ordinal/key-value segments intact); the declared path is derived
+// here for the repeated-container lookup.
+bool is_leaf_element(const pugi::xml_node &node, std::string_view node_path,
+                     const schema_projection &proj)
+{
+    return node.attributes().empty() && !has_element_child(node)
+           && !proj.is_repeated_container(declared_path(node_path, proj));
 }
 
 // The value of an element's primary-key field: the attribute named `key_field`,
@@ -303,12 +329,8 @@ walk(const pugi::xml_node &node, std::string_view path,
 
         std::string child_path = join(path, child.name());
 
-        // A leaf: no attributes and no child elements. Its value is the
-        // concatenation of any text/CDATA children, or the empty string when it
-        // has none (`<motd></motd>` -> ""). A repeated container is structural
-        // even when momentarily empty, so it is never mistaken for a leaf.
-        if(child.attributes().empty() && !has_element_child(child)
-           && !proj.is_repeated_container(declared_path(child_path, proj)))
+        // A leaf carries its own text (or the empty string, `<motd></motd>` -> "").
+        if(is_leaf_element(child, child_path, proj))
         {
             if(!skip.empty() && skip == std::string_view(child.name()))
                 continue;
@@ -517,21 +539,27 @@ config_source_result xml_source::pull()
         if(auto r = reject_mixed_content(root); !r)
             return unexpected(r.error());
 
+        // A transparent root that carries only character data (no child elements, no
+        // attributes -- so it passes reject_mixed_content) has no representable key:
+        // stripping the root name leaves the text unkeyed. Reject it loudly rather
+        // than let the child loop skip the text node and discard it silently.
+        if(is_leaf_element(root, std::string_view(root.name()), m_projection)
+           && has_text_content(root))
+            return unexpected(config_source_error{errc::malformed_source,
+                nucleus::format(
+                    "xml source: named-space root element '{}' carries character "
+                    "data with no representable key", root.name())});
+
         // Walk each direct child as a top-level keyspace entry (root is transparent).
         for(const pugi::xml_node &child : root.children())
         {
             if(child.type() != pugi::node_element)
                 continue;
 
-            // A root-anchored leaf (no attributes, no child elements, not a
-            // repeated container) carries its own text. walk() only reads a
-            // node's attributes and its leaf children, never the walked node's
-            // own text, so passing such a leaf to walk() would drop its value.
-            // Classify it the same way walk()'s child loop does before recursing.
+            // A root-anchored leaf carries its own text, which walk() -- reading only
+            // a node's attributes and leaf children -- would never read. Read it here.
             const std::string child_path(child.name());
-            if(child.attributes().empty() && !has_element_child(child)
-               && !m_projection.is_repeated_container(
-                      declared_path(child_path, m_projection)))
+            if(is_leaf_element(child, child_path, m_projection))
             {
                 batch.entries.push_back(
                     make_entry(child_path, read_leaf_value(child), capabilities()));
@@ -545,9 +573,18 @@ config_source_result xml_source::pull()
     }
     else
     {
-        // Unnamed space: root element name is the first key segment (unchanged behavior).
-        if(auto r = walk(root, std::string_view(root.name()), capabilities(), m_projection,
-                         batch, {}, seen_keys, ordinal_counters, true, 0); !r)
+        // Unnamed space: the root element name is the first key segment. A bare
+        // single-root leaf (`<port>8080</port>`, the normal product of a flat source)
+        // carries its own text, which walk() -- reading only a node's attributes and
+        // leaf children -- would never read. Read it directly on this path, exactly
+        // as the named-space child loop does, so the value survives the round-trip.
+        const std::string root_path(root.name());
+        if(is_leaf_element(root, root_path, m_projection))
+            batch.entries.push_back(
+                make_entry(root_path, read_leaf_value(root), capabilities()));
+        else if(auto r = walk(root, std::string_view(root.name()), capabilities(),
+                              m_projection, batch, {}, seen_keys, ordinal_counters,
+                              true, 0); !r)
             return unexpected(r.error());
     }
 
