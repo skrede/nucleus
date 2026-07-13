@@ -96,7 +96,7 @@ private:
         if(key == member_path)
             return true;
         if(key.size() < member_path.size() + 3
-           || key.compare(0, member_path.size(), member_path) != 0
+           || !key.starts_with(member_path)
            || key[member_path.size()] != '[' || key.back() != ']')
             return false;
         for(std::size_t i = member_path.size() + 1; i + 1 < key.size(); ++i)
