@@ -42,6 +42,13 @@
 #include <string_view>
 #include <type_traits>
 
+// The strtof/strtod fallback parses against an explicit cached "C" locale using
+// the POSIX/CRT _l primitives and newlocale/_create_locale; those are not exposed
+// by the <cxxx> C++ wrapper headers, so pull the C header on the fallback path.
+#if !defined(__cpp_lib_to_chars) || defined(NUCLEUS_FORCE_FP_FROM_CHARS_FALLBACK)
+#include <locale.h>
+#endif
+
 namespace nucleus {
 
 // ---------------------------------------------------------------------------
@@ -61,9 +68,10 @@ namespace nucleus {
 // {ptr, ec} expressed in the original view's coordinates, so the dispatch in the
 // converters below is byte-for-byte identical on every toolchain.
 //
-// NOTE: on the fallback path the parse follows the active C locale's numeric
-// conventions; the std::from_chars path (every modern toolchain) is
-// unconditionally locale-independent.
+// Both paths are locale-independent: from_chars is so by definition, and the
+// fallback parses against a cached "C" locale via the _l primitives (never the
+// process-global setlocale) and pre-rejects hex-float, so a given input parses
+// identically on every toolchain and host locale.
 //
 // Define NUCLEUS_FORCE_FP_FROM_CHARS_FALLBACK to exercise the strtof/strtod path
 // on a toolchain that does have floating-point from_chars (used by the tests to
@@ -88,6 +96,40 @@ inline fp_parse_result fp_from_chars(std::string_view sv, Float &out)
 
 #else
 
+// Owns a "C" numeric locale so the fallback parse follows C conventions (a '.'
+// decimal point, no digit grouping) regardless of the active thread/global
+// locale, using the _l primitives instead of the process-global setlocale. The
+// handle is created once and freed at process exit so ASan/LSan sees no leak.
+#if defined(_MSC_VER)
+struct c_numeric_locale
+{
+    _locale_t handle;
+    c_numeric_locale() : handle(_create_locale(LC_ALL, "C")) {}
+    ~c_numeric_locale() { if(handle) _free_locale(handle); }
+    c_numeric_locale(const c_numeric_locale &) = delete;
+    c_numeric_locale &operator=(const c_numeric_locale &) = delete;
+    c_numeric_locale(c_numeric_locale &&) = delete;
+    c_numeric_locale &operator=(c_numeric_locale &&) = delete;
+};
+#else
+struct c_numeric_locale
+{
+    locale_t handle;
+    c_numeric_locale() : handle(newlocale(LC_NUMERIC_MASK, "C", nullptr)) {}
+    ~c_numeric_locale() { if(handle) freelocale(handle); }
+    c_numeric_locale(const c_numeric_locale &) = delete;
+    c_numeric_locale &operator=(const c_numeric_locale &) = delete;
+    c_numeric_locale(c_numeric_locale &&) = delete;
+    c_numeric_locale &operator=(c_numeric_locale &&) = delete;
+};
+#endif
+
+inline const c_numeric_locale &cached_c_numeric_locale()
+{
+    static const c_numeric_locale loc;
+    return loc;
+}
+
 template<typename Float>
 inline fp_parse_result fp_from_chars(std::string_view sv, Float &out)
 {
@@ -101,6 +143,22 @@ inline fp_parse_result fp_from_chars(std::string_view sv, Float &out)
         // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): data() marks the zero-consumed position in the view's coordinate space; it is never read as a null-terminated string.
         return {sv.data(), std::errc::invalid_argument};
 
+    // from_chars(general) reads "0x10" as 0 and stops at the 'x'; strtod would
+    // accept it as a C99 hex-float. Pre-reject a 0x/0X prefix (after an optional
+    // '-') the same way -- consume only the leading '0' and report success with
+    // ptr at the 'x' -- so the classifier yields the identical trailing-characters
+    // outcome on both paths.
+    {
+        const std::size_t digit = (lead == '-') ? 1u : 0u;
+        if(digit + 1 < sv.size() && sv[digit] == '0'
+           && (sv[digit + 1] == 'x' || sv[digit + 1] == 'X'))
+        {
+            out = Float{0};
+            // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): data()+offset marks the 'x' position in the view's coordinate space; it is never read as a null-terminated string.
+            return {sv.data() + digit + 1, std::errc{}};
+        }
+    }
+
     // strtof/strtod scan to a NUL terminator and would read past a view that is
     // a window into a larger buffer, so parse a terminated copy and map the
     // consumed length back onto the original view's coordinates.
@@ -109,10 +167,19 @@ inline fp_parse_result fp_from_chars(std::string_view sv, Float &out)
     char *end = nullptr;
     errno = 0;
     Float value{};
+    const auto loc = cached_c_numeric_locale().handle;
     if constexpr(std::is_same_v<Float, float>)
-        value = std::strtof(begin, &end);
+#if defined(_MSC_VER)
+        value = _strtof_l(begin, &end, loc);
+#else
+        value = strtof_l(begin, &end, loc);
+#endif
     else
-        value = std::strtod(begin, &end);
+#if defined(_MSC_VER)
+        value = _strtod_l(begin, &end, loc);
+#else
+        value = strtod_l(begin, &end, loc);
+#endif
 
     if(end == begin)
         // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): data() marks the zero-consumed position in the view's coordinate space; it is never read as a null-terminated string.
