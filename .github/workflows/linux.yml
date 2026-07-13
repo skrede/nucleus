@@ -77,6 +77,12 @@ jobs:
       - name: Build
         run: cmake --build build
 
+      # The forced-fallback converter test parses under a comma-decimal locale to
+      # prove locale-independent float parsing; the runner does not ship one
+      # pre-generated, so generate it here. Harmless if already present.
+      - name: Generate comma-decimal locale
+        run: sudo locale-gen de_DE.UTF-8 && sudo update-locale
+
       - name: Test
         run: cd build && ctest --output-on-failure --timeout 300
 

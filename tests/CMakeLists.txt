@@ -92,6 +92,14 @@ nucleus_add_test(pkey_tokenizer_test nucleus::runtime)
 nucleus_add_test(config_node_parent_test nucleus::runtime)
 nucleus_add_test(recognizer_of_test nucleus::argv)
 nucleus_add_test(converter_edge_cases_test)
+# Forces the strtof/strtod fallback so it is exercised on every platform, not
+# only Apple libc++; the test switches the thread locale to a comma-decimal one.
+nucleus_add_test(converter_locale_test)
+target_compile_definitions(converter_locale_test PRIVATE
+    NUCLEUS_FORCE_FP_FROM_CHARS_FALLBACK)
+# Catch2 exits 4 when every test skips (here: no comma-decimal locale installed);
+# tell CTest that is a skip, not a failure.
+set_tests_properties(converter_locale_test PROPERTIES SKIP_RETURN_CODE 4)
 nucleus_add_test(selector_test nucleus::runtime)
 nucleus_add_test(selector_combinator_test nucleus::runtime)
 nucleus_add_test(selector_schema_role_test nucleus::runtime)
