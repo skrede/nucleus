@@ -27,25 +27,38 @@ public:
         return anchor(std::move(under));
     }
 
-    // Convenience: build a keyspace anchor from a `/`-separated string. Malformed
-    // strings collapse to the root anchor; hosts that need validation parse the
-    // path themselves and pass it to keyspace(key_path).
+    // Convenience: build a keyspace anchor from a `/`-separated string. A malformed
+    // path yields an invalid anchor that carries the offending string; the
+    // registration seam rejects it loudly with errc::malformed_source rather than
+    // silently re-anchoring at root.
     static anchor keyspace(const std::string &under)
     {
         if(auto parsed = key_path::parse(under); parsed)
             return anchor(std::move(parsed).value());
-        return root();
+        return anchor(invalid_tag{}, under);
     }
 
-    bool is_root() const noexcept { return m_under.empty(); }
+    bool is_root() const noexcept { return !m_invalid && m_under.empty(); }
 
-    // The path this anchor attaches under. Empty for the root anchor.
+    // True when keyspace(string) was handed a malformed path. Such an anchor never
+    // attaches: the registration entry points reject it before attach.
+    bool is_invalid() const noexcept { return m_invalid; }
+
+    // The path this anchor attaches under. Empty for the root and invalid anchors.
     const key_path &under() const noexcept { return m_under; }
 
-private:
-    explicit anchor(key_path under) : m_under(std::move(under)) {}
+    // The offending string when this anchor is invalid; empty otherwise.
+    const std::string &invalid_path() const noexcept { return m_invalid_path; }
 
-    key_path m_under;
+private:
+    struct invalid_tag {};
+
+    explicit anchor(key_path under) : m_under(std::move(under)) {}
+    anchor(invalid_tag, std::string bad) : m_invalid_path(std::move(bad)), m_invalid(true) {}
+
+    key_path    m_under;
+    std::string m_invalid_path;
+    bool        m_invalid = false;
 };
 
 }

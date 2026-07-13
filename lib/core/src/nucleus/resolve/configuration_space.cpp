@@ -168,6 +168,16 @@ tree_tokenizer make_pkey_tree_tokenizer(const schema_element &el)
         });
 }
 
+// A malformed anchor path (from anchor::keyspace(string)) never attaches: reject it
+// loudly before attach so a mis-anchored element cannot silently take effect at root.
+registration_result reject_if_invalid_anchor(const anchor &at, std::string_view what)
+{
+    if(at.is_invalid())
+        return unexpected(error{errc::malformed_source, nucleus::format(
+            "{}: anchor path '{}' is malformed", what, at.invalid_path())});
+    return registration_ok();
+}
+
 // The state-machine guard: mutating the builder is only legal until build() seals
 // it. An attempt after build() is rejected with a reason naming the operation that
 // was actually attempted -- the lifecycle enforced, not merely documented.
@@ -290,6 +300,8 @@ registration_result config_space_builder::register_element(schema_element elemen
         return guard;
     if(auto verdict = m_impl->review(registration_kind::schema, owner); !verdict)
         return verdict;
+    if(auto anchored = reject_if_invalid_anchor(element.at, "register_element"); !anchored)
+        return anchored;
     // Identity elements whose container tag collides with a reserved name
     // would produce an unusable auto-registered tokenizer — reject loudly before
     // schema.attach() so the error reaches the host at schema-build time.
@@ -318,6 +330,8 @@ registration_result config_space_builder::register_constraint_group(constraint_g
         return guard;
     if(auto verdict = m_impl->review(registration_kind::schema, owner); !verdict)
         return verdict;
+    if(auto anchored = reject_if_invalid_anchor(group.at, "register_constraint_group"); !anchored)
+        return anchored;
     if(auto attached = m_impl->schema.attach_constraint_group(std::move(group)); !attached)
         return unexpected(error{errc::rejected_registration, std::move(attached).error()});
     return registration_ok();
@@ -330,6 +344,8 @@ registration_result config_space_builder::register_identity_group(identity_group
         return guard;
     if(auto verdict = m_impl->review(registration_kind::schema, owner); !verdict)
         return verdict;
+    if(auto anchored = reject_if_invalid_anchor(group.at, "register_identity_group"); !anchored)
+        return anchored;
     // Reserved-prefix carve-out: a namespace name colliding with a builtin (a
     // reserved tree-tokenizer category or the engine's own 'nucleus' prefix) is
     // rejected so host identifiers can never shadow a builtin.
