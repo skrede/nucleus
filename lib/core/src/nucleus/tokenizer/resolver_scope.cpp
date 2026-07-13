@@ -247,6 +247,13 @@ token_result resolver_scope::resolve_all(std::string_view input)
         auto span = find_next_token(input, pos);
         if(!span)
         {
+            // find_next_token yields no span for two reasons: no ${ remains (a
+            // legitimate literal remainder), or a ${ opened but never balanced.
+            // A surviving ${ at or after pos means the latter -- fail loudly with
+            // the same contract pass-2 raises, instead of emitting raw ${ text.
+            if(input.find("${", pos) != std::string_view::npos)
+                return unexpected(resolve_error(resolve_errc::parse_error,
+                                          "unterminated ${ in value"));
             result.append(input.substr(pos));
             break;
         }
