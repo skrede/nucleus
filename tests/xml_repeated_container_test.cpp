@@ -431,6 +431,42 @@ TEST_CASE("emit still writes a repeated scalar leaf value", "[xml][xml_emitter]"
     REQUIRE(emitted.find(">b<") != std::string::npos);
 }
 
+TEST_CASE("a declared repeated container carrying only whitespace CDATA is "
+          "rejected on read", "[xml][repeated_container][malformed]")
+{
+    // The whitespace corner of the same defect: a value written as CDATA (the form
+    // the emitter uses for a whitespace-only value) directly on a repeated container
+    // is still text on a structural node -- unrepresentable, and previously dropped
+    // silently because the text guard filtered whitespace-only CDATA out. It must
+    // fail loudly too, exactly as the non-whitespace text case does.
+    const nucleus::config_space space = make_cluster_space_for_emitter();
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{},
+        doc_opts("<cluster><node><![CDATA[ ]]></node>"
+                 "<node><port>90</port></node></cluster>"));
+    REQUIRE_FALSE(loaded);
+    CHECK(loaded.error().code == nucleus::errc::malformed_source);
+    CHECK(loaded.error().message.find("character data") != std::string::npos);
+}
+
+TEST_CASE("a whitespace-only leaf value under a repeated container round-trips",
+          "[xml][repeated_container][round_trip][fidelity]")
+{
+    // The whitespace-CDATA guard must NOT over-reject: a whitespace-only value on a
+    // LEAF beneath a repeated container is a real value and must survive emit (which
+    // writes it as CDATA) -> load. The container itself keeps its structural children,
+    // so its guard does not fire.
+    const nucleus::config_space space = make_cluster_space_for_emitter();
+    std::map<std::string, std::string> values{{"cluster/node[0]/port", " "}};
+    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+
+    std::ostringstream out;
+    REQUIRE(nucleus::xml::emit_document(cfg, out));
+
+    auto reloaded = nucleus::load_config(space, nucleus::source_stack{}, doc_opts(out.str()));
+    REQUIRE(reloaded);
+    CHECK(reloaded.value().get("cluster/node[0]/port") == " ");
+}
+
 TEST_CASE("xml emitter -- contiguous indexed leaves round-trip in order",
           "[xml][xml_emitter][round_trip]")
 {

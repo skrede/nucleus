@@ -105,14 +105,27 @@ bool has_element_child(const pugi::xml_node &node)
     return false;
 }
 
-// True when a node carries non-whitespace character data of its own (plain text or
-// a CDATA section directly beneath it).
+// True when a text/CDATA child carries content that must not be silently dropped.
+// A CDATA section always counts: it is an explicit, retained value carrier -- the
+// emitter writes a whitespace-only value as CDATA precisely so it survives the
+// round-trip. Plain pcdata counts only when it holds a non-whitespace byte, because
+// pugixml's default parse flags discard whitespace-only pcdata before it reaches the
+// tree, so any whitespace-only pcdata still present is incidental and carries no value.
+bool is_content_node(const pugi::xml_node &node)
+{
+    if(node.type() == pugi::node_cdata)
+        return true;
+    return node.type() == pugi::node_pcdata
+           && std::string_view(node.value()).find_first_not_of(" \t\r\n")
+                  != std::string_view::npos;
+}
+
+// True when a node carries character data of its own (plain text or a CDATA section
+// directly beneath it) that would be lost if the node is treated as structural.
 bool has_text_content(const pugi::xml_node &node)
 {
     for(const pugi::xml_node &content : node.children())
-        if(is_value_node(content)
-           && std::string_view(content.value()).find_first_not_of(" \t\r\n")
-                  != std::string_view::npos)
+        if(is_content_node(content))
             return true;
     return false;
 }
@@ -213,9 +226,7 @@ reject_mixed_content(const pugi::xml_node &node)
     {
         if(content.type() == pugi::node_element)
             has_child_element = true;
-        else if(is_value_node(content)
-                && std::string_view(content.value())
-                       .find_first_not_of(" \t\r\n") != std::string_view::npos)
+        else if(is_content_node(content))
             has_text = true;
     }
     if(has_text && (has_child_element || !node.attributes().empty()))
