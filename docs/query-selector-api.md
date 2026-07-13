@@ -66,6 +66,14 @@ Structural selectors narrow by position relative to the anchor.
 | `at_depth(n)` | Nodes exactly `n` path segments below the anchor. |
 | `under(subpath)` | Nodes whose path starts with the given absolute subpath. |
 
+`at_depth` and `children` diverge on a **repeated anchor**. `at_depth` counts
+only `/` separators, while `children` treats a `[n]` instance boundary as one
+level below the anchor. So for a repeated container `servers` with instances
+`servers[0]`, `servers[1]`, each holding a `host` field &mdash;
+`query(servers, ctx).at_depth(1)` returns the instances' fields (the `host`
+leaves), whereas `query(servers, ctx).children()` returns the instances
+(`servers[0]`, `servers[1]`) themselves.
+
 Selectors compose by AND-chaining:
 
 ```cpp

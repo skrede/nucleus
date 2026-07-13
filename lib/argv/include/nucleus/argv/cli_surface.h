@@ -28,7 +28,7 @@ namespace nucleus {
 //   * the delimiter (default `-`) is ALWAYS the path separator; every
 //     occurrence maps to the keyspace separator `/`. Multi-word segments use
 //     underscores, which pass through untouched. So
-//     `--plexus-udp-auth_mode=auth` -> key `plexus/udp/auth_mode` = `auth`.
+//     `--net-udp-auth_mode=auth` -> key `net/udp/auth_mode` = `auth`.
 //
 // Segments cannot contain the delimiter, and there is NO longest-match
 // disambiguation and NO escaping. That restriction is precisely what makes the

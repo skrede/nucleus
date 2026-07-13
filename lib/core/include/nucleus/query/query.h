@@ -43,7 +43,10 @@ public:
     // All nodes reachable from the anchor, excluding the anchor itself.
     selector descendants() const;
 
-    // Nodes exactly `depth` path segments below the anchor.
+    // Nodes exactly `depth` `/`-separator segments below the anchor. Diverges
+    // from children() on a repeated anchor: a `[n]` instance boundary is not a
+    // separator, so at_depth(1) returns the instances' fields, whereas
+    // children() treats each `[n]` instance as one level below the anchor.
     selector at_depth(std::size_t depth) const;
 
     // Nodes whose path starts with the given absolute subpath prefix.

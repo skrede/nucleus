@@ -262,6 +262,8 @@ private:
 // sealed space using index-as-rank precedence, optionally expanding document_paths
 // from load_options through the inheritance chain walker. Concurrent-safe;
 // borrows the space by const reference and owns all mutable resolve state locally.
+// Concurrent loads may share the space but must each pass their OWN source_stack:
+// the non-const source_stack& is per-load state, not shared across threads.
 // The stack is BORROWED, not consumed: it stays valid afterward, so the same
 // stack can pre-flight via check_capabilities() and then load_config, or load_config
 // more than once (sources are pulled again; a document source reuses its cached parse).

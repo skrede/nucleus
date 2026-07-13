@@ -21,7 +21,7 @@ public:
     static anchor root() { return anchor(key_path{}); }
 
     // A position under an already-defined keyspace path. The path is the FQN of
-    // the node the element attaches under (e.g. "plexus" or "plexus/udp").
+    // the node the element attaches under (e.g. "net" or "net/udp").
     static anchor keyspace(key_path under)
     {
         return anchor(std::move(under));

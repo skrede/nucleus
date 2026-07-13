@@ -6,6 +6,7 @@
 #include <memory>
 #include <cstddef>
 #include <utility>
+#include <variant>
 
 using nucleus::expected;
 using nucleus::unexpect;
@@ -36,6 +37,19 @@ TEST_CASE("expected carries an error on failure", "[expected]")
     REQUIRE_FALSE(r.has_value());
     REQUIRE_FALSE(static_cast<bool>(r));
     REQUIRE(r.error() == "bad input");
+}
+
+// Pins the current wrong-state access throw so any future move to a dedicated
+// bad_expected_access<E> is a deliberate, tested change rather than a silent one.
+TEST_CASE("wrong-state value()/error() throws std::bad_variant_access", "[expected]")
+{
+    auto ok = parse(true);
+    REQUIRE(ok.has_value());
+    REQUIRE_THROWS_AS(ok.error(), std::bad_variant_access);
+
+    auto bad = parse(false);
+    REQUIRE_FALSE(bad.has_value());
+    REQUIRE_THROWS_AS(bad.value(), std::bad_variant_access);
 }
 
 TEST_CASE("expected disambiguates same-typed value and error via unexpected", "[expected]")

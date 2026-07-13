@@ -194,11 +194,6 @@ public:
         return a.m_segments == b.m_segments;
     }
 
-    friend bool operator!=(const key_path &a, const key_path &b) noexcept
-    {
-        return !(a == b);
-    }
-
 private:
     std::vector<std::string> m_segments;
 };
