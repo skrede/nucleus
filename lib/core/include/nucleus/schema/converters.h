@@ -22,6 +22,17 @@
 //
 // Converters must not throw; return unexpected() for any conversion error.
 
+// strtod_l/strtof_l (the fallback float parsers below) are glibc/BSD xlocale
+// extensions, not POSIX; glibc declares them from <cstdlib> only under
+// _GNU_SOURCE. libstdc++ defines _GNU_SOURCE unconditionally so the default
+// Linux toolchain already exposes them, but libc++ does not -- which would hide
+// the symbols on a libc++ build that reaches the fallback. Request it before the
+// first libc header is pulled; the guard makes it a no-op where already set and
+// it only ever widens the declared surface.
+#if defined(__linux__) && !defined(_GNU_SOURCE)
+#define _GNU_SOURCE 1
+#endif
+
 #include "nucleus/expected.h"
 
 #include "nucleus/schema/schema.h"
@@ -43,11 +54,12 @@
 #include <type_traits>
 
 // The strtof/strtod fallback parses against an explicit cached "C" locale using
-// the POSIX/CRT _l primitives and newlocale/_create_locale; those are not exposed
-// by the <cxxx> C++ wrapper headers, so pull the C header on the fallback path.
+// the _l parsers and newlocale/_create_locale; those are not exposed by the
+// <cxxx> C++ wrapper headers, so pull the C header on the fallback path.
 #if !defined(__cpp_lib_to_chars) || defined(NUCLEUS_FORCE_FP_FROM_CHARS_FALLBACK)
-// <clocale> cannot replace this: newlocale/strtod_l and the MSVC _l equivalents
-// are POSIX/CRT extensions absent from the C++ wrapper header.
+// <clocale> cannot replace this: newlocale/strtod_l are glibc/BSD (xlocale)
+// extensions and the _l variants are MSVC CRT extensions -- none are declared by
+// the C++ wrapper header.
 // NOLINTNEXTLINE(modernize-deprecated-headers)
 #include <locale.h>
 #endif
@@ -171,6 +183,12 @@ inline fp_parse_result fp_from_chars(std::string_view sv, Float &out)
     errno = 0;
     Float value{};
     auto *const loc = cached_c_numeric_locale().handle;
+    if(loc == nullptr)
+        // newlocale/_create_locale returned null (the "C" locale is effectively
+        // always creatable, so this is practically unreachable). Report an invalid
+        // parse rather than passing a null locale_t to strtod_l -- undefined behavior.
+        // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): data() marks the zero-consumed position in the view's coordinate space; it is never read as a null-terminated string.
+        return {sv.data(), std::errc::invalid_argument};
     if constexpr(std::is_same_v<Float, float>)
 #if defined(_MSC_VER)
         value = _strtof_l(begin, &end, loc);
