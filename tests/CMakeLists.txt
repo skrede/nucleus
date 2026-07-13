@@ -430,7 +430,7 @@ add_test(
     COMMAND ${CMAKE_COMMAND} --build . --target sibling_member_fixture --config $<CONFIG>
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
-set_tests_properties(flat_ownership_negative_compile PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(flat_ownership_negative_compile PROPERTIES WILL_FAIL TRUE RUN_SERIAL TRUE)
 
 add_executable(sibling_member_fixture EXCLUDE_FROM_ALL
     isolation/sibling_member_fixture.cpp)
@@ -444,7 +444,7 @@ add_test(
     COMMAND ${CMAKE_COMMAND} --build . --target entangling_ctor_fixture --config $<CONFIG>
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
-set_tests_properties(flat_ownership_entangling_ctor_negative_compile PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(flat_ownership_entangling_ctor_negative_compile PROPERTIES WILL_FAIL TRUE RUN_SERIAL TRUE)
 
 add_executable(entangling_ctor_fixture EXCLUDE_FROM_ALL
     isolation/entangling_ctor_fixture.cpp)
@@ -458,7 +458,7 @@ add_test(
     COMMAND ${CMAKE_COMMAND} --build . --target source_concept_unsatisfied_fixture --config $<CONFIG>
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
-set_tests_properties(source_concept_unsatisfied_compile PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(source_concept_unsatisfied_compile PROPERTIES WILL_FAIL TRUE RUN_SERIAL TRUE)
 
 add_executable(source_concept_unsatisfied_fixture EXCLUDE_FROM_ALL
     isolation/source_concept_unsatisfied_fixture.cpp)
@@ -488,6 +488,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
             -P ${CMAKE_SOURCE_DIR}/scripts/expect_warning_compile_failure.cmake
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )
+    set_tests_properties(reintroduced_warning_negative_compile PROPERTIES RUN_SERIAL TRUE)
 
     add_executable(reintroduced_warning_fixture EXCLUDE_FROM_ALL
         isolation/reintroduced_warning_fixture.cpp)

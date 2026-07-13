@@ -97,3 +97,28 @@ jobs:
 
       - name: Run consumer test
         run: ./build-consumer/integration_test
+
+  sanitizer:
+    runs-on: macos-14
+    name: sanitizer (address)
+    # Apple's runtime has no LeakSanitizer, so LSan false-positives on macOS.
+    # Disabling leak detection keeps the address checks (use-after-free, overflow)
+    # while opting out of the unsupported leak leg -- the standard macOS knob.
+    env:
+      ASAN_OPTIONS: detect_leaks=0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: >-
+          cmake . -B build-san
+          -DNUCLEUS_BUILD_TESTS=ON
+          -DNUCLEUS_BUILD_SOURCE_XML=ON
+          -DNUCLEUS_BUILD_SANITIZER=ON
+          -DNUCLEUS_SANITIZER=address
+
+      - name: Build
+        run: cmake --build build-san
+
+      - name: Test
+        run: cd build-san && ctest --output-on-failure --timeout 300
