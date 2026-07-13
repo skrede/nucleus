@@ -187,8 +187,9 @@ TEST_CASE("emit_template + xml_source round-trip with space_name reproduces keys
     auto opts = make_opts(tmpl, "engine");
     auto result = load_config(space, source_stack{}, opts);
     REQUIRE(result);
-    // Template carries no value so get() returns nothing; no error means round-trip succeeds.
-    REQUIRE(result.value().get("plugin/x") == std::nullopt);
+    // The template placeholder is an empty leaf (`<x/>`, no attributes, no child
+    // elements), which reads as an empty-string value: empty leaves carry "".
+    REQUIRE(result.value().get("plugin/x") == "");
 }
 
 TEST_CASE("config_space::space_name() returns the name set on the builder",

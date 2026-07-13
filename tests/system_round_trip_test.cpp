@@ -154,6 +154,83 @@ TEST_CASE("round-trip: all scalar values survive emit -> reload unchanged",
         REQUIRE(c2.get_all(key) == c1.get_all(key));
 }
 
+TEST_CASE("fidelity: empty, whitespace, comment-split and CDATA leaves read as expected",
+          "[system][round_trip][fidelity]")
+{
+    // A document-shaped fixture that exercises every silent-loss shape at once: a
+    // comment splitting a value, a CDATA section splitting a value, an empty leaf,
+    // and a whitespace-only leaf.
+    config_space_builder builder;
+    REQUIRE(builder.register_element(element("server", anchor::root())));
+    REQUIRE(builder.register_element(element("host", anchor::keyspace("server"))));
+    REQUIRE(builder.register_element(element("motd", anchor::keyspace("server"))));
+    REQUIRE(builder.register_element(element("blank", anchor::keyspace("server"))));
+    REQUIRE(builder.register_element(element("port", anchor::keyspace("server"))));
+    REQUIRE(builder.register_element(element("note", anchor::keyspace("server"))));
+    const config_space space = builder.build();
+
+    const char *doc =
+        "<server>\n"
+        "  <host>localhost</host>\n"
+        "  <motd></motd>\n"
+        "  <blank>   </blank>\n"
+        "  <port>8<!-- keep the default -->080</port>\n"
+        "  <note>a<![CDATA[b]]>c</note>\n"
+        "</server>\n";
+
+    load_options opts;
+    opts.document_paths = {"config.xml"};
+    opts.make_document = [doc](const std::string &) { return xml_of(doc); };
+
+    auto loaded = load_config(space, source_stack{}, opts);
+    REQUIRE(loaded);
+    const config &c = loaded.value();
+
+    REQUIRE(c.get("server/host") == "localhost");
+    // A comment or CDATA boundary splits character data into adjacent text nodes;
+    // all pieces concatenate into the leaf value (pugixml text()/DOM semantics).
+    REQUIRE(c.get("server/port") == "8080");
+    REQUIRE(c.get("server/note") == "abc");
+    // Empty and whitespace-only leaves are the empty string, not silently absent.
+    REQUIRE(c.get("server/motd") == "");
+    REQUIRE(c.get("server/blank") == "");
+}
+
+TEST_CASE("round-trip: an empty-string value survives emit -> reload",
+          "[system][round_trip][fidelity]")
+{
+    config_space_builder builder;
+    REQUIRE(builder.register_element(element("server", anchor::root())));
+    REQUIRE(builder.register_element(element("host", anchor::keyspace("server"))));
+    REQUIRE(builder.register_element(element("motd", anchor::keyspace("server"))));
+    const config_space space = builder.build();
+
+    runtime_source src;
+    src.set("server/host", "localhost")
+       .set("server/motd", "");
+
+    auto first = load_config(space, source_stack{std::move(src)}, {});
+    REQUIRE(first);
+    const config &c1 = first.value();
+    REQUIRE(c1.get("server/motd") == "");
+
+    std::ostringstream emitted;
+    REQUIRE(xml::emit_document(c1, emitted));
+
+    const std::string xml_text = emitted.str();
+    load_options reload_opts;
+    reload_opts.document_paths = {"out.xml"};
+    reload_opts.make_document = [&xml_text](const std::string &) { return xml_of(xml_text); };
+
+    auto second = load_config(space, source_stack{}, reload_opts);
+    REQUIRE(second);
+    const config &c2 = second.value();
+
+    REQUIRE(c2.keys() == c1.keys());
+    REQUIRE(c2.get("server/motd") == "");
+    REQUIRE(c2.get("server/host") == "localhost");
+}
+
 TEST_CASE("round-trip via env emitter: scalar subset reloads its keys",
           "[system][round_trip]")
 {

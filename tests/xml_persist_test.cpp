@@ -83,6 +83,48 @@ TEST_CASE("a resolved config round-trips through XML persistence", "[persist]")
     REQUIRE(reloaded.get_all("server/tag") == std::vector<std::string>{"alpha", "beta"});
 }
 
+TEST_CASE("a duplicate attribute is rejected as malformed_source", "[persist][malformed]")
+{
+    nucleus::config_space_builder engine;
+    declare_server(engine);
+    nucleus::config_space space = engine.build();
+
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{},
+        document_options("<server host=\"a\" host=\"b\"><host>c</host></server>"));
+    REQUIRE_FALSE(loaded);
+    CHECK(loaded.error().code == nucleus::errc::malformed_source);
+    CHECK(loaded.error().message.find("host") != std::string::npos);
+    CHECK(loaded.error().message.find("server") != std::string::npos);
+}
+
+TEST_CASE("more than one root element is rejected as malformed_source", "[persist][malformed]")
+{
+    nucleus::config_space_builder engine;
+    declare_server(engine);
+    nucleus::config_space space = engine.build();
+
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{},
+        document_options("<server><host>a</host></server>"
+                         "<server><host>b</host></server>"));
+    REQUIRE_FALSE(loaded);
+    CHECK(loaded.error().code == nucleus::errc::malformed_source);
+    CHECK(loaded.error().message.find("more than one root") != std::string::npos);
+}
+
+TEST_CASE("trailing content after the root element is rejected as malformed_source",
+          "[persist][malformed]")
+{
+    nucleus::config_space_builder engine;
+    declare_server(engine);
+    nucleus::config_space space = engine.build();
+
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{},
+        document_options("<server><host>a</host></server><![CDATA[trailing]]>"));
+    REQUIRE_FALSE(loaded);
+    CHECK(loaded.error().code == nucleus::errc::malformed_source);
+    CHECK(loaded.error().message.find("trailing content") != std::string::npos);
+}
+
 TEST_CASE("emit_document to a file persists a config that re-reads identically", "[persist]")
 {
     nucleus::config_space_builder engine;

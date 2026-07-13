@@ -94,32 +94,48 @@ bool is_value_node(const pugi::xml_node &node)
     return node.type() == pugi::node_pcdata || node.type() == pugi::node_cdata;
 }
 
-// True when an element is a pure-text leaf: no attributes, no child elements,
-// exactly one text child. Such an element models a `<key>value</key>` leaf, the
-// element-form analog of an attribute.
-bool is_text_leaf(const pugi::xml_node &node)
+// True when an element carries at least one child element. Such an element is
+// structural (a container), never a text leaf.
+bool has_element_child(const pugi::xml_node &node)
 {
-    return node.attributes().empty()
-        && node.first_child()
-        && node.first_child() == node.last_child()
-        && is_value_node(node.first_child());
+    for(const pugi::xml_node &child : node.children())
+        if(child.type() == pugi::node_element)
+            return true;
+    return false;
+}
+
+// Reads a leaf element's value as the concatenation of all its text/CDATA
+// children, per pugixml text()/DOM semantics: a comment or CDATA boundary splits
+// character data into adjacent text nodes and every piece belongs to the value
+// (`<port>8<!-- c -->080</port>` is 8080). A single text child (the common case)
+// and the empty element are returned as zero-copy views into the arena; only a
+// genuinely split value is materialized into an owned string.
+value read_leaf_value(const pugi::xml_node &node)
+{
+    const pugi::xml_node first = node.first_child();
+    if(!first || (first == node.last_child() && is_value_node(first)))
+        return value::view(std::string_view(node.child_value()));
+
+    std::string joined;
+    for(const pugi::xml_node &child : node.children())
+        if(is_value_node(child))
+            joined.append(child.value());
+    return value::owned(std::move(joined));
 }
 
 // The value of an element's primary-key field: the attribute named `key_field`,
-// or a pure-text child element of that name. Empty when neither is present -- the
-// element is an anonymous (keyless) instance of its container.
-std::string_view keyed_value(const pugi::xml_node &node, const std::string &key_field)
+// or a text child element of that name (whose value may be split across text and
+// CDATA nodes). A keyless instance -- neither present -- yields an empty value.
+value keyed_value(const pugi::xml_node &node, const std::string &key_field)
 {
     if(pugi::xml_attribute const attr = node.attribute(key_field.c_str()))
-        return {attr.value()};
+        return value::view(std::string_view(attr.value()));
 
     pugi::xml_node const child = node.child(key_field.c_str());
-    if(child && child.first_child()
-            && child.first_child() == child.last_child()
-            && is_value_node(child.first_child()))
-        return {child.child_value()};
+    if(child && !has_element_child(child) && child.first_child())
+        return read_leaf_value(child);
 
-    return {};
+    return value::view(std::string_view{});
 }
 
 // Validates grammar attributes on a transparent named-space root without emitting
@@ -129,9 +145,16 @@ std::string_view keyed_value(const pugi::xml_node &node, const std::string &key_
 expected<void, config_source_error>
 validate_root_attrs(const pugi::xml_node &root)
 {
+    std::set<std::string_view> seen_attrs;
     for(const pugi::xml_attribute &attr : root.attributes())
     {
         auto const name = std::string_view(attr.name());
+        if(!seen_attrs.insert(name).second)
+            return unexpected(config_source_error{errc::malformed_source,
+                nucleus::format(
+                    "duplicate attribute '{}' on element '{}': "
+                    "the same attribute appears more than once on this element",
+                    name, root.name())});
         if(name == "inherit")
             continue; // consumed by inheritance()
         if(name == "extend")
@@ -187,9 +210,42 @@ walk(const pugi::xml_node &node, std::string_view path,
                 "element nesting exceeds the depth cap ({}) at '{}'",
                 max_element_depth, path)});
 
+    // Mixed content -- non-whitespace character data alongside a child element --
+    // is not a modeled configuration shape (a value is either a leaf's text or a
+    // container's children, never both). Reject it rather than silently dropping
+    // the text via the structural walk. Whitespace between elements is discarded
+    // by pugixml's default parse flags and so never trips this.
+    {
+        bool has_child_element = false;
+        bool has_text = false;
+        for(const pugi::xml_node &content : node.children())
+        {
+            if(content.type() == pugi::node_element)
+                has_child_element = true;
+            else if(is_value_node(content)
+                    && std::string_view(content.value())
+                           .find_first_not_of(" \t\r\n") != std::string_view::npos)
+                has_text = true;
+        }
+        if(has_child_element && has_text)
+            return unexpected(config_source_error{errc::malformed_source,
+                nucleus::format(
+                    "element '{}' mixes character data and child elements; "
+                    "mixed content is not a supported configuration shape",
+                    node.name())});
+    }
+
+    std::set<std::string_view> seen_attrs;
     for(const pugi::xml_attribute &attr : node.attributes())
     {
         auto const attr_name = std::string_view(attr.name());
+
+        if(!seen_attrs.insert(attr_name).second)
+            return unexpected(config_source_error{errc::malformed_source,
+                nucleus::format(
+                    "duplicate attribute '{}' on element '{}': "
+                    "the same attribute appears more than once on this element",
+                    attr_name, node.name())});
 
         // "inherit" is a grammar attribute: suppress on root (consumed by
         // inheritance()), reject loudly on non-root elements.
@@ -233,13 +289,17 @@ walk(const pugi::xml_node &node, std::string_view path,
             continue;
 
         std::string child_path = join(path, child.name());
-        if(is_text_leaf(child))
+
+        // A leaf: no attributes and no child elements. Its value is the
+        // concatenation of any text/CDATA children, or the empty string when it
+        // has none (`<motd></motd>` -> ""). A repeated container is structural
+        // even when momentarily empty, so it is never mistaken for a leaf.
+        if(child.attributes().empty() && !has_element_child(child)
+           && !proj.is_repeated_container(declared_path(child_path, proj)))
         {
             if(!skip.empty() && skip == std::string_view(child.name()))
                 continue;
-            batch.entries.push_back(make_entry(child_path,
-                                               value::view(std::string_view(child.child_value())),
-                                               caps));
+            batch.entries.push_back(make_entry(child_path, read_leaf_value(child), caps));
             continue;
         }
 
@@ -248,7 +308,8 @@ walk(const pugi::xml_node &node, std::string_view path,
         // through to the plain structural walk.
         if(const std::string *key = proj.key_of(child_path))
         {
-            std::string_view key_val = keyed_value(child, *key);
+            const value key_value = keyed_value(child, *key);
+            const std::string_view key_val = key_value.text();
             if(!key_val.empty())
             {
                 // Same-layer duplicate primary-key detection: two instances with
@@ -287,7 +348,7 @@ walk(const pugi::xml_node &node, std::string_view path,
                 // this entry is already recorded before suppression fires.
                 batch.entries.push_back(make_entry(
                     join(join(child_path, key_val), *key),
-                    value::view(key_val), caps));
+                    key_value, caps));
 
                 if(auto r = walk(child, join(child_path, key_val), caps, proj,
                                  batch, *key, seen_keys, ordinal_counters,
@@ -378,6 +439,29 @@ config_source_result xml_source::pull()
     if(!root)
         return unexpected(config_source_error{errc::malformed_source,
             std::string("xml source: document has no root element")});
+
+    // XML 1.0 permits exactly one root element and no character data after it.
+    // pugixml is lenient: it parses trailing sibling elements into the document
+    // (a hidden second root) and retains trailing CDATA. Reject both here, once,
+    // so the named-space and unnamed walks below are covered. (Trailing plain
+    // text is discarded by pugixml before it reaches the tree, so it cannot enter
+    // the keyspace; only retained top-level nodes are observable here.)
+    for(pugi::xml_node sib = root.next_sibling(); sib; sib = sib.next_sibling())
+    {
+        if(sib.type() == pugi::node_element)
+            return unexpected(config_source_error{errc::malformed_source,
+                nucleus::format(
+                    "xml source: document has more than one root element "
+                    "(a second root element '{}' follows the root element '{}')",
+                    sib.name(), root.name())});
+        if(is_value_node(sib)
+           && std::string_view(sib.value()).find_first_not_of(" \t\r\n")
+                  != std::string_view::npos)
+            return unexpected(config_source_error{errc::malformed_source,
+                nucleus::format(
+                    "xml source: trailing content after the root element '{}'",
+                    root.name())});
+    }
 
     config_source_batch batch;
     std::map<std::string, std::set<std::string>> seen_keys;
