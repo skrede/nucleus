@@ -165,6 +165,7 @@ private:
                 bool is_active = false;
                 if(m.active_value.has_value())
                 {
+                    const std::string &want = *m.active_value;
                     // The member may live at an indexed instance path (member[n]) when
                     // it is a repeated element, where the plain path carries no scalar;
                     // the canonical scan finds every such instance. when_value matching
@@ -174,7 +175,7 @@ private:
                         for(const std::string &mi :
                             instances_of(schema, resolved, *member_kp))
                             if(auto v = resolved.get(mi);
-                               v.has_value() && *v == *m.active_value)
+                               v.has_value() && *v == want)
                             {
                                 is_active = true;
                                 break;

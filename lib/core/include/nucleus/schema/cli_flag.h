@@ -40,7 +40,7 @@ public:
             return unexpected(std::string("CLI delimiter '") + std::string(text)
                         + "' must not contain '[' or ']' (ordinal-index notation)");
         bool all_digits = true;
-        for(char c : text)
+        for(const char c : text)
             all_digits = all_digits && (c >= '0' && c <= '9');
         if(all_digits)
             return unexpected(std::string("CLI delimiter '") + std::string(text)

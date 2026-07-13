@@ -21,7 +21,6 @@
 #include <any>
 #include <array>
 #include <string>
-#include <string_view>
 
 // <clocale> lacks newlocale/uselocale/strtod_l and the MSVC _l equivalents.
 // NOLINTNEXTLINE(modernize-deprecated-headers)
