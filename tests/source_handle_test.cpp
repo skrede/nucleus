@@ -136,6 +136,22 @@ TEST_CASE("source_handle dispatches all four ops for a full source", "[source_ha
     REQUIRE(decl.path == "parent.xml");
 }
 
+TEST_CASE("source_handle: a moved-from handle is detectably invalid", "[source_handle]")
+{
+    nucleus::source_handle h{flat_source{}};
+    REQUIRE(h.valid());
+
+    nucleus::source_handle moved{std::move(h)};
+    REQUIRE(moved.valid());
+    REQUIRE_FALSE(h.valid()); // NOLINT(bugprone-use-after-move): intentional inspection
+
+    // Dispatching on the moved-from handle would trip the assert guard; a death
+    // test facility is not wired into this suite, so we assert validity only.
+    auto result = moved.pull();
+    REQUIRE(result);
+    REQUIRE(result.value().entries[0].path == "a/b");
+}
+
 TEST_CASE("source_stack stores sources in insertion order and size is correct", "[source_stack]")
 {
     nucleus::source_stack stack{flat_source{}, full_source{}};

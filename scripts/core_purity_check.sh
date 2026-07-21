@@ -14,11 +14,24 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Forbidden vocabulary: any format NAME (xml), the parser DEPENDENCY (pugi/pugixml),
-# and host-specific (vagus, node-vocabulary tags) symbols. The core is format-
-# agnostic -- it must not name a format at all; per-format emitters live in their
-# own quarantined modules.
-pattern='xml|pugi|<vagus>|<node>|\bvagus\b|#include[[:space:]]*[<"]nucleus/(env|argv|runtime)/'
+# Forbidden vocabulary: any format NAME (xml) and the parser DEPENDENCY
+# (pugi/pugixml), plus the structural adapter-include assertion. The core is
+# format-agnostic -- it must not name a format at all; per-format emitters live in
+# their own quarantined modules. Kept in lockstep with the CMake gate
+# (scripts/core_purity_check.cmake).
+pattern='xml|pugi|#include[[:space:]]*[<"]nucleus/(env|argv|runtime)/'
+
+# Host-application tokens are not committed here; they are appended from an
+# uncommitted, gitignored local file (one token per line) if it is present. A
+# missing file leaves the format-only default, so a fresh clone and the local
+# ctest gate pass unmodified -- the read is append-if-present, never require.
+local_tokens_file="$root/scripts/purity_tokens.local"
+if [[ -f "$local_tokens_file" ]]; then
+    while IFS= read -r token || [[ -n "$token" ]]; do
+        [[ -z "$token" ]] && continue
+        pattern="$pattern|$token"
+    done < "$local_tokens_file"
+fi
 
 # The quarantined module that is ALLOWED to mention parser/host vocabulary
 # because it IS the wrapper: the xml format module (lib/xml/). It lives outside

@@ -95,6 +95,34 @@ never fails loudly &mdash; absent keys yield a null-view that propagates. Shape 
 pre-order `visit(fn)` with bool-stop, and an enter/leave `walk(walker)` via
 `config_tree_walker`. Repeated instances are visited in numeric ordinal order.
 
+* **Constraint and identity groups** \
+A relationship between sibling fields is a container-scoped **constraint group**
+&mdash; exclusion/choice cardinality over the active members of one container
+instance, or a host validator &mdash; enforced on the resolved, sliced tree with a
+loud diagnostic naming the parties. An **identity group** pools one identifier
+field across the instances of several member element-types under a parent
+container, required present and unique within a slice. See
+[`docs/constraint-groups.md`](docs/constraint-groups.md).
+
+* **Keyed composition** \
+A repeated/identified collection declares a `merge_mode` schema-side that governs
+how a higher source layer combines with a lower one &mdash; changing only the
+combine operation within the existing source-stack precedence, never the layer
+ordering. See [`docs/keyed-composition.md`](docs/keyed-composition.md).
+
+* **Keyref referential integrity** \
+A **keyref** is a field whose value names a target in a named identity namespace
+&mdash; the read-side analog of `xs:keyref`. The engine validates it against
+dangling references and lets a host dereference it to the target node, reusing
+the tree-addressing and query machinery with no new `${...}` token. See
+[`docs/keyref.md`](docs/keyref.md).
+
+* **Query / selector API** \
+A programmatic fluent surface over the sealed schema: `query_context()` snapshots
+a space, `query(anchor, ctx)` composes structural, kind, and schema-role
+selectors with combinators, and `one()` gives loud single-match semantics. See
+[`docs/query-selector-api.md`](docs/query-selector-api.md).
+
 ## Build
 
 ```sh
@@ -127,7 +155,7 @@ cmake --install build --prefix /your/prefix
 ```
 
 ```cmake
-find_package(nucleus 0.2 REQUIRED)
+find_package(nucleus 0.4 REQUIRED)
 target_link_libraries(app PRIVATE nucleus::nucleus nucleus::xml)
 ```
 
@@ -138,7 +166,7 @@ the same targets:
 include(FetchContent)
 FetchContent_Declare(nucleus
     GIT_REPOSITORY https://github.com/skrede/nucleus.git
-    GIT_TAG v0.2.0)
+    GIT_TAG v0.4.1)
 FetchContent_MakeAvailable(nucleus)
 ```
 

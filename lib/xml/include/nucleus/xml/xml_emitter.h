@@ -1,7 +1,9 @@
 #ifndef HPP_GUARD_NUCLEUS_XML_XML_EMITTER_H
 #define HPP_GUARD_NUCLEUS_XML_XML_EMITTER_H
 
+#include "nucleus/error.h"
 #include "nucleus/config.h"
+#include "nucleus/expected.h"
 #include "nucleus/config_space.h"
 #include "nucleus/schema/projection.h"
 
@@ -20,14 +22,14 @@ namespace nucleus::xml {
 // here; the library is reachable only in xml_emitter.cpp.
 // When space_name is non-empty, the output is wrapped under <space_name>...</space_name>
 // for symmetric round-trip with xml_source::with_space_name().
-void emit_template(const config_space &space, std::ostream &out,
+expected<void, error> emit_template(const config_space &space, std::ostream &out,
                    std::string_view space_name = {});
-void emit_document(const config &config, std::ostream &out,
+expected<void, error> emit_document(const config &config, std::ostream &out,
                    std::string_view space_name = {});
 // Schema-aware overload: when proj is non-empty, pkey leaves are rendered as XML
 // attributes on their parent container element rather than as child text nodes,
 // preventing the double-write that would corrupt a load→emit→load round-trip.
-void emit_document(const config &config, std::ostream &out,
+expected<void, error> emit_document(const config &config, std::ostream &out,
                    const schema_projection &proj,
                    std::string_view space_name = {});
 
@@ -41,13 +43,13 @@ struct emitter
     std::string space_name;
     schema_projection proj;
 
-    void emit_template(const config_space &space, std::ostream &out) const
+    expected<void, error> emit_template(const config_space &space, std::ostream &out) const
     {
-        nucleus::xml::emit_template(space, out, space_name);
+        return nucleus::xml::emit_template(space, out, space_name);
     }
-    void emit_document(const config &config, std::ostream &out) const
+    expected<void, error> emit_document(const config &config, std::ostream &out) const
     {
-        nucleus::xml::emit_document(config, out, proj, space_name);
+        return nucleus::xml::emit_document(config, out, proj, space_name);
     }
 };
 

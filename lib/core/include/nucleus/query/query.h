@@ -16,22 +16,23 @@
 
 namespace nucleus {
 
-// Composed per-node predicate for the selector. Both arguments are stable
-// for the lifetime of the visit; ctx may be nullptr for structural/kind queries.
+// Composed per-node predicate for the selector. Both arguments are stable for
+// the lifetime of the visit; the selector always passes the address of its owned
+// context snapshot (structural/kind predicates simply ignore it).
 using node_predicate = std::function<bool(const config_node &, const schema_query_context *)>;
 
 // Composable, value-semantic predicate composer over the config_node walk.
 // Built by query(); callers chain structural/kind/combinator selectors, then
 // call a terminal to materialise results.
 //
-// Lifetime: borrows m_anchor (config) and m_ctx (config_space); neither must
-// outlive the selector or any config_node results collected from it.
+// Lifetime: owns m_ctx by value (a self-contained schema snapshot); borrows
+// m_anchor (config), which must outlive the selector and its collected results.
 class selector
 {
 public:
-    selector(config_node anchor, const schema_query_context *ctx)
+    selector(config_node anchor, schema_query_context ctx)
         : m_anchor(std::move(anchor))
-        , m_ctx(ctx)
+        , m_ctx(std::move(ctx))
         , m_predicate([](const config_node &, const schema_query_context *) { return true; })
     {}
 
@@ -43,7 +44,10 @@ public:
     // All nodes reachable from the anchor, excluding the anchor itself.
     selector descendants() const;
 
-    // Nodes exactly `depth` path segments below the anchor.
+    // Nodes exactly `depth` `/`-separator segments below the anchor. Diverges
+    // from children() on a repeated anchor: a `[n]` instance boundary is not a
+    // separator, so at_depth(1) returns the instances' fields, whereas
+    // children() treats each `[n]` instance as one level below the anchor.
     selector at_depth(std::size_t depth) const;
 
     // Nodes whose path starts with the given absolute subpath prefix.
@@ -76,7 +80,8 @@ public:
 
     // Combinator methods.
 
-    // Union: a node is included when this selector OR the other would include it.
+    // Union of predicates, evaluated over THIS selector's anchor-subtree traversal:
+    // a node reachable only from the other selector's anchor is not visited.
     selector or_(const selector &other) const;
 
     // Exclusion: a node is included when this selector would include it AND the
@@ -128,12 +133,12 @@ private:
     // Returns a copy of this selector with `p` AND-composed into the predicate.
     selector with_predicate(node_predicate p) const;
 
-    config_node                m_anchor;
-    const schema_query_context *m_ctx;
-    node_predicate             m_predicate;
+    config_node          m_anchor;
+    schema_query_context m_ctx;
+    node_predicate       m_predicate;
 };
 
-// Entry point: returns a selector anchored at `anchor` that borrows `ctx` transiently.
+// Entry point: returns a selector anchored at `anchor` that copies `ctx` in.
 // The default predicate matches every node reachable via visit() from the anchor.
 selector query(config_node anchor, const schema_query_context &ctx);
 

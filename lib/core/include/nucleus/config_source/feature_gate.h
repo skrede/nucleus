@@ -7,6 +7,8 @@
 #include "nucleus/log_sink.h"
 #include "nucleus/capability.h"
 
+#include "nucleus/config_source/degradation.h"
+
 #include <string>
 #include <vector>
 #include <utility>
@@ -34,16 +36,6 @@ struct feature_requirement
 {
     capability cap;
     requirement_strength strength;
-};
-
-// A feature that was asked for optionally but the source could not provide. It
-// is surfaced (not dropped silently): emitted through the log_sink at warn level
-// and recorded here so it can become value provenance ("field X degraded because
-// source 'env' lacks nesting").
-struct degradation
-{
-    capability cap;
-    std::string note;
 };
 
 // The error a required-but-unsatisfiable capability produces. It names BOTH

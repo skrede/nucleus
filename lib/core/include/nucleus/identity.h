@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <utility>
+#include <concepts>
 #include <typeinfo>
 #include <type_traits>
 
@@ -25,9 +26,16 @@ public:
     // value, so has_value() stays false.
     owner_token() : m_identity(std::make_shared<int>()) {}
 
+    // The noexcept requirement is load-bearing: model::equals is a noexcept
+    // override calling held == other.held, so a throwing operator== would risk
+    // std::terminate. equality_comparable is added only for a legible failure.
     template <typename T>
     explicit owner_token(T value)
-        requires (!std::is_same_v<std::decay_t<T>, owner_token>) : m_payload(std::make_shared<model<std::decay_t<T>>>(std::move(value)))
+        requires (!std::is_same_v<std::decay_t<T>, owner_token>
+                  && std::equality_comparable<std::decay_t<T>>
+                  && noexcept(std::declval<const std::decay_t<T> &>()
+                              == std::declval<const std::decay_t<T> &>()))
+        : m_payload(std::make_shared<model<std::decay_t<T>>>(std::move(value)))
     {
     }
 
@@ -44,11 +52,6 @@ public:
         if(!a.m_payload && !b.m_payload)
             return a.m_identity == b.m_identity;
         return false;
-    }
-
-    friend bool operator!=(const owner_token &a, const owner_token &b) noexcept
-    {
-        return !(a == b);
     }
 
 private:

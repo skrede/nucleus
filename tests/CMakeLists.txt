@@ -60,18 +60,19 @@ nucleus_add_test(schema_registry_test)
 nucleus_add_test(schema_enforcer_test)
 nucleus_add_test(constraint_group_test nucleus::runtime)
 nucleus_add_test(identity_group_test nucleus::runtime)
-nucleus_add_test(keyed_composition_test nucleus::runtime)
+nucleus_add_test(keyed_composition_test nucleus::runtime nucleus::argv nucleus::env)
 nucleus_add_test(keyref_test nucleus::runtime)
 if(NUCLEUS_BUILD_SOURCE_XML)
-    nucleus_add_test(argv_source_test nucleus::argv nucleus::xml)
+    nucleus_add_test(argv_source_test nucleus::argv nucleus::xml nucleus::runtime)
 endif()
 nucleus_add_test(schema_cli_bijection_test nucleus::argv)
 nucleus_add_test(multispace_argv_test nucleus::argv)
+nucleus_add_test(flat_emit_test nucleus::env nucleus::argv)
 nucleus_add_test(token_lexer_test)
 nucleus_add_test(token_resolution_test)
 nucleus_add_test(named_args_test)
 nucleus_add_test(token_cycle_test)
-nucleus_add_test(resolution_test nucleus::env nucleus::argv)
+nucleus_add_test(resolution_test nucleus::env nucleus::argv nucleus::runtime)
 nucleus_add_test(diagnostics_test)
 nucleus_add_test(completion_test)
 nucleus_add_test(completion_smoke_test)
@@ -79,7 +80,7 @@ nucleus_add_test(completion_smoke_test)
 # tell CTest that is a skip, not a failure.
 set_tests_properties(completion_smoke_test PROPERTIES SKIP_RETURN_CODE 4)
 nucleus_add_test(facade_completion_test)
-nucleus_add_test(strain_scope_policy_test nucleus::runtime)
+nucleus_add_test(strain_scope_policy_test nucleus::runtime nucleus::xml)
 nucleus_add_test(converter_registry_test nucleus::env)
 nucleus_add_test(builder_lifecycle_test)
 nucleus_add_test(expand_independence_test nucleus::env)
@@ -92,6 +93,14 @@ nucleus_add_test(pkey_tokenizer_test nucleus::runtime)
 nucleus_add_test(config_node_parent_test nucleus::runtime)
 nucleus_add_test(recognizer_of_test nucleus::argv)
 nucleus_add_test(converter_edge_cases_test)
+# Forces the strtof/strtod fallback so it is exercised on every platform, not
+# only Apple libc++; the test switches the thread locale to a comma-decimal one.
+nucleus_add_test(converter_locale_test)
+target_compile_definitions(converter_locale_test PRIVATE
+    NUCLEUS_FORCE_FP_FROM_CHARS_FALLBACK)
+# Catch2 exits 4 when every test skips (here: no comma-decimal locale installed);
+# tell CTest that is a skip, not a failure.
+set_tests_properties(converter_locale_test PROPERTIES SKIP_RETURN_CODE 4)
 nucleus_add_test(selector_test nucleus::runtime)
 nucleus_add_test(selector_combinator_test nucleus::runtime)
 nucleus_add_test(selector_schema_role_test nucleus::runtime)
@@ -421,7 +430,7 @@ add_test(
     COMMAND ${CMAKE_COMMAND} --build . --target sibling_member_fixture --config $<CONFIG>
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
-set_tests_properties(flat_ownership_negative_compile PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(flat_ownership_negative_compile PROPERTIES WILL_FAIL TRUE RUN_SERIAL TRUE)
 
 add_executable(sibling_member_fixture EXCLUDE_FROM_ALL
     isolation/sibling_member_fixture.cpp)
@@ -435,7 +444,7 @@ add_test(
     COMMAND ${CMAKE_COMMAND} --build . --target entangling_ctor_fixture --config $<CONFIG>
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
-set_tests_properties(flat_ownership_entangling_ctor_negative_compile PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(flat_ownership_entangling_ctor_negative_compile PROPERTIES WILL_FAIL TRUE RUN_SERIAL TRUE)
 
 add_executable(entangling_ctor_fixture EXCLUDE_FROM_ALL
     isolation/entangling_ctor_fixture.cpp)
@@ -449,7 +458,7 @@ add_test(
     COMMAND ${CMAKE_COMMAND} --build . --target source_concept_unsatisfied_fixture --config $<CONFIG>
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
-set_tests_properties(source_concept_unsatisfied_compile PROPERTIES WILL_FAIL TRUE)
+set_tests_properties(source_concept_unsatisfied_compile PROPERTIES WILL_FAIL TRUE RUN_SERIAL TRUE)
 
 add_executable(source_concept_unsatisfied_fixture EXCLUDE_FROM_ALL
     isolation/source_concept_unsatisfied_fixture.cpp)
@@ -479,6 +488,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
             -P ${CMAKE_SOURCE_DIR}/scripts/expect_warning_compile_failure.cmake
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )
+    set_tests_properties(reintroduced_warning_negative_compile PROPERTIES RUN_SERIAL TRUE)
 
     add_executable(reintroduced_warning_fixture EXCLUDE_FROM_ALL
         isolation/reintroduced_warning_fixture.cpp)

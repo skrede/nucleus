@@ -12,6 +12,12 @@ documents the parts nucleus ships that satisfy those seams.
 | [Shipped implementations](api-implementations.md) | The concrete modules nucleus ships that satisfy the seams: `xml_source`, `env_source`, `argv_source`, `runtime_source`, the per-format emitters, and the `log_sink` adapters — with the capability descriptor and CMake target of each. |
 | [Query / Selector API](query-selector-api.md) | Programmatic fluent query surface: `query_context()`, `query(anchor, ctx)`, structural/kind/schema-role selectors, `one()` loud semantics, owner-token and strain selectors, combinators, and the lifetime contract. |
 | [Named tokenizer arguments](named-tokenizer-arguments.md) | The named & typed tokenizer-function argument surface: the `name=value` grammar, `[ ]` list values and lexical quoting, declaring typed arguments (`arg_spec`) and reading them (`named_args`), and the did-you-mean / typed coercion diagnostics. |
+| [CLI grammar](cli-grammar.md) | The command-line grammar: `argv_source` flag-to-key mapping, custom delimiters and anchors, and multi-space addressing across named keyspaces. |
+| [Descriptions and `--help`](cli-help.md) | Element descriptions and their projections: the single `described()` field that feeds both shell completion and projected `--help` text, so the two never drift. |
+| [Constraint groups](constraint-groups.md) | Container-scoped constraint and identity groups: exclusion/choice cardinality, host validators, and identity namespaces pooling an identifier across sibling element-types. |
+| [Keyed composition](keyed-composition.md) | Cross-layer merge modes for repeated/identified collections: how a higher layer combines with a lower one within the existing source-stack precedence order. |
+| [Keyref](keyref.md) | Schema-declared references by identifier: dangling-reference validation and host dereference to the target node, reusing the tree-addressing and query machinery. |
+| [Design posture](design-posture.md) | The library's design posture: the principles and boundaries behind the API &mdash; what the core decides versus what it leaves to the host. |
 
 The [`examples/`](../examples) directory holds a small, self-contained program per
 concept; each reference section points at the matching example.

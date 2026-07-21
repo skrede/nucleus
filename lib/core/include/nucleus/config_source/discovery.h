@@ -21,6 +21,17 @@ struct discovered_source
     std::string extension;
 };
 
+// The outcome of opening a discovered set: handles that opened, in discovery
+// order, and the candidates that were found but could not be opened. A found
+// path fails to open when its parser factory is not resolvable for the path
+// (e.g. a multi-dot extension the registry claims whole but the path resolves
+// by its last suffix only). The host decides what to do with the failures.
+struct open_result
+{
+    std::vector<source_handle>     handles;
+    std::vector<discovered_source> failures;
+};
+
 // The mechanism, never the policy. The host supplies WHAT to look for (a base
 // name, with no extension), WHERE to look (an ordered list of search
 // directories), and WHICH formats are understood (the extension registry). The
@@ -51,6 +62,10 @@ public:
             {
                 std::filesystem::path candidate = dir / (std::string(base_name) + ext);
                 std::error_code ec;
+                // A filesystem error (e.g. permission-denied) reports the
+                // ec-overload as not-a-regular-file, so the candidate is treated
+                // as absent rather than surfaced. Documented as known behavior in
+                // docs/api-implementations.md.
                 if(std::filesystem::is_regular_file(candidate, ec))
                     found.push_back({path_to_text(candidate), ext});
             }
@@ -59,17 +74,23 @@ public:
     }
 
     // Builds source handles for every discovered candidate using the registry's
-    // parser factories. The returned handles are ready to fold, in discovery order.
-    static std::vector<source_handle>
+    // parser factories. Handles are ready to fold, in discovery order; a
+    // candidate the registry cannot open is surfaced in `failures` rather than
+    // silently dropped.
+    static open_result
     open_all(std::string_view base_name,
              const std::vector<std::filesystem::path> &search_paths,
              const extension_registry &registry)
     {
-        std::vector<source_handle> sources;
+        open_result result;
         for(const discovered_source &hit : find(base_name, search_paths, registry))
+        {
             if(auto src = registry.open(hit.path))
-                sources.push_back(std::move(*src));
-        return sources;
+                result.handles.push_back(std::move(*src));
+            else
+                result.failures.push_back(hit);
+        }
+        return result;
     }
 };
 

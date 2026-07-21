@@ -5,6 +5,7 @@
 #include "nucleus/config_source/config_source.h"
 
 #include <memory>
+#include <cassert>
 #include <utility>
 
 namespace nucleus {
@@ -29,13 +30,36 @@ public:
 
     ~source_handle() = default;
 
-    capability_descriptor capabilities() const { return m_self->do_caps(); }
+    // A moved-from handle is empty: move defaults m_self to null. Every dispatch
+    // member requires a live handle; calling one on a moved-from handle is a
+    // contract violation. The dispatch members assert valid() in debug builds so
+    // the violation is diagnosable there; under NDEBUG the assert is compiled out
+    // and the dispatch is a plain null dereference.
+    bool valid() const noexcept { return m_self != nullptr; }
 
-    void apply_projection(const schema_projection & p) { m_self->do_project(p); }
+    capability_descriptor capabilities() const
+    {
+        assert(valid() && "capabilities() on a moved-from source_handle");
+        return m_self->do_caps();
+    }
 
-    inherit_declaration inheritance() const { return m_self->do_inherit(); }
+    void apply_projection(const schema_projection & p)
+    {
+        assert(valid() && "apply_projection() on a moved-from source_handle");
+        m_self->do_project(p);
+    }
 
-    config_source_result pull() { return m_self->do_pull(); }
+    inherit_declaration inheritance() const
+    {
+        assert(valid() && "inheritance() on a moved-from source_handle");
+        return m_self->do_inherit();
+    }
+
+    config_source_result pull()
+    {
+        assert(valid() && "pull() on a moved-from source_handle");
+        return m_self->do_pull();
+    }
 
 private:
     struct concept_t

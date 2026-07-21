@@ -79,6 +79,11 @@ struct schema_element
     // the core stays domain-neutral and free of any enum-reflection dependency.
     std::vector<std::string> allowed_values;
 
+    // A short, human-readable description of this element. It is the single source
+    // the shell completions and the projected --help text both read; empty (the
+    // default) means the flag carries no help text.
+    std::string description;
+
     // Optional type-erased converter: converts a resolved string_view to a typed
     // value at the load boundary. Null (default) means untyped (string-only via
     // get()). Set with type_identity by the typed_element factory. Converters must
@@ -194,6 +199,15 @@ inline schema_element enum_element(std::string name, anchor at,
 {
     schema_element e = element(std::move(name), std::move(at));
     e.allowed_values = std::move(values);
+    return e;
+}
+
+// Attaches a human-readable description to an element. Reads as
+// described(enum_element("level", at, {...}), "set the logging level"); the
+// description feeds both the shell completions and the projected --help text.
+inline schema_element described(schema_element e, std::string text)
+{
+    e.description = std::move(text);
     return e;
 }
 

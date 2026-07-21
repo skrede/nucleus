@@ -627,16 +627,27 @@ with `errc::rejected_registration` and a message naming the conflicting owners.
 ```cpp
 struct discovered_source { std::string path; std::string extension; };
 
+// handles: the candidates that opened, in discovery order.
+// failures: the candidates that were found but the registry could not open.
+struct open_result {
+    std::vector<source_handle>     handles;
+    std::vector<discovered_source> failures;
+};
+
 static std::vector<discovered_source> discovery::find(
     std::string_view base_name,
     const std::vector<std::filesystem::path> &search_paths,
     const extension_registry &registry);
 
-static std::vector<source_handle> discovery::open_all(
+static open_result discovery::open_all(
     std::string_view base_name,
     const std::vector<std::filesystem::path> &search_paths,
     const extension_registry &registry);
 ```
+
+`open_all` returns a partial-success result: an unopenable candidate is
+surfaced in `failures` rather than silently dropped, so a host can log or
+reject it. The host decides the policy.
 
 ---
 

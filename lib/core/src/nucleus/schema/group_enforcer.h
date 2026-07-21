@@ -59,6 +59,11 @@ private:
                  const key_path &declared)
     {
         const std::size_t depth = declared.segments().size();
+        // A root-anchored container has exactly one instance: the config root. The
+        // prefix scan below cannot express it (an empty prefix is not a parseable
+        // key), so it is named explicitly.
+        if(depth == 0)
+            return {std::string{}};
         std::set<std::string> prefixes;
         for(const std::string &key : resolved.keys())
         {
@@ -78,6 +83,26 @@ private:
     static bool present(const config &resolved, const std::string &path)
     {
         return config_node(&resolved, path).exists();
+    }
+
+    // Whether key names member_path exactly, or an indexed instance of it
+    // (member_path[<digits>]) -- the storage shape of a repeated member. Matches
+    // by the concrete instance path, so it is correct when member_path itself
+    // carries an ordinal/key segment (a member under a repeated/keyed container),
+    // unlike instances_of, whose canonical compare expects an ordinal-free path.
+    static bool names_member_instance(const std::string &key,
+                                      const std::string &member_path)
+    {
+        if(key == member_path)
+            return true;
+        if(key.size() < member_path.size() + 3
+           || !key.starts_with(member_path)
+           || key[member_path.size()] != '[' || key.back() != ']')
+            return false;
+        for(std::size_t i = member_path.size() + 1; i + 1 < key.size(); ++i)
+            if(key[i] < '0' || key[i] > '9')
+                return false;
+        return true;
     }
 
     static std::string bundle_label(const std::vector<std::string> &names)
@@ -160,8 +185,22 @@ private:
                 bool is_active = false;
                 if(m.active_value.has_value())
                 {
-                    auto v = resolved.get(member_path);
-                    is_active = v.has_value() && *v == *m.active_value;
+                    const std::string &want = *m.active_value;
+                    // Resolve the member's value(s) for THIS instance directly: the
+                    // scalar member at member_path, or -- when it is a repeated element
+                    // whose plain path carries no scalar -- its indexed instances
+                    // member_path[n]. Routing member_path back through instances_of is
+                    // wrong here: under a repeated/keyed container member_path already
+                    // carries the ordinal/key, which the canonical compare strips. when_value
+                    // matching is an exact-string compare -- unlike the case-insensitive
+                    // bool converter, a value differing only in case does not activate it.
+                    for(const std::string &k : resolved.keys())
+                        if(names_member_instance(k, member_path))
+                            if(auto v = resolved.get(k); v.has_value() && *v == want)
+                            {
+                                is_active = true;
+                                break;
+                            }
                 }
                 else
                     is_active = present(resolved, member_path);

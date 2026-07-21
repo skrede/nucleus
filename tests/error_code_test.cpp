@@ -20,6 +20,7 @@
 #include <memory>
 #include <string>
 #include <cstdint>
+#include <system_error>
 
 using nucleus::errc;
 using nucleus::anchor;
@@ -203,4 +204,19 @@ TEST_CASE("get_as distinguishes absent_key, missing_converter, and mismatched_ty
     auto mismatched = loaded.value().get_as<float>("cfg/val");
     REQUIRE_FALSE(mismatched);
     CHECK(mismatched.error().code == errc::mismatched_type);
+}
+
+TEST_CASE("errc drops into std::error_code via the category shim", "[error][code]")
+{
+    std::error_code ec = nucleus::make_error_code(errc::absent_key);
+    CHECK(ec.value() == static_cast<int>(errc::absent_key));
+    CHECK(ec.category() == nucleus::errc_category());
+    CHECK(ec.message() == std::string(nucleus::to_string(errc::absent_key)));
+
+    // is_error_code_enum lets an errc construct a std::error_code implicitly.
+    std::error_code implicit = errc::schema_violation;
+    CHECK(static_cast<bool>(implicit));
+    CHECK(implicit.value() == static_cast<int>(errc::schema_violation));
+    CHECK(implicit.category() == nucleus::errc_category());
+    CHECK(implicit == errc::schema_violation);
 }

@@ -16,6 +16,7 @@
 #include <utility>
 #include <filesystem>
 #include <functional>
+#include <system_error>
 #include <unordered_set>
 
 namespace nucleus {
@@ -80,14 +81,16 @@ public:
         path_guard &operator=(const path_guard &) = delete;
     };
 
-    // One entry in the expanded chain: the path the source was built from and the
-    // erased source handle. Owned by the caller. The walk pulls once to surface the
-    // inheritance declaration; the fold performs the consuming pull via the handle.
-    // The handle is move-only; the walker moves it here after the walk pull.
+    // One entry in the expanded chain: the path the source was built from, the
+    // erased source handle, and the batch the walk-pull already produced from it.
+    // Owned by the caller. The walk pulls exactly once, both to surface the
+    // inheritance declaration and to produce this cached batch; the fold consumes
+    // the batch directly instead of pulling the handle a second time.
     struct chain_entry
     {
-        std::string   path;
-        source_handle src;
+        std::string         path;
+        source_handle       src;
+        config_source_batch cached_batch;
     };
 
         // Factory type: given a path string, return a source_handle ready to fold.
@@ -105,6 +108,21 @@ public:
            const inherit_policy &policy)
     {
         chain_walker walker(policy);
+        // Collect the normalized form of every initially-requested path before
+        // expansion begins, so the admissibility exemption below is keyed on
+        // "was this ever directly requested" rather than on visit order --
+        // the same document must be exempt whether it is walked as a request
+        // first or reached as another request's inherited parent first. The
+        // non-throwing overload skips an unnormalizable path here; expand_one()
+        // reports it as a typed error below.
+        for(const std::string &path : requested_paths)
+        {
+            std::error_code ec;
+            std::string norm =
+                std::filesystem::weakly_canonical(path, ec).generic_string();
+            if(!ec)
+                walker.m_requested.insert(std::move(norm));
+        }
         std::vector<chain_entry> out;
         for(const std::string &path : requested_paths)
         {
@@ -178,11 +196,21 @@ private:
         if(!dg)
             return unexpected(std::move(dg).error());
 
+        // A document already appended to out (reached earlier by a different
+        // route -- e.g. directly requested AND recursively reached as another
+        // requested path's inherited parent) has already been fully walked and
+        // pulled; skip the walk-pull and the recursive inherit= walk entirely so
+        // it contributes exactly one chain_entry, at the layer of its first visit.
+        if(m_expanded.contains(norm))
+            return {};
+        m_expanded.insert(norm);
+
         // Build the source handle via the host factory.
         source_handle handle = make(path);
 
-        // Pull once to read the inheritance declaration; the fold will pull again
-        // via the handle stored in chain_entry.
+        // The pull below produces this document's batch once; it is cached on
+        // chain_entry so the fold consumes it directly instead of pulling the
+        // same handle a second time.
         handle.apply_projection(projection);
 
         // A pull failure is already a typed source error (unreadable, malformed);
@@ -215,9 +243,11 @@ private:
         // kind::opt_out terminates the chain below this file (no recursion).
         // kind::inherit_default means "no parent declared" -- the chain terminates here.
 
-        // Admissibility check: invoked only for candidate parent sources; the
-        // initially requested source is never subject to the admissibility policy.
-        if(is_parent && m_admissibility)
+        // Admissibility check: invoked only for candidate parent sources; a
+        // source that appears anywhere in the initially-requested set is exempt
+        // regardless of the order or role it is first reached in, so the outcome
+        // does not depend on whether it is walked as a request or as a parent first.
+        if(is_parent && m_admissibility && !m_requested.contains(norm))
         {
             // Pull capabilities for the admissibility check via the handle.
             std::string reason = m_admissibility(handle.capabilities());
@@ -227,9 +257,8 @@ private:
         }
 
         // Append this source AFTER its parent (root-first). The handle is move-only;
-        // the walk-pull above read only the inheritance declaration, the fold will
-        // perform its own pull via the stored handle.
-        out.push_back(chain_entry{path, std::move(handle)});
+        // the walk-pull's batch travels with it so the fold never re-pulls.
+        out.push_back(chain_entry{path, std::move(handle), std::move(pulled).value()});
 
         // depth_guard and path_guard released here by RAII.
         return {};
@@ -238,6 +267,16 @@ private:
     std::size_t m_depth = 0;
     std::size_t m_cap;
     std::unordered_set<std::string> m_visited;
+    // Canonical keys of every document already appended to out across the whole
+    // expand() call. Unlike m_visited (RAII-released per top-level requested
+    // path), this set is never erased -- it spans all requested_paths so the
+    // same document reached via two different routes is walked/pulled once.
+    std::unordered_set<std::string> m_expanded;
+    // Normalized paths of every source in the initially-requested set, populated
+    // once before expansion begins (see expand()). Order-independent: a document
+    // is exempt from admissibility whenever it is a member of this set, regardless
+    // of which role (request or parent) reaches it first during the walk.
+    std::unordered_set<std::string> m_requested;
     std::function<std::string(capability_descriptor)> m_admissibility;
 };
 

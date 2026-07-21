@@ -76,11 +76,11 @@ struct is_expected : std::false_type {};
 template <typename T, typename E>
 struct is_expected<expected<T, E>> : std::true_type {};
 
-// Variant-backed value-or-error mirroring std::expected under the C++20 contract:
-// holds exactly one of a value (T) or an error (E). Index 0 is the value.
-// on the type (std::expected itself is not marked): every result
-// channel in the library is fallible-by-value, so silently dropping one is
-// always a bug -- the builder's "loud state-machine error" contract depends on it.
+// Variant-backed value-or-error mirroring std::expected's C++20 contract: holds
+// exactly one of a value (T, index 0) or an error (E). Every result channel is
+// fallible-by-value, so silently dropping one is a bug. Deliberately minimal:
+// no std converting-ctor/emplace/swap surface, and wrong-state value()/error()
+// throws std::bad_variant_access rather than a std::bad_expected_access<E>.
 template <typename T, typename E>
 class expected
 {

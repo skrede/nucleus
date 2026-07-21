@@ -169,11 +169,8 @@ selector selector::owned_by(owner_token token) const
 
 selector selector::in_strain() const
 {
-    if(!m_ctx)
-        return with_predicate([](const config_node &, const schema_query_context *) { return false; });
-
     // Compute strain prefix once at call time, not per node visit.
-    const std::string pkey_cont{m_ctx->primary_key_container()};
+    const std::string pkey_cont{m_ctx.primary_key_container()};
     const std::string_view anchor_path = m_anchor.path();
 
     // Anchor must be within a specific ordinal instance of pkey_cont.
@@ -208,12 +205,14 @@ selector selector::or_(const selector &other) const
 {
     node_predicate left  = m_predicate;
     node_predicate right = other.m_predicate;
-    const schema_query_context *other_ctx = other.m_ctx;
 
+    // Capture a COPY of the other selector's context: it may be a temporary, so
+    // holding its address would dangle once the full expression ends.
     selector copy = *this;
-    copy.m_predicate = [lhs = std::move(left), rhs = std::move(right), other_ctx](
+    copy.m_predicate = [lhs = std::move(left), rhs = std::move(right),
+                        other_ctx = other.m_ctx](
                            const config_node &node, const schema_query_context *ctx) {
-        return lhs(node, ctx) || rhs(node, other_ctx);
+        return lhs(node, ctx) || rhs(node, &other_ctx);
     };
     return copy;
 }
@@ -233,7 +232,7 @@ selector selector::excluding(node_predicate pred) const
 void selector::each(std::function<void(const config_node &)> fn) const
 {
     const node_predicate &pred = m_predicate;
-    const schema_query_context *ctx = m_ctx;
+    const schema_query_context *ctx = &m_ctx;
     m_anchor.visit([&pred, ctx, &fn](const config_node &node) -> bool {
         if(node.exists() && pred(node, ctx))
             fn(node);
@@ -260,7 +259,7 @@ bool selector::exists() const
 {
     bool found = false;
     const node_predicate &pred = m_predicate;
-    const schema_query_context *ctx = m_ctx;
+    const schema_query_context *ctx = &m_ctx;
     m_anchor.visit([&pred, ctx, &found](const config_node &node) -> bool {
         if(node.exists() && pred(node, ctx))
         {
@@ -286,7 +285,7 @@ expected<config_node, error> selector::one() const
 
 selector query(config_node anchor, const schema_query_context &ctx)
 {
-    return selector{std::move(anchor), &ctx};
+    return selector{std::move(anchor), ctx};
 }
 
 expected<config_node, error>

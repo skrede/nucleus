@@ -5,8 +5,6 @@
 #include "nucleus/expected.h"
 #include "nucleus/identity.h"
 
-#include <cctype>
-
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/projection.h"
@@ -18,6 +16,7 @@
 #include "nucleus/registry/registration.h"
 
 #include <set>
+#include <cctype>
 #include <string>
 #include <vector>
 #include <cstddef>
@@ -86,6 +85,11 @@ public:
     // rejected and the element is not stored.
     schema_attach_result attach(schema_element el)
     {
+        if(el.at.is_invalid())
+            return unexpected(nucleus::format(
+                "schema element '{}' has a malformed keyspace anchor '{}'",
+                el.name, el.at.invalid_path()));
+
         if(!el.at.is_root())
         {
             const key_path &under = el.at.under();
@@ -178,6 +182,20 @@ public:
                     "registered identity group",
                     el.name, el.keyref_into));
         }
+
+        // An element path may be declared once. Re-declaring it would let a later
+        // element silently override the first's role by declaration order (a pkey
+        // smuggled under a repeated container, a second typed element dropped at the
+        // typed store). Membership is over declared ELEMENTS by exact path -- prefix
+        // nodes stay admissible so children still attach under a declared container,
+        // and a path-tagged registration is a separate surface adjudicated as a
+        // conflict rather than rejected here.
+        if(std::ranges::any_of(m_elements, [&](const schema_element &e) {
+               return e.declared_path() == el.declared_path();
+           }))
+            return unexpected(nucleus::format(
+                "schema element '{}' re-declares already-declared path '{}'",
+                el.name, el.declared_path().str()));
 
         m_defined.insert(el.declared_path().str());
         m_elements.push_back(std::move(el));
@@ -483,12 +501,16 @@ private:
         return node.empty() || is_defined_text(node.str());
     }
 
+    // m_defined is a sorted std::set, so any entry starting with a given prefix
+    // sorts contiguously starting at lower_bound(prefix); checking the single
+    // candidate there is equivalent to the prior any_of prefix scan.
     bool is_defined_text(const std::string &at) const
     {
+        if(m_defined.contains(at))
+            return true;
         const std::string below = at + key_path::separator;
-        return std::ranges::any_of(m_defined, [&](const std::string &defined) {
-            return defined == at || defined.starts_with(below);
-        });
+        const auto it = m_defined.lower_bound(below);
+        return it != m_defined.end() && it->starts_with(below);
     }
 
     // Whether a container path has a declared primary key -- the test that makes

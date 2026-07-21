@@ -129,6 +129,26 @@ TEST_CASE("malformed tokens report parse_error", "[lexer]")
     REQUIRE_FALSE(stray.has_value());
 }
 
+TEST_CASE("a repeated argument name is a parse error", "[lexer]")
+{
+    // A token call repeating a top-level argument name must be rejected loudly
+    // rather than silently keeping the first occurrence and dropping the rest.
+    auto duplicate = lex_token("${string.replace(value=a, value=b, to=c)}");
+    REQUIRE_FALSE(duplicate.has_value());
+    CHECK(duplicate.error().code == resolve_errc::parse_error);
+    CHECK(duplicate.error().message.find("value") != std::string::npos);
+}
+
+TEST_CASE("distinct argument names still lex successfully", "[lexer]")
+{
+    auto r = lex_token("${string.replace(value=a, from=b, to=c)}");
+    REQUIRE(r.has_value());
+    REQUIRE(r.value().args.size() == 3);
+    CHECK(r.value().args[0].name == "value");
+    CHECK(r.value().args[1].name == "from");
+    CHECK(r.value().args[2].name == "to");
+}
+
 TEST_CASE("a dynamically-named function is a clean parse error", "[lexer]")
 {
     // A nested ${...} forming the function name ahead of a top-level '(' is an

@@ -6,6 +6,8 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
+#include "nucleus/keyspace/provenance.h"
+
 #include "nucleus/xml/xml_emitter.h"
 #include "nucleus/xml/xml_source.h"
 
@@ -13,6 +15,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <map>
 #include <algorithm>
 #include <optional>
 #include <sstream>
@@ -195,12 +198,35 @@ TEST_CASE("emit_document renders pkey as XML attribute not child element",
     const nucleus::config &config = loaded.value();
 
     std::ostringstream out;
-    nucleus::xml::emit_document(config, out, projection_of(space));
+    REQUIRE(nucleus::xml::emit_document(config, out, projection_of(space)));
     const std::string emitted = out.str();
 
     // The pkey value appears as an attribute on <server>, not as a child element.
     REQUIRE(emitted.find("name=\"web\"") != std::string::npos);
     REQUIRE(emitted.find("<name>web</name>") == std::string::npos);
+}
+
+TEST_CASE("emit_document rejects a repeated primary-key value instead of a duplicate attribute",
+          "[pkey_identity]")
+{
+    // A hand-built config carrying two values for the pkey field of one container
+    // would emit <server name="web" name="db"> -- a repeated attribute the reader
+    // refuses on re-read. The emitter must reject rather than produce output its
+    // own reader rejects.
+    nucleus::config_space_builder engine;
+    declare_cluster(engine);
+    nucleus::config_space space = engine.build();
+
+    std::map<std::string, std::string> values{
+        {"cluster/server/name[0]", "web"},
+        {"cluster/server/name[1]", "db"}};
+    const nucleus::config config(std::move(values), nucleus::provenance{});
+
+    std::ostringstream out;
+    auto result = nucleus::xml::emit_document(config, out, projection_of(space));
+    REQUIRE_FALSE(result);
+    REQUIRE(result.error().code == nucleus::errc::malformed_source);
+    REQUIRE(out.str().empty());
 }
 
 TEST_CASE("load→emit→load round-trip is a byte-stable fixpoint",
@@ -219,7 +245,7 @@ TEST_CASE("load→emit→load round-trip is a byte-stable fixpoint",
 
     // Emit C1 with schema projection so the pkey renders as an attribute.
     std::ostringstream out;
-    nucleus::xml::emit_document(c1, out, projection_of(space));
+    REQUIRE(nucleus::xml::emit_document(c1, out, projection_of(space)));
     const std::string emitted = out.str();
     REQUIRE_FALSE(emitted.empty());
 

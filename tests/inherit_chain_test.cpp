@@ -11,6 +11,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <map>
+#include <memory>
 #include <string>
 #include <vector>
 #include <optional>
@@ -287,7 +289,7 @@ TEST_CASE("depth cap exceeded returns loud error naming the limit", "[chain]")
     auto loaded = load_chain(space, {"a.xml"}, factory, std::nullopt, std::move(policy));
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().message.find("depth") != std::string::npos);
-    REQUIRE(loaded.error().message.find("2") != std::string::npos);
+    REQUIRE(loaded.error().message.find('2') != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------
@@ -424,6 +426,92 @@ TEST_CASE("admissibility reject-all fails naming the parent in a two-file chain"
     REQUIRE_FALSE(loaded);
     // The error must name the rejected parent, not "derived.xml".
     REQUIRE(loaded.error().message.find("base.xml") != std::string::npos);
+}
+
+// ---------------------------------------------------------------------------
+// 8d. A source directly requested AND reached as another request's inherited
+//     parent is exempt from admissibility regardless of visit order: the
+//     chain-expansion dedupe must not make the exemption depend on which role
+//     (request or parent) the shared document happens to be visited under first.
+// ---------------------------------------------------------------------------
+TEST_CASE("directly-requested source reached as an inherited parent is exempt "
+          "from admissibility regardless of request order", "[chain]")
+{
+    // Wraps an xml_source but reports a caller-supplied capability descriptor
+    // instead of xml_source's own, so the admissibility policy below can be
+    // made to reject exactly the documents the test targets.
+    struct capped_xml_source
+    {
+        nucleus::xml_source src;
+        nucleus::capability_descriptor caps;
+
+        nucleus::capability_descriptor capabilities() const { return caps; }
+        void apply_projection(const nucleus::schema_projection &p) { src.apply_projection(p); }
+        nucleus::inherit_declaration inheritance() const { return src.inheritance(); }
+        nucleus::config_source_result pull() { return src.pull(); }
+    };
+
+    const char *a_doc = R"(<cluster><server name="web"><port>80</port></server></cluster>)";
+    const char *b_doc =
+        R"(<cluster inherit="a.xml"><server name="web" extend="wide"><protocol>tcp</protocol></server></cluster>)";
+    const char *c_doc = R"(<cluster><server name="orphan"><port>1</port></server></cluster>)";
+    const char *d_doc =
+        R"(<cluster inherit="c.xml"><server name="orphan" extend="wide"><protocol>udp</protocol></server></cluster>)";
+
+    nucleus::config_space_builder engine;
+    declare_cluster(engine);
+    nucleus::config_space space = engine.build();
+
+    // Rejects any source that lacks nesting. a.xml and c.xml are both built
+    // without it, so the policy would reject either if it ran against them.
+    nucleus::inherit_policy policy;
+    policy.admissibility = [](nucleus::capability_descriptor caps) -> std::string {
+        return caps.supports(nucleus::capability::nesting) ? std::string{} : "lacks nesting";
+    };
+
+    const nucleus::capability_descriptor bare{};
+    const nucleus::capability_descriptor nested{nucleus::capability::nesting};
+
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
+        const std::string name = filename_of(path);
+        if(name == "a.xml")
+            return nucleus::source_handle(capped_xml_source{
+                nucleus::xml_source::from(nucleus::xml_source_options::of_string(a_doc)), bare});
+        if(name == "b.xml")
+            return nucleus::source_handle(capped_xml_source{
+                nucleus::xml_source::from(nucleus::xml_source_options::of_string(b_doc)), nested});
+        if(name == "c.xml")
+            return nucleus::source_handle(capped_xml_source{
+                nucleus::xml_source::from(nucleus::xml_source_options::of_string(c_doc)), bare});
+        if(name == "d.xml")
+            return nucleus::source_handle(capped_xml_source{
+                nucleus::xml_source::from(nucleus::xml_source_options::of_string(d_doc)), nested});
+        return nucleus::source_handle(nucleus::env_source{});
+    };
+
+    // a.xml is directly requested AND reached as b.xml's inherited parent. The
+    // policy would reject it as a parent, but its direct-request membership
+    // exempts it -- regardless of which order the two paths are listed in.
+    auto loaded_b_first = load_chain(space, {"b.xml", "a.xml"}, factory, "web", policy);
+    REQUIRE(loaded_b_first);
+    REQUIRE(loaded_b_first.value().get("cluster/server/port") == "80");
+    REQUIRE(loaded_b_first.value().get("cluster/server/protocol") == "tcp");
+
+    auto loaded_a_first = load_chain(space, {"a.xml", "b.xml"}, factory, "web", policy);
+    REQUIRE(loaded_a_first);
+    REQUIRE(loaded_a_first.value().get("cluster/server/port") == "80");
+    REQUIRE(loaded_a_first.value().get("cluster/server/protocol") == "tcp");
+
+    // Negative control: c.xml is a genuinely transitive-only parent (never
+    // directly requested), so the same policy must still reject it -- the
+    // exemption above must not have disabled the admissibility check entirely.
+    auto loaded_transitive_only = load_chain(space, {"d.xml"}, factory, "orphan", policy);
+    REQUIRE_FALSE(loaded_transitive_only);
+    const bool has_rejected =
+        loaded_transitive_only.error().message.find("admissibility") != std::string::npos
+        || loaded_transitive_only.error().message.find("rejected") != std::string::npos;
+    REQUIRE(has_rejected);
+    REQUIRE(loaded_transitive_only.error().message.find("c.xml") != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------
@@ -824,7 +912,7 @@ TEST_CASE("depth-cap boundary: exactly at the cap loads, one beyond fails", "[ch
         auto loaded = load_chain(space, {"a.xml"}, factory, std::nullopt, std::move(policy));
         REQUIRE_FALSE(loaded);
         REQUIRE(loaded.error().message.find("depth") != std::string::npos);
-        REQUIRE(loaded.error().message.find("2") != std::string::npos);
+        REQUIRE(loaded.error().message.find('2') != std::string::npos);
     }
 }
 
@@ -887,6 +975,115 @@ TEST_CASE("duplicate-canonical path reached two ways resolves deterministically"
     // Deterministic composition: base supplies port, derived supplies protocol.
     REQUIRE(loaded.value().get("cluster/server/port") == "80");
     REQUIRE(loaded.value().get("cluster/server/protocol") == "tcp");
+}
+
+// ---------------------------------------------------------------------------
+// Duplicate-canonical path, named strain: base.xml is requested directly AND
+// reached again as derived.xml's inherited parent, on a schema with a primary
+// key. derived.xml introduces its own, DIFFERENT named strain ("app") rather
+// than re-declaring "web", so a correct load never needs an extend attribute:
+// "web" is written exactly once. Before expand()'s dedupe was scoped across
+// the whole call, base.xml was walked twice -- once as the directly-requested
+// path, once again as derived.xml's recursively-expanded parent -- so slice()
+// saw "web" introduced at two layers with no extend= disposition and rejected
+// the load as an illegitimate re-open, even though the user wrote it once.
+// ---------------------------------------------------------------------------
+TEST_CASE("duplicate-canonical path reached two ways resolves deterministically "
+          "for a named strain", "[chain]")
+{
+    const char *base_doc =
+        R"(<cluster><server name="web"><port>80</port></server></cluster>)";
+    const char *derived_doc =
+        R"(<cluster inherit="base.xml"><server name="app"><port>443</port></server></cluster>)";
+
+    nucleus::config_space_builder engine;
+    declare_cluster(engine);
+    nucleus::config_space space = engine.build();
+
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
+        const std::string name = filename_of(path);
+        if(name == "base.xml") return xml_of(base_doc);
+        if(name == "derived.xml") return xml_of(derived_doc);
+        return nucleus::source_handle(nucleus::env_source{});
+    };
+
+    auto loaded = load_chain(space, {"base.xml", "derived.xml"}, factory, "web");
+    REQUIRE(loaded);
+    REQUIRE(loaded.value().get("cluster/server/port") == "80");
+}
+
+// ---------------------------------------------------------------------------
+// Each chain document is pulled exactly once per load, proven directly by an
+// instrumented counting source rather than by the absence of a re-open error.
+// Before the walk-pull's batch was cached on chain_entry, every chain document
+// was pulled twice per load: once by chain_walker to read its inherit=
+// declaration, once again by fold() to consume its entries -- for every
+// document, not only ones reached twice by different routes.
+// ---------------------------------------------------------------------------
+TEST_CASE("each chain document is pulled exactly once per load", "[chain]")
+{
+    // Wraps an xml_source and increments a shared counter on every pull(),
+    // forwarding capabilities()/apply_projection()/inheritance()/pull() to the
+    // wrapped source unchanged -- satisfies config_source plus the optional
+    // projects_source/inheriting_source refinements by duck typing, exactly as
+    // xml_source itself does.
+    struct counting_xml_source
+    {
+        nucleus::xml_source  src;
+        std::shared_ptr<int> pull_count;
+
+        static nucleus::capability_descriptor capabilities()
+        {
+            return nucleus::xml_source::capabilities();
+        }
+
+        void apply_projection(const nucleus::schema_projection &projection)
+        {
+            src.apply_projection(projection);
+        }
+
+        nucleus::inherit_declaration inheritance() const { return src.inheritance(); }
+
+        nucleus::config_source_result pull()
+        {
+            ++*pull_count;
+            return src.pull();
+        }
+    };
+
+    const char *base_doc =
+        R"(<cluster><server name="web"><port>80</port></server></cluster>)";
+    const char *derived_doc =
+        R"(<cluster inherit="base.xml">)"
+        R"(<server name="web" extend="wide"><protocol>tcp</protocol></server></cluster>)";
+
+    std::map<std::string, std::shared_ptr<int>> counters;
+
+    nucleus::config_space_builder engine;
+    declare_cluster(engine);
+    nucleus::config_space space = engine.build();
+
+    auto factory = [&](const std::string &path) -> nucleus::source_handle {
+        const std::string name = filename_of(path);
+
+        const char *text = nullptr;
+        if(name == "base.xml") text = base_doc;
+        else if(name == "derived.xml") text = derived_doc;
+        else return nucleus::source_handle(nucleus::env_source{});
+
+        std::shared_ptr<int> &counter = counters[name];
+        if(!counter)
+            counter = std::make_shared<int>(0);
+        return nucleus::source_handle(counting_xml_source{
+            nucleus::xml_source::from(nucleus::xml_source_options::of_string(text)),
+            counter});
+    };
+
+    // Single top-level request: base.xml is only reached via the inherit chain.
+    auto loaded = load_chain(space, {"derived.xml"}, factory);
+    REQUIRE(loaded);
+    REQUIRE(*counters.at("base.xml") == 1);
+    REQUIRE(*counters.at("derived.xml") == 1);
 }
 
 // ---------------------------------------------------------------------------

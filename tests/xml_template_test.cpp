@@ -21,7 +21,7 @@ namespace {
 std::string template_of(const nucleus::config_space &space)
 {
     std::ostringstream oss;
-    nucleus::xml::emit_template(space, oss);
+    REQUIRE(nucleus::xml::emit_template(space, oss));
     return oss.str();
 }
 

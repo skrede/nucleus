@@ -23,6 +23,7 @@
 
 #include "nucleus/tokenizer/token_resolution.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
+#include "nucleus/tokenizer/substitution_budget.h"
 #include "nucleus/tokenizer/tree_resolver_scope.h"
 #include "nucleus/tokenizer/tree_tokenizer_registry.h"
 
@@ -111,6 +112,11 @@ public:
         std::optional<std::size_t>          inheritance_layer;
         // Set for document sources (derives from entries[i].path); absent for stack/argv/env sources.
         std::optional<std::filesystem::path> origin_file;
+        // Set for chain-layer handles: points at the batch chain_walker already
+        // pulled during the inheritance walk, so fold() consumes it instead of
+        // pulling the same handle a second time. Null for stack/argv/env layers,
+        // which have no walk phase and are pulled here for the first time.
+        config_source_batch *cached_batch = nullptr;
     };
 
     // Fold overload that consumes a sequence of layered_handle descriptors.
@@ -149,6 +155,21 @@ public:
         const std::set<std::string> repeated_container_prefixes =
             m_schema.repeated_container_paths();
 
+        // A space has at most one primary key (schema_registry::attach() rejects a
+        // second), so its container fixes a single, constant key-segment index the
+        // Case B sweep below uses to stay strain-aware -- never a per-entry or
+        // nested-ancestor computation.
+        std::optional<key_path> keyed_container_path;
+        for(const schema_element &el : m_schema.elements())
+        {
+            if(!el.identity)
+                continue;
+            keyed_container_path = el.container();
+            break;
+        }
+        const std::size_t keyed_len =
+            keyed_container_path ? keyed_container_path->size() : 0;
+
         // Keyed-composition setup: for every repeated element declaring a
         // non-default merge mode, find the identity-group field that keys it. A keyed
         // mode with no covering identity group has no merge key -- a loud error.
@@ -180,29 +201,60 @@ public:
             m_keyed_fields[cpath] = field;
         }
 
-        // Deferred checks: CLI plain-ordinal overrides deferred until after
-        // all layers fold so the document layer is present in m_building regardless
-        // of its rank relative to the argv layer.
-        struct pending_cli_ordinal
+        // Declared leaf names per keyed-merge container, used by the flat
+        // multi-leaf grouping below to detect field-major arrival (schema-known,
+        // not incrementally learned from the data -- see the grouping's own
+        // comment for why that distinction matters). Computed once per fold(),
+        // shared across every layer.
+        std::map<std::string, std::set<std::string>> keyed_declared_suffixes;
+        for(const auto &[cpath, mode] : m_keyed_modes)
         {
-            std::size_t     ordinal;
-            std::string     container_prefix;
-            key_path        rebracketed;
-            value           val;
-            origin          prov;
-        };
-        std::vector<pending_cli_ordinal> deferred_cli_overrides;
+            auto container_kp = key_path::parse(cpath);
+            if(!container_kp)
+                continue;
+            std::set<std::string> &declared = keyed_declared_suffixes[cpath];
+            for(const schema_element &child : m_schema.elements())
+                if(child.container() == container_kp.value())
+                    declared.insert(child.name);
+        }
+
+        // Deferred checks: CLI plain-ordinal overrides recognized here but
+        // validated/applied only by apply_deferred_cli_overrides(), which the
+        // caller runs after slice() (and therefore after
+        // merge_keyed_collections()) so the check sees the load's fully
+        // materialized, selected-strain keyspace regardless of a keyed or
+        // keyed-merge container standing between the fold and the argv layer's rank.
+        m_deferred_cli_overrides.clear();
+
+        // One pass-1 budget shared by every value in this load: a
+        // bounded-depth fanout spanning several values is charged against a single
+        // running count, so the total-substitution ceiling holds across the load.
+        substitution_budget budget(m_expansion_budget);
 
         for(layered_handle *lh : ordered)
         {
-            lh->handle->apply_projection(projection);
-            config_source_result pulled = lh->handle->pull();
-            if(!pulled)
-                return unexpected(error{pulled.error().code,
-                                        nucleus::format("source '{}': {}",
-                                            lh->label, pulled.error().message)});
+            // A chain layer's batch was already pulled during the inheritance
+            // walk; consume the cached batch here instead of pulling the same
+            // handle again. Stack/argv/env layers have no walk phase and are
+            // pulled for the first (and only) time here.
+            config_source_result pulled;
+            config_source_batch *batch_ptr = nullptr;
+            if(lh->cached_batch != nullptr)
+            {
+                batch_ptr = lh->cached_batch;
+            }
+            else
+            {
+                lh->handle->apply_projection(projection);
+                pulled = lh->handle->pull();
+                if(!pulled)
+                    return unexpected(error{pulled.error().code,
+                                            nucleus::format("source '{}': {}",
+                                                lh->label, pulled.error().message)});
+                batch_ptr = &pulled.value();
+            }
 
-            config_source_batch &batch = pulled.value();
+            config_source_batch &batch = *batch_ptr;
 
             // Extend= targeting a repeated container is not supported.
             for(const extend_disposition &d : batch.dispositions)
@@ -229,12 +281,19 @@ public:
             // (non-indexed) under a keyed-merge container. Keyed by actual container path.
             std::map<std::string, std::size_t> keyed_flat_counter;
 
+            // Per-layer, per-actual_container record of which leaf suffixes have
+            // already been seen for the CURRENT flat instance. A suffix repeating
+            // signals a new instance starting (mirrors leaf_ordinal_counters'
+            // duplicate_keys-gated advance-on-repeat, applied to the keyed divert).
+            std::map<std::string, std::set<std::string>> keyed_flat_suffixes_seen;
+
             for(keyspace_entry &entry : batch.entries)
             {
                 token_result expanded = lh->origin_file
                     ? resolve_tokens(entry.value.text(), m_tokenizer, *lh->origin_file,
-                                     &m_tree_tokenizer)
-                    : resolve_tokens(entry.value.text(), m_tokenizer, &m_tree_tokenizer);
+                                     budget, &m_tree_tokenizer)
+                    : resolve_tokens(entry.value.text(), m_tokenizer, budget,
+                                     &m_tree_tokenizer);
                 if(!expanded)
                     return unexpected(error{errc::unresolved_token, nucleus::format(
                         "source '{}': token resolution failed for key '{}': {}",
@@ -242,7 +301,9 @@ public:
 
                 auto path_res = key_path::parse(entry.path);
                 if(!path_res)
-                    continue;
+                    return unexpected(error{errc::malformed_source, nucleus::format(
+                        "source '{}': malformed key path '{}': {}",
+                        lh->label, entry.path, path_res.error())});
                 key_path path = std::move(path_res).value();
 
                 const std::string canonical_path = m_schema.canonical_text(path);
@@ -255,6 +316,83 @@ public:
                             return true;
                     return false;
                 }();
+
+                // Detect a CLI plain-ordinal path: a digit-only segment
+                // following a repeated container prefix is an ordinal index from
+                // "--cluster-node-0-endpoint-port=90" -> "cluster/node/0/endpoint/port".
+                // Re-bracket to "cluster/node[0]/endpoint/port" and enforce
+                // (override-only: ordinal must be < existing instance count). This
+                // check runs before the keyed-composition divert below so an
+                // ordinal-shaped path targeting a keyed-merge container is recognized
+                // as an override attempt, not swallowed into the divert as a flat
+                // leaf with a literal digit-shaped suffix.
+                const auto plain_ordinal_rebracketed = [&]()
+                    -> expected<std::optional<key_path>, resolve_fold_error>
+                {
+                    const std::vector<std::string> &segs = path.segments();
+                    for(std::size_t i = 1; i < segs.size(); ++i)
+                    {
+                        // Plain digit-only segment (e.g. "0", "42") -- not bracket form.
+                        const std::string &seg = segs[i];
+                        const bool all_digits = std::ranges::all_of(
+                            seg, [](char c){ return c >= '0' && c <= '9'; });
+                        if(!all_digits)
+                            continue;
+                        // Build the prefix path up to (not including) the digit segment.
+                        std::string prefix;
+                        for(std::size_t j = 0; j < i; ++j)
+                        {
+                            if(j) prefix += key_path::separator;
+                            prefix += segs[j];
+                        }
+                        if(!repeated_container_prefixes.contains(prefix))
+                            continue;
+                        // Found: "prefix/N/..." is a CLI ordinal path. Cap the digit
+                        // run at 18 (mirroring key_path::is_indexed_segment's own bound)
+                        // so a crafted, absurdly long digit run cannot wrap a size_t.
+                        if(seg.size() > 18)
+                            return unexpected(error{errc::malformed_source, nucleus::format(
+                                "CLI ordinal segment '{}' exceeds the maximum of 18 digits",
+                                seg)});
+                        const std::size_t ordinal = [&]() {
+                            std::size_t v = 0;
+                            for(char const c : seg) v = (v * 10) + static_cast<std::size_t>(c - '0');
+                            return v;
+                        }();
+                        // Re-bracket: "prefix/N/rest" -> "prefix[N]/rest".
+                        std::string rebracketed_str = prefix + "[" + std::to_string(ordinal) + "]";
+                        for(std::size_t j = i + 1; j < segs.size(); ++j)
+                        {
+                            rebracketed_str += key_path::separator;
+                            rebracketed_str += segs[j];
+                        }
+                        auto kp = key_path::parse(rebracketed_str);
+                        if(!kp)
+                            return unexpected(error{errc::malformed_source, std::move(kp).error()});
+                        // Defer storage and check until apply_deferred_cli_overrides()
+                        // runs after slice(), so the document source is in
+                        // m_building regardless of rank.
+                        m_deferred_cli_overrides.push_back(
+                            {ordinal, prefix, std::move(kp).value(),
+                             value::owned(std::move(expanded).value()),
+                             origin{lh->rank, lh->label, lh->owner, lh->inheritance_layer}});
+                        // Signal "deferred": return a non-empty optional wrapping the
+                        // zero-segment key_path as a sentinel (empty path cannot appear
+                        // as a real indexed result, so the has_value() check below
+                        // disambiguates via a separate cli_deferred_this_entry flag).
+                        return std::optional<key_path>{key_path{}};
+                    }
+                    return std::optional<key_path>{std::nullopt};
+                }();
+                if(!plain_ordinal_rebracketed)
+                    return unexpected(plain_ordinal_rebracketed.error());
+
+                const bool cli_deferred_this_entry =
+                    plain_ordinal_rebracketed.value().has_value()
+                    && plain_ordinal_rebracketed.value().value().empty();
+
+                if(cli_deferred_this_entry)
+                    continue; // storage and the ordinal-range check deferred to post-fold pass
 
                 // Keyed-composition divert: if this entry sits under a
                 // keyed-merge container, accumulate it (by identity-group key, merged
@@ -294,9 +432,6 @@ public:
                         if(!actual_container.empty())
                             actual_container += key_path::separator;
                         actual_container += key_path::base_name(cseg);
-                        const std::size_t ordinal = key_path::is_indexed_segment(cseg)
-                            ? key_path::ordinal_of(cseg)
-                            : keyed_flat_counter[actual_container]++;
                         std::string suffix;
                         for(std::size_t i = len; i < segs.size(); ++i)
                         {
@@ -304,9 +439,58 @@ public:
                                 suffix += key_path::separator;
                             suffix += segs[i];
                         }
+                        std::size_t ordinal = 0;
+                        if(key_path::is_indexed_segment(cseg))
+                        {
+                            ordinal = key_path::ordinal_of(cseg);
+                        }
+                        else
+                        {
+                            // Flat (non-indexed) entry: group per (rank, container) --
+                            // a suffix repeating within the current instance means a
+                            // NEW instance is starting, gated on duplicate_keys exactly
+                            // as leaf_ordinal_counters gates Case A's analogous repeat.
+                            // This grouping REQUIRES instance-major arrival (all of one
+                            // instance's fields before the next instance's fields begin);
+                            // a suffix reappearing before every declared field has been
+                            // seen for the current instance means the source emitted
+                            // fields field-major instead, which this grouping cannot
+                            // safely disambiguate -- fail loudly rather than silently
+                            // mis-pairing leaves across instances.
+                            std::set<std::string> &seen = keyed_flat_suffixes_seen[actual_container];
+                            if(!seen.contains(suffix))
+                            {
+                                ordinal = keyed_flat_counter[actual_container];
+                                seen.insert(suffix);
+                            }
+                            else if(entry.capabilities.supports(capability::duplicate_keys))
+                            {
+                                const std::set<std::string> &declared =
+                                    keyed_declared_suffixes[canon];
+                                if(!declared.empty() && seen != declared)
+                                    return unexpected(error{errc::layering_violation, nucleus::format(
+                                        "source '{}': flat entries for keyed collection '{}' "
+                                        "must supply every field of one instance before the "
+                                        "next instance begins (instance-major order); field "
+                                        "'{}' repeated after only {} of {} declared fields were "
+                                        "seen for the current instance",
+                                        lh->label, canon, suffix, seen.size(), declared.size())});
+                                ordinal = ++keyed_flat_counter[actual_container];
+                                seen.clear();
+                                seen.insert(suffix);
+                            }
+                            else
+                            {
+                                return unexpected(error{errc::layering_violation, nucleus::format(
+                                    "source '{}': flat entry '{}' cannot address keyed "
+                                    "collection '{}': a source without duplicate_keys can "
+                                    "supply at most one instance's worth of leaves per layer",
+                                    lh->label, entry.path, canon)});
+                            }
+                        }
                         m_actual_to_canonical[actual_container] = canon;
                         m_keyed_accumulator[actual_container].push_back(keyed_instance_entry{
-                            lh->rank, ordinal, std::move(suffix),
+                            lh->rank, ordinal, suffix,
                             // NOLINTNEXTLINE(bugprone-use-after-move): the move runs only on the diverted branch which immediately continues to the next entry, so expanded is never read afterward.
                             std::move(expanded).value(),
                             origin{lh->rank, lh->label, lh->owner, lh->inheritance_layer}});
@@ -316,102 +500,45 @@ public:
                         continue;
                 }
 
-                // Detect a CLI plain-ordinal path: a digit-only segment
-                // following a repeated container prefix is an ordinal index from
-                // "--cluster-node-0-endpoint-port=90" -> "cluster/node/0/endpoint/port".
-                // Re-bracket to "cluster/node[0]/endpoint/port" and enforce
-                // (override-only: ordinal must be < existing instance count).
-                const auto plain_ordinal_rebracketed = [&]()
-                    -> expected<std::optional<key_path>, resolve_fold_error>
-                {
-                    const std::vector<std::string> &segs = path.segments();
-                    for(std::size_t i = 1; i < segs.size(); ++i)
-                    {
-                        // Plain digit-only segment (e.g. "0", "42") -- not bracket form.
-                        const std::string &seg = segs[i];
-                        const bool all_digits = std::ranges::all_of(
-                            seg, [](char c){ return c >= '0' && c <= '9'; });
-                        if(!all_digits)
-                            continue;
-                        // Build the prefix path up to (not including) the digit segment.
-                        std::string prefix;
-                        for(std::size_t j = 0; j < i; ++j)
-                        {
-                            if(j) prefix += key_path::separator;
-                            prefix += segs[j];
-                        }
-                        if(!repeated_container_prefixes.contains(prefix))
-                            continue;
-                        // Found: "prefix/N/..." is a CLI ordinal path.
-                        const std::size_t ordinal = [&]() {
-                            std::size_t v = 0;
-                            for(char const c : seg) v = (v * 10) + static_cast<std::size_t>(c - '0');
-                            return v;
-                        }();
-                        // Re-bracket: "prefix/N/rest" -> "prefix[N]/rest".
-                        std::string rebracketed_str = prefix + "[" + std::to_string(ordinal) + "]";
-                        for(std::size_t j = i + 1; j < segs.size(); ++j)
-                        {
-                            rebracketed_str += key_path::separator;
-                            rebracketed_str += segs[j];
-                        }
-                        auto kp = key_path::parse(rebracketed_str);
-                        if(!kp)
-                            return unexpected(error{errc::malformed_source, std::move(kp).error()});
-                        // Defer storage and check until all layers are folded
-                        // so the document source is in m_building regardless of rank.
-                        deferred_cli_overrides.push_back(
-                            {ordinal, prefix, std::move(kp).value(),
-                             value::owned(std::move(expanded).value()),
-                             origin{lh->rank, lh->label, lh->owner, lh->inheritance_layer}});
-                        // Signal "deferred": return a non-empty optional wrapping the
-                        // zero-segment key_path as a sentinel (empty path cannot appear
-                        // as a real indexed result, so the has_value() check below
-                        // disambiguates via a separate cli_deferred_this_entry flag).
-                        return std::optional<key_path>{key_path{}};
-                    }
-                    return std::optional<key_path>{std::nullopt};
-                }();
-                if(!plain_ordinal_rebracketed)
-                    return unexpected(plain_ordinal_rebracketed.error());
-
-                const bool cli_deferred_this_entry =
-                    plain_ordinal_rebracketed.value().has_value()
-                    && plain_ordinal_rebracketed.value().value().empty();
-
-                if(cli_deferred_this_entry)
-                    continue; // storage and the ordinal-range check deferred to post-fold pass
-
-                if(plain_ordinal_rebracketed.value().has_value())
-                {
-                    // Case C: CLI plain-ordinal override. The path has
-                    // been re-bracketed; store directly without wholesale-replace so
-                    // only this specific instance is overridden (rank-precedence wins).
-                    const key_path &rebracketed_path = plain_ordinal_rebracketed.value().value();
-                    m_building.set(rebracketed_path, value::owned(std::move(expanded).value()));
-                    m_provenance.record(rebracketed_path.str(),
-                                        origin{lh->rank, lh->label, lh->owner,
-                                               lh->inheritance_layer});
-                }
-                else if(is_already_indexed)
+                if(is_already_indexed)
                 {
                     // Case B: already-indexed path (from a tree source's ordinal emission).
                     // Find the container prefix (the declared repeated container path).
+                    // A repeated container may nest inside another repeated container
+                    // (e.g. "cluster/node" holding "cluster/node/tags"), so more than one
+                    // declared prefix can match the same canonical path; select the
+                    // LONGEST (most specific) match rather than the first one found, or
+                    // the sweep below would operate at the wrong, too-shallow scope.
                     std::string container_prefix;
                     for(const std::string &prefix : repeated_container_prefixes)
                     {
                         // The canonical of this path must start with prefix + separator.
                         const std::string p_slash = prefix + key_path::separator;
-                        if(canonical_path == prefix
-                           || canonical_path.starts_with(p_slash))
+                        if((canonical_path == prefix || canonical_path.starts_with(p_slash))
+                           && prefix.size() > container_prefix.size())
                         {
                             container_prefix = prefix;
-                            break;
                         }
                     }
                     // Also handle repeated leaves with indexed paths (config/tags[0]).
                     if(container_prefix.empty() && repeated_paths.contains(canonical_path))
                         container_prefix = canonical_path;
+
+                    // canonical_text() strips the key segment, so two different
+                    // strains' entries under the same keyed container collide on
+                    // `under` below. When the container is nested under the
+                    // schema's keyed container, additionally require the same key
+                    // segment at the fixed keyed_len index before sweeping.
+                    bool nested_in_keyed = false;
+                    std::string this_key_seg;
+                    if(keyed_container_path && !container_prefix.empty())
+                    {
+                        const std::string kcp = keyed_container_path->str();
+                        nested_in_keyed = container_prefix == kcp
+                            || container_prefix.starts_with(kcp + key_path::separator);
+                        if(nested_in_keyed && path.size() > keyed_len)
+                            this_key_seg = path.segments()[keyed_len];
+                    }
 
                     if(!container_prefix.empty()
                        && !swept_containers_this_layer.contains(container_prefix))
@@ -431,11 +558,14 @@ public:
                             const bool under =
                                 ec == container_prefix
                                 || ec.starts_with(cp_slash);
-                            if(under)
-                            {
-                                m_building.remove(existing);
-                                m_provenance.forget(es);
-                            }
+                            if(!under)
+                                continue;
+                            if(nested_in_keyed
+                               && (existing.size() <= keyed_len
+                                   || existing.segments()[keyed_len] != this_key_seg))
+                                continue;
+                            m_building.remove(existing);
+                            m_provenance.forget(es);
                         }
                     }
 
@@ -496,7 +626,9 @@ public:
                         actual_path_str + "[" + std::to_string(ordinal) + "]";
                     auto indexed_kp = key_path::parse(indexed_path);
                     if(!indexed_kp)
-                        continue;
+                        return unexpected(error{errc::malformed_source, nucleus::format(
+                            "internal invariant violation: re-parsed path failed to parse "
+                            "in fold()'s Case A re-indexing: '{}'", indexed_path)});
                     m_building.set(indexed_kp.value(),
                                    value::owned(std::move(expanded).value()));
                     m_provenance.record(indexed_path,
@@ -516,41 +648,6 @@ public:
                 m_dispositions.push_back(d);
 
             m_buffers.push_back(std::move(batch.buffer));
-        }
-
-        //  post-fold: validate and store all deferred CLI plain-ordinal overrides
-        // now that all document layers are present in m_building.
-        for(pending_cli_ordinal &override : deferred_cli_overrides)
-        {
-            const std::string bracket_prefix = override.container_prefix + "[";
-            std::size_t instance_count = 0;
-            for(const key_path &bp : m_building.paths())
-            {
-                const std::string bps = bp.str();
-                if(!bps.starts_with(bracket_prefix))
-                    continue;
-                const auto lb = bps.find('[', override.container_prefix.size());
-                const auto rb = bps.find(']', lb);
-                if(lb == std::string::npos || rb == std::string::npos)
-                    continue;
-                std::size_t slot = 0;
-                for(std::size_t k = lb + 1; k < rb; ++k)
-                    slot = (slot * 10) + static_cast<std::size_t>(bps[k] - '0');
-                instance_count = std::max(slot + 1, instance_count);
-            }
-            if(override.ordinal >= instance_count)
-                return unexpected(error{errc::schema_violation, nucleus::format(
-                    "argv ordinal {} for '{}' is out of range: "
-                    "{} instance(s) exist; out of range",
-                    override.ordinal, override.container_prefix, instance_count)});
-            // Ordinal is valid; store only if no higher-rank entry already exists
-            // at this path (rank-precedence: higher-rank wins even over deferred entries).
-            const origin *existing = m_provenance.of(override.rebracketed.str());
-            if(existing == nullptr || existing->rank < override.prov.rank)
-            {
-                m_building.set(override.rebracketed, override.val);
-                m_provenance.record(override.rebracketed.str(), override.prov);
-            }
         }
 
         return {};
@@ -620,7 +717,13 @@ public:
                 for(merged_instance *mi : instances)
                 {
                     auto it = by_key.find(mi->key);
-                    if(it != by_key.end() && it->second->rank != mi->rank)
+                    if(it != by_key.end() && it->second->rank == mi->rank)
+                        return unexpected(error{errc::layering_violation, nucleus::format(
+                            "keyed collection '{}': identifier '{}'='{}' is duplicated "
+                            "within layer '{}'; unite is strict-additive (no duplicate "
+                            "identifiers within one layer)",
+                            canon, field, mi->key, mi->prov.layer)});
+                    if(it != by_key.end())
                         return unexpected(error{errc::layering_violation, nucleus::format(
                             "keyed collection '{}': identifier '{}'='{}' is introduced at "
                             "two layers ('{}' and '{}'); unite is strict-additive "
@@ -663,7 +766,9 @@ public:
                         ? base : base + key_path::separator + leaf->suffix;
                     auto kp = key_path::parse(new_path);
                     if(!kp)
-                        continue;
+                        return unexpected(error{errc::malformed_source, nucleus::format(
+                            "internal invariant violation: re-parsed path failed to parse "
+                            "in merge_keyed_collections()'s rebuild: '{}'", new_path)});
                     m_building.set(kp.value(), value::owned(leaf->value));
                     m_provenance.record(new_path, leaf->prov);
                 }
@@ -732,9 +837,33 @@ public:
             {
                 // Skip paths where the segment after the container is an ordinal
                 // index -- those are flat-source repeated leaves, not keyed instances.
+                // An indexed-shaped segment is only a legitimate ordinal when a
+                // repeated element is genuinely declared directly at this container
+                // under that base name; otherwise it is a strain whose primary-key
+                // value merely happens to be bracket-shaped, and must not vanish here.
                 if(path.size() > container.size()
                    && key_path::is_indexed_segment(path.segments()[container.size()]))
-                    continue;
+                {
+                    const std::string base = std::string(
+                        key_path::base_name(path.segments()[container.size()]));
+                    const key_path declared_child = container.child(base);
+                    bool declared_repeated_child = false;
+                    for(const schema_element &child_el : m_schema.elements())
+                    {
+                        if(child_el.repeated && child_el.declared_path() == declared_child)
+                        {
+                            declared_repeated_child = true;
+                            break;
+                        }
+                    }
+                    if(declared_repeated_child)
+                        continue;
+                    return unexpected(error{errc::schema_violation, nucleus::format(
+                        "primary-key value '{}' in container '{}' is shaped like a "
+                        "repeated-instance ordinal ('[n]'), which this container does "
+                        "not declare a repeated child at; rename the key value",
+                        path.segments()[container.size()], container.str())});
+                }
 
                 if(m_schema.keyed_instance_path(container, path))
                     strains[path.segments()[container.size()]].push_back(path);
@@ -990,15 +1119,12 @@ public:
                 for(const key_path &path : snapshot)
                 {
                     const origin *orig = m_provenance.of(path.str());
-                    std::size_t path_rank = orig != nullptr ? orig->rank : 0;
-                    if(orig == nullptr)
-                    {
-                        // Check collection origins for repeated leaves.
-                        const std::vector<origin> *col_orig =
-                            m_provenance.collection_origins_of(path.str());
-                        if(col_orig != nullptr && !col_orig->empty())
-                            path_rank = col_orig->front().rank;
-                    }
+                    // Flat unified-path writes (argv/env) carry no inheritance_layer
+                    // and always win by plain stack precedence, per strain_scope.h's
+                    // documented contract; exempt them from the rank-bounded prune.
+                    if(orig != nullptr && !orig->inheritance_layer.has_value())
+                        continue;
+                    const std::size_t path_rank = orig != nullptr ? orig->rank : 0;
                     if(path_rank == 0 || path_rank <= Ld)
                         continue;
                     // Keyed-merge collections were finalised across layers already;
@@ -1022,6 +1148,52 @@ public:
             m_keyed_satisfied.push_back(container.str());
         }
 
+        return {};
+    }
+
+    // Validates and stores every CLI plain-ordinal override deferred during
+    // fold(). MUST run after slice() (and therefore after
+    // merge_keyed_collections(), which itself runs before slice()) so a
+    // keyed container's override unambiguously targets the load's own
+    // selected strain at its already-unified path, and a keyed-merge
+    // container's override sees the container's real, merged instance count
+    // rather than zero (the accumulator, not m_building, holds those entries
+    // until merge_keyed_collections() runs).
+    expected<void, resolve_fold_error> apply_deferred_cli_overrides()
+    {
+        for(pending_cli_ordinal &override : m_deferred_cli_overrides)
+        {
+            const std::string bracket_prefix = override.container_prefix + "[";
+            std::set<std::size_t> existing_ordinals;
+            for(const key_path &bp : m_building.paths())
+            {
+                const std::string bps = bp.str();
+                if(!bps.starts_with(bracket_prefix))
+                    continue;
+                const auto lb = bps.find('[', override.container_prefix.size());
+                const auto rb = bps.find(']', lb);
+                if(lb == std::string::npos || rb == std::string::npos)
+                    continue;
+                std::size_t slot = 0;
+                for(std::size_t k = lb + 1; k < rb; ++k)
+                    slot = (slot * 10) + static_cast<std::size_t>(bps[k] - '0');
+                existing_ordinals.insert(slot);
+            }
+            if(!existing_ordinals.contains(override.ordinal))
+                return unexpected(error{errc::schema_violation, nucleus::format(
+                    "argv ordinal {} for '{}' is out of range: "
+                    "{} instance(s) exist; out of range",
+                    override.ordinal, override.container_prefix,
+                    existing_ordinals.size())});
+            // Ordinal exists; store only if no higher-rank entry already exists
+            // at this path (rank-precedence: higher-rank wins even over deferred entries).
+            const origin *existing = m_provenance.of(override.rebracketed.str());
+            if(existing == nullptr || existing->rank < override.prov.rank)
+            {
+                m_building.set(override.rebracketed, override.val);
+                m_provenance.record(override.rebracketed.str(), override.prov);
+            }
+        }
         return {};
     }
 
@@ -1049,7 +1221,7 @@ public:
 
         expansion_guard leaf_guard(default_reference_depth_cap);
         std::unordered_map<std::string, std::string> resolved_cache;
-        std::size_t substitution_counter = 0;
+        substitution_budget budget(m_reference_budget);
 
         // Snapshot paths (resolving writes back via m_building.set()).
         std::vector<key_path> const all_paths = m_building.paths();
@@ -1063,7 +1235,7 @@ public:
             if(text.find("${") == std::string_view::npos)
                 continue;
 
-            auto r = resolve_one_leaf(kp, leaf_guard, resolved_cache, substitution_counter);
+            auto r = resolve_one_leaf(kp, leaf_guard, resolved_cache, budget);
             if(!r)
             {
                 const resolve_error &re = r.error();
@@ -1085,18 +1257,27 @@ public:
     // actionable; missing required fields are reported by the enforcer.
     expected<void, resolve_fold_error> validate()
     {
-        if(m_schema.surface().empty())
+        const bool has_groups = !m_schema.constraint_groups().empty()
+                             || !m_schema.identity_groups().empty();
+
+        // The unknown-path/required checks only apply when the schema declares a
+        // surface (an empty schema is not a claim that nothing is allowed), so they
+        // short-circuit here. The group/identity pass is orthogonal: it runs whenever
+        // any group is registered, independent of the surface -- a root-anchored
+        // host-validator valve carries no element surface yet must still enforce.
+        if(m_schema.surface().empty() && !has_groups)
             return {};
 
-        schema_validation checked = schema_enforcer::validate(m_schema, m_building,
-                                                              m_keyed_satisfied);
+        schema_validation checked = m_schema.surface().empty()
+            ? schema_validation{}
+            : schema_enforcer::validate(m_schema, m_building, m_keyed_satisfied);
 
         // Container-scoped constraint + identity groups enforce over the resolved,
         // sliced tree -- run on a transient config snapshot so the host-validator valve and
         // member navigation use the real config_node walk. Skipped when no group is
         // declared (the common case pays nothing).
         std::vector<schema_violation> group_violations;
-        if(!m_schema.constraint_groups().empty() || !m_schema.identity_groups().empty())
+        if(has_groups)
         {
             std::map<std::string, std::string> owned;
             for(const key_path &path : m_building.paths())
@@ -1162,12 +1343,16 @@ public:
             // when node is repeated) has no scalar at the plain declared path; its
             // values live at cluster/node[0]/port, cluster/node[1]/port, etc.
             bool found_any_indexed = false;
+            bool has_plain_scalar = false;
             for(const key_path &kp : m_building.paths())
             {
                 if(m_schema.canonical_text(kp) != path_str)
                     continue;
                 if(kp.str() == path_str)
-                    continue; // handled by the direct path branch below
+                {
+                    has_plain_scalar = true;
+                    continue; // handled below, once we know whether indexed siblings coexist
+                }
                 found_any_indexed = true;
                 const value *v = m_building.find(kp);
                 if(v == nullptr)
@@ -1185,6 +1370,26 @@ public:
                             kp.str(), res.error(), layer_label)});
                 }
                 m_typed.emplace(kp.str(), std::move(res).value());
+            }
+
+            // A scalar written directly at the plain declared path cannot coexist with
+            // properly-indexed sibling instances of the same repeated field: it bypasses
+            // the fold's own ordinal-indexing machinery and would otherwise sit in the
+            // resolved keyspace unconverted and unvalidated.
+            if(found_any_indexed && has_plain_scalar)
+            {
+                std::string repeated_ancestor;
+                for(const std::string &rc : m_schema.repeated_container_paths())
+                {
+                    if(path_str.starts_with(rc + key_path::separator)
+                       && rc.size() > repeated_ancestor.size())
+                        repeated_ancestor = rc;
+                }
+                return unexpected(error{errc::schema_violation, nucleus::format(
+                    "path '{}' has both an unindexed value and indexed sibling instances "
+                    "under repeated container '{}'; a scalar may not coexist with indexed "
+                    "instances of the same repeated field",
+                    path_str, repeated_ancestor)});
             }
 
             // Direct path lookup: plain (non-indexed) scalar at the declared path.
@@ -1216,7 +1421,7 @@ public:
     // Copies every building value OUT into an owned snapshot and pairs it with the
     // provenance recorded alongside it, producing the immutable, self-owning config.
     // All repeated paths are indexed scalars in m_building; no collection branch needed.
-    config freeze() const
+    config freeze(std::vector<degradation> degraded = {}) const
     {
         std::map<std::string, std::string> owned;
         for(const key_path &path : m_building.paths())
@@ -1224,7 +1429,7 @@ public:
             if(const value *v = m_building.find(path))
                 owned.emplace(path.str(), std::string(v->text()));
         }
-        return {std::move(owned), m_typed, m_provenance};
+        return {std::move(owned), m_typed, m_provenance, std::move(degraded)};
     }
 
     // Sets the pass-2 reference substitution budget. 0 maps to the engine default (never zero-cap).
@@ -1232,6 +1437,14 @@ public:
     {
         if(budget != 0)
             m_reference_budget = budget;
+    }
+
+    // Sets the pass-1 expansion substitution budget. 0 maps to the engine default (never zero-cap).
+    // Must be called before fold(), which is where pass-1 expansion runs.
+    void set_expansion_budget(std::size_t budget) noexcept
+    {
+        if(budget != 0)
+            m_expansion_budget = budget;
     }
 
 private:
@@ -1244,7 +1457,7 @@ private:
     resolve_one_leaf(const key_path &kp,
                      expansion_guard &leaf_guard,
                      std::unordered_map<std::string, std::string> &resolved_cache,
-                     std::size_t &substitution_counter)
+                     substitution_budget &budget)
     {
         const std::string path_str = kp.str();
 
@@ -1273,16 +1486,14 @@ private:
             return unexpected(std::move(guard_scope).error());
 
         // Build the ensure_resolved callback for depth-first recursive resolution.
-        // Captures this, leaf_guard, resolved_cache, and substitution_counter by ref.
+        // Captures this, leaf_guard, resolved_cache, and budget by ref.
         ensure_resolved_fn ensure = [&](const key_path &target)
             -> expected<void, resolve_error>
         {
-            return resolve_one_leaf(target, leaf_guard, resolved_cache,
-                                    substitution_counter);
+            return resolve_one_leaf(target, leaf_guard, resolved_cache, budget);
         };
 
-        tree_resolver_scope scope(m_building, kp,
-                                  substitution_counter, m_reference_budget,
+        tree_resolver_scope scope(m_building, kp, budget,
                                   std::move(ensure), &m_tree_tokenizer);
         auto resolved = scope.resolve_value(text);
         if(!resolved)
@@ -1340,7 +1551,9 @@ private:
             const std::string unified_str = relay_canonical(keyed);
             auto unified = key_path::parse(unified_str);
             if(!unified)
-                continue;
+                return unexpected(error{errc::malformed_source, nucleus::format(
+                    "internal invariant violation: re-parsed path failed to parse "
+                    "in relay_strain()'s unification: '{}'", unified_str)});
 
             const value *v = m_building.find(keyed);
             if(v == nullptr)
@@ -1487,6 +1700,7 @@ private:
     const tree_tokenizer_registry   &m_tree_tokenizer;
 
     std::size_t m_reference_budget = default_reference_budget;
+    std::size_t m_expansion_budget = default_expansion_budget;
 
     keyspace m_building;
     provenance m_provenance;
@@ -1521,6 +1735,18 @@ private:
     // and its canonical form (to look up mode/field).
     std::map<std::string, std::vector<keyed_instance_entry>> m_keyed_accumulator;
     std::map<std::string, std::string> m_actual_to_canonical;
+
+    // A CLI plain-ordinal override recognized during fold(), held here until
+    // apply_deferred_cli_overrides() validates and stores it after slice().
+    struct pending_cli_ordinal
+    {
+        std::size_t     ordinal;
+        std::string     container_prefix;
+        key_path        rebracketed;
+        value           val;
+        origin          prov;
+    };
+    std::vector<pending_cli_ordinal> m_deferred_cli_overrides;
 };
 
 }

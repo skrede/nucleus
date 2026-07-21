@@ -106,6 +106,24 @@ TEST_CASE("field-form nesting resolves the head to a fixpoint", "[resolve][neste
     CHECK(r.value() == "value");
 }
 
+TEST_CASE("a chained value carrying a further token past a literal prefix resolves identically",
+          "[resolve][nested]")
+{
+#ifdef _WIN32
+    _putenv_s("CHAIN_HEAD", "head ${env.CHAIN_TAIL}");
+    _putenv_s("CHAIN_TAIL", "tail");
+#else
+    setenv("CHAIN_HEAD", "head ${env.CHAIN_TAIL}", 1);
+    setenv("CHAIN_TAIL", "tail", 1);
+#endif
+    auto reg = core_registry();
+    // The produced value is "head ${env.CHAIN_TAIL}": the splice-point resume
+    // must skip the literal "head " yet still yield the whole fixpoint.
+    auto r = resolve_tokens("${env.CHAIN_HEAD}", reg);
+    REQUIRE(r.has_value());
+    CHECK(r.value() == "head tail");
+}
+
 TEST_CASE("scope file-frame keys resolve against the file frame", "[resolve][scope]")
 {
     auto reg = core_registry();
@@ -202,4 +220,26 @@ TEST_CASE("an unknown tokenizer function is a named error", "[resolve][string]")
     auto r = resolve_tokens("${string.bogusfn(value=x)}", reg);
     REQUIRE_FALSE(r.has_value());
     CHECK(r.error().code == resolve_errc::unknown_function);
+}
+
+TEST_CASE("an unbalanced ${ is a parse_error, not silent passthrough", "[resolve]")
+{
+    auto reg = core_registry();
+    auto r = resolve_tokens("prefix ${env.HOME suffix", reg);
+    REQUIRE_FALSE(r.has_value());
+    CHECK(r.error().code == resolve_errc::parse_error);
+    CHECK(r.error().message.find("unterminated ${") != std::string::npos);
+}
+
+TEST_CASE("no-token and balanced-token values still resolve after the loud unbalanced path",
+          "[resolve]")
+{
+#ifdef _WIN32
+    _putenv_s("NUCLEUS_BALANCED_VAR", "ok");
+#else
+    setenv("NUCLEUS_BALANCED_VAR", "ok", 1);
+#endif
+    auto reg = core_registry();
+    CHECK(resolve_tokens("plain text, no braces", reg).value() == "plain text, no braces");
+    CHECK(resolve_tokens("a ${env.NUCLEUS_BALANCED_VAR} b", reg).value() == "a ok b");
 }

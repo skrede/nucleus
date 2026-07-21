@@ -179,6 +179,144 @@ TEST_CASE("anonymous strains alone collapse into the config space",
     REQUIRE_FALSE(config.contains("cluster/server/name"));
 }
 
+TEST_CASE("an explicitly-empty primary-key value is rejected",
+          "[projection][keyed]")
+{
+    nucleus::config_space_builder engine;
+    declare_cluster(engine);
+    nucleus::config_space space = engine.build();
+
+    // A present-but-empty key is an empty identity, not an anonymous instance:
+    // it cannot silently degrade to the structural walk and shadow real strains.
+    SECTION("empty key attribute")
+    {
+        const char *doc = R"(
+            <cluster>
+                <server name=""><port>80</port></server>
+            </cluster>)";
+        auto loaded = load_doc(space, doc);
+        REQUIRE_FALSE(loaded);
+        REQUIRE(loaded.error().code == nucleus::errc::malformed_source);
+        REQUIRE(loaded.error().message.find("empty primary-key value")
+                != std::string::npos);
+        REQUIRE(loaded.error().message.find("cluster/server") != std::string::npos);
+    }
+
+    SECTION("empty key text child")
+    {
+        const char *doc = R"(
+            <cluster>
+                <server><name></name><port>80</port></server>
+            </cluster>)";
+        auto loaded = load_doc(space, doc);
+        REQUIRE_FALSE(loaded);
+        REQUIRE(loaded.error().code == nucleus::errc::malformed_source);
+        REQUIRE(loaded.error().message.find("empty primary-key value")
+                != std::string::npos);
+    }
+}
+
+TEST_CASE("a genuinely absent key still loads as an anonymous instance",
+          "[projection][keyed]")
+{
+    // The companion to the empty-key rejection: absence (no key attribute and no
+    // key child) is unchanged -- the instance is an anonymous template.
+    const char *doc = R"(
+        <cluster>
+            <server><port>80</port></server>
+        </cluster>)";
+
+    nucleus::config_space_builder engine;
+    declare_cluster(engine);
+    nucleus::config_space space = engine.build();
+
+    auto loaded = load_doc(space, doc);
+    REQUIRE(loaded);
+    const nucleus::config &config = loaded.value();
+
+    REQUIRE(config.get("cluster/server/port") == "80");
+    REQUIRE_FALSE(config.contains("cluster/server/name"));
+}
+
+// The keyed-container projection lookup reads the RAW walk path. The two shapes
+// that could put a stray key value or ordinal on that path -- a keyed container
+// nested under another keyed container, or under a repeated container -- are both
+// rejected by the schema at attach (a config space has exactly one primary key,
+// and a primary key may not sit under a repeated ancestor). These cases lock that
+// invariant: a keyed container's path can never carry an enclosing key-value or
+// ordinal segment, so the lookup needs no canonicalization. (Canonicalizing the
+// lookup with declared_path here would be unsound: under an anonymous instance the
+// walk emits no key-value segment, so declared_path over-strips a genuine nested
+// child -- see the anonymous-nested-container case below.)
+TEST_CASE("a config space admits only one primary key (no keyed-under-keyed)",
+          "[projection][keyed][schema-invariant]")
+{
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(engine.register_element(nucleus::element("server", anchor::keyspace("cluster"))));
+    REQUIRE(engine.register_element(
+        nucleus::primary_key_element("name", anchor::keyspace("cluster/server"))));
+    REQUIRE(engine.register_element(nucleus::element("route", anchor::keyspace("cluster/server"))));
+
+    auto second = engine.register_element(
+        nucleus::primary_key_element("id", anchor::keyspace("cluster/server/route")));
+    REQUIRE_FALSE(second);
+    REQUIRE(second.error().message.find("exactly one") != std::string::npos);
+}
+
+TEST_CASE("a primary key may not sit under a repeated ancestor (no keyed-under-repeated)",
+          "[projection][keyed][schema-invariant]")
+{
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("root", anchor::root())));
+    REQUIRE(engine.register_element(nucleus::repeated_element("rack", anchor::keyspace("root"))));
+    REQUIRE(engine.register_element(nucleus::element("server", anchor::keyspace("root/rack"))));
+
+    auto keyed = engine.register_element(
+        nucleus::primary_key_element("name", anchor::keyspace("root/rack/server")));
+    REQUIRE_FALSE(keyed);
+    REQUIRE(keyed.error().message.find("repeated ancestor") != std::string::npos);
+}
+
+TEST_CASE("an anonymous keyed instance keeps its nested containers intact",
+          "[projection][keyed]")
+{
+    // An anonymous <server> (no key) descends without a key-value path segment,
+    // so a nested container under it sits at cluster/server/<child>. The keyed
+    // lookup must read that path as-is. A declared_path canonicalization would
+    // strip <child> as if it were the (absent) server key value, collapse
+    // cluster/server/profile -> cluster/server (whose key is 'name'), and then --
+    // because the nested <profile> carries its own name="demo" -- mistake the
+    // child for a keyed instance, inserting a spurious 'demo' path segment. Assert
+    // the nested container's contents survive under the declared path.
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(engine.register_element(nucleus::element("server", anchor::keyspace("cluster"))));
+    REQUIRE(engine.register_element(
+        nucleus::primary_key_element("name", anchor::keyspace("cluster/server"))));
+    REQUIRE(engine.register_element(nucleus::element("profile", anchor::keyspace("cluster/server"))));
+    REQUIRE(engine.register_element(
+        nucleus::unique_element("name", anchor::keyspace("cluster/server/profile"))));
+    REQUIRE(engine.register_element(
+        nucleus::element("message", anchor::keyspace("cluster/server/profile"))));
+    nucleus::config_space space = engine.build();
+
+    const char *doc = R"(
+        <cluster>
+            <server>
+                <profile name="demo"><message>hi</message></profile>
+            </server>
+        </cluster>)";
+
+    auto loaded = load_doc(space, doc);
+    REQUIRE(loaded);
+    const nucleus::config &config = loaded.value();
+
+    REQUIRE(config.get("cluster/server/profile/message") == "hi");
+    REQUIRE(config.get("cluster/server/profile/name") == "demo");
+    REQUIRE_FALSE(config.contains("cluster/server/profile/demo/message"));
+}
+
 TEST_CASE("without a declared primary key the structural walk is unchanged",
           "[projection][keyed]")
 {

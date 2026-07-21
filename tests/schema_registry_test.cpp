@@ -1,5 +1,6 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
+#include "nucleus/schema/converters.h"
 #include "nucleus/schema/schema_registry.h"
 
 #include "nucleus/keyspace/key_path.h"
@@ -255,4 +256,78 @@ TEST_CASE("Primary key under non-repeated child of repeated container rejected",
     REQUIRE(bad.error().find("primary key under repeated") != std::string::npos);
     // The ancestor 'cluster/node' must be named in the error.
     REQUIRE(bad.error().find("cluster/node") != std::string::npos);
+}
+
+TEST_CASE("re-declaring an already-declared element path is rejected at attach",
+          "[schema_registry][redeclaration]")
+{
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::element("cluster", anchor::root())));
+
+    // The first declaration at cluster/node wins.
+    REQUIRE(reg.attach(nucleus::element("node", anchor::keyspace("cluster"))));
+
+    // Redeclaring the same exact path as a primary key is rejected -- otherwise a
+    // pkey could be smuggled under a container by declaration order. The reject is
+    // what keeps attach-time invariants independent of declaration order.
+    auto as_identity =
+        reg.attach(nucleus::identity_element("node", anchor::keyspace("cluster")));
+    REQUIRE_FALSE(as_identity);
+    REQUIRE(as_identity.error().find("re-declares") != std::string::npos);
+
+    // Redeclaring the same exact path as a repeated container is rejected too.
+    auto as_repeated =
+        reg.attach(nucleus::repeated_element("node", anchor::keyspace("cluster")));
+    REQUIRE_FALSE(as_repeated);
+    REQUIRE(as_repeated.error().find("re-declares") != std::string::npos);
+}
+
+TEST_CASE("re-declaration reject is order-independent",
+          "[schema_registry][redeclaration]")
+{
+    // The same two declarations attached in the opposite order still leave the
+    // first winner in place and reject the second -- the schema's meaning cannot
+    // depend on which declaration is attached first.
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::element("cluster", anchor::root())));
+
+    REQUIRE(reg.attach(nucleus::repeated_element("node", anchor::keyspace("cluster"))));
+    auto second =
+        reg.attach(nucleus::element("node", anchor::keyspace("cluster")));
+    REQUIRE_FALSE(second);
+    REQUIRE(second.error().find("re-declares") != std::string::npos);
+}
+
+TEST_CASE("a second typed element at one path is rejected, not silently dropped",
+          "[schema_registry][redeclaration]")
+{
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::element("logging", anchor::root())));
+
+    REQUIRE(reg.attach(
+        nucleus::typed_element<int>("level", anchor::keyspace("logging"))));
+
+    // A second typed element at the same exact path used to be silently discarded
+    // at the typed store; it is now rejected loudly.
+    auto second = reg.attach(
+        nucleus::typed_element<double>("level", anchor::keyspace("logging")));
+    REQUIRE_FALSE(second);
+    REQUIRE(second.error().find("re-declares") != std::string::npos);
+}
+
+TEST_CASE("a legitimate child attach under a declared container still succeeds",
+          "[schema_registry][redeclaration]")
+{
+    // The reject is exact-path membership, never prefix membership: an already
+    // declared container path is a prefix of its children, and every child must
+    // still attach.
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::element("cluster", anchor::root())));
+    REQUIRE(reg.attach(nucleus::element("node", anchor::keyspace("cluster"))));
+
+    // Children under the declared container are not re-declarations of it.
+    REQUIRE(reg.attach(nucleus::element("port", anchor::keyspace("cluster/node"))));
+    REQUIRE(reg.attach(nucleus::element("host", anchor::keyspace("cluster/node"))));
+    REQUIRE(reg.recognizes(path_of("cluster/node/port")));
+    REQUIRE(reg.recognizes(path_of("cluster/node/host")));
 }

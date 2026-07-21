@@ -35,6 +35,16 @@ public:
         if(text.size() > 1 && text.find(key_path::separator) != std::string_view::npos)
             return unexpected(std::string("CLI delimiter '") + std::string(text)
                         + "' must not contain the keyspace separator '/'");
+        if(text.find('[') != std::string_view::npos
+                || text.find(']') != std::string_view::npos)
+            return unexpected(std::string("CLI delimiter '") + std::string(text)
+                        + "' must not contain '[' or ']' (ordinal-index notation)");
+        bool all_digits = true;
+        for(const char c : text)
+            all_digits = all_digits && (c >= '0' && c <= '9');
+        if(all_digits)
+            return unexpected(std::string("CLI delimiter '") + std::string(text)
+                        + "' must not be all digits (ordinal-index notation)");
         return cli_delimiter(std::string(text));
     }
 

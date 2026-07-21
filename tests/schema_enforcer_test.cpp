@@ -179,3 +179,94 @@ TEST_CASE("a repeated element accepts indexed values within the allowed set", "[
 
     REQUIRE(schema_enforcer::validate(reg, ks));
 }
+
+TEST_CASE("a closed-value leaf under a repeated container is checked per instance",
+          "[enforcer]")
+{
+    // cluster/node is a repeated container; mode is a non-repeated closed-value leaf
+    // beneath it. A resolved keyspace stores instances as cluster/node[i]/mode, so
+    // the plain declared path cluster/node/mode never carries a value -- yet every
+    // ordinal instance's value must satisfy the closed set.
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::element("cluster", anchor::root())));
+    REQUIRE(reg.attach(nucleus::repeated_element("node", anchor::keyspace(path_of("cluster")))));
+    REQUIRE(reg.attach(nucleus::enum_element("mode", anchor::keyspace(path_of("cluster/node")),
+                                     {"active", "standby"})));
+
+    keyspace ks;
+    ks.set(path_of("cluster/node[0]/mode"), nucleus::value::owned("active"));
+    ks.set(path_of("cluster/node[1]/mode"), nucleus::value::owned("stanby"));
+
+    auto v = schema_enforcer::validate(reg, ks);
+    REQUIRE_FALSE(v);
+    REQUIRE(violation_mentions(v.error(), "'stanby' is not one of the allowed values"));
+    // The violation names the concrete instance path, not the plain declared path.
+    REQUIRE(violation_mentions(v.error(), "cluster/node[1]/mode"));
+    REQUIRE(violation_mentions(v.error(), "did you mean 'standby'?"));
+}
+
+TEST_CASE("closed-value leaves under a repeated container all in-set validate clean",
+          "[enforcer]")
+{
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::element("cluster", anchor::root())));
+    REQUIRE(reg.attach(nucleus::repeated_element("node", anchor::keyspace(path_of("cluster")))));
+    REQUIRE(reg.attach(nucleus::enum_element("mode", anchor::keyspace(path_of("cluster/node")),
+                                     {"active", "standby"})));
+
+    keyspace ks;
+    ks.set(path_of("cluster/node[0]/mode"), nucleus::value::owned("active"));
+    ks.set(path_of("cluster/node[1]/mode"), nucleus::value::owned("standby"));
+
+    REQUIRE(schema_enforcer::validate(reg, ks));
+}
+
+TEST_CASE("a unique leaf with duplicate ordinal-sibling values is rejected", "[enforcer]")
+{
+    // cluster/node is a repeated container; id is a unique (non-identity) leaf.
+    // Two ordinal siblings carrying the same id must fail, naming both instances.
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::element("cluster", anchor::root())));
+    REQUIRE(reg.attach(nucleus::repeated_element("node", anchor::keyspace(path_of("cluster")))));
+    REQUIRE(reg.attach(nucleus::unique_element("id", anchor::keyspace(path_of("cluster/node")))));
+
+    keyspace ks;
+    ks.set(path_of("cluster/node[0]/id"), nucleus::value::owned("alpha"));
+    ks.set(path_of("cluster/node[1]/id"), nucleus::value::owned("alpha"));
+
+    auto v = schema_enforcer::validate(reg, ks);
+    REQUIRE_FALSE(v);
+    REQUIRE(violation_mentions(v.error(), "cluster/node[0]/id"));
+    REQUIRE(violation_mentions(v.error(), "cluster/node[1]/id"));
+}
+
+TEST_CASE("a unique leaf with distinct ordinal-sibling values validates clean", "[enforcer]")
+{
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::element("cluster", anchor::root())));
+    REQUIRE(reg.attach(nucleus::repeated_element("node", anchor::keyspace(path_of("cluster")))));
+    REQUIRE(reg.attach(nucleus::unique_element("id", anchor::keyspace(path_of("cluster/node")))));
+
+    keyspace ks;
+    ks.set(path_of("cluster/node[0]/id"), nucleus::value::owned("alpha"));
+    ks.set(path_of("cluster/node[1]/id"), nucleus::value::owned("beta"));
+
+    REQUIRE(schema_enforcer::validate(reg, ks));
+}
+
+TEST_CASE("a unique leaf under a keyed container does not double-fire", "[enforcer]")
+{
+    // node is a keyed container: its identity field named the strain and was
+    // consumed at slice time, so exactly one value per keyed field survives to
+    // validate(). The ordinal-sibling unique pass must see that single value and
+    // stay silent -- it must NOT collide with the slice-time strain check.
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::element("node", anchor::root())));
+    REQUIRE(reg.attach(nucleus::identity_element("name", anchor::keyspace(path_of("node")))));
+    REQUIRE(reg.attach(nucleus::unique_element("id", anchor::keyspace(path_of("node")))));
+
+    keyspace ks;
+    ks.set(path_of("node/id"), nucleus::value::owned("alpha"));
+
+    REQUIRE(schema_enforcer::validate(reg, ks, {"node"}));
+}

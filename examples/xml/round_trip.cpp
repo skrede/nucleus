@@ -70,15 +70,31 @@ int main()
 
     // The blank schema template (declared fields, no values) for contrast.
     std::cout << "# xml template\n";
-    nucleus::xml::emit_template(space, std::cout);
+    if(auto emitted = nucleus::xml::emit_template(space, std::cout); !emitted)
+    {
+        std::cerr << "xml template emit failed: " << emitted.error() << '\n';
+        return 1;
+    }
 
     // The same resolved config rendered through each source format.
     std::cout << "\n# xml document\n";
-    nucleus::xml::emit_document(config, std::cout);
+    if(auto emitted = nucleus::xml::emit_document(config, std::cout); !emitted)
+    {
+        std::cerr << "xml document emit failed: " << emitted.error() << '\n';
+        return 1;
+    }
     std::cout << "\n# env document\n";
-    nucleus::env::emit_document(config, std::cout);
+    if(auto emitted = nucleus::env::emit_document(config, std::cout); !emitted)
+    {
+        std::cerr << "env document emit failed: " << emitted.error() << '\n';
+        return 1;
+    }
     std::cout << "\n# args document\n";
-    nucleus::argv::emit_document(config, std::cout);
+    if(auto emitted = nucleus::argv::emit_document(config, std::cout); !emitted)
+    {
+        std::cerr << "args document emit failed: " << emitted.error() << '\n';
+        return 1;
+    }
 
     return 0;
 }

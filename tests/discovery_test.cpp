@@ -183,10 +183,37 @@ TEST_CASE("discovery finds host-supplied base name across host-supplied paths", 
     REQUIRE(hits.front().path.find(nucleus::path_to_text(home)) != std::string::npos);
 
     // open_all builds a live source per hit through the registry's factories.
-    auto sources = nucleus::discovery::open_all(base, search_paths, registry);
-    REQUIRE(sources.size() == 2);
-    for(auto &src : sources)
+    auto opened = nucleus::discovery::open_all(base, search_paths, registry);
+    REQUIRE(opened.handles.size() == 2);
+    REQUIRE(opened.failures.empty());
+    for(auto &src : opened.handles)
         REQUIRE(src.pull());
+
+    fs::remove_all(root);
+}
+
+TEST_CASE("open_all surfaces a discovered candidate it cannot open", "[discovery]")
+{
+    namespace fs = std::filesystem;
+    fs::path root = unique_temp_dir("nucleus_discovery_fail_");
+    fs::remove_all(root);
+
+    // A multi-dot extension the registry claims whole (".tar.gz") but which the
+    // path resolves by its last suffix only (".gz"): find() matches the whole
+    // claim while open() cannot, so the candidate lands in failures.
+    nucleus::extension_registry registry;
+    REQUIRE(registry.claim({"xml"}, tagging_factory("xml")));
+    REQUIRE(registry.claim({"tar.gz"}, tagging_factory("archive")));
+
+    const std::string base = "settings";
+    touch(root / (base + ".xml"));
+    touch(root / (base + ".tar.gz"));
+
+    auto opened = nucleus::discovery::open_all(base, {root}, registry);
+    REQUIRE(opened.handles.size() == 1);
+    REQUIRE(opened.handles.front().pull());
+    REQUIRE(opened.failures.size() == 1);
+    REQUIRE(opened.failures.front().path.find(base + ".tar.gz") != std::string::npos);
 
     fs::remove_all(root);
 }

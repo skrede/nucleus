@@ -15,12 +15,27 @@ if(NOT DEFINED NUCLEUS_ROOT)
 endif()
 
 # Forbidden vocabulary. Case-insensitive substrings that must not appear in core:
-# any format NAME (xml), the parser DEPENDENCY (pugi/pugixml), and host-specific
-# (vagus/node-vocabulary) symbols. The core is format-agnostic -- it must not name a
-# format at all; the output seam is a format-agnostic concept, and every per-format
-# emitter lives in its own quarantined module. Kept in lockstep with the shell gate
+# any format NAME (xml) and the parser DEPENDENCY (pugi/pugixml). The core is
+# format-agnostic -- it must not name a format at all; the output seam is a
+# format-agnostic concept, and every per-format emitter lives in its own
+# quarantined module. Kept in lockstep with the shell gate
 # (scripts/core_purity_check.sh).
-set(forbidden "xml" "pugi" "vagus" "<vagus>" "<node>")
+set(forbidden "xml" "pugi")
+
+# Host-application tokens are not committed here; they are appended at runtime from
+# an uncommitted, gitignored local file (one token per line) if it is present. A
+# missing file leaves the format-only default, so a fresh clone and the local
+# ctest gate pass unmodified -- the read is append-if-present, never require.
+set(local_tokens_file "${CMAKE_CURRENT_LIST_DIR}/purity_tokens.local")
+if(EXISTS "${local_tokens_file}")
+    file(STRINGS "${local_tokens_file}" local_tokens)
+    foreach(token ${local_tokens})
+        string(STRIP "${token}" token)
+        if(NOT token STREQUAL "")
+            list(APPEND forbidden "${token}")
+        endif()
+    endforeach()
+endif()
 
 # Directories that are allowed to mention parser/host vocabulary because they ARE
 # the quarantined module: the xml format module (lib/xml/) wraps pugixml privately.

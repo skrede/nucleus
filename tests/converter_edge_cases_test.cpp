@@ -118,3 +118,20 @@ TEST_CASE("double converter covers the full error matrix", "[typed][builtin][flo
     fails_with<double>("+2.5", "invalid characters");
     fails_with<double>("abc", "invalid characters");
 }
+
+// A leading '-' with nothing parseable after it is syntax, not range, for signed
+// and floating targets: "-abc" and a bare "-" are invalid characters. Only an
+// unsigned target reads a leading '-' as a value below its floor (out of range).
+TEST_CASE("a leading minus is invalid characters for signed and float targets",
+          "[typed][builtin][integer][float]")
+{
+    fails_with<int32_t>("-abc", "invalid characters");
+    fails_with<int32_t>("-", "invalid characters");
+    fails_with<int64_t>("-abc", "invalid characters");
+    fails_with<float>("-abc", "invalid characters");
+    fails_with<float>("-", "invalid characters");
+    fails_with<double>("-abc", "invalid characters");
+
+    fails_with<uint32_t>("-abc", "out of range");
+    fails_with<uint32_t>("-", "out of range");
+}

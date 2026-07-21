@@ -182,6 +182,11 @@ token_result resolver_scope::resolve_one(std::string_view token)
     auto guard = m_guard.enter(std::string(token));
     if(!guard) return unexpected(std::move(guard).error());
 
+    // Bound total substitutions across the whole load (orthogonal to the depth
+    // cap): a bounded-depth exponential fanout is stopped by count, not depth.
+    if(auto charged = m_budget.charge(); !charged)
+        return unexpected(std::move(charged).error());
+
     // Field-form nesting (${env.${var}}): a nested ${...} that sits OUTSIDE any
     // argument list is resolved into the head before lexing, so the lexer sees a
     // flat category.name. Function-argument nesting (${f.g(${b})}) is left to the
@@ -225,10 +230,17 @@ token_result resolver_scope::resolve_one(std::string_view token)
 
     // Recursive-to-fixpoint: the produced text may itself still contain ${...}
     // (a binding whose value is a token, or the outer of a ${a${b}} once the
-    // inner resolved). Re-scan it while this token's guard is still live.
-    if(produced.value().find("${") != std::string::npos)
-        return resolve_all(produced.value());
-    return produced;
+    // inner resolved). Resume from the first ${ so the already-literal prefix is
+    // not rescanned; the re-expansion still runs under this token's live guard,
+    // so a token that re-emits itself (splice at offset 0) stays a named cycle.
+    const std::string &out = produced.value();
+    const auto splice = out.find("${");
+    if(splice == std::string::npos)
+        return produced;
+
+    auto tail = resolve_all(std::string_view(out).substr(splice));
+    if(!tail) return unexpected(std::move(tail).error());
+    return out.substr(0, splice) + std::move(tail).value();
 }
 
 token_result resolver_scope::resolve_all(std::string_view input)
@@ -242,6 +254,13 @@ token_result resolver_scope::resolve_all(std::string_view input)
         auto span = find_next_token(input, pos);
         if(!span)
         {
+            // find_next_token yields no span for two reasons: no ${ remains (a
+            // legitimate literal remainder), or a ${ opened but never balanced.
+            // A surviving ${ at or after pos means the latter -- fail loudly with
+            // the same contract pass-2 raises, instead of emitting raw ${ text.
+            if(input.find("${", pos) != std::string_view::npos)
+                return unexpected(resolve_error(resolve_errc::parse_error,
+                                          "unterminated ${ in value"));
             result.append(input.substr(pos));
             break;
         }

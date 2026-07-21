@@ -21,6 +21,7 @@ using nucleus::anchor;
 using nucleus::keyspace;
 using nucleus::key_path;
 using nucleus::argv_source;
+using nucleus::cli_delimiter;
 using nucleus::schema_registry;
 using nucleus::schema_enforcer;
 
@@ -78,4 +79,27 @@ TEST_CASE("an undeclared flag is rejected by the schema authority", "[bijection]
 
     auto batch = src.pull();
     REQUIRE_FALSE(batch); // strict: the schema does not declare this path
+}
+
+// A digit or bracket delimiter collides with ordinal-index notation, so flag
+// segmentation would be ambiguous. Both belong to the same non-invertible class
+// as `=` and `/` and are rejected at parse time.
+TEST_CASE("a digit delimiter is rejected", "[bijection]")
+{
+    REQUIRE_FALSE(cli_delimiter::parse("0"));
+    REQUIRE_FALSE(cli_delimiter::parse("42"));
+}
+
+TEST_CASE("a bracket-containing delimiter is rejected", "[bijection]")
+{
+    REQUIRE_FALSE(cli_delimiter::parse("["));
+    REQUIRE_FALSE(cli_delimiter::parse("]"));
+    REQUIRE_FALSE(cli_delimiter::parse("_[_"));
+}
+
+TEST_CASE("a conventional delimiter still parses", "[bijection]")
+{
+    REQUIRE(cli_delimiter::parse("-"));
+    REQUIRE(cli_delimiter::parse("__"));
+    REQUIRE(cli_delimiter::parse("."));
 }

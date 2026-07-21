@@ -114,6 +114,11 @@ public:
     // Normalizes an extension to a leading-dot, lower-effort canonical form. An
     // empty string maps to "" (no extension). Exposed so discovery shares the
     // exact same normalization.
+    //
+    // Case-sensitive: ".CFG" and ".cfg" are distinct keys. On case-insensitive
+    // filesystems (Windows, default macOS) a document whose on-disk extension
+    // differs in case from the registered one will not match. Documented as
+    // known platform-divergent behavior in docs/api-implementations.md.
     static std::string normalize(std::string_view extension)
     {
         if(extension.empty())

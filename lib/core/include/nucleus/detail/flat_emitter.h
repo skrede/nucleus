@@ -1,17 +1,23 @@
 #ifndef HPP_GUARD_NUCLEUS_DETAIL_FLAT_EMITTER_H
 #define HPP_GUARD_NUCLEUS_DETAIL_FLAT_EMITTER_H
 
+#include "nucleus/error.h"
 #include "nucleus/config.h"
+#include "nucleus/format.h"
+#include "nucleus/expected.h"
 #include "nucleus/config_space.h"
 
 #include "nucleus/schema/schema.h"
 
 #include "nucleus/keyspace/key_path.h"
+#include "nucleus/keyspace/ordinal_sort_key.h"
 
 #include <span>
 #include <string>
+#include <vector>
 #include <cstddef>
 #include <ostream>
+#include <algorithm>
 #include <string_view>
 
 namespace nucleus::detail {
@@ -26,7 +32,7 @@ inline bool is_flat_leaf(const schema_element &el,
     for(const schema_element &other : all)
     {
         const std::string path = other.declared_path().str();
-        if(path.size() > prefix.size() && path.compare(0, prefix.size(), prefix) == 0)
+        if(path.size() > prefix.size() && path.starts_with(prefix))
             return false;
     }
     return true;
@@ -63,8 +69,8 @@ inline std::string render_flat_key(std::string_view key,
     {
         if(i == key.size() || key[i] == key_path::separator)
         {
-            std::string_view seg = key.substr(start, i - start);
-            std::string_view base = key_path::base_name(seg);
+            const std::string_view seg = key.substr(start, i - start);
+            const std::string_view base = key_path::base_name(seg);
             if(!first_seg)
                 out.append(key_separator);
             out.append(base);
@@ -79,7 +85,7 @@ inline std::string render_flat_key(std::string_view key,
 // LEAF path (its path joined by `key_separator`), blank value (template only), with
 // `key_prefix` prepended to every key. A constrained leaf annotates its allowed
 // set as a trailing `# allowed: a|b|c`.
-inline void emit_flat_template(const config_space &space, std::ostream &out,
+inline expected<void, error> emit_flat_template(const config_space &space, std::ostream &out,
                                std::string_view key_prefix,
                                std::string_view key_separator = "/",
                                std::string_view anchor = {})
@@ -106,18 +112,48 @@ inline void emit_flat_template(const config_space &space, std::ostream &out,
         }
         out << '\n';
     }
+    return {};
 }
 
-// Projects a resolved config into flat KEY=value lines: one line per
-// resolved value, so a repeated path emits one line per value in order, with
-// `key_prefix` prepended to every key. The flat line contract carries no embedded
-// newline; values are written verbatim otherwise.
-inline void emit_flat_document(const config &config, std::ostream &out,
+// Projects a resolved config into flat KEY=value lines: one line per resolved
+// value, so a repeated path emits one line per value in order, with `key_prefix`
+// prepended to every key. Keys are sorted by numeric ordinal so repeated
+// instances round-trip in order (node[2] before node[10]) at N >= 11 rather than
+// in lexicographic map order. A key OR value carrying an embedded newline or
+// carriage return is rejected before any write: the line-oriented flat grammar
+// would let such text forge an extra flag/var line on round-trip.
+inline expected<void, error> emit_flat_document(const config &config, std::ostream &out,
                                std::string_view key_prefix,
                                std::string_view key_separator = "/",
                                std::string_view anchor = {})
 {
-    for(const std::string &key : config.keys())
+    std::vector<std::string> sorted_keys = config.keys();
+    std::stable_sort(sorted_keys.begin(), sorted_keys.end(),
+        [](const std::string &a, const std::string &b) {
+            return ordinal_sort_key(a) < ordinal_sort_key(b);
+        });
+
+    for(const std::string &key : sorted_keys)
+    {
+        std::string_view rendered = key;
+        if(!strip_flat_anchor(rendered, anchor))
+            continue;
+        if(key.find('\n') != std::string::npos
+           || key.find('\r') != std::string::npos)
+            return unexpected(error{errc::malformed_source, nucleus::format(
+                "flat emit: key '{}' carries an embedded newline or carriage "
+                "return, which the line-oriented flat format cannot represent "
+                "without forging an extra line", key)});
+        for(const std::string &value : config.get_all(key))
+            if(value.find('\n') != std::string::npos
+               || value.find('\r') != std::string::npos)
+                return unexpected(error{errc::malformed_source, nucleus::format(
+                    "flat emit: value for key '{}' carries an embedded newline or "
+                    "carriage return, which the line-oriented flat format cannot "
+                    "represent without forging an extra line", key)});
+    }
+
+    for(const std::string &key : sorted_keys)
     {
         std::string_view rendered = key;
         if(!strip_flat_anchor(rendered, anchor))
@@ -126,6 +162,7 @@ inline void emit_flat_document(const config &config, std::ostream &out,
             out << key_prefix << render_flat_key(rendered, key_separator) << '='
                 << value << '\n';
     }
+    return {};
 }
 
 }

@@ -82,6 +82,11 @@ struct load_options
     std::function<source_handle(const std::string &)>   make_document;
     // Maximum tree-reference substitutions in one pass-2 resolve. 0 = engine default (10000).
     std::size_t                                         reference_budget = 0;
+    // Maximum token-expansion substitutions in one pass-1 fold. 0 = engine default (2500).
+    std::size_t                                         expansion_budget = 0;
+    // Optional host sink for load-time warnings (soft-capability degradations).
+    // nullptr = no logging; degradations are still recorded on config::degradations().
+    log_sink*                                           log = nullptr;
 };
 
 // The mutable, free-standing builder: sole owner of the three flat sibling
@@ -170,11 +175,11 @@ public:
     // (document root element, env prefix, argv first segment). Empty = unnamed.
     config_space_builder &name(std::string space_name);
 
-    // Seals the builder into an immutable config_space. Infallible (it never
-    // returns an error); it copies the three registries + policy + ledger into the
+    // Seals the builder into an immutable config_space: the first build() never
+    // returns an error; it copies the three registries + policy + ledger into the
     // sealed product and marks the builder spent. After build(), every register_* /
-    // install_* / set_registration_policy is a LOUD state-machine error, never a
-    // silent no-op.
+    // install_* / set_registration_policy is a LOUD state-machine error, name() and
+    // a second build() throw std::invalid_argument -- never a silent no-op.
     config_space build();
 
 private:
@@ -220,12 +225,21 @@ public:
                                                   const key_path &anchor = {},
                                                   std::string_view space_name = {}) const;
 
+    // Generates plain --help text projected from the sealed schema and bound to
+    // `prog`: one line per flag with its description, allowed-values, and a
+    // required marker, grouped by top-level keyspace. Flags render under
+    // `delimiter` and relative to `anchor`. Only the string crosses the boundary;
+    // the host owns how it is surfaced.
+    std::string generate_help(std::string_view prog,
+                                            const cli_delimiter &delimiter = {},
+                                            const key_path &anchor = {}) const;
+
     // The declared schema elements, the neutral data a format emitter projects into
     // a template. A pure read of the sealed schema; the registry stays encapsulated.
     std::span<const schema_element> schema_elements() const;
 
-    // Builds a transient schema_query_context for use with query(). Borrows this
-    // config_space; the returned context must not outlive this space.
+    // Builds a schema_query_context snapshot for use with query(). The returned
+    // context is an owned snapshot the caller may keep past this space's lifetime.
     schema_query_context query_context() const;
 
     // Returns a NEW builder pre-populated with a DEEP COPY of this sealed space's
@@ -248,6 +262,8 @@ private:
 // sealed space using index-as-rank precedence, optionally expanding document_paths
 // from load_options through the inheritance chain walker. Concurrent-safe;
 // borrows the space by const reference and owns all mutable resolve state locally.
+// Concurrent loads may share the space but must each pass their OWN source_stack:
+// the non-const source_stack& is per-load state, not shared across threads.
 // The stack is BORROWED, not consumed: it stays valid afterward, so the same
 // stack can pre-flight via check_capabilities() and then load_config, or load_config
 // more than once (sources are pulled again; a document source reuses its cached parse).
@@ -261,10 +277,11 @@ load_result load_config(const config_space &space,
                                source_stack &&stack,
                                const load_options &options = {});
 
-// Capability pre-flight for the source_stack-based load_config. Reads capabilities
-// only -- no pull, no fold -- so the stack is borrowed const and stays intact
-// for the load_config() that follows it. Consistent with load_config() over the same
-// stack+options.
+// Capability pre-flight for the source_stack-based load_config. Expands the
+// inheritance chain -- reading and parsing every chain document -- so a missing
+// chain document fails the capability check. The stack is borrowed const and stays
+// intact for the load_config() that follows it. Consistent with load_config() over
+// the same stack+options.
 gate_result check_capabilities(const config_space &space,
                                              const source_stack &stack,
                                              const load_options &options = {});

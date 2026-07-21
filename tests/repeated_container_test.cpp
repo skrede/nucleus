@@ -13,13 +13,10 @@
 
 #include "nucleus/config.h"
 #include "nucleus/error.h"
-#include "nucleus/capability.h"
 
 #include "nucleus/keyspace/value.h"
 #include "nucleus/keyspace/key_path.h"
 #include "nucleus/keyspace/keyspace.h"
-
-#include "nucleus/config_source/config_source.h"
 
 #include "nucleus/xml/xml_source.h"
 #include "nucleus/runtime/runtime_source.h"
@@ -138,6 +135,55 @@ TEST_CASE("wholesale-replace -- layer 2 with 2 nodes replaces layer 1 three-node
     REQUIRE(cfg.get("cluster/node[1]/port") == "90");
     // Node[2] from the first layer must be absent.
     REQUIRE(cfg.get("cluster/node[2]/port") == std::nullopt);
+}
+
+TEST_CASE("wholesale-replace -- nested repeated-in-repeated sweep operates at "
+          "the innermost container, not the outer one",
+          "[repeated_container][wholesale_replace][nested]")
+{
+    // Schema: cluster -> node (repeated) -> label (leaf), tags (repeated) -> name.
+    // "node" and "node/tags" are BOTH declared repeated containers, one nested
+    // inside the other; "cluster/node" is a prefix of "cluster/node/tags" so a
+    // container-prefix selection that stops at the first (shortest) match picks
+    // the wrong, outer container for any entry actually belonging to "tags".
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(engine.register_element(
+        nucleus::repeated_element("node", anchor::keyspace("cluster"))));
+    REQUIRE(engine.register_element(
+        nucleus::element("label", anchor::keyspace("cluster/node"))));
+    REQUIRE(engine.register_element(
+        nucleus::repeated_element("tags", anchor::keyspace("cluster/node"))));
+    REQUIRE(engine.register_element(
+        nucleus::element("name", anchor::keyspace("cluster/node/tags"))));
+    nucleus::config_space space = engine.build();
+
+    // Layer 1 supplies both label and a tag under node[0].
+    auto src1 = xml_of(
+        "<cluster>"
+        "<node><label>keep</label><tags><name>a</name></tags></node>"
+        "</cluster>");
+    // Layer 2 (higher precedence) touches ONLY the nested "tags" container --
+    // it never mentions "label" at all.
+    auto src2 = xml_of(
+        "<cluster>"
+        "<node><tags><name>z</name></tags></node>"
+        "</cluster>");
+
+    auto loaded = nucleus::load_config(space,
+        nucleus::source_stack{std::move(src1), std::move(src2)},
+        {});
+    REQUIRE(loaded);
+    const nucleus::config &cfg = loaded.value();
+
+    // A too-shallow sweep (at "cluster/node" instead of "cluster/node/tags")
+    // would wipe "label" as collateral damage even though layer 2 never
+    // touched it; the innermost sweep must leave it untouched.
+    REQUIRE(cfg.get("cluster/node[0]/label") == "keep");
+    // The nested "tags" container itself must still wholesale-replace: layer
+    // 2's single tag replaces layer 1's, not merges alongside it.
+    REQUIRE(cfg.get("cluster/node[0]/tags[0]/name") == "z");
+    REQUIRE_FALSE(cfg.get("cluster/node[0]/tags[1]/name").has_value());
 }
 
 TEST_CASE("extend= on repeated container returns layering_violation",
@@ -355,7 +401,7 @@ TEST_CASE("get_as on unindexed repeated container path returns errc::index_requi
     REQUIRE_FALSE(result.has_value());
     REQUIRE(result.error().code == nucleus::errc::index_required);
     REQUIRE(result.error().message.find("cluster/node") != std::string::npos);
-    REQUIRE(result.error().message.find("2") != std::string::npos);
+    REQUIRE(result.error().message.find('2') != std::string::npos);
 
     // Indexed path must succeed (port is typed only if converter registered,
     // otherwise absent_key for untyped; but cluster/node[0]/port IS present).
@@ -527,6 +573,59 @@ TEST_CASE("Repeated container inside keyed container -- ordinals survive slice",
     REQUIRE_FALSE(cfg.contains("cluster/server/primary/route"));
 }
 
+TEST_CASE("Repeated container inside keyed container -- later layer's new strain "
+          "does not delete an earlier strain's route",
+          "[repeated_container]")
+{
+    // Same schema as above: cluster -> server (keyed by name) -> route
+    // (repeated) -> port. base.xml declares strain "a"; derived.xml inherits
+    // from it and introduces a DIFFERENT strain "b" with its own route -- a
+    // legal, brand-new strain, not an extend= of "a".
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(engine.register_element(
+        nucleus::element("server", anchor::keyspace("cluster"))));
+    REQUIRE(engine.register_element(
+        nucleus::primary_key_element("name", anchor::keyspace("cluster/server"))));
+    REQUIRE(engine.register_element(
+        nucleus::repeated_element("route", anchor::keyspace("cluster/server"))));
+    REQUIRE(engine.register_element(
+        nucleus::element("port", anchor::keyspace("cluster/server/route"))));
+    nucleus::config_space space = engine.build();
+
+    const char *base_doc =
+        "<cluster>"
+        "<server name=\"a\"><route><port>80</port></route></server>"
+        "</cluster>";
+    const char *derived_doc =
+        "<cluster inherit=\"base.xml\">"
+        "<server name=\"b\"><route><port>443</port></route></server>"
+        "</cluster>";
+
+    nucleus::load_options opts;
+    opts.document_paths = {"derived.xml"};
+    opts.make_document = [&](const std::string &path) -> nucleus::source_handle {
+        if(path == "base.xml")
+            return nucleus::source_handle(xml_of(base_doc));
+        return nucleus::source_handle(xml_of(derived_doc));
+    };
+
+    // Selecting the EARLIER strain ("a") must not lose its route to the
+    // later layer's introduction of a different strain's route.
+    opts.selection = "a";
+    auto loaded_a = nucleus::load_config(space, nucleus::source_stack{}, opts);
+    REQUIRE(loaded_a);
+    REQUIRE(loaded_a.value().get("cluster/server/route[0]/port") == "80");
+
+    // Selecting the later strain ("b") sees its own route and no leakage
+    // from strain "a".
+    opts.selection = "b";
+    auto loaded_b = nucleus::load_config(space, nucleus::source_stack{}, opts);
+    REQUIRE(loaded_b);
+    REQUIRE(loaded_b.value().get("cluster/server/route[0]/port") == "443");
+    REQUIRE_FALSE(loaded_b.value().contains("cluster/server/a/route"));
+}
+
 // ---------------------------------------------------------------------------
 // extend= targeting repeated container via inheritance chain
 // ---------------------------------------------------------------------------
@@ -659,4 +758,62 @@ TEST_CASE("get_as index_required reports instance count not entry count",
     REQUIRE(result.error().code == nucleus::errc::index_required);
     // The message must say "2 instance(s)", not "4 instance(s)".
     REQUIRE(result.error().message.find("2 instance") != std::string::npos);
+}
+
+TEST_CASE("A flat scalar coexisting with indexed repeated-container siblings is "
+          "rejected loudly",
+          "[repeated_container][convert]")
+{
+    // Schema: cluster -> node (repeated) -> port (typed, so convert() visits it).
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(engine.register_element(
+        nucleus::repeated_element("node", anchor::keyspace("cluster"))));
+    nucleus::schema_element port_el =
+        nucleus::typed_element<int>("port", anchor::keyspace("cluster/node"));
+    REQUIRE(engine.register_element(std::move(port_el)));
+    nucleus::config_space space = engine.build();
+
+    // Two properly-indexed instances from a document source...
+    auto src = xml_of(
+        "<cluster>"
+        "<node><port>80</port></node>"
+        "<node><port>90</port></node>"
+        "</cluster>");
+    // ...plus a value written directly at the plain declared path, bypassing the
+    // fold's own ordinal-indexing machinery entirely.
+    nucleus::runtime_source malformed;
+    malformed.set("cluster/node/port", "99");
+
+    auto loaded = nucleus::load_config(space,
+        nucleus::source_stack{std::move(src), std::move(malformed)}, {});
+    REQUIRE_FALSE(loaded);
+    REQUIRE(loaded.error().code == nucleus::errc::schema_violation);
+    REQUIRE(loaded.error().message.find("cluster/node/port") != std::string::npos);
+    REQUIRE(loaded.error().message.find("cluster/node") != std::string::npos);
+}
+
+TEST_CASE("Indexed-only instances under a repeated container convert without error",
+          "[repeated_container][convert]")
+{
+    // The legitimate, overwhelmingly common shape: no coexisting plain scalar.
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(engine.register_element(
+        nucleus::repeated_element("node", anchor::keyspace("cluster"))));
+    nucleus::schema_element port_el =
+        nucleus::typed_element<int>("port", anchor::keyspace("cluster/node"));
+    REQUIRE(engine.register_element(std::move(port_el)));
+    nucleus::config_space space = engine.build();
+
+    auto src = xml_of(
+        "<cluster>"
+        "<node><port>80</port></node>"
+        "<node><port>90</port></node>"
+        "</cluster>");
+    auto loaded = nucleus::load_config(space,
+        nucleus::source_stack{std::move(src)}, {});
+    REQUIRE(loaded);
+    REQUIRE(loaded.value().get_as<int>("cluster/node[0]/port").value() == 80);
+    REQUIRE(loaded.value().get_as<int>("cluster/node[1]/port").value() == 90);
 }

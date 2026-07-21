@@ -230,6 +230,10 @@ expected<std::vector<token_argument>, resolve_error> parse_args(std::string_view
     {
         auto arg = read_arg(body, i);
         if(!arg) return unexpected(std::move(arg).error());
+        for(const auto &seen : args)
+            if(seen.name == arg.value().name)
+                return parse_failure("duplicate argument '" + arg.value().name
+                                     + "' in token call");
         args.push_back(std::move(arg).value());
         skip_ws(body, i);
         if(i >= body.size())

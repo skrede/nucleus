@@ -135,9 +135,11 @@ TEST_CASE("load_options.scope = file_level excludes container entries above the 
     nucleus::config_space space = engine.build();
 
     // L0 (rank 0): defines the alpha strain with its port; Ld=0.
-    // L1 (rank 1): adds a DISTINCT container key (not overriding L0's port) plus a
-    //              general entry. Under file_level, both are excluded (rank > Ld).
-    //              Under default, only the general entry is admitted.
+    // L1 (rank 1): adds a general entry with no inheritance_layer (a stack
+    //              source). Per strain_scope.h's documented contract, a flat
+    //              unified-path write is not instance-scoped and always wins
+    //              by plain precedence, so it survives file_level's prune
+    //              under both policies below.
     nucleus::runtime_source L0, L1;
     L0.set("cluster/node/alpha/name", "alpha")
       .set("cluster/node/alpha/port", "9000"); // defining layer for alpha
@@ -152,8 +154,9 @@ TEST_CASE("load_options.scope = file_level excludes container entries above the 
 
     // Port from L0 (rank 0 = Ld) survives under file_level.
     REQUIRE(loaded.value().get("cluster/node/port") == "9000");
-    // The general entry at rank > Ld is excluded under file_level.
-    REQUIRE_FALSE(loaded.value().contains("app/label"));
+    // The general (non-keyed) stack entry above Ld survives: file_level's
+    // rank-bounded prune exempts stack entries (no inheritance_layer).
+    REQUIRE(loaded.value().get("app/label") == "core");
 
     // Default (space_open_container_closed) admits the general entry from L1.
     load_options default_opts;

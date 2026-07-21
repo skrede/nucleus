@@ -31,113 +31,57 @@ public:
 
     // Removes the value at a leaf path (no-op when none is set there). Used by the
     // load when it re-lays entries under different paths (e.g. stripping a transient
-    // key segment). Clears both the scalar and the collection map at this path.
+    // key segment).
     void remove(const key_path &path)
     {
         m_values.erase(path.str());
-        m_collections.erase(path.str());
     }
 
     bool contains(const key_path &path) const
     {
-        if(m_values.contains(path.str()))
-            return true;
-        auto cit = m_collections.find(path.str());
-        return cit != m_collections.end() && !cit->second.empty();
+        return m_values.contains(path.str());
     }
 
-    // The value at a leaf path, or nullptr if none is set there. Returns nullptr
-    // for repeated paths (which hold a collection, not a scalar).
+    // The value at a leaf path, or nullptr if none is set there.
     const value *find(const key_path &path) const
     {
         auto it = m_values.find(path.str());
         return it == m_values.end() ? nullptr : &it->second;
     }
 
-    // Appends one value to the collection at a repeated path (within-layer
-    // accumulation). Enforces the invariant that a path is scalar OR collection,
-    // never both: any scalar at this path is erased first.
-    void append(const key_path &path, value v)
-    {
-        m_values.erase(path.str());
-        m_collections[path.str()].push_back(std::move(v));
-    }
-
-    // Replaces the collection at a repeated path wholesale (cross-layer replace).
-    // If the replacement is empty, removes the path entirely instead. Enforces
-    // the scalar/collection invariant: any scalar at this path is erased first.
-    void replace_collection(const key_path &path, std::vector<value> values)
-    {
-        m_values.erase(path.str());
-        if(values.empty())
-        {
-            m_collections.erase(path.str());
-            return;
-        }
-        m_collections[path.str()] = std::move(values);
-    }
-
-    // The collection at a repeated path, or nullptr if none is set there.
-    const std::vector<value> *find_collection(const key_path &path) const
-    {
-        auto it = m_collections.find(path.str());
-        return it == m_collections.end() ? nullptr : &it->second;
-    }
-
-    // Whether the path holds a collection (as opposed to a scalar or nothing).
-    bool is_collection(const key_path &path) const
-    {
-        return m_collections.contains(path.str());
-    }
-
     std::size_t size() const noexcept
     {
-        return m_values.size() + m_collections.size();
+        return m_values.size();
     }
 
     bool empty() const noexcept
     {
-        return m_values.empty() && m_collections.empty();
+        return m_values.empty();
     }
 
-    // Every leaf path that carries a value or a collection, in canonical order.
-    // Both maps are std::map (sorted), so a two-iterator merge walk produces a
-    // sorted, deduplicated result.
+    // Every leaf path that carries a value, in canonical order (m_values is
+    // already a sorted std::map).
     std::vector<key_path> paths() const
     {
         std::vector<key_path> out;
-        out.reserve(m_values.size() + m_collections.size());
-        auto sv = m_values.begin();
-        auto sc = m_collections.begin();
-        while(sv != m_values.end() || sc != m_collections.end())
+        out.reserve(m_values.size());
+        for(const auto &[text, _] : m_values)
         {
-            std::string text;
-            if(sv != m_values.end() && (sc == m_collections.end() || sv->first < sc->first))
-                text = (sv++)->first;
-            else if(sc != m_collections.end() && (sv == m_values.end() || sc->first < sv->first))
-                text = (sc++)->first;
-            else // equal keys would violate the invariant; skip the duplicate gracefully
-            { text = sv->first; ++sv; ++sc; }
             if(auto parsed = key_path::parse(text); parsed)
                 out.push_back(std::move(parsed).value());
         }
         return out;
     }
 
-    // Whether any leaf value or collection exists at or below the given prefix
-    // node. An empty prefix asks whether the keyspace has any values at all.
+    // Whether any leaf value exists at or below the given prefix node. An empty
+    // prefix asks whether the keyspace has any values at all.
     bool has_node(const key_path &prefix) const
     {
         if(prefix.empty())
-            return !m_values.empty() || !m_collections.empty();
+            return !m_values.empty();
         const std::string at = prefix.str();
         const std::string below = at + key_path::separator;
         for(const auto &[text, _] : m_values)
-        {
-            if(text == at || text.starts_with(below))
-                return true;
-        }
-        for(const auto &[text, _] : m_collections)
         {
             if(text == at || text.starts_with(below))
                 return true;
@@ -148,8 +92,7 @@ public:
     // The distinct immediate child segments directly under a prefix node. For
     // prefix a/b with leaves a/b/c and a/b/d/e this yields {c, d}. An empty
     // prefix yields the top-level segments. This is the structural step the
-    // schema surface and CLI projection walk. Covers both scalar and collection
-    // paths.
+    // schema surface and CLI projection walk.
     std::vector<std::string> children_of(const key_path &prefix) const
     {
         const std::size_t depth = prefix.size();
@@ -176,18 +119,12 @@ public:
 
         for(const auto &[text, _] : m_values)
             collect_child(text);
-        for(const auto &[text, _] : m_collections)
-            collect_child(text);
 
         return out;
     }
 
 private:
     std::map<std::string, value> m_values;
-    // Parallel map for repeated-path collections. A path is either in m_values
-    // OR m_collections, never both -- this invariant is enforced at write time
-    // by append(), replace_collection(), and remove().
-    std::map<std::string, std::vector<value>> m_collections;
 };
 
 }

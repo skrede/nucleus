@@ -29,6 +29,7 @@
 #include <vector>
 #include <utility>
 #include <optional>
+#include <stdexcept>
 #include <filesystem>
 #include <string_view>
 
@@ -168,6 +169,16 @@ tree_tokenizer make_pkey_tree_tokenizer(const schema_element &el)
         });
 }
 
+// A malformed anchor path (from anchor::keyspace(string)) never attaches: reject it
+// loudly before attach so a mis-anchored element cannot silently take effect at root.
+registration_result reject_if_invalid_anchor(const anchor &at, std::string_view what)
+{
+    if(at.is_invalid())
+        return unexpected(error{errc::malformed_source, nucleus::format(
+            "{}: anchor path '{}' is malformed", what, at.invalid_path())});
+    return registration_ok();
+}
+
 // The state-machine guard: mutating the builder is only legal until build() seals
 // it. An attempt after build() is rejected with a reason naming the operation that
 // was actually attempted -- the lifecycle enforced, not merely documented.
@@ -213,19 +224,22 @@ assemble_handles(const space_core &state,
     handles.reserve(entries.size() + layers.size());
 
     // The chain occupies the base ranks [0, m), base-first; each entry carries
-    // its inheritance-chain layer ordinal equal to its chain index.
+    // its inheritance-chain layer ordinal equal to its chain index, plus a
+    // pointer to the batch chain_walker already pulled for it during the walk.
     for(std::size_t i = 0; i < entries.size(); ++i)
         handles.push_back({&entries[i].src, i,
                            nucleus::format("path:{}", entries[i].path), {}, i,
-                           std::filesystem::path(entries[i].path)});
+                           std::filesystem::path(entries[i].path),
+                           &entries[i].cached_batch});
 
     // Stack handles sit ABOVE the whole chain: rank = chain size + stack index.
-    // Their label keeps the bare stack index so provenance reads stack[N].
+    // Their label keeps the bare stack index so provenance reads stack[N]. They
+    // have no walk phase, so cached_batch stays nullptr (fold() pulls them).
     const std::size_t base_offset = entries.size();
     for(std::size_t i = 0; i < layers.size(); ++i)
         handles.push_back({&layers[i], base_offset + i,
                            nucleus::format("stack[{}]", i), {}, std::nullopt,
-                           std::nullopt});
+                           std::nullopt, nullptr});
 
     return handles;
 }
@@ -287,6 +301,8 @@ registration_result config_space_builder::register_element(schema_element elemen
         return guard;
     if(auto verdict = m_impl->review(registration_kind::schema, owner); !verdict)
         return verdict;
+    if(auto anchored = reject_if_invalid_anchor(element.at, "register_element"); !anchored)
+        return anchored;
     // Identity elements whose container tag collides with a reserved name
     // would produce an unusable auto-registered tokenizer — reject loudly before
     // schema.attach() so the error reaches the host at schema-build time.
@@ -315,6 +331,8 @@ registration_result config_space_builder::register_constraint_group(constraint_g
         return guard;
     if(auto verdict = m_impl->review(registration_kind::schema, owner); !verdict)
         return verdict;
+    if(auto anchored = reject_if_invalid_anchor(group.at, "register_constraint_group"); !anchored)
+        return anchored;
     if(auto attached = m_impl->schema.attach_constraint_group(std::move(group)); !attached)
         return unexpected(error{errc::rejected_registration, std::move(attached).error()});
     return registration_ok();
@@ -327,6 +345,8 @@ registration_result config_space_builder::register_identity_group(identity_group
         return guard;
     if(auto verdict = m_impl->review(registration_kind::schema, owner); !verdict)
         return verdict;
+    if(auto anchored = reject_if_invalid_anchor(group.at, "register_identity_group"); !anchored)
+        return anchored;
     // Reserved-prefix carve-out: a namespace name colliding with a builtin (a
     // reserved tree-tokenizer category or the engine's own 'nucleus' prefix) is
     // rejected so host identifiers can never shadow a builtin.
@@ -391,6 +411,11 @@ registration_result config_space_builder::register_converter(
 
 config_space_builder &config_space_builder::name(std::string space_name)
 {
+    // Sealed-state door: name() has no expected return, so the loud channel is a
+    // throw (mirrors multispace_argv_source::for_space); message shape matches
+    // reject_if_built so all sealed-state rejections read consistently.
+    if(m_impl->built)
+        throw std::invalid_argument("name() is not allowed: the builder has already been built");
     m_impl->name = std::move(space_name);
     return *this;
 }
@@ -405,6 +430,12 @@ std::vector<conflict_report> config_space_builder::conflicts() const { return m_
 
 config_space config_space_builder::build()
 {
+    // Sealed-state door: a second build() would produce a divergent sealed space,
+    // so reject a spent builder loudly before doing any work (throw, not expected --
+    // build() returns config_space); message shape matches reject_if_built.
+    if(m_impl->built)
+        throw std::invalid_argument("build() is not allowed: the builder has already been built");
+
     // Auto-register a pkey tree tokenizer for every identity element.
     // If the host already registered a tokenizer for this category, skip
     // auto-registration so the host's registration wins (last-registration-wins
@@ -474,6 +505,15 @@ std::string config_space::generate_completion(shell which, std::string_view prog
     return nucleus::generate_completion(which, m_impl->schema, prog, delimiter, anchor, space_name);
 }
 
+std::string config_space::generate_help(std::string_view prog,
+                                                    const cli_delimiter &delimiter,
+                                                    const key_path &anchor) const
+{
+    // Project the sealed schema through the free generator. Only the help string
+    // crosses the boundary; the registry stays encapsulated.
+    return nucleus::generate_help(m_impl->schema, prog, delimiter, anchor);
+}
+
 std::span<const schema_element> config_space::schema_elements() const
 {
     // Project the sealed schema's declared elements as a read-only view; the
@@ -539,17 +579,25 @@ load_result load_config(const config_space &space,
     std::vector<resolution_context::layered_handle> handles = std::move(assembled).value();
 
     log_sink default_log;
-    if(auto gated = gate_assembled_handles(state.schema, handles, default_log); !gated)
+    log_sink &log = options.log ? *options.log : default_log;
+    auto gated = gate_assembled_handles(state.schema, handles, log);
+    if(!gated)
         return unexpected(std::move(gated).error());
+    // The SAME list is both logged (inside gate_stack) and carried onto the frozen
+    // config as load-level provenance -- moved, never recomputed, so they cannot diverge.
+    std::vector<degradation> degraded = std::move(gated.value().degraded);
 
     resolution_context ctx(state.schema, state.tokenizer, state.converters,
                            state.tree_tokenizer);
+    ctx.set_expansion_budget(options.expansion_budget);
     if(auto folded = ctx.fold(handles); !folded)
         return unexpected(std::move(folded).error());
     if(auto merged = ctx.merge_keyed_collections(); !merged)
         return unexpected(std::move(merged).error());
     if(auto sliced = ctx.slice(options.selection, options.scope); !sliced)
         return unexpected(std::move(sliced).error());
+    if(auto applied = ctx.apply_deferred_cli_overrides(); !applied)
+        return unexpected(std::move(applied).error());
     ctx.set_reference_budget(options.reference_budget);
     if(auto refs = ctx.resolve_references(); !refs)
         return unexpected(std::move(refs).error());
@@ -557,7 +605,7 @@ load_result load_config(const config_space &space,
         return unexpected(std::move(checked).error());
     if(auto converted = ctx.convert(); !converted)
         return unexpected(std::move(converted).error());
-    return ctx.freeze();
+    return ctx.freeze(std::move(degraded));
 }
 
 load_result load_config(const config_space &space,
@@ -600,8 +648,9 @@ gate_result check_capabilities(const config_space &space,
         descriptors.emplace_back(nucleus::format("stack[{}]", i), layers[i].capabilities());
 
     log_sink default_log;
+    log_sink &log = options.log ? *options.log : default_log;
     return gate_stack("schema", descriptors,
-                      derive_capability_requirements(state.schema.elements()), default_log);
+                      derive_capability_requirements(state.schema.elements()), log);
 }
 
 }

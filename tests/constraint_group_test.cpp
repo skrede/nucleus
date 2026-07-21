@@ -83,6 +83,69 @@ TEST_CASE("when_value activation only counts the matching value", "[constraint]"
     REQUIRE(mentions(r.error(), "'eager'"));
 }
 
+TEST_CASE("when_value activation finds a member at an indexed instance path", "[constraint]")
+{
+    auto make = [] {
+        config_space_builder b;
+        REQUIRE(b.register_element(element("server", anchor::root())));
+        REQUIRE(b.register_element(element("cache", anchor::keyspace("server"))));
+        REQUIRE(b.register_element(
+            repeated_element("eager", anchor::keyspace("server/cache"))));
+        REQUIRE(b.register_element(element("lru", anchor::keyspace("server/cache"))));
+        REQUIRE(b.register_constraint_group(
+            exclusion_group("cache_policy", anchor::keyspace("server/cache"))
+                .member("eager", when_value("true"))
+                .member("lru")
+                .at_most(1)));
+        return std::move(b).build();
+    };
+
+    // A single repeated value is stored at the indexed path server/cache/eager[0];
+    // the plain path carries no scalar.
+    SECTION("indexed eager=true plus lru -> two active -> violation")
+    {
+        auto space = make();
+        runtime_source src;
+        src.set("server/cache/eager", "true").set("server/cache/lru", "on");
+        auto r = load_config(space, source_stack{std::move(src)}, {});
+        REQUIRE_FALSE(r.has_value());
+        REQUIRE(mentions(r.error(), "cache_policy"));
+        REQUIRE(mentions(r.error(), "'eager'"));
+    }
+    SECTION("exact-match: a case-differing indexed value does not activate")
+    {
+        auto space = make();
+        runtime_source src;
+        src.set("server/cache/eager", "TRUE").set("server/cache/lru", "on");
+        REQUIRE(load_config(space, source_stack{std::move(src)}, {}).has_value());
+    }
+}
+
+TEST_CASE("when_value activation fires per-instance under a repeated container", "[constraint]")
+{
+    config_space_builder b;
+    REQUIRE(b.register_element(repeated_element("pool", anchor::root())));
+    REQUIRE(b.register_element(element("mode", anchor::keyspace("pool"))));
+    REQUIRE(b.register_element(element("lru", anchor::keyspace("pool"))));
+    REQUIRE(b.register_constraint_group(
+        exclusion_group("pool_policy", anchor::keyspace("pool"))
+            .member("mode", when_value("active"))
+            .member("lru")
+            .at_most(1)));
+    auto space = std::move(b).build();
+
+    // pool[0]: mode=active + lru=on -> two active -> violation on this instance.
+    // pool[1]: mode=idle   + lru=on -> mode inactive -> one active -> fine.
+    runtime_source src;
+    src.set("pool[0]/mode", "active").set("pool[0]/lru", "on")
+       .set("pool[1]/mode", "idle").set("pool[1]/lru", "on");
+    auto r = load_config(space, source_stack{std::move(src)}, {});
+    REQUIRE_FALSE(r.has_value());
+    REQUIRE(mentions(r.error(), "pool_policy"));
+    REQUIRE(mentions(r.error(), "'mode'"));
+    REQUIRE(mentions(r.error(), "pool[0]"));
+}
+
 TEST_CASE("exactly(1) and at_least(1) cardinality", "[constraint]")
 {
     SECTION("exactly(1): one active satisfies, two active violates")
@@ -197,6 +260,38 @@ TEST_CASE("validate_group valve runs a host predicate", "[constraint]")
     auto r = load_config(space, source_stack{std::move(bad)}, {});
     REQUIRE_FALSE(r.has_value());
     REQUIRE(mentions(r.error(), "ttl must not be zero"));
+}
+
+TEST_CASE("Root-anchored group-only schema enforces on an empty surface", "[constraint]")
+{
+    auto make = [](bool reject) {
+        config_space_builder b;
+        REQUIRE(b.register_constraint_group(validate_group(
+            "root_valve", anchor::root(),
+            [reject](const config_node &) -> expected<void, std::string> {
+                if(reject)
+                    return nucleus::unexpected(std::string("host rejected the root"));
+                return {};
+            })));
+        return std::move(b).build();
+    };
+
+    SECTION("rejecting validator fails the load")
+    {
+        auto space = make(true);
+        runtime_source src;
+        src.set("anything", "x");
+        auto r = load_config(space, source_stack{std::move(src)}, {});
+        REQUIRE_FALSE(r.has_value());
+        REQUIRE(mentions(r.error(), "host rejected the root"));
+    }
+    SECTION("passing validator loads clean")
+    {
+        auto space = make(false);
+        runtime_source src;
+        src.set("anything", "x");
+        REQUIRE(load_config(space, source_stack{std::move(src)}, {}).has_value());
+    }
 }
 
 TEST_CASE("Registration rejects an undefined member loudly", "[constraint]")

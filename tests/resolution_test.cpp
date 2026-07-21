@@ -1,8 +1,10 @@
 #include "nucleus/config_space.h"
 #include "nucleus/identity.h"
+#include "nucleus/error.h"
 
 #include "nucleus/env/env_source.h"
 #include "nucleus/argv/argv_source.h"
+#include "nucleus/runtime/runtime_source.h"
 
 #include "nucleus/tokenizer/tokenizer_builder.h"
 #include "nucleus/tokenizer/builtin_tokenizers.h"
@@ -240,6 +242,21 @@ TEST_CASE("install_tokenizer injects an additional tokenizer reachable at resolv
     auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(env)}, {});
     REQUIRE(loaded);
     REQUIRE(loaded.value().get("msg") == "hello world");
+}
+
+TEST_CASE("a malformed key path fails the load loudly, naming the source and the offending path",
+          "[resolution]")
+{
+    nucleus::config_space space = nucleus::config_space_builder{}.build();
+
+    nucleus::runtime_source src;
+    src.set("server//port", "80"); // empty segment -- malformed
+
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(src)}, {});
+    REQUIRE_FALSE(loaded);
+    REQUIRE(loaded.error().code == nucleus::errc::malformed_source);
+    REQUIRE(loaded.error().message.find("stack[0]") != std::string::npos);
+    REQUIRE(loaded.error().message.find("server//port") != std::string::npos);
 }
 
 TEST_CASE("tokens are expanded per-source before layering (expand-then-layer)", "[resolution][tokens]")

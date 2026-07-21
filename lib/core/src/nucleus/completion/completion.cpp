@@ -37,6 +37,21 @@ value_sets(const schema_registry &schema)
     return out;
 }
 
+// Index a path's description by its canonical string, so a recognized path picks
+// up the description of the element that declares it. The description travels the
+// SAME keyed path as the allowed_values, keeping both projections in step.
+std::map<std::string, std::string>
+descriptions(const schema_registry &schema)
+{
+    std::map<std::string, std::string> out;
+    for(const schema_element &el : schema.elements())
+    {
+        if(!el.description.empty())
+            out.emplace(el.declared_path().str(), el.description);
+    }
+    return out;
+}
+
 // Constructs the wildcard flag for a path that crosses `container` at depth
 // `container_depth` (number of segments in the container path). The wildcard
 // replaces the ordinal position: --prefix-*-suffix under `delimiter`.
@@ -76,6 +91,7 @@ completion_model project(const schema_registry &schema,
                                        std::string_view space_name)
 {
     const auto values = value_sets(schema);
+    const auto descs = descriptions(schema);
     const std::set<std::string> repeated_containers = schema.repeated_container_paths();
 
     completion_model model;
@@ -96,7 +112,10 @@ completion_model project(const schema_registry &schema,
         opt.flag = flag_of(effective, delimiter);
         if(auto it = values.find(path.str()); it != values.end())
             opt.values = it->second;
+        if(auto it = descs.find(path.str()); it != descs.end())
+            opt.description = it->second;
         const auto option_values = opt.values;
+        const auto option_description = opt.description;
         model.options.push_back(std::move(opt));
 
         // Emit an additional wildcard entry when the path crosses a repeated
@@ -122,12 +141,38 @@ completion_model project(const schema_registry &schema,
                 wild.has_ordinal_wildcard = true;
                 if(!option_values.empty())
                     wild.values = option_values;
+                if(!option_description.empty())
+                    wild.description = option_description;
                 model.options.push_back(std::move(wild));
                 break; // one wildcard entry per crossing
             }
         }
     }
     return model;
+}
+
+// One plain --help line for a declared element: its flag, then its description,
+// its allowed-values list, and a required marker -- each part appended only when
+// present. No shell escaping: help text is plain, not a completion spec.
+std::string help_line(const std::string &flag, const schema_element &el)
+{
+    std::string line = "  " + flag;
+    if(!el.description.empty())
+        line += "  " + el.description;
+    if(!el.allowed_values.empty())
+    {
+        line += " [values: ";
+        for(std::size_t i = 0; i < el.allowed_values.size(); ++i)
+        {
+            if(i != 0)
+                line += ", ";
+            line += el.allowed_values[i];
+        }
+        line += "]";
+    }
+    if(el.required)
+        line += " (required)";
+    return line;
 }
 
 }
@@ -150,6 +195,46 @@ std::string generate_completion(shell which, const schema_registry &schema,
         break;
     }
     return script;
+}
+
+std::string generate_help(const schema_registry &schema, std::string_view prog,
+                          const cli_delimiter &delimiter, const key_path &anchor)
+{
+    // Iterate the same projected surface the completions use so the two never
+    // disagree on which flags exist; join each path to its element for the
+    // description/values/required a help line adds. A path registered as a bare
+    // recognized target (no typed element) still gets its flag line. Group by the
+    // top-level keyspace segment; the map keeps groups in stable alphabetical
+    // order so the help text is reproducible.
+    std::map<std::string, const schema_element *> by_path;
+    for(const schema_element &el : schema.elements())
+        by_path.emplace(el.declared_path().str(), &el);
+
+    std::map<std::string, std::vector<std::string>> groups;
+    for(const key_path &path : schema.surface())
+    {
+        if(!anchor.empty()
+           && (!path.starts_with(anchor) || path.size() == anchor.size()))
+            continue;
+
+        const key_path relative = anchor.empty() ? path : path.relative_to(anchor);
+        if(relative.segments().empty())
+            continue;
+        const std::string &group = relative.segments().front();
+        const std::string flag = flag_of(relative, delimiter);
+        const auto it = by_path.find(path.str());
+        groups[group].push_back(it != by_path.end() ? help_line(flag, *it->second)
+                                                     : "  " + flag);
+    }
+
+    std::string out = std::string(prog) + " options:\n";
+    for(const auto &[group, lines] : groups)
+    {
+        out += "\n" + group + ":\n";
+        for(const std::string &line : lines)
+            out += line + "\n";
+    }
+    return out;
 }
 
 }

@@ -36,8 +36,8 @@ The context pre-builds two indices at construction time:
 - a role index (canonical declared path → `node_role`)
 - an owner index (canonical declared path → `owner_token`)
 
-**Lifetime:** `ctx` borrows `space`; it must not outlive the `config_space`.
-Keep both alive for the duration of any query that uses the context.
+**Lifetime:** `ctx` is a self-contained snapshot &mdash; it may safely outlive the
+`config_space` it was built from. The `selector` copies it in by value.
 
 ### `query(anchor, ctx)`
 
@@ -45,7 +45,7 @@ Keep both alive for the duration of any query that uses the context.
 selector query(config_node anchor, const schema_query_context &ctx);
 ```
 
-Returns a `selector` anchored at `anchor` that borrows `ctx` transiently.
+Returns a `selector` anchored at `anchor` that copies `ctx` in by value.
 The default selector matches every node reachable from the anchor.
 
 ```cpp
@@ -65,6 +65,14 @@ Structural selectors narrow by position relative to the anchor.
 | `descendants()` | All transitive nodes reachable from the anchor, excluding the anchor itself. |
 | `at_depth(n)` | Nodes exactly `n` path segments below the anchor. |
 | `under(subpath)` | Nodes whose path starts with the given absolute subpath. |
+
+`at_depth` and `children` diverge on a **repeated anchor**. `at_depth` counts
+only `/` separators, while `children` treats a `[n]` instance boundary as one
+level below the anchor. So for a repeated container `servers` with instances
+`servers[0]`, `servers[1]`, each holding a `host` field &mdash;
+`query(servers, ctx).at_depth(1)` returns the instances' fields (the `host`
+leaves), whereas `query(servers, ctx).children()` returns the instances
+(`servers[0]`, `servers[1]`) themselves.
 
 Selectors compose by AND-chaining:
 
@@ -255,6 +263,13 @@ auto non_server = query(cfg.root()["cluster"], ctx)
                       .collect();
 ```
 
+**`or_()` union reach.** `or_(other)` is a union of predicates &mdash; a node
+matches when this selector OR `other` would include it. The union is still
+evaluated over **this** selector's own traversal (this selector's anchor
+subtree); nodes reachable only from `other`'s anchor are never visited. When the
+two selectors share an anchor (the common case) this is a plain predicate union;
+when their anchors are disjoint, only this selector's subtree is walked.
+
 ### Single-pass evaluation
 
 The selector evaluates the composed predicate chain in a **single pass** over
@@ -270,8 +285,9 @@ lookups are O(log N) via the pre-built index.
 `config_node` must not outlive its source `config`. Storing results and then
 destroying the `config` is undefined behaviour (caught by AddressSanitizer).
 
-**`schema_query_context`** borrows the `config_space`. The context must not
-outlive the space it was built from.
+**`schema_query_context`** is a self-contained snapshot. It owns its schema data
+and may safely outlive the `config_space` it was built from; the `selector` holds
+its own copy by value.
 
 **Recommended pattern:**
 

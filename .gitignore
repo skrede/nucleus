@@ -51,4 +51,7 @@ coverage.*
 CLAUDE.md
 GEMINI.md
 
+# Uncommitted host-token list for the core-purity gate (injected in CI)
+scripts/purity_tokens.local
+
 **/*vcpkg_installed/

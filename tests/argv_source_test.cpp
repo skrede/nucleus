@@ -2,9 +2,11 @@
 #include "nucleus/capability.h"
 #include "nucleus/config.h"
 #include "nucleus/config_space.h"
+#include "nucleus/error.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
+#include "nucleus/schema/identity_group.h"
 
 #include "nucleus/config_source/source_handle.h"
 #include "nucleus/config_source/config_source.h"
@@ -18,6 +20,8 @@
 #include "nucleus/argv/cli_surface.h"
 
 #include "nucleus/xml/xml_source.h"
+
+#include "nucleus/runtime/runtime_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -155,7 +159,7 @@ TEST_CASE("the recognizer sees the full anchored path", "[argv][anchor]")
     argv_source src(std::vector<std::string>{"--udp-auth_mode=auth"});
     src.anchor_at(key_path::parse("plexus").value())
         .recognize_with([&](const key_path &p)
-                        { return declared.count(p.str()) != 0; });
+                        { return declared.contains(p.str()); });
 
     REQUIRE(src.pull());
 
@@ -163,7 +167,7 @@ TEST_CASE("the recognizer sees the full anchored path", "[argv][anchor]")
     // declare: strict validation rejects it.
     argv_source unanchored(std::vector<std::string>{"--udp-auth_mode=auth"});
     unanchored.recognize_with([&](const key_path &p)
-                              { return declared.count(p.str()) != 0; });
+                              { return declared.contains(p.str()); });
     REQUIRE_FALSE(unanchored.pull());
 }
 
@@ -197,7 +201,7 @@ TEST_CASE("schema validation is a separate step after mapping (strict)", "[argv]
     std::set<std::string> declared{"plexus/udp/auth_mode"};
     argv_source src(std::vector<std::string>{"--plexus-udp-bogus=x"});
     src.recognize_with([&](const key_path &p)
-                       { return declared.count(p.str()) != 0; });
+                       { return declared.contains(p.str()); });
 
     auto batch = src.pull();
     REQUIRE_FALSE(batch); // strict by default: unknown path is an error
@@ -210,7 +214,7 @@ TEST_CASE("lenient mode stores unknown flags as strings with a warning", "[argv]
     capturing_sink sink;
     argv_source src(std::vector<std::string>{"--plexus-udp-bogus=x"});
     src.recognize_with([&](const key_path &p)
-                       { return declared.count(p.str()) != 0; })
+                       { return declared.contains(p.str()); })
         .policy(nucleus::unknown_key_policy::lenient)
         .log_to(sink);
 
@@ -226,7 +230,7 @@ TEST_CASE("a recognized flag passes strict validation", "[argv]")
     std::set<std::string> declared{"plexus/udp/auth_mode"};
     argv_source src(std::vector<std::string>{"--plexus-udp-auth_mode=auth"});
     src.recognize_with([&](const key_path &p)
-                       { return declared.count(p.str()) != 0; });
+                       { return declared.contains(p.str()); });
 
     auto batch = src.pull();
     REQUIRE(batch);
@@ -364,7 +368,55 @@ TEST_CASE("argv out-of-range ordinal -- loud error", "[argv][repeated_container]
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().message.find("out of range") != std::string::npos);
     // The error names the actual count of instances (2).
-    REQUIRE(loaded.error().message.find("2") != std::string::npos);
+    REQUIRE(loaded.error().message.find('2') != std::string::npos);
+}
+
+TEST_CASE("cli ordinal digit run over 18 digits is rejected, not silently wrapped",
+          "[argv][repeated_container]")
+{
+    const nucleus::config_space space = make_cluster_space();
+
+    auto xml = xml_of_cluster(
+        "<cluster>"
+        "<node><endpoint><port>80</port></endpoint></node>"
+        "</cluster>");
+
+    // 19 digits: one past the 18-digit cap key_path::is_indexed_segment also enforces.
+    argv_source argv(std::vector<std::string>{
+        "--cluster-node-9999999999999999999-endpoint-port=90"});
+    argv.recognize_with(nucleus::recognizer_of(space));
+
+    auto loaded = nucleus::load_config(
+        space,
+        nucleus::source_stack{std::move(xml), std::move(argv)},
+        {});
+    REQUIRE_FALSE(loaded);
+    REQUIRE(loaded.error().code == nucleus::errc::malformed_source);
+}
+
+TEST_CASE("cli ordinal digit run at 18 digits is still accepted (boundary)",
+          "[argv][repeated_container]")
+{
+    const nucleus::config_space space = make_cluster_space();
+
+    auto xml = xml_of_cluster(
+        "<cluster>"
+        "<node><endpoint><port>80</port></endpoint></node>"
+        "</cluster>");
+
+    // 18 digits, out of instance range (only 1 exists) -- must fail on range,
+    // not on the digit cap, proving the boundary itself is not rejected.
+    argv_source argv(std::vector<std::string>{
+        "--cluster-node-999999999999999999-endpoint-port=90"});
+    argv.recognize_with(nucleus::recognizer_of(space));
+
+    auto loaded = nucleus::load_config(
+        space,
+        nucleus::source_stack{std::move(xml), std::move(argv)},
+        {});
+    REQUIRE_FALSE(loaded);
+    REQUIRE(loaded.error().code == nucleus::errc::schema_violation);
+    REQUIRE(loaded.error().message.find("out of range") != std::string::npos);
 }
 
 TEST_CASE("argv ordinal == count is out of range -- cannot append",
@@ -388,7 +440,7 @@ TEST_CASE("argv ordinal == count is out of range -- cannot append",
         {});
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().message.find("out of range") != std::string::npos);
-    REQUIRE(loaded.error().message.find("2") != std::string::npos);
+    REQUIRE(loaded.error().message.find('2') != std::string::npos);
 }
 
 TEST_CASE("argv lower-rank than document with valid ordinal 0 succeeds",
@@ -418,4 +470,146 @@ TEST_CASE("argv lower-rank than document with valid ordinal 0 succeeds",
     REQUIRE(loaded);
     // XML wins (higher rank), port for node[0] is still 80.
     REQUIRE(loaded.value().get("cluster/node[0]/endpoint/port") == "80");
+}
+
+// ---------------------------------------------------------------------------
+// CLI ordinal addressing for a repeated container nested inside a keyed
+// container -- proves the deferred-override apply pass, moved to run after
+// slice(), reaches the load's selected strain instead of always reporting
+// zero existing instances (the pre-slice keyed path never starts with the
+// declared, key-stripped container prefix).
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Schema: cluster -> server (keyed by name) -> route (repeated) -> port.
+nucleus::config_space make_keyed_cluster_space()
+{
+    nucleus::config_space_builder builder;
+    REQUIRE(builder.register_element(
+        nucleus::element("cluster", nucleus::anchor::root())));
+    REQUIRE(builder.register_element(
+        nucleus::element("server", nucleus::anchor::keyspace("cluster"))));
+    REQUIRE(builder.register_element(
+        nucleus::primary_key_element("name", nucleus::anchor::keyspace("cluster/server"))));
+    REQUIRE(builder.register_element(
+        nucleus::repeated_element("route", nucleus::anchor::keyspace("cluster/server"))));
+    REQUIRE(builder.register_element(
+        nucleus::element("port", nucleus::anchor::keyspace("cluster/server/route"))));
+    return builder.build();
+}
+
+}
+
+TEST_CASE("cli ordinal addressing reaches the selected strain's instance of a "
+          "repeated container nested inside a keyed container",
+          "[argv][keyed]")
+{
+    const nucleus::config_space space = make_keyed_cluster_space();
+
+    auto xml = xml_of_cluster(
+        "<cluster>"
+        "<server name=\"primary\">"
+        "<route><port>80</port></route>"
+        "<route><port>443</port></route>"
+        "</server>"
+        "</cluster>");
+
+    argv_source argv(std::vector<std::string>{"--cluster-server-route-0-port=90"});
+    argv.recognize_with(nucleus::recognizer_of(space));
+
+    nucleus::load_options opts;
+    opts.selection = "primary";
+    auto loaded = nucleus::load_config(
+        space,
+        nucleus::source_stack{std::move(xml), std::move(argv)},
+        opts);
+    REQUIRE(loaded);
+    const nucleus::config &cfg = loaded.value();
+
+    // route[0] overridden by argv; route[1] unchanged from XML.
+    REQUIRE(cfg.get("cluster/server/route[0]/port") == "90");
+    REQUIRE(cfg.get("cluster/server/route[1]/port") == "443");
+}
+
+TEST_CASE("cli ordinal override of a sparse layer's nonexistent slot cannot "
+          "mint a new instance",
+          "[argv][keyed]")
+{
+    const nucleus::config_space space = make_keyed_cluster_space();
+
+    // Sparse layer: only route[5] exists for strain "primary". No route[0..4].
+    nucleus::runtime_source src;
+    src.set("cluster/server/primary/name", "primary")
+       .set("cluster/server/primary/route[5]/port", "8080");
+
+    // Ordinal 3 has no existing instance -- the override must not mint one.
+    argv_source argv(std::vector<std::string>{"--cluster-server-route-3-port=90"});
+    argv.recognize_with(nucleus::recognizer_of(space));
+
+    nucleus::load_options opts;
+    opts.selection = "primary";
+    auto loaded = nucleus::load_config(
+        space,
+        nucleus::source_stack{std::move(src), std::move(argv)},
+        opts);
+    REQUIRE_FALSE(loaded);
+    REQUIRE(loaded.error().code == nucleus::errc::schema_violation);
+}
+
+// ---------------------------------------------------------------------------
+// CLI ordinal addressing for a keyed-merge (`unite`) container -- the full
+// positive round trip: 32-04's dispatch reorder recognizes the argv path as
+// an ordinal override instead of diverting it as a flat leaf, and this
+// plan's defer-past-slice timing fix lets the override actually reach the
+// merged instance (merge_keyed_collections() runs before slice(), which runs
+// before this apply pass, so m_building already holds the merged collection).
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// endpoints/output (repeated, unite merge) keyed by `name` via an identity group.
+nucleus::config_space make_unite_endpoints_space()
+{
+    nucleus::config_space_builder builder;
+    REQUIRE(builder.register_element(
+        nucleus::element("endpoints", nucleus::anchor::root())));
+    REQUIRE(builder.register_element(
+        nucleus::merging(nucleus::repeated_element("output", nucleus::anchor::keyspace("endpoints")),
+                          nucleus::merge_mode::unite)));
+    REQUIRE(builder.register_element(
+        nucleus::element("name", nucleus::anchor::keyspace("endpoints/output"))));
+    REQUIRE(builder.register_element(
+        nucleus::element("addr", nucleus::anchor::keyspace("endpoints/output"))));
+    REQUIRE(builder.register_identity_group(
+        nucleus::identity_group("output_names", nucleus::anchor::keyspace("endpoints"))
+            .members({"output"}).field("name")));
+    return builder.build();
+}
+
+}
+
+TEST_CASE("cli ordinal override of a keyed-merge (unite) container reaches "
+          "the merged instance",
+          "[argv][keyed]")
+{
+    const nucleus::config_space space = make_unite_endpoints_space();
+
+    nucleus::runtime_source base;
+    base.set("endpoints/output[0]/name", "a")
+        .set("endpoints/output[0]/addr", "10.0.0.1");
+
+    argv_source argv(std::vector<std::string>{"--endpoints-output-0-name=x"});
+    argv.recognize_with(nucleus::recognizer_of(space));
+
+    auto loaded = nucleus::load_config(
+        space,
+        nucleus::source_stack{std::move(base), std::move(argv)},
+        {});
+    REQUIRE(loaded);
+
+    // The override reaches the merged instance's "name" leaf; the untouched
+    // sibling leaf survives.
+    REQUIRE(loaded.value().get("endpoints/output[0]/name") == "x");
+    REQUIRE(loaded.value().get("endpoints/output[0]/addr") == "10.0.0.1");
 }

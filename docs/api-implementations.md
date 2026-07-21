@@ -52,7 +52,7 @@ class xml_source final {
 public:
     static xml_source from(xml_source_options options);
 
-    capability_descriptor capabilities() const;
+    static capability_descriptor capabilities();
     config_source_result pull();
     void apply_projection(const schema_projection &projection);
     inherit_declaration inheritance() const;   // callable after pull()
@@ -106,6 +106,27 @@ See [`examples/xml/xml.cpp`](../examples/xml/xml.cpp),
 [`examples/schema/strains.cpp`](../examples/schema/strains.cpp), and
 [`tests/inherit_chain_test.cpp`](../tests/inherit_chain_test.cpp).
 
+### Well-formedness and discovery stances
+
+Three edge behaviors are deliberate and documented rather than defended against
+in code:
+
+- **Undeclared XML entities load as literal text.** pugixml does not expand
+  entity references, so an undeclared `&foo;` reaches the keyspace as the
+  literal characters `&foo;` rather than being expanded or rejected. This is
+  XXE-safe by construction — no external entity is ever fetched — which is the
+  right posture for hostile input; it is imperfect for honest input that meant a
+  declared entity, and dedicated detection is deferred.
+- **Extension matching is case-sensitive.** A parser registered for `.xml`
+  does not match a file named `config.XML`. On case-insensitive filesystems
+  (Windows, default macOS) the on-disk name and the registered extension can
+  differ in case and silently fail to pair. Normalization to a single case is
+  deferred; register the exact case a host expects to encounter.
+- **A discovery filesystem error reads as absent.** When probing a candidate
+  path, a filesystem error (for example permission-denied) is treated the same
+  as the file not existing: the candidate is skipped, not surfaced as an error.
+  Discovery reports what it could positively confirm as a regular file.
+
 ---
 
 <a id="env_source"></a>
@@ -127,7 +148,7 @@ explicit env_source(std::vector<std::pair<std::string, std::string>> entries);
 env_source &set(std::string path, std::string text);   // fluent
 
 static capability_descriptor descriptor() noexcept;     // empty
-capability_descriptor capabilities() const;              // == descriptor()
+static capability_descriptor capabilities();             // == descriptor()
 config_source_result pull();                      // owned values, no retained buffer
 ```
 
@@ -167,7 +188,7 @@ argv_source &policy(unknown_key_policy policy) noexcept;   // strict (default) |
 argv_source &log_to(log_sink &sink) noexcept;
 
 static capability_descriptor descriptor() noexcept;        // { nesting, duplicate_keys }
-capability_descriptor capabilities() const;
+static capability_descriptor capabilities();
 config_source_result pull();                        // owned values
 ```
 
@@ -229,7 +250,7 @@ runtime_source();
 explicit runtime_source(std::vector<std::pair<std::string, std::string>> entries);
 runtime_source &set(std::string path, std::string text);   // fluent
 
-capability_descriptor capabilities() const;   // { nesting, duplicate_keys, typed_scalars }
+static capability_descriptor capabilities();   // { nesting, duplicate_keys, typed_scalars }
 config_source_result pull();            // owned values
 ```
 
@@ -248,6 +269,10 @@ nucleus::runtime_source defaults;
 defaults.set("server/host", "localhost").set("server/port", "8080");
 ```
 
+It is not synchronized: confine one instance to a single thread, or finish
+building it before sharing it. Concurrent `set()`/`pull()` on the same instance
+is a data race on its entries.
+
 See [`examples/composition/source_stack.cpp`](../examples/composition/source_stack.cpp) and
 [`examples/composition/reusable_space.cpp`](../examples/composition/reusable_space.cpp).
 
@@ -259,10 +284,17 @@ See [`examples/composition/source_stack.cpp`](../examples/composition/source_sta
 Each format module ships the output pair as free functions in its own
 namespace, plus a `struct emitter` whose members forward to them so the module
 satisfies the [`config_emitter`](api-using.md#emit) concept by type as well as
-by call surface. Both operations write into a caller-owned `std::ostream`; the
-caller owns persistence. The argv pair takes an optional `cli_delimiter` and
-`key_path` anchor (`argv::emitter` carries both as its only state), which must
-match the `argv_source` it round-trips with.
+by call surface. Both operations write into a caller-owned `std::ostream` and
+return `expected<void, error>`; the caller owns persistence. The argv pair takes
+an optional `cli_delimiter` and `key_path` anchor (`argv::emitter` carries both
+as its only state), which must match the `argv_source` it round-trips with.
+
+Both operations honor an **all-or-nothing partial-write contract**: on any emit
+failure nothing is written to the caller-owned stream, so a returned `error`
+leaves the stream exactly as it was on entry. A failure carries the shared
+`error` vocabulary (`errc::malformed_source` for a value or name the format
+cannot represent) — the emit side speaks the same result channel as the load
+side.
 
 | Header | Free functions | Rendering |
 |--------|----------------|-----------|

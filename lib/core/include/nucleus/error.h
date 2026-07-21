@@ -4,6 +4,7 @@
 #include <string>
 #include <ostream>
 #include <string_view>
+#include <system_error>
 
 namespace nucleus {
 
@@ -80,6 +81,35 @@ inline std::ostream &operator<<(std::ostream &os, const error &e)
     return os << to_string(e.code) << ": " << e.message;
 }
 
+namespace detail {
+class errc_category final : public std::error_category
+{
+public:
+    const char *name() const noexcept override { return "nucleus"; }
+    std::string message(int code) const override
+    {
+        return std::string(to_string(static_cast<errc>(code)));
+    }
+};
 }
+
+// std::error_code interop for errc: a singleton category whose message() reuses
+// to_string(errc), so an errc drops into any std::error_code sink. Additive --
+// the native result channel still carries error (code + verbatim message).
+inline const std::error_category &errc_category() noexcept
+{
+    static const detail::errc_category instance;
+    return instance;
+}
+
+inline std::error_code make_error_code(errc code) noexcept
+{
+    return std::error_code(static_cast<int>(code), errc_category());
+}
+
+}
+
+template <>
+struct std::is_error_code_enum<nucleus::errc> : std::true_type {};
 
 #endif

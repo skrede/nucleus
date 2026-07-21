@@ -7,6 +7,7 @@
 #include "nucleus/keyspace/keyspace.h"
 
 #include "nucleus/tokenizer/expansion_guard.h"
+#include "nucleus/tokenizer/substitution_budget.h"
 #include "nucleus/tokenizer/resolve_error.h"
 #include "nucleus/tokenizer/token_lexer.h"
 
@@ -38,8 +39,7 @@ class tree_resolver_scope
 public:
     tree_resolver_scope(const keyspace &building,
                         key_path current_path,
-                        std::size_t &substitution_counter,
-                        std::size_t budget,
+                        substitution_budget &budget,
                         ensure_resolved_fn ensure_resolved,
                         const tree_tokenizer_registry *tree_reg = nullptr) noexcept;
 
@@ -53,12 +53,11 @@ public:
 private:
     token_result resolve_absolute(std::string_view path_body);
     token_result resolve_relative(std::string_view rel_body);
-    key_path     resolve_relative_path(std::string_view rel_body);
+    expected<key_path, resolve_error> resolve_relative_path(std::string_view rel_body);
 
     const keyspace                  &m_building;
     key_path                         m_current_path;
-    std::size_t                     &m_substitution_counter;
-    std::size_t                      m_budget;
+    substitution_budget             &m_budget;
     ensure_resolved_fn               m_ensure_resolved;
     const tree_tokenizer_registry   *m_tree_tokenizer = nullptr;
 };

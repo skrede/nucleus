@@ -97,7 +97,11 @@ int main()
 
     // Emit with schema projection so the pkey renders as an XML attribute.
     std::ostringstream out;
-    nucleus::xml::emit_document(config, out, projection_of(space));
+    if(auto result = nucleus::xml::emit_document(config, out, projection_of(space)); !result)
+    {
+        std::cerr << "emit failed: " << result.error() << '\n';
+        return 1;
+    }
     const std::string emitted = out.str();
     std::cout << "\nEmitted XML:\n" << emitted;
 

@@ -80,6 +80,78 @@ TEST_CASE("xml_source: named-space transparency strips root from key paths",
     REQUIRE_FALSE(result.value().get("engine/plugin/x"));
 }
 
+TEST_CASE("xml_source: a root-anchored leaf under a named space keeps its value",
+          "[identity_envelope][xml]")
+{
+    // motd is a single-segment key: under a named space its element is a direct
+    // child of the transparent root. The read path must classify it as a leaf and
+    // read its text, not walk it as a container (which would drop the value).
+    config_space_builder b;
+    REQUIRE(b.register_schema("motd"));
+    REQUIRE(b.register_schema("plugin/x"));
+    auto space = b.build();
+    auto opts = make_opts(
+        "<engine><motd>hello</motd><plugin><x>1</x></plugin></engine>", "engine");
+
+    auto result = load_config(space, source_stack{}, opts);
+    REQUIRE(result);
+    REQUIRE(result.value().get("motd") == "hello");
+    REQUIRE(result.value().get("plugin/x") == "1");
+}
+
+TEST_CASE("emit_document + load round-trip preserves a root-anchored leaf under a named space",
+          "[identity_envelope][xml][round-trip]")
+{
+    config_space_builder b;
+    REQUIRE(b.register_schema("motd"));
+    auto space = b.build();
+
+    auto opts = make_opts("<engine><motd>hello</motd></engine>", "engine");
+    auto loaded = load_config(space, source_stack{}, opts);
+    REQUIRE(loaded);
+    REQUIRE(loaded.value().get("motd") == "hello");
+
+    std::ostringstream out;
+    REQUIRE(nucleus::xml::emit_document(loaded.value(), out, "engine"));
+
+    auto reopts = make_opts(out.str(), "engine");
+    auto reloaded = load_config(space, source_stack{}, reopts);
+    REQUIRE(reloaded);
+    REQUIRE(reloaded.value().get("motd") == "hello");
+}
+
+TEST_CASE("xml_source: mixed content on a named-space root is rejected loudly",
+          "[identity_envelope][xml]")
+{
+    // The transparent root carries character data alongside its child elements.
+    // The same shape on any non-root element is a loud error; enforce it here too
+    // rather than silently discarding the stray text.
+    auto space = make_plugin_space();
+    auto opts = make_opts(
+        "<engine>stray text<plugin><x>1</x></plugin></engine>", "engine");
+
+    auto result = load_config(space, source_stack{}, opts);
+    REQUIRE_FALSE(result);
+    REQUIRE(result.error().code == errc::malformed_source);
+    REQUIRE(result.error().message.find("mixes character data") != std::string::npos);
+}
+
+TEST_CASE("xml_source: pure character data as a named-space root body is rejected loudly",
+          "[identity_envelope][xml]")
+{
+    // <engine>hello</engine> under space "engine": the root's text has no
+    // representable key (the transparent root name is stripped). It passes the
+    // mixed-content check (no structure alongside the text) but must not be silently
+    // discarded -- it is the last silent-discard path on the named-space root.
+    auto space = make_plugin_space();
+    auto opts = make_opts("<engine>hello</engine>", "engine");
+
+    auto result = load_config(space, source_stack{}, opts);
+    REQUIRE_FALSE(result);
+    REQUIRE(result.error().code == errc::malformed_source);
+    REQUIRE(result.error().message.find("no representable key") != std::string::npos);
+}
+
 TEST_CASE("xml_source: unnamed space keeps root name as first key segment",
           "[identity_envelope][xml]")
 {
@@ -142,7 +214,7 @@ TEST_CASE("xml::emit_template with space_name wraps output in a named root eleme
     // emit_template projects schema_elements(), so we need register_element.
     auto space = make_plugin_space_typed();
     std::ostringstream out;
-    nucleus::xml::emit_template(space, out, "engine");
+    REQUIRE(nucleus::xml::emit_template(space, out, "engine"));
     const std::string xml = out.str();
 
     REQUIRE(xml.find("<engine>") != std::string::npos);
@@ -162,7 +234,7 @@ TEST_CASE("xml::emit_document with space_name wraps the document in a named root
     REQUIRE(config_result);
 
     std::ostringstream out;
-    nucleus::xml::emit_document(config_result.value(), out, "engine");
+    REQUIRE(nucleus::xml::emit_document(config_result.value(), out, "engine"));
     const std::string xml = out.str();
 
     REQUIRE(xml.find("<engine>") != std::string::npos);
@@ -177,7 +249,7 @@ TEST_CASE("emit_template + xml_source round-trip with space_name reproduces keys
     auto space = make_plugin_space_typed();
 
     std::ostringstream tmpl_out;
-    nucleus::xml::emit_template(space, tmpl_out, "engine");
+    REQUIRE(nucleus::xml::emit_template(space, tmpl_out, "engine"));
     const std::string tmpl = tmpl_out.str();
 
     // The template is valid XML parseable by xml_source with the same space name.
@@ -187,8 +259,9 @@ TEST_CASE("emit_template + xml_source round-trip with space_name reproduces keys
     auto opts = make_opts(tmpl, "engine");
     auto result = load_config(space, source_stack{}, opts);
     REQUIRE(result);
-    // Template carries no value so get() returns nothing; no error means round-trip succeeds.
-    REQUIRE(result.value().get("plugin/x") == std::nullopt);
+    // The template placeholder is an empty leaf (`<x/>`, no attributes, no child
+    // elements), which reads as an empty-string value: empty leaves carry "".
+    REQUIRE(result.value().get("plugin/x") == "");
 }
 
 TEST_CASE("config_space::space_name() returns the name set on the builder",
