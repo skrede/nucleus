@@ -104,8 +104,13 @@ jobs:
     # Apple's runtime has no LeakSanitizer, so LSan false-positives on macOS.
     # Disabling leak detection keeps the address checks (use-after-free, overflow)
     # while opting out of the unsupported leak leg -- the standard macOS knob.
+    # abort_on_error defaults to 1 on Darwin (0 on Linux): on a finding ASan would
+    # raise SIGABRT, which CTest reports as "Subprocess aborted" and does not let
+    # PASS_REGULAR_EXPRESSION override -- so the asan_trip_test assertion fails. Exit
+    # instead of aborting so the trip test's expected diagnostic is matched, exactly
+    # as on Linux; a real finding still terminates its test with a non-zero exit.
     env:
-      ASAN_OPTIONS: detect_leaks=0
+      ASAN_OPTIONS: detect_leaks=0:abort_on_error=0
     steps:
       - uses: actions/checkout@v4
 
