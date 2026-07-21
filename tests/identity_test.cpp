@@ -16,12 +16,12 @@ namespace {
 
 struct noexcept_comparable
 {
-    bool operator==(const noexcept_comparable &) const noexcept { return true; }
+    [[maybe_unused]] bool operator==(const noexcept_comparable &) const noexcept { return true; }
 };
 
 struct throwing_comparable
 {
-    bool operator==(const throwing_comparable &) const { return true; }
+    [[maybe_unused]] bool operator==(const throwing_comparable &) const { return true; }
 };
 
 }
