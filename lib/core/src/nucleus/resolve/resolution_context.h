@@ -1572,10 +1572,10 @@ private:
 
     // The indexed path a repeated leaf arriving without an ordinal is stored at,
     // taken from the layer's counter for its value list.
-    expected<key_path, resolve_fold_error>
+    static expected<key_path, resolve_fold_error>
     mint_leaf_ordinal(const keyspace_entry &entry, const std::string &sweep_key,
                       const std::string &label,
-                      std::map<std::string, std::size_t> &counters) const
+                      std::map<std::string, std::size_t> &counters)
     {
         if(!entry.capabilities.supports(capability::duplicate_keys)
            && counters.contains(sweep_key))
