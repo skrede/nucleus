@@ -55,6 +55,25 @@ inline void declare_cluster_nodes_routes(nucleus::config_space_builder &builder)
         nucleus::repeated_element("zone", anchor::keyspace("cluster"))));
 }
 
+// cluster / server (primary-keyed by name) / route[] / { port, method }. The
+// container carries a primary key but declares no keyed merge mode, so its entries
+// flow through the ordinary sweep with the transient key segment still in the path.
+inline void declare_keyed_server_routes(nucleus::config_space_builder &builder)
+{
+    using nucleus::anchor;
+    REQUIRE(builder.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(builder.register_element(
+        nucleus::element("server", anchor::keyspace("cluster"))));
+    REQUIRE(builder.register_element(
+        nucleus::primary_key_element("name", anchor::keyspace("cluster/server"))));
+    REQUIRE(builder.register_element(
+        nucleus::repeated_element("route", anchor::keyspace("cluster/server"))));
+    REQUIRE(builder.register_element(
+        nucleus::element("port", anchor::keyspace("cluster/server/route"))));
+    REQUIRE(builder.register_element(
+        nucleus::element("method", anchor::keyspace("cluster/server/route"))));
+}
+
 // The filename portion of a (possibly absolute) path, so the factory can dispatch
 // against an in-repo fixture directory without depending on the working directory.
 inline std::string filename_of(const std::string &path)

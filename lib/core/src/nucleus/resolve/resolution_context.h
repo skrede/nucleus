@@ -330,8 +330,9 @@ public:
                         // so a crafted, absurdly long digit run cannot wrap a size_t.
                         if(seg.size() > 18)
                             return unexpected(error{errc::malformed_source, nucleus::format(
-                                "CLI ordinal segment '{}' exceeds the maximum of 18 digits",
-                                seg)});
+                                "source '{}': malformed key path '{}': CLI ordinal segment "
+                                "'{}' exceeds the maximum of 18 digits",
+                                lh->label, entry.path, seg)});
                         const std::size_t ordinal = [&]() {
                             std::size_t v = 0;
                             for(char const c : seg) v = (v * 10) + static_cast<std::size_t>(c - '0');
@@ -346,7 +347,9 @@ public:
                         }
                         auto kp = key_path::parse(rebracketed_str);
                         if(!kp)
-                            return unexpected(error{errc::malformed_source, std::move(kp).error()});
+                            return unexpected(error{errc::malformed_source, nucleus::format(
+                                "source '{}': malformed key path '{}': {}",
+                                lh->label, entry.path, kp.error())});
                         // Defer storage and check until apply_deferred_cli_overrides()
                         // runs after slice(), so the document source is in
                         // m_building regardless of rank.
@@ -492,6 +495,13 @@ public:
                             "internal invariant violation: no prefix of '{}' canonicalizes "
                             "to its declared repeated scope '{}' in fold()'s sweep",
                             entry.path, scope)});
+
+                    const std::string unaddressed =
+                        unindexed_repeated_container(repeated_container_prefixes, path);
+                    if(!unaddressed.empty())
+                        return unexpected(error{errc::malformed_source, nucleus::format(
+                            "source '{}': key path '{}' addresses repeated container '{}' "
+                            "without naming an instance", lh->label, entry.path, unaddressed)});
 
                     key_path target = path;
                     if(scope_is_leaf && !key_path::is_indexed_segment(path.leaf()))
@@ -1530,6 +1540,27 @@ private:
             return instance_prefix(m_schema, path, scope);
         return join_segment(path.parent().str(),
                             std::string(key_path::base_name(path.leaf())));
+    }
+
+    // The declared repeated container a path names without naming one of its
+    // instances, empty when every repeated-container segment carries an ordinal. A
+    // repeated leaf's own segment is never a member of `containers`, so the plain
+    // arrival that mints a leaf ordinal is exempt without a second rule.
+    std::string unindexed_repeated_container(const std::set<std::string> &containers,
+                                             const key_path &path) const
+    {
+        std::string prefix;
+        for(const std::string &segment : path.segments())
+        {
+            prefix = join_segment(prefix, segment);
+            const auto parsed = key_path::parse(prefix);
+            if(!parsed || key_path::is_indexed_segment(segment))
+                continue;
+            const std::string declared = m_schema.canonical_text(parsed.value());
+            if(containers.contains(declared))
+                return declared;
+        }
+        return {};
     }
 
     // One keyspace scan per scope per layer: every existing entry under the scope is

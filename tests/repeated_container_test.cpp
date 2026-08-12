@@ -759,8 +759,8 @@ TEST_CASE("get_as index_required reports instance count not entry count",
     REQUIRE(result.error().message.find("2 instance") != std::string::npos);
 }
 
-TEST_CASE("A flat scalar coexisting with indexed repeated-container siblings is "
-          "rejected loudly",
+TEST_CASE("A flat scalar under a repeated container is rejected at the source boundary, "
+          "naming the source and the path",
           "[repeated_container][convert]")
 {
     // Schema: cluster -> node (repeated) -> port (typed, so convert() visits it).
@@ -779,15 +779,16 @@ TEST_CASE("A flat scalar coexisting with indexed repeated-container siblings is 
         "<node><port>80</port></node>"
         "<node><port>90</port></node>"
         "</cluster>");
-    // ...plus a value written directly at the plain declared path, bypassing the
-    // fold's own ordinal-indexing machinery entirely.
+    // ...plus a value written directly at the plain declared path, which names no
+    // instance of the repeated container and so is unaddressable by construction.
     nucleus::runtime_source malformed;
     malformed.set("cluster/node/port", "99");
 
     auto loaded = nucleus::load_config(space,
         nucleus::source_stack{std::move(src), std::move(malformed)}, {});
     REQUIRE_FALSE(loaded);
-    REQUIRE(loaded.error().code == nucleus::errc::schema_violation);
+    REQUIRE(loaded.error().code == nucleus::errc::malformed_source);
+    REQUIRE(loaded.error().message.find("stack[1]") != std::string::npos);
     REQUIRE(loaded.error().message.find("cluster/node/port") != std::string::npos);
     REQUIRE(loaded.error().message.find("cluster/node") != std::string::npos);
 }

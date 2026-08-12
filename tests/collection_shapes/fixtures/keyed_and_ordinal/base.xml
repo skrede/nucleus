@@ -1,0 +1,6 @@
+<cluster>
+    <server name="alpha">
+        <route><port>80</port><method>get</method></route>
+        <route><port>443</port><method>post</method></route>
+    </server>
+</cluster>

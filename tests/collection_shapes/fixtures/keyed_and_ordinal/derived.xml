@@ -1,0 +1,6 @@
+<cluster inherit="base.xml">
+    <server name="beta">
+        <route><port>8080</port><method>put</method></route>
+        <route><port>9090</port><method>head</method></route>
+    </server>
+</cluster>
