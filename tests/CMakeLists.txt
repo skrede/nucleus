@@ -358,6 +358,23 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         NUCLEUS_GOLDEN_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/inheritance_golden/fixtures")
     add_test(NAME inheritance_golden_test COMMAND inheritance_golden_test)
 
+    # Collection shapes: nested repetition under sibling outer instances, repeated
+    # leaves inside and outside a repeated container, and layered sources over a
+    # single document -- asserting both the resolved values and the provenance the
+    # untouched instances keep. Fixture documents live beside the test.
+    add_executable(collection_shapes_test collection_shapes/collection_shapes_test.cpp)
+    nucleus_enable_coverage(collection_shapes_test)
+    nucleus_warnings(collection_shapes_test)
+    target_link_libraries(collection_shapes_test
+        PRIVATE nucleus::nucleus nucleus::xml nucleus::runtime Catch2::Catch2WithMain)
+    target_include_directories(collection_shapes_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/lib/core/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/collection_shapes
+    )
+    target_compile_definitions(collection_shapes_test PRIVATE
+        NUCLEUS_COLLECTION_SHAPES_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/collection_shapes/fixtures")
+    add_test(NAME collection_shapes_test COMMAND collection_shapes_test)
+
     # System tests: end-to-end coverage of the space + stack + configuration triple.
     # Each links the real shipped modules it exercises so the linker verifies the module
     # boundaries are correct.

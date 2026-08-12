@@ -1,0 +1,5 @@
+<cluster>
+    <node>
+        <tags><name>gamma</name></tags>
+    </node>
+</cluster>

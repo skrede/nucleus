@@ -11,6 +11,7 @@
 #include "nucleus/keyspace/keyspace.h"
 #include "nucleus/keyspace/provenance.h"
 
+#include "nucleus/schema/instance_paths.h"
 #include "nucleus/schema/schema_enforcer.h"
 #include "nucleus/schema/group_enforcer.h"
 #include "nucleus/schema/schema_registry.h"
@@ -143,32 +144,12 @@ public:
 
         const schema_projection projection = m_schema.projection();
 
-        std::set<std::string> repeated_paths;
-        for(const schema_element &el : m_schema.elements())
-        {
-            if(el.repeated)
-                repeated_paths.insert(el.declared_path().str());
-        }
+        const std::set<std::string> repeated_declared = repeated_declared_paths(m_schema);
 
         // Repeated container prefixes: declared paths of repeated elements that
         // have child elements. Used for wholesale-replace and extend= guard.
         const std::set<std::string> repeated_container_prefixes =
             m_schema.repeated_container_paths();
-
-        // A space has at most one primary key (schema_registry::attach() rejects a
-        // second), so its container fixes a single, constant key-segment index the
-        // Case B sweep below uses to stay strain-aware -- never a per-entry or
-        // nested-ancestor computation.
-        std::optional<key_path> keyed_container_path;
-        for(const schema_element &el : m_schema.elements())
-        {
-            if(!el.identity)
-                continue;
-            keyed_container_path = el.container();
-            break;
-        }
-        const std::size_t keyed_len =
-            keyed_container_path ? keyed_container_path->size() : 0;
 
         // Keyed-composition setup: for every repeated element declaring a
         // non-default merge mode, find the identity-group field that keys it. A keyed
@@ -270,12 +251,18 @@ public:
 
             // Per-layer counters for repeated leaves arriving as plain paths
             // (duplicate_keys sources like runtime_source or tree sources with flat
-            // repeated leaves). Keyed by canonical path.
+            // repeated leaves). Keyed by the sweep key of the leaf's value list.
             std::map<std::string, std::size_t> leaf_ordinal_counters;
 
-            // Tracks which container prefixes have had their wholesale-replace
+            // Tracks which concrete instances have had their wholesale-replace
             // sweep done in this layer.
-            std::set<std::string> swept_containers_this_layer;
+            std::set<std::string> swept_instances_this_layer;
+
+            // Existing entries of a repeated scope, bucketed by sweep key. Filled
+            // by one keyspace scan the first time a layer touches the scope, so an
+            // instance sweep never rescans. Keyed by scope, then by sweep key.
+            std::map<std::string, std::map<std::string, std::vector<key_path>>>
+                instance_buckets;
 
             // Per-layer ordinal counter for diverted keyed entries arriving flat
             // (non-indexed) under a keyed-merge container. Keyed by actual container path.
@@ -307,15 +294,6 @@ public:
                 key_path path = std::move(path_res).value();
 
                 const std::string canonical_path = m_schema.canonical_text(path);
-
-                // Determine if this entry is an already-indexed path from a
-                // document source (e.g. "cluster/node[0]/port" from a tree source).
-                const bool is_already_indexed = [&]() {
-                    for(const std::string &seg : path.segments())
-                        if(key_path::is_indexed_segment(seg))
-                            return true;
-                    return false;
-                }();
 
                 // Detect a CLI plain-ordinal path: a digit-only segment
                 // following a repeated container prefix is an ordinal index from
@@ -500,140 +478,39 @@ public:
                         continue;
                 }
 
-                if(is_already_indexed)
+                const std::string scope =
+                    repeated_scope_of(repeated_declared, canonical_path);
+                const bool scope_is_leaf =
+                    !scope.empty() && !repeated_container_prefixes.contains(scope);
+                // A repeated leaf has no declared sub-structure, so an entry deeper
+                // than the leaf itself addresses no instance of it and stores plainly.
+                if(!scope.empty() && (!scope_is_leaf || canonical_path == scope))
                 {
-                    // Case B: already-indexed path (from a tree source's ordinal emission).
-                    // Find the container prefix (the declared repeated container path).
-                    // A repeated container may nest inside another repeated container
-                    // (e.g. "cluster/node" holding "cluster/node/tags"), so more than one
-                    // declared prefix can match the same canonical path; select the
-                    // LONGEST (most specific) match rather than the first one found, or
-                    // the sweep below would operate at the wrong, too-shallow scope.
-                    std::string container_prefix;
-                    for(const std::string &prefix : repeated_container_prefixes)
-                    {
-                        // The canonical of this path must start with prefix + separator.
-                        const std::string p_slash = prefix + key_path::separator;
-                        if((canonical_path == prefix || canonical_path.starts_with(p_slash))
-                           && prefix.size() > container_prefix.size())
-                        {
-                            container_prefix = prefix;
-                        }
-                    }
-                    // Also handle repeated leaves with indexed paths (config/tags[0]).
-                    if(container_prefix.empty() && repeated_paths.contains(canonical_path))
-                        container_prefix = canonical_path;
-
-                    // canonical_text() strips the key segment, so two different
-                    // strains' entries under the same keyed container collide on
-                    // `under` below. When the container is nested under the
-                    // schema's keyed container, additionally require the same key
-                    // segment at the fixed keyed_len index before sweeping.
-                    bool nested_in_keyed = false;
-                    std::string this_key_seg;
-                    if(keyed_container_path && !container_prefix.empty())
-                    {
-                        const std::string kcp = keyed_container_path->str();
-                        nested_in_keyed = container_prefix == kcp
-                            || container_prefix.starts_with(kcp + key_path::separator);
-                        if(nested_in_keyed && path.size() > keyed_len)
-                            this_key_seg = path.segments()[keyed_len];
-                    }
-
-                    if(!container_prefix.empty()
-                       && !swept_containers_this_layer.contains(container_prefix))
-                    {
-                        //  wholesale-replace: on first entry from a new layer
-                        // touching this container, remove all existing entries.
-                        swept_containers_this_layer.insert(container_prefix);
-                        const std::string cp_slash =
-                            container_prefix + key_path::separator;
-                        const std::vector<key_path> snapshot = m_building.paths();
-                        for(const key_path &existing : snapshot)
-                        {
-                            const std::string es = existing.str();
-                            // Remove entries that belong to this container:
-                            // either their canonical starts with the prefix or equals it.
-                            const std::string ec = m_schema.canonical_text(existing);
-                            const bool under =
-                                ec == container_prefix
-                                || ec.starts_with(cp_slash);
-                            if(!under)
-                                continue;
-                            if(nested_in_keyed
-                               && (existing.size() <= keyed_len
-                                   || existing.segments()[keyed_len] != this_key_seg))
-                                continue;
-                            m_building.remove(existing);
-                            m_provenance.forget(es);
-                        }
-                    }
-
-                    m_building.set(path, value::owned(std::move(expanded).value()));
-                    m_provenance.record(entry.path,
-                                        origin{lh->rank, lh->label, lh->owner,
-                                               lh->inheritance_layer});
-                }
-                else if(repeated_paths.contains(canonical_path))
-                {
-                    // Case A: plain repeated-leaf entry arriving as a plain path
-                    // (from duplicate_keys sources like runtime_source or tree sources).
-                    // Track ordinals by ACTUAL path for per-strain independence;
-                    // wholesale-replace by CANONICAL path so all prior-layer entries
-                    // for this repeated field are evicted on first new-layer access.
-                    const std::string &actual_path_str = entry.path;
-
-                    if(!entry.capabilities.supports(capability::duplicate_keys)
-                       && leaf_ordinal_counters.contains(actual_path_str))
-                    {
-                        return unexpected(error{errc::layering_violation,
-                            nucleus::format(
-                                "source '{}': repeated field '{}' received multiple "
-                                "values from a source that does not support "
-                                "duplicate_keys; a flat source can supply at most one "
-                                "value per repeated field per layer",
-                                lh->label, entry.path)});
-                    }
-
-                    // Cross-layer wholesale-replace: on first touch of this canonical
-                    // repeated path in this layer, sweep existing flat (non-keyed)
-                    // entries whose canonical form matches. Keyed entries (paths that
-                    // contain transient key-value segments) are intentionally left in
-                    // the building keyspace so slice() can still find and relay the
-                    // strain; relay_strain handles displacement via its rank check.
-                    if(!swept_containers_this_layer.contains(canonical_path))
-                    {
-                        swept_containers_this_layer.insert(canonical_path);
-                        const std::string cp_bracket = canonical_path + "[";
-                        const std::vector<key_path> snapshot = m_building.paths();
-                        for(const key_path &existing : snapshot)
-                        {
-                            const std::string es = existing.str();
-                            // Only sweep flat entries: those that ARE the canonical path
-                            // or are directly-indexed versions of it (canonical_path[N]).
-                            if(es != canonical_path
-                               && !es.starts_with(cp_bracket))
-                                continue;
-                            m_building.remove(existing);
-                            m_provenance.forget(es);
-                        }
-                    }
-
-                    const std::size_t ordinal = leaf_ordinal_counters[actual_path_str]++;
-                    // Store with ordinal appended to the ACTUAL path (not canonical),
-                    // preserving any key segment for relay_strain to find.
-                    const std::string indexed_path =
-                        actual_path_str + "[" + std::to_string(ordinal) + "]";
-                    auto indexed_kp = key_path::parse(indexed_path);
-                    if(!indexed_kp)
+                    const std::string sweep_key = sweep_key_of(path, scope, scope_is_leaf);
+                    if(sweep_key.empty())
                         return unexpected(error{errc::malformed_source, nucleus::format(
-                            "internal invariant violation: re-parsed path failed to parse "
-                            "in fold()'s Case A re-indexing: '{}'", indexed_path)});
-                    m_building.set(indexed_kp.value(),
-                                   value::owned(std::move(expanded).value()));
-                    m_provenance.record(indexed_path,
-                                        origin{lh->rank, lh->label, lh->owner,
-                                               lh->inheritance_layer});
+                            "internal invariant violation: no prefix of '{}' canonicalizes "
+                            "to its declared repeated scope '{}' in fold()'s sweep",
+                            entry.path, scope)});
+
+                    key_path target = path;
+                    if(scope_is_leaf && !key_path::is_indexed_segment(path.leaf()))
+                    {
+                        auto minted = mint_leaf_ordinal(entry, sweep_key, lh->label,
+                                                        leaf_ordinal_counters);
+                        if(!minted)
+                            return unexpected(std::move(minted).error());
+                        target = std::move(minted).value();
+                    }
+
+                    if(!swept_instances_this_layer.contains(sweep_key))
+                    {
+                        swept_instances_this_layer.insert(sweep_key);
+                        if(!instance_buckets.contains(scope))
+                            instance_buckets[scope] = bucket_by_instance(scope, scope_is_leaf);
+                        sweep_instance(instance_buckets[scope][sweep_key]);
+                    }
+                    store_entry(target, std::move(expanded).value(), *lh);
                 }
                 else
                 {
@@ -1640,6 +1517,83 @@ private:
             m_provenance.forget(keyed.str());
         }
         return {};
+    }
+
+    // The sweep unit an entry belongs to. A repeated container instance carries
+    // fields, so it is addressable on its own; a repeated leaf ordinal carries
+    // nothing, so its unit is the whole value list under one enclosing instance and
+    // the trailing ordinal is dropped. Empty when the scope is unreachable.
+    std::string sweep_key_of(const key_path &path, const std::string &scope,
+                             bool scope_is_leaf) const
+    {
+        if(!scope_is_leaf)
+            return instance_prefix(m_schema, path, scope);
+        return join_segment(path.parent().str(),
+                            std::string(key_path::base_name(path.leaf())));
+    }
+
+    // One keyspace scan per scope per layer: every existing entry under the scope is
+    // filed under the same sweep key the entry loop derives, so each instance sweeps
+    // from its bucket and resolution stays linear in the instance count.
+    std::map<std::string, std::vector<key_path>>
+    bucket_by_instance(const std::string &scope, bool scope_is_leaf) const
+    {
+        const std::string terminated = scope + key_path::separator;
+        std::map<std::string, std::vector<key_path>> buckets;
+        for(const key_path &existing : m_building.paths())
+        {
+            const std::string canonical = m_schema.canonical_text(existing);
+            if(canonical != scope && !canonical.starts_with(terminated))
+                continue;
+            const std::string key = sweep_key_of(existing, scope, scope_is_leaf);
+            if(!key.empty())
+                buckets[key].push_back(existing);
+        }
+        return buckets;
+    }
+
+    // Removal and its provenance forget live together so the pair cannot drift.
+    void sweep_instance(const std::vector<key_path> &bucket)
+    {
+        for(const key_path &existing : bucket)
+        {
+            m_building.remove(existing);
+            m_provenance.forget(existing.str());
+        }
+    }
+
+    // The store and its provenance record live together for the same reason.
+    void store_entry(const key_path &target, std::string &&text, const layered_handle &lh)
+    {
+        m_building.set(target, value::owned(std::move(text)));
+        m_provenance.record(target.str(),
+                            origin{lh.rank, lh.label, lh.owner, lh.inheritance_layer});
+    }
+
+    // The indexed path a repeated leaf arriving without an ordinal is stored at,
+    // taken from the layer's counter for its value list.
+    expected<key_path, resolve_fold_error>
+    mint_leaf_ordinal(const keyspace_entry &entry, const std::string &sweep_key,
+                      const std::string &label,
+                      std::map<std::string, std::size_t> &counters) const
+    {
+        if(!entry.capabilities.supports(capability::duplicate_keys)
+           && counters.contains(sweep_key))
+            return unexpected(error{errc::layering_violation,
+                nucleus::format(
+                    "source '{}': repeated field '{}' received multiple "
+                    "values from a source that does not support "
+                    "duplicate_keys; a flat source can supply at most one "
+                    "value per repeated field per layer",
+                    label, entry.path)});
+        const std::string indexed =
+            sweep_key + "[" + std::to_string(counters[sweep_key]++) + "]";
+        auto indexed_kp = key_path::parse(indexed);
+        if(!indexed_kp)
+            return unexpected(error{errc::malformed_source, nucleus::format(
+                "internal invariant violation: re-parsed path failed to parse "
+                "in fold()'s repeated-leaf re-indexing: '{}'", indexed)});
+        return std::move(indexed_kp).value();
     }
 
     // True when a canonical path is at or under a container declaring a keyed merge

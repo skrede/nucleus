@@ -1,0 +1,10 @@
+<cluster>
+    <node>
+        <port>10</port>
+        <tags><name>alpha</name></tags>
+    </node>
+    <node>
+        <port>20</port>
+        <tags><name>beta</name></tags>
+    </node>
+</cluster>
