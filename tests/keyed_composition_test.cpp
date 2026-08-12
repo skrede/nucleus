@@ -54,7 +54,7 @@ bool mentions(const error &e, const char *needle)
 
 }
 
-TEST_CASE("wholesale_replace (default) — higher layer replaces the whole collection",
+TEST_CASE("wholesale_replace (default) — higher layer replaces the instances it supplies",
           "[keyed]")
 {
     auto space = make_space(merge_mode::wholesale_replace, /*with_identity=*/false);
@@ -67,7 +67,8 @@ TEST_CASE("wholesale_replace (default) — higher layer replaces the whole colle
     auto r = load_config(space, source_stack{std::move(base), std::move(over)}, {});
     REQUIRE(r.has_value());
     auto n = names(*r);
-    REQUIRE(n == std::vector<std::string>{"c"});  // base {a,b} replaced wholesale
+    // The override addresses output[0] alone, so the base's output[1] stays.
+    REQUIRE(n == std::vector<std::string>{"c", "b"});
 }
 
 TEST_CASE("Unite — layers union; a duplicate identifier across layers is loud",

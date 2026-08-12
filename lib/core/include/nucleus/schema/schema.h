@@ -24,7 +24,8 @@ namespace nucleus {
 // is always wholly from one layer -- so deep field-patch (modify_by_key) is deferred.
 enum class merge_mode
 {
-    // Default: a higher layer's collection replaces the lower wholesale.
+    // Default: a higher layer replaces, whole, each instance it supplies, and leaves
+    // the lower layer's instances it does not address in place.
     wholesale_replace,
     // The union / strict-additive mode: layers union; a duplicate identifier across
     // layers is a loud error (additions only, never an accidental override).
@@ -62,7 +63,7 @@ struct schema_element
     bool repeated = false;
 
     // Cross-layer combination mode for a repeated/identified collection. The default
-    // replaces wholesale; unite/replace_by_key key on an identity group's field.
+    // replaces per ordinal instance; unite/replace_by_key key on an identity group's field.
     merge_mode merge = merge_mode::wholesale_replace;
 
     // When non-empty, this leaf is a keyref: its value names a target in the identity

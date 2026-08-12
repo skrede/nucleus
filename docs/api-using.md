@@ -173,9 +173,11 @@ each occupy a distinct zero-based ordinal slot in the resolved keyspace:
   `cluster/node[1]/port`.
 - **Nested repetition** — composes: `cluster/node[0]/route[1]/target`.
 
-Ordinals are zero-based and assigned in document order. A higher-precedence
-source layer replaces the entire collection wholesale — there is no positional
-merging across layers. `extend=` may not target a repeated container
+Ordinals are zero-based and assigned in document order. Replacement across
+layers is per concrete instance: a higher-precedence source layer replaces each
+instance it addresses — wholly, never field by field — and leaves instances it
+does not address in place. A two-instance layer over a three-instance base
+therefore resolves to three instances. `extend=` may not target a repeated container
 (`errc::layering_violation`). `repeated` requires no `identity` or `unique`
 declaration: the three axes are orthogonal — `repeated` governs placement,
 `identity` governs strain selection, and `unique` governs value validation. An

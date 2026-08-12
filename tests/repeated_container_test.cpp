@@ -104,7 +104,8 @@ TEST_CASE("unified fold -- repeated leaf stored as indexed scalars",
     REQUIRE_FALSE(cfg.get("config/tags").has_value());
 }
 
-TEST_CASE("wholesale-replace -- layer 2 with 2 nodes replaces layer 1 three-node layer",
+TEST_CASE("wholesale-replace -- a two-node layer over a three-node base replaces the "
+          "two instances it addresses and leaves the third in place",
           "[repeated_container][wholesale_replace]")
 {
     nucleus::config_space_builder engine;
@@ -130,11 +131,9 @@ TEST_CASE("wholesale-replace -- layer 2 with 2 nodes replaces layer 1 three-node
     REQUIRE(loaded);
     const nucleus::config &cfg = loaded.value();
 
-    // Higher-rank layer wins with 2 nodes; first layer's 3 nodes are gone.
     REQUIRE(cfg.get("cluster/node[0]/port") == "80");
     REQUIRE(cfg.get("cluster/node[1]/port") == "90");
-    // Node[2] from the first layer must be absent.
-    REQUIRE(cfg.get("cluster/node[2]/port") == std::nullopt);
+    REQUIRE(cfg.get("cluster/node[2]/port") == "30");
 }
 
 TEST_CASE("wholesale-replace -- nested repeated-in-repeated sweep operates at "

@@ -82,10 +82,11 @@ for the full grammar reference, setup example, and cross-format envelope table.
 `repeated` is legal on any schema element &mdash; leaf or container. N sibling
 instances each occupy a distinct zero-based ordinal slot in the resolved keyspace
 (`cluster/node[0]/port`, `cluster/node[1]/port`); nesting composes
-(`node[0]/route[1]/...`). A higher-precedence source layer replaces the
-collection wholesale. CLI flags address instances via a plain ordinal segment
-(`--cluster-node-0-port=v`). See [`docs/api-using.md`](docs/api-using.md) for the
-full addressing rules including `get_all` gather and `errc::index_required`.
+(`node[0]/route[1]/...`). A higher-precedence source layer replaces each
+instance it addresses and leaves the rest in place. CLI flags address instances
+via a plain ordinal segment (`--cluster-node-0-port=v`). See
+[`docs/api-using.md`](docs/api-using.md) for the full addressing rules including
+`get_all` gather and `errc::index_required`.
 
 * **Configuration walk API** \
 `config::root()` returns a value-semantic `config_node` cursor backed by the

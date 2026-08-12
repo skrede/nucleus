@@ -67,7 +67,7 @@ int main()
         s.set("endpoints/output[0]/name", "a").set("endpoints/output[0]/addr", "over-a");
         return s; };
 
-    // Default: the higher layer's collection replaces the base wholesale -> {c}.
+    // Default: the override supplies output[0] alone, so {a} is replaced and {b} stays.
     show("wholesale_replace (default): base {a,b} + override {c}",
          merge_mode::wholesale_replace, false, base(), over_add());
 

@@ -244,8 +244,8 @@ public:
                     return unexpected(error{errc::layering_violation,
                         nucleus::format(
                             "extend= targeting repeated container '{}' is not "
-                            "supported: repeated containers replace wholesale "
-                            "across layers",
+                            "supported: a repeated container composes across layers "
+                            "by ordinal instance, not by extension",
                             d.container_path)});
             }
 

@@ -23,12 +23,13 @@ builder.register_element(
 
 | Mode | Identifier only in lower | only in higher | same identifier in both layers |
 |------|--------------------------|----------------|--------------------------------|
-| `wholesale_replace` (default) | dropped | kept | higher wins (whole collection replaced) |
+| `wholesale_replace` (default) | kept, unless the higher layer addresses its ordinal | kept | higher wins (that instance replaced whole) |
 | `unite` | kept | kept | **loud error** (duplicate across layers; strict-additive, no override) |
 | `replace_by_key` | kept | kept | higher layer's **whole element** replaces the lower's |
 
-- **`wholesale_replace`** is the default and is byte-identical to the historical behavior: a
-  higher layer's collection replaces the lower one entirely.
+- **`wholesale_replace`** is the default and composes by ordinal position rather than by key:
+  each instance the higher layer supplies replaces, whole, the lower layer's instance at that
+  ordinal, and an instance the higher layer does not address stays in place.
 - **`unite`** unions the layers. It is strict-additive: re-introducing an existing identifier
   in a higher layer is a loud error (additions only, never an accidental override).
 - **`replace_by_key`** unions the layers, but a matching identifier replaces that whole
