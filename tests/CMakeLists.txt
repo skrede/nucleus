@@ -362,15 +362,18 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # leaves inside and outside a repeated container, and layered sources over a
     # single document -- asserting both the resolved values and the provenance the
     # untouched instances keep; plus the addressing rule that rejects a path naming
-    # no instance, and ordinal repetition beneath a primary-keyed container.
-    # Fixture documents live beside the test.
+    # no instance, ordinal repetition beneath a primary-keyed container, the pool a
+    # unique value competes in, and one document combining those shapes across a
+    # load, an emit and a load again. Fixture documents live beside the test.
     add_executable(collection_shapes_test
         collection_shapes/collection_shapes_test.cpp
         collection_shapes/addressing_test.cpp
         collection_shapes/keyed_ordinal_test.cpp
         collection_shapes/transparent_root_test.cpp
         collection_shapes/instance_presence_test.cpp
-        collection_shapes/violation_report_test.cpp)
+        collection_shapes/violation_report_test.cpp
+        collection_shapes/unique_scope_test.cpp
+        collection_shapes/combined_shapes_test.cpp)
     nucleus_enable_coverage(collection_shapes_test)
     nucleus_warnings(collection_shapes_test)
     target_link_libraries(collection_shapes_test

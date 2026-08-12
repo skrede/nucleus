@@ -1,0 +1,5 @@
+<cluster>
+    <node>
+        <route><port>81</port><method>trace</method></route>
+    </node>
+</cluster>

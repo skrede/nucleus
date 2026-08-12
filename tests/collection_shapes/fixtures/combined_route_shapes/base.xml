@@ -1,0 +1,16 @@
+<cluster>
+    <node>
+        <port>10</port>
+        <route><port>80</port><method>get</method></route>
+        <route><port>443</port><method>post</method></route>
+    </node>
+    <node>
+        <port>20</port>
+        <route><port>8080</port><method>put</method></route>
+        <route><port>9090</port><method>head</method></route>
+    </node>
+    <server name="alpha">
+        <route><port>5000</port></route>
+        <route><port>6000</port></route>
+    </server>
+</cluster>

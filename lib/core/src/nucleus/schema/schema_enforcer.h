@@ -60,7 +60,9 @@ using schema_validation = expected<void, std::vector<schema_violation>>;
 //                        value outside that set is rejected; the nearest allowed
 //                        value (by edit distance) is offered as a suggestion.
 //   * unique          -- a non-identity `unique` leaf's value must be distinct
-//                        across the ordinal siblings of its repeated container.
+//                        within one concrete instance of the repeated scope
+//                        enclosing its container, not across unrelated outer
+//                        instances.
 //
 // The enforcer borrows the schema and the keyspace as parameters -- it stores
 // neither and holds no registry reference, in keeping with the flat topology.
@@ -261,27 +263,39 @@ private:
             declared, text, parties)});
     }
 
-    // A non-identity `unique` leaf's value must be distinct across the ordinal
-    // siblings of its repeated container. A keyed (pkey) container is already
-    // reconciled to a single surviving strain by slice time, so this pass sees at
-    // most one value per keyed field and cannot collide with the disjoint
-    // slice-time strain uniqueness check.
+    // A non-identity `unique` value competes only within one concrete instance of
+    // the innermost repeated scope STRICTLY above its container -- two nodes may
+    // each carry a route on port 8080, two routes of one node may not; scoping to
+    // the container itself would pool each innermost instance alone and leave the
+    // check unfireable. A keyed (pkey) container is reconciled to one surviving
+    // strain by slice time, so this pass cannot collide with the slice-time check.
     static void check_unique(const pass_input &in, const schema_element &el,
                              std::vector<schema_violation> &out)
     {
         if(!el.unique || el.identity)
             return;
         const std::string declared = el.declared_path().str();
-        std::map<std::string, std::vector<std::string>> by_value;
+        const std::string scope =
+            repeated_scope_of(in.repeated_declared, el.container().parent().str());
+        std::map<std::pair<std::string, std::string>, std::vector<std::string>> pools;
         for(const key_path &path : in.paths)
         {
             if(in.schema.canonical_text(path) != declared)
                 continue;
             if(const value *v = in.resolved.find(path))
-                by_value[std::string(v->text())].push_back(path.str());
+                pools[{pool_of(in, path, scope), std::string(v->text())}]
+                    .push_back(path.str());
         }
-        for(const auto &[text, instances] : by_value)
-            report_duplicates(declared, text, instances, out);
+        for(const auto &[pool, instances] : pools)
+            report_duplicates(declared, pool.second, instances, out);
+    }
+
+    static std::string pool_of(const pass_input &in, const key_path &path,
+                               const std::string &scope)
+    {
+        if(scope.empty())
+            return {};
+        return instance_prefix(in.schema, path, scope);
     }
 };
 
