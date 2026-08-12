@@ -142,7 +142,7 @@ TEST_CASE("xml_source: pure character data as a named-space root body is rejecte
     // <engine>hello</engine> under space "engine": the root's text has no
     // representable key (the transparent root name is stripped). It passes the
     // mixed-content check (no structure alongside the text) but must not be silently
-    // discarded -- it is the last silent-discard path on the named-space root.
+    // discarded.
     auto space = make_plugin_space();
     auto opts = make_opts("<engine>hello</engine>", "engine");
 
@@ -150,6 +150,68 @@ TEST_CASE("xml_source: pure character data as a named-space root body is rejecte
     REQUIRE_FALSE(result);
     REQUIRE(result.error().code == errc::malformed_source);
     REQUIRE(result.error().message.find("no representable key") != std::string::npos);
+}
+
+TEST_CASE("xml_source: character data beside an attribute on a named-space root is "
+          "rejected as mixed content",
+          "[identity_envelope][xml]")
+{
+    // The no-representable-key rejection claims the pure-text root only; text that
+    // coexists with an attribute is mixed content and keeps that message.
+    auto space = make_plugin_space();
+    auto opts = make_opts("<engine version=\"2\">stray text</engine>", "engine");
+
+    auto result = load_config(space, source_stack{}, opts);
+    REQUIRE_FALSE(result);
+    REQUIRE(result.error().code == errc::malformed_source);
+    REQUIRE(result.error().message.find("mixes character data") != std::string::npos);
+}
+
+TEST_CASE("xml_source: a non-grammar attribute on a named-space root is discarded, "
+          "yielding neither a key nor an error",
+          "[identity_envelope][xml]")
+{
+    // The root envelope's own attributes never reach the keyspace. Stated here as
+    // the current contract, not as an endorsement: emitting them would turn names no
+    // schema declares into bare top-level keys, so documents that load today would
+    // begin failing on an unknown path.
+    auto space = make_plugin_space();
+    auto opts = make_opts("<engine version=\"2\"><plugin><x>1</x></plugin></engine>",
+                          "engine");
+
+    auto result = load_config(space, source_stack{}, opts);
+    REQUIRE(result);
+    REQUIRE(result.value().get("plugin/x") == "1");
+    REQUIRE_FALSE(result.value().contains("version"));
+    REQUIRE_FALSE(result.value().contains("engine/version"));
+}
+
+TEST_CASE("xml_source: inherit= on a named-space root yields no keyspace entry",
+          "[identity_envelope][xml]")
+{
+    config_space_builder b;
+    REQUIRE(b.register_schema("plugin/x"));
+    auto space = b.build();
+    auto opts = make_opts("<engine inherit=\"none\"><plugin><x>1</x></plugin></engine>",
+                          "engine");
+
+    auto result = load_config(space, source_stack{}, opts);
+    REQUIRE(result);
+    REQUIRE(result.value().get("plugin/x") == "1");
+    REQUIRE_FALSE(result.value().contains("inherit"));
+}
+
+TEST_CASE("xml_source: a duplicate attribute on a named-space root is rejected",
+          "[identity_envelope][xml]")
+{
+    auto space = make_plugin_space();
+    auto opts = make_opts("<engine a=\"1\" a=\"2\"><plugin><x>1</x></plugin></engine>",
+                          "engine");
+
+    auto result = load_config(space, source_stack{}, opts);
+    REQUIRE_FALSE(result);
+    REQUIRE(result.error().code == errc::malformed_source);
+    REQUIRE(result.error().message.find("duplicate attribute") != std::string::npos);
 }
 
 TEST_CASE("xml_source: unnamed space keeps root name as first key segment",

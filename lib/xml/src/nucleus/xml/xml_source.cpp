@@ -341,6 +341,13 @@ walk(const pugi::xml_node &node, std::string_view path,
 
         if(!skip.empty() && skip == attr_name)
             continue;
+
+        // The transparent named-space root is walked under an empty path, so an
+        // attribute of its own would become a bare top-level key. The root envelope
+        // carries metadata, not keyspace content: discard it, as this path always has.
+        if(is_root && path.empty())
+            continue;
+
         batch.entries.push_back(make_entry(join(path, attr.name()),
                                            value::view(std::string_view(attr.value())), caps));
     }
@@ -544,8 +551,10 @@ config_source_result xml_source::pull()
 
     if(!m_space_name.empty())
     {
-        // Named-space envelope: validate root name, then walk each child directly
-        // so the root element name is stripped from all key paths.
+        // Named-space envelope: validate the root name, then walk the root itself
+        // under an empty path, so the root element name is stripped from all key
+        // paths while its children are classified by the same rules as any other
+        // element's children.
         if(std::string_view(root.name()) != m_space_name)
             return unexpected(config_source_error{errc::malformed_source,
                 nucleus::format("xml source: expected root element '{}', found '{}'",
@@ -556,52 +565,28 @@ config_source_result xml_source::pull()
         if(auto r = validate_root_attrs(root); !r)
             return unexpected(r.error());
 
-        // The transparent root is not passed to walk(), so run the mixed-content
-        // check here too -- otherwise stray character data on a named-space root is
-        // silently discarded while the same shape on any other element is rejected.
-        if(auto r = reject_mixed_content(root); !r)
-            return unexpected(r.error());
-
-        // A transparent root that carries character data has no representable key:
-        // stripping the root name leaves the text unkeyed. reject_mixed_content above
-        // guarantees any text here coexists with neither a child nor an attribute, so
-        // has_text_content is sufficient -- it also catches a root the projection
-        // declares a repeated container (which is_leaf_element would exclude, letting
-        // the child loop drop the text silently).
-        if(has_text_content(root))
+        // A transparent root carrying nothing but character data has no representable
+        // key: stripping the root name leaves the text unkeyed. The walk's own
+        // container-carrying-only-text rejection names the path, which is empty here,
+        // so this shape is claimed before the walk sees it. Text alongside a child or
+        // an attribute is mixed content and stays with the walk's entry check.
+        if(!has_element_child(root) && root.attributes().empty() && has_text_content(root))
             return unexpected(config_source_error{errc::malformed_source,
                 nucleus::format(
                     "xml source: named-space root element '{}' carries character "
                     "data with no representable key", root.name())});
 
-        // Walk each direct child as a top-level keyspace entry (root is transparent).
-        for(const pugi::xml_node &child : root.children())
-        {
-            if(child.type() != pugi::node_element)
-                continue;
-
-            // A root-anchored leaf carries its own text, which walk() -- reading only
-            // a node's attributes and leaf children -- would never read. Read it here.
-            const std::string child_path(child.name());
-            if(is_leaf_element(child, child_path, m_projection))
-            {
-                batch.entries.push_back(
-                    make_entry(child_path, read_leaf_value(child), capabilities()));
-                continue;
-            }
-
-            if(auto r = walk(child, std::string_view(child.name()), capabilities(), m_projection,
-                             batch, {}, seen_keys, ordinal_counters, false, 1); !r)
-                return unexpected(r.error());
-        }
+        if(auto r = walk(root, std::string_view{}, capabilities(), m_projection,
+                         batch, {}, seen_keys, ordinal_counters, true, 0); !r)
+            return unexpected(r.error());
     }
     else
     {
         // Unnamed space: the root element name is the first key segment. A bare
         // single-root leaf (`<port>8080</port>`, the normal product of a flat source)
         // carries its own text, which walk() -- reading only a node's attributes and
-        // leaf children -- would never read. Read it directly on this path, exactly
-        // as the named-space child loop does, so the value survives the round-trip.
+        // leaf children -- would never read. Read it directly so the value survives
+        // the round-trip.
         const std::string root_path(root.name());
         if(is_leaf_element(root, root_path, m_projection))
             batch.entries.push_back(

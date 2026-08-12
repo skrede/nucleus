@@ -1,0 +1,7 @@
+<engine>
+    <node><port>80</port><label>first</label></node>
+    <node><port>90</port><label>second</label></node>
+    <server name="alpha"><port>1</port></server>
+    <server name="beta"><port>2</port></server>
+    <motd>hello</motd>
+</engine>

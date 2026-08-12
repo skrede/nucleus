@@ -43,6 +43,31 @@ TEST_CASE("a pathologically deep document fails with a depth-cap error, not a cr
     REQUIRE(pulled.error().message.find("depth cap") != std::string::npos);
 }
 
+TEST_CASE("a transparent root's children start one level below the root for the "
+          "depth cap", "[xml][robustness]")
+{
+    // The named-space root contributes no path segment, so its children are the
+    // first level the cap counts. Pinning both sides of the boundary keeps the
+    // count from drifting by one when the root's own handling changes.
+    const auto nested = [](int levels) {
+        std::string doc = "<engine>";
+        for(int i = 0; i < levels; ++i)
+            doc += "<a>";
+        doc += "v";
+        for(int i = 0; i < levels; ++i)
+            doc += "</a>";
+        return doc + "</engine>";
+    };
+
+    auto under = xml_of(nested(65));
+    REQUIRE(under.with_space_name("engine").pull());
+
+    auto over = xml_of(nested(66));
+    auto pulled = over.with_space_name("engine").pull();
+    REQUIRE_FALSE(pulled);
+    REQUIRE(pulled.error().message.find("depth cap") != std::string::npos);
+}
+
 TEST_CASE("a CDATA leaf value resolves like plain text", "[xml][robustness]")
 {
     nucleus::config_space_builder builder;

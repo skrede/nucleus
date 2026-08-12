@@ -74,6 +74,22 @@ inline void declare_keyed_server_routes(nucleus::config_space_builder &builder)
         nucleus::element("method", anchor::keyspace("cluster/server/route"))));
 }
 
+// node[] / {port, label}, server (primary-keyed by name) / port, and a plain motd
+// leaf -- all anchored at the root, so under a named space they are direct children
+// of the transparent root rather than of an enclosing element.
+inline void declare_transparent_root_nodes(nucleus::config_space_builder &builder)
+{
+    using nucleus::anchor;
+    REQUIRE(builder.register_element(nucleus::repeated_element("node", anchor::root())));
+    REQUIRE(builder.register_element(nucleus::element("port", anchor::keyspace("node"))));
+    REQUIRE(builder.register_element(nucleus::element("label", anchor::keyspace("node"))));
+    REQUIRE(builder.register_element(nucleus::element("server", anchor::root())));
+    REQUIRE(builder.register_element(
+        nucleus::primary_key_element("name", anchor::keyspace("server"))));
+    REQUIRE(builder.register_element(nucleus::element("port", anchor::keyspace("server"))));
+    REQUIRE(builder.register_element(nucleus::element("motd", anchor::root())));
+}
+
 // The filename portion of a (possibly absolute) path, so the factory can dispatch
 // against an in-repo fixture directory without depending on the working directory.
 inline std::string filename_of(const std::string &path)
