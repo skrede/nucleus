@@ -1191,7 +1191,7 @@ public:
             for(const schema_violation &v : checked.error())
             {
                 report += nucleus::format("\n  - {}", v.reason);
-                if(!m_schema.recognizes_text(v.path))
+                if(!m_schema.recognizes_text(canonical_of(v.path)))
                 {
                     auto near = suggest_keys(v.path, known, 1);
                     if(!near.empty())
@@ -1260,9 +1260,16 @@ public:
             }
 
             // A scalar written directly at the plain declared path cannot coexist with
-            // properly-indexed sibling instances of the same repeated field: it bypasses
-            // the fold's own ordinal-indexing machinery and would otherwise sit in the
-            // resolved keyspace unconverted and unvalidated.
+            // indexed siblings that canonicalize onto it: it bypasses the fold's own
+            // ordinal-indexing machinery and would otherwise sit in the resolved
+            // keyspace unconverted. This looks redundant with the addressing rule the
+            // fold applies, and for a DECLARED repeated container it is -- the plain
+            // arrival is rejected earlier, at the source boundary. What still reaches
+            // here is the other shape: a bracket-shaped segment on a container the
+            // schema does not declare repeated. The addressing rule cannot see it (its
+            // set holds declared repeated containers only) while canonical_text strips
+            // the ordinal regardless, so the two paths land on one declared element.
+            // The container name below is consequently empty for that shape.
             if(found_any_indexed && has_plain_scalar)
             {
                 std::string repeated_ancestor;
@@ -1540,6 +1547,15 @@ private:
             return instance_prefix(m_schema, path, scope);
         return join_segment(path.parent().str(),
                             std::string(key_path::base_name(path.leaf())));
+    }
+
+    // The declared form of a violation path, so a concrete instance path
+    // (cluster/node[0]/port) is recognized as the element it already names and draws
+    // no nearest-key suggestion. A path that does not parse falls through unchanged.
+    std::string canonical_of(const std::string &path) const
+    {
+        const auto parsed = key_path::parse(path);
+        return parsed ? m_schema.canonical_text(parsed.value()) : path;
     }
 
     // The declared repeated container a path names without naming one of its

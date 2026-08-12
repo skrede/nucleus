@@ -6,7 +6,10 @@
 #include "nucleus/keyspace/key_path.h"
 
 #include <set>
+#include <span>
 #include <string>
+#include <vector>
+#include <cstddef>
 
 namespace nucleus {
 
@@ -62,6 +65,55 @@ inline std::string instance_prefix(const schema_registry &schema, const key_path
             return prefix;
     }
     return {};
+}
+
+// Distinct concrete container-instance prefixes whose canonical form equals the
+// declared container path -- correct under repeated/keyed ancestors (the prefix
+// keeps the [n] ordinals; the canonical compare strips them).
+inline std::vector<std::string>
+instances_of(const schema_registry &schema, std::span<const std::string> keys,
+             const key_path &declared)
+{
+    // A root-anchored container has exactly one instance: the config root. The
+    // prefix scan below cannot express it (an empty prefix is not a parseable
+    // key), so it is named explicitly.
+    const std::size_t depth = declared.segments().size();
+    if(depth == 0)
+        return {std::string{}};
+    std::set<std::string> prefixes;
+    for(const std::string &key : keys)
+    {
+        auto kp = key_path::parse(key);
+        if(!kp || kp->segments().size() < depth)
+            continue;
+        std::string prefix;
+        for(std::size_t i = 0; i < depth; ++i)
+            prefix = join_segment(prefix, kp->segments()[i]);
+        auto pp = key_path::parse(prefix);
+        if(pp && schema.canonical_text(*pp) == declared.str())
+            prefixes.insert(prefix);
+    }
+    return {prefixes.begin(), prefixes.end()};
+}
+
+// Whether key names member_path exactly, or an indexed instance of it
+// (member_path[<digits>]) -- the storage shape of a repeated member. Matches by
+// the concrete instance path, so it is correct when member_path itself carries an
+// ordinal/key segment (a member under a repeated/keyed container), unlike
+// instances_of, whose canonical compare expects an ordinal-free declared path.
+inline bool names_member_instance(const std::string &key,
+                                  const std::string &member_path)
+{
+    if(key == member_path)
+        return true;
+    if(key.size() < member_path.size() + 3
+       || !key.starts_with(member_path)
+       || key[member_path.size()] != '[' || key.back() != ']')
+        return false;
+    for(std::size_t i = member_path.size() + 1; i + 1 < key.size(); ++i)
+        if(key[i] < '0' || key[i] > '9')
+            return false;
+    return true;
 }
 
 }

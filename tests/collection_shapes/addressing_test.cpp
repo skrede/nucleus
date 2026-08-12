@@ -4,6 +4,8 @@
 #include "nucleus/config.h"
 #include "nucleus/config_space.h"
 
+#include "nucleus/schema/converters.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
@@ -144,6 +146,35 @@ TEST_CASE("an empty source stack reaches resolution with no entries and produces
         nucleus::load_config(cluster_space(), nucleus::source_stack{}, {});
     REQUIRE_FALSE(nested);
     REQUIRE(nested.error().code == nucleus::errc::unmet_capability);
+}
+
+TEST_CASE("a bracket-shaped segment on an undeclared-repeated container escapes the "
+          "addressing rule and is caught at conversion",
+          "[collection_shapes][addressing]")
+{
+    // The addressing rule tests membership of the declared repeated containers, so a
+    // container the schema does not declare repeated is outside its reach -- while
+    // canonicalization strips the ordinal regardless, landing both keys on one
+    // element. This is the shape that still reaches the convert-time coexistence
+    // check, and it names no repeated container because there is none.
+    nucleus::config_space_builder builder;
+    REQUIRE(builder.register_element(nucleus::element("cluster", nucleus::anchor::root())));
+    REQUIRE(builder.register_element(
+        nucleus::element("x", nucleus::anchor::keyspace("cluster"))));
+    REQUIRE(builder.register_element(
+        nucleus::typed_element<int>("port", nucleus::anchor::keyspace("cluster/x"))));
+    const nucleus::config_space space = builder.build();
+
+    const nucleus::load_result loaded = nucleus::load_config(space,
+        nucleus::source_stack{nucleus::shapes::runtime_layer(
+            {{"cluster/x/port", "1"}, {"cluster/x[0]/port", "2"}})},
+        {});
+    REQUIRE_FALSE(loaded);
+    INFO("message: " << loaded.error().message);
+    REQUIRE(loaded.error().code == nucleus::errc::schema_violation);
+    REQUIRE(loaded.error().message.find(
+                "has both an unindexed value and indexed sibling instances")
+            != std::string::npos);
 }
 
 TEST_CASE("a malformed ordinal under a single-segment repeated container prefix still "

@@ -345,7 +345,7 @@ TEST_CASE("schema_enforcer: unknown indexed path produces violation",
     REQUIRE(mentions_not_declared);
 }
 
-TEST_CASE("schema_enforcer: required check satisfied by indexed instance",
+TEST_CASE("schema_enforcer: required check satisfied by the instance that supplies it",
           "[repeated_container][enforcer][required]")
 {
     nucleus::schema_registry reg;
@@ -362,15 +362,11 @@ TEST_CASE("schema_enforcer: required check satisfied by indexed instance",
     ks_with.set(kp("cluster/node[0]/port"), nucleus::value::owned("80"));
     REQUIRE(nucleus::schema_enforcer::validate(reg, ks_with));
 
-    // No instances present: cluster/node/port required but absent -- violation.
+    // No instances at all: the required child has nowhere to be missing from. The
+    // container is not itself required, so an empty collection is legal and the
+    // child obligation applies only to instances that exist.
     nucleus::keyspace ks_without;
-    const auto result = nucleus::schema_enforcer::validate(reg, ks_without);
-    REQUIRE_FALSE(result);
-    const bool mentions_required = std::any_of(
-        result.error().begin(), result.error().end(),
-        [](const nucleus::schema_violation &v)
-        { return v.reason.find("required field") != std::string::npos; });
-    REQUIRE(mentions_required);
+    REQUIRE(nucleus::schema_enforcer::validate(reg, ks_without));
 }
 
 // ---------------------------------------------------------------------------
