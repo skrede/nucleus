@@ -28,4 +28,26 @@ endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/nucleus-targets.cmake")
 
+# check_required_components() reports a component missing unless nucleus_<component>_FOUND
+# is set, and nothing else sets it -- so without this every find_package(nucleus COMPONENTS
+# ...) failed, whatever was actually installed. `core` maps onto nucleus::nucleus because
+# core is exported under EXPORT_NAME nucleus; the nucleus::core spelling is an in-tree ALIAS
+# and CMake does not export aliases.
+if(TARGET nucleus::nucleus)
+    set(nucleus_nucleus_FOUND TRUE)
+    set(nucleus_core_FOUND TRUE)
+else()
+    set(nucleus_nucleus_FOUND FALSE)
+    set(nucleus_core_FOUND FALSE)
+endif()
+
+foreach(_nucleus_component runtime env argv xml)
+    if(TARGET nucleus::${_nucleus_component})
+        set(nucleus_${_nucleus_component}_FOUND TRUE)
+    else()
+        set(nucleus_${_nucleus_component}_FOUND FALSE)
+    endif()
+endforeach()
+unset(_nucleus_component)
+
 check_required_components(nucleus)

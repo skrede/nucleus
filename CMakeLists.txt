@@ -110,6 +110,12 @@ install(FILES
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/nucleus
 )
 
+# Apache-2.0 section 4(a) requires the license to travel with every distributed copy, and an
+# installed tree is a distributed copy -- a binary redistributor has nothing else to carry.
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/licenses/nucleus
+)
+
 if(NUCLEUS_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
