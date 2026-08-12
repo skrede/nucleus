@@ -177,11 +177,16 @@ Ordinals are zero-based and assigned in document order. Replacement across
 layers is per concrete instance: a higher-precedence source layer replaces each
 instance it addresses — wholly, never field by field — and leaves instances it
 does not address in place. A two-instance layer over a three-instance base
-therefore resolves to three instances. `extend=` may not target a repeated container
-(`errc::layering_violation`). `repeated` requires no `identity` or `unique`
-declaration: the three axes are orthogonal — `repeated` governs placement,
-`identity` governs strain selection, and `unique` governs value validation. An
-element cannot be both `repeated` and `unique`.
+therefore resolves to three instances. Under nested repetition the unit is the
+innermost instance the addressed path names: a layer setting
+`cluster/node[1]/route[0]/target` replaces `route[0]` wholly and leaves both
+`route[1]` and the rest of `node[1]` in place, whereas a layer setting
+`cluster/node[1]/port` replaces `node[1]` wholly, nested routes included.
+`extend=` may not target a repeated container (`errc::layering_violation`).
+`repeated` requires no `identity` or `unique` declaration: the three axes are
+orthogonal — `repeated` governs placement, `identity` governs strain selection,
+and `unique` governs value validation. An element cannot be both `repeated` and
+`unique`.
 
 ```cpp
 // Repeated container: each <node> becomes an indexed subtree.
