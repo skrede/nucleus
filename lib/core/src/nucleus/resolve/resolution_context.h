@@ -1342,6 +1342,16 @@ public:
     }
 
 private:
+    struct relayed_value
+    {
+        key_path path;
+        value    val;
+        origin   prov;
+    };
+
+    using relayed_instance_groups =
+            std::map<std::string, std::vector<std::pair<std::size_t, key_path>>>;
+
     // Recursive single-leaf resolver for pass-2. Resolves `kp`'s value by first
     // ensuring all leaves it references are themselves resolved (depth-first).
     // The expansion_guard detects cycles; the cache prevents repeated work.
@@ -1410,6 +1420,8 @@ private:
         const std::set<std::string> repeated_declared = repeated_declared_paths(m_schema);
         const std::set<std::string> repeated_containers =
                 m_schema.repeated_container_paths();
+        const std::set<std::string> relayed_containers =
+                relayed_container_scopes(keyed_paths, repeated_containers);
 
         for(const key_path &keyed : keyed_paths)
         {
@@ -1497,6 +1509,176 @@ private:
             }
             m_building.remove(keyed);
             m_provenance.forget(keyed.str());
+        }
+        return compact_relayed_instances(relayed_containers);
+    }
+
+    std::set<std::string>
+    relayed_container_scopes(const std::vector<key_path> &paths,
+                             const std::set<std::string> &containers) const
+    {
+        std::set<std::string> scopes;
+        for(const key_path &path : paths)
+        {
+            const std::string canonical = m_schema.canonical_text(path);
+            if(under_keyed_merge(canonical))
+                continue;
+            for(const std::string &scope : containers)
+                if(canonical == scope || canonical.starts_with(scope + key_path::separator))
+                    scopes.insert(scope);
+        }
+        return scopes;
+    }
+
+    // Repeated leaves are whole value-list units and cannot form an interior gap.
+    expected<void, resolve_fold_error>
+    compact_relayed_instances(const std::set<std::string> &scopes)
+    {
+        auto declared = ordered_relayed_scopes(scopes);
+        if(!declared)
+            return unexpected(std::move(declared).error());
+        for(const key_path &scope : declared.value())
+        {
+            if(auto compacted = compact_relayed_scope(scope); !compacted)
+                return compacted;
+        }
+        return {};
+    }
+
+    expected<std::vector<key_path>, resolve_fold_error>
+    ordered_relayed_scopes(const std::set<std::string> &scopes) const
+    {
+        std::vector<key_path> declared;
+        declared.reserve(scopes.size());
+        for(const std::string &scope : scopes)
+        {
+            auto parsed = key_path::parse(scope);
+            if(!parsed)
+                return unexpected(error{errc::malformed_source, nucleus::format("internal invariant violation: declared scope failed to parse "
+                                                                                "in compact_relayed_instances(): '{}'",
+                                                                                scope)});
+            declared.push_back(std::move(parsed).value());
+        }
+        std::sort(declared.begin(), declared.end(),
+                  [](const key_path &a, const key_path &b)
+                  {
+                      return a.size() != b.size() ? a.size() < b.size()
+                                                  : a.str() < b.str();
+                  });
+        return declared;
+    }
+
+    std::vector<std::string> building_key_texts() const
+    {
+        std::vector<std::string> keys;
+        keys.reserve(m_building.size());
+        for(const key_path &path : m_building.paths())
+            keys.push_back(path.str());
+        return keys;
+    }
+
+    expected<relayed_instance_groups, resolve_fold_error>
+    grouped_relayed_instances(const key_path &declared) const
+    {
+        const std::vector<std::string> keys = building_key_texts();
+        relayed_instance_groups        groups;
+        for(const std::string &text : instances_of(m_schema, keys, declared))
+        {
+            auto actual = key_path::parse(text);
+            if(!actual)
+                return unexpected(error{errc::malformed_source, nucleus::format("internal invariant violation: enumerated instance failed to parse "
+                                                                                "in compact_relayed_instances(): '{}'",
+                                                                                text)});
+            const std::size_t ordinal = key_path::ordinal_of(actual->leaf());
+            groups[actual->parent().str()].emplace_back(
+                    ordinal, std::move(actual).value());
+        }
+        for(auto &[_, instances] : groups)
+            std::sort(instances.begin(), instances.end(),
+                      [](const auto &a, const auto &b)
+                      { return a.first < b.first; });
+        return groups;
+    }
+
+    expected<void, resolve_fold_error>
+    compact_relayed_scope(const key_path &declared)
+    {
+        auto groups = grouped_relayed_instances(declared);
+        if(!groups)
+            return unexpected(std::move(groups).error());
+        for(const auto &[_, instances] : groups.value())
+        {
+            std::size_t target_ordinal = 0;
+            for(const auto &[source_ordinal, source] : instances)
+            {
+                if(source_ordinal != target_ordinal)
+                {
+                    const auto segment = std::string(key_path::base_name(source.leaf())) +
+                            "[" + std::to_string(target_ordinal) + "]";
+                    if(auto moved = compact_relayed_instance(
+                               source, source.parent().child(segment));
+                       !moved)
+                        return moved;
+                }
+                ++target_ordinal;
+            }
+        }
+        return {};
+    }
+
+    expected<std::vector<relayed_value>, resolve_fold_error>
+    relayed_values_of(const key_path &instance) const
+    {
+        std::vector<relayed_value> values;
+        const std::string          exact = instance.str();
+        const std::string          below = exact + key_path::separator;
+        for(const key_path &path : m_building.paths())
+        {
+            if(path.str() != exact && !path.str().starts_with(below))
+                continue;
+            const value  *val  = m_building.find(path);
+            const origin *prov = m_provenance.of(path.str());
+            if(val == nullptr || prov == nullptr)
+                return unexpected(error{errc::malformed_source, nucleus::format("internal invariant violation: value and provenance diverged "
+                                                                                "in compact_relayed_instances(): '{}'",
+                                                                                path.str())});
+            values.push_back(relayed_value{path, *val, *prov});
+        }
+        return values;
+    }
+
+    expected<void, resolve_fold_error>
+    move_relayed_value(const relayed_value &entry, const key_path &source,
+                       const key_path &target)
+    {
+        const std::string suffix      = entry.path.str().substr(source.str().size());
+        const std::string rewritten   = target.str() + suffix;
+        auto              destination = key_path::parse(rewritten);
+        if(!destination)
+            return unexpected(error{errc::malformed_source, nucleus::format("internal invariant violation: re-parsed path failed to parse in "
+                                                                            "compact_relayed_instances()'s rebuild: '{}'",
+                                                                            rewritten)});
+        if(m_building.contains(destination.value()))
+            return unexpected(error{errc::malformed_source, nucleus::format("internal invariant violation: compact_relayed_instances() would "
+                                                                            "overwrite occupied path '{}' while moving '{}'",
+                                                                            rewritten, entry.path.str())});
+        m_building.set(destination.value(), entry.val);
+        m_provenance.record(rewritten, entry.prov);
+        m_building.remove(entry.path);
+        m_provenance.forget(entry.path.str());
+        return {};
+    }
+
+    expected<void, resolve_fold_error>
+    compact_relayed_instance(const key_path &source, const key_path &target)
+    {
+        auto values = relayed_values_of(source);
+        if(!values)
+            return unexpected(std::move(values).error());
+        for(const relayed_value &entry : values.value())
+        {
+            if(auto moved = move_relayed_value(entry, source, target); !moved)
+                return moved;
         }
         return {};
     }

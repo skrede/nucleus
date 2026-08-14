@@ -69,6 +69,11 @@ void require_direct_overlay(const nucleus::config &cfg)
 {
     const std::string serialized = nucleus::shapes::serialize(cfg);
     INFO(serialized);
+    REQUIRE(serialized == "cluster/server/name = primary [0|stack[0]|anonymous|-]\n"
+                          "cluster/server/route[0]/method = patch [1|stack[1]|anonymous|-]\n"
+                          "cluster/server/route[0]/port = 80 [0|stack[0]|anonymous|-]\n"
+                          "cluster/server/route[1]/method = post [0|stack[0]|anonymous|-]\n"
+                          "cluster/server/route[1]/port = 443 [0|stack[0]|anonymous|-]\n");
     REQUIRE(cfg.get("cluster/server/route[0]/method") == "patch");
     REQUIRE(cfg.get("cluster/server/route[0]/port") == "80");
     REQUIRE(cfg.get("cluster/server/route[1]/method") == "post");
