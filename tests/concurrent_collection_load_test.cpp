@@ -1,16 +1,6 @@
-// The collection sweep keeps its per-layer state -- the leaf ordinal counters, the
-// swept-instance set and the bucketed instance scan -- inside fold()'s layer loop
-// (resolution_context.h:252-276). concurrent_load_test.cpp already pins race freedom
-// for a flat schema, but a flat schema never reaches that loop's collection path, so
-// none of those structures is exercised there. This drives the same shared-const-space
-// design through nested repeated containers with a layer that replaces one innermost
-// instance -- the shape that fills all of them.
-//
-// A shared const space is the stronger claim than the distinct-space one: distinct
-// spaces share strictly less. ASan cannot see data races; the ThreadSanitizer CI
-// flavor running this same test is what validates the claim. The latch and the
-// iteration loop exist to give TSan genuinely overlapping access windows rather than
-// threads that serialize through their own setup.
+// A shared const space is the stronger claim than distinct spaces, which share
+// strictly less. The latch and repeated loads give ThreadSanitizer overlapping
+// resolution windows through both collection routes.
 
 #include "nucleus/config_space.h"
 
@@ -28,113 +18,174 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include <utility>
 #include <cstddef>
+#include <utility>
+#include <functional>
 
 namespace {
 
-constexpr std::size_t thread_count = 8;
-constexpr std::size_t iterations = 64;
+using source_factory = nucleus::source_stack (*)();
 
-// cluster / node[] / { port, label, route[]/port, tags[]/name } -- route and tags are
-// repeated containers nested inside a repeated container, so an addressed route
-// instance has both a sibling instance and a sibling subtree to leave alone.
 void declare_nested_collection(nucleus::config_space_builder &builder)
 {
     using nucleus::anchor;
     REQUIRE(builder.register_element(nucleus::element("cluster", anchor::root())));
     REQUIRE(builder.register_element(
-        nucleus::repeated_element("node", anchor::keyspace("cluster"))));
+            nucleus::repeated_element("node", anchor::keyspace("cluster"))));
     REQUIRE(builder.register_element(
-        nucleus::element("port", anchor::keyspace("cluster/node"))));
+            nucleus::element("label", anchor::keyspace("cluster/node"))));
     REQUIRE(builder.register_element(
-        nucleus::element("label", anchor::keyspace("cluster/node"))));
+            nucleus::repeated_element("route", anchor::keyspace("cluster/node"))));
     REQUIRE(builder.register_element(
-        nucleus::repeated_element("route", anchor::keyspace("cluster/node"))));
+            nucleus::element("port", anchor::keyspace("cluster/node/route"))));
     REQUIRE(builder.register_element(
-        nucleus::element("port", anchor::keyspace("cluster/node/route"))));
+            nucleus::repeated_element("tags", anchor::keyspace("cluster/node"))));
     REQUIRE(builder.register_element(
-        nucleus::repeated_element("tags", anchor::keyspace("cluster/node"))));
-    REQUIRE(builder.register_element(
-        nucleus::element("name", anchor::keyspace("cluster/node/tags"))));
+            nucleus::element("name", anchor::keyspace("cluster/node/tags"))));
 }
 
-nucleus::source_stack layered_instances()
+void declare_keyed_collection(nucleus::config_space_builder &builder)
+{
+    using nucleus::anchor;
+    REQUIRE(builder.register_element(nucleus::element("cluster", anchor::root())));
+    REQUIRE(builder.register_element(
+            nucleus::element("server", anchor::keyspace("cluster"))));
+    REQUIRE(builder.register_element(
+            nucleus::primary_key_element("name", anchor::keyspace("cluster/server"))));
+    REQUIRE(builder.register_element(
+            nucleus::repeated_element("route", anchor::keyspace("cluster/server"))));
+    REQUIRE(builder.register_element(
+            nucleus::element("port", anchor::keyspace("cluster/server/route"))));
+    REQUIRE(builder.register_element(
+            nucleus::element("method", anchor::keyspace("cluster/server/route"))));
+}
+
+nucleus::source_stack ordinal_layers()
 {
     nucleus::runtime_source base;
-    base.set("cluster/node[0]/port", "80")
-        .set("cluster/node[0]/label", "keep")
-        .set("cluster/node[0]/route[0]/port", "8080")
-        .set("cluster/node[0]/route[1]/port", "8443")
-        .set("cluster/node[0]/tags[0]/name", "a")
-        .set("cluster/node[1]/port", "90");
-
-    // Addresses route[0] only: the sweep must replace that instance wholly and spare
-    // route[1], node[0]'s own leaves and the nested tags subtree.
+    base.set("cluster/node[0]/label", "keep")
+            .set("cluster/node[0]/route[0]/port", "8080")
+            .set("cluster/node[0]/route[1]/port", "8443")
+            .set("cluster/node[0]/tags[0]/name", "a")
+            .set("cluster/node[1]/label", "sibling");
     nucleus::runtime_source overlay;
     overlay.set("cluster/node[0]/route[0]/port", "7000");
-
     return nucleus::source_stack{std::move(base), std::move(overlay)};
 }
 
-std::map<std::string, std::string> snapshot_of(const nucleus::config &cfg)
+nucleus::source_stack keyed_layers()
 {
-    std::map<std::string, std::string> out;
-    for(const std::string &key : cfg.keys())
-        out.emplace(key, cfg.get(key).value_or(std::string{}));
+    nucleus::runtime_source overlay;
+    overlay.set("cluster/server/route[0]/method", "patch");
+    return nucleus::source_stack{std::move(overlay)};
+}
+
+nucleus::source_handle keyed_document(const std::string &)
+{
+    nucleus::runtime_source document;
+    document.set("cluster/server/primary/route[0]/port", "80")
+            .set("cluster/server/primary/route[0]/method", "get")
+            .set("cluster/server/primary/route[1]/port", "443")
+            .set("cluster/server/primary/route[1]/method", "post");
+    return nucleus::source_handle(std::move(document));
+}
+
+nucleus::load_options keyed_options()
+{
+    nucleus::load_options options;
+    options.document_paths = {"base.runtime"};
+    options.make_document  = keyed_document;
+    options.selection      = "primary";
+    return options;
+}
+
+std::string serialize(const nucleus::config &config)
+{
+    std::string out;
+    for(const std::string &key : config.keys())
+    {
+        const nucleus::origin *origin = config.provenance_of(key);
+        out += key + " = " + config.get(key).value_or(std::string()) + " [";
+        if(origin != nullptr)
+            out += std::to_string(origin->rank) + "|" + origin->layer + "|" + (origin->inheritance_layer.has_value() ? std::to_string(origin->inheritance_layer.value()) : std::string("-"));
+        out += "]\n";
+    }
     return out;
 }
 
-// Catch2's assertion macros are not thread-safe, so a worker reports failure by
-// leaving its ok flag clear and the caller asserts once every thread has joined.
-void load_repeatedly(const nucleus::config_space &space, std::latch &start,
-                     std::map<std::string, std::string> &out, char &ok)
+void load_repeatedly(const nucleus::config_space &space, source_factory make_sources,
+                     const nucleus::load_options &options, std::size_t repetitions,
+                     std::latch &start, std::string &out, char &ok)
 {
     start.arrive_and_wait();
-    for(std::size_t iter = 0; iter < iterations; ++iter)
+    for(std::size_t repetition = 0; repetition < repetitions; ++repetition)
     {
         const nucleus::load_result loaded =
-            nucleus::load_config(space, layered_instances(), {});
+                nucleus::load_config(space, make_sources(), options);
         if(!loaded)
             return;
-        out = snapshot_of(loaded.value());
+        out = serialize(loaded.value());
     }
     ok = 1;
 }
 
+std::vector<std::string> concurrent_results(
+        const nucleus::config_space &space, source_factory make_sources,
+        const nucleus::load_options &options, std::size_t thread_count,
+        std::size_t repetitions)
+{
+    std::vector<std::string> results(thread_count);
+    std::vector<char>        ok(thread_count, 0);
+    std::latch               start(static_cast<std::ptrdiff_t>(thread_count));
+    std::vector<std::thread> threads;
+    threads.reserve(thread_count);
+    for(std::size_t index = 0; index < thread_count; ++index)
+        threads.emplace_back(load_repeatedly, std::cref(space), make_sources,
+                             std::cref(options), repetitions, std::ref(start),
+                             std::ref(results[index]), std::ref(ok[index]));
+    for(std::thread &thread : threads)
+        thread.join();
+    for(char status : ok)
+        REQUIRE(status);
+    for(std::size_t index = 1; index < thread_count; ++index)
+        REQUIRE(results[index] == results.front());
+    return results;
 }
 
-TEST_CASE("N threads load one shared const space of nested repeated containers "
-          "lock-free with identical results",
+}
+
+TEST_CASE("concurrent loads of nested ordinal collections produce identical trees",
           "[concurrent][load][collection_shapes]")
 {
     nucleus::config_space_builder builder;
     declare_nested_collection(builder);
     const nucleus::config_space space = builder.build();
 
-    std::vector<std::map<std::string, std::string>> results(thread_count);
-    // char, not vector<bool>: the bit-packed specialization shares machine words
-    // across indices, so concurrent per-thread writes would race on the same word.
-    std::vector<char> ok(thread_count, 0);
-    std::latch start(thread_count);
+    const std::vector<std::string> results = concurrent_results(
+            space, ordinal_layers, {}, 8, 64);
+    REQUIRE(results.front().find("cluster/node[0]/route[0]/port = 7000 [1|stack[1]|-") != std::string::npos);
+    REQUIRE(results.front().find("cluster/node[0]/route[1]/port = 8443 [0|stack[0]|-") != std::string::npos);
+    REQUIRE(results.front().find("cluster/node[1]/label = sibling") != std::string::npos);
+}
 
-    std::vector<std::thread> threads;
-    threads.reserve(thread_count);
-    for(std::size_t i = 0; i < thread_count; ++i)
-        threads.emplace_back(load_repeatedly, std::cref(space), std::ref(start),
-                             std::ref(results[i]), std::ref(ok[i]));
-    for(std::thread &t : threads)
-        t.join();
+TEST_CASE("concurrent selected-strain loads resolve keyed collections identically",
+          "[concurrent][load][collection_shapes][keyed][sweep]")
+{
+    nucleus::config_space_builder builder;
+    declare_keyed_collection(builder);
+    const nucleus::config_space space   = builder.build();
+    const nucleus::load_options options = keyed_options();
 
-    for(std::size_t i = 0; i < thread_count; ++i)
-        REQUIRE(ok[i]);
-
-    const std::map<std::string, std::string> &expected = results.front();
-    REQUIRE(expected.at("cluster/node[0]/route[0]/port") == "7000");
-    REQUIRE(expected.at("cluster/node[0]/route[1]/port") == "8443");
-    REQUIRE(expected.at("cluster/node[0]/label") == "keep");
-    REQUIRE(expected.at("cluster/node[0]/tags[0]/name") == "a");
-    REQUIRE(expected.at("cluster/node[1]/port") == "90");
-    for(std::size_t i = 1; i < thread_count; ++i)
-        REQUIRE(results[i] == expected);
+    constexpr std::size_t thread_counts[] = {2, 4, 8, 16};
+    constexpr std::size_t repetitions[]   = {1, 8, 64};
+    for(std::size_t thread_count : thread_counts)
+        for(std::size_t repetition_count : repetitions)
+        {
+            CAPTURE(thread_count, repetition_count);
+            const std::vector<std::string> results = concurrent_results(
+                    space, keyed_layers, options, thread_count, repetition_count);
+            REQUIRE(results.front().find("cluster/server/route[0]/method = patch [1|stack[0]|-") != std::string::npos);
+            REQUIRE(results.front().find("cluster/server/route[1]/port = 443 [0|path:base.runtime|0") != std::string::npos);
+            REQUIRE(results.front().find("cluster/server/route[1]/method = post [0|path:base.runtime|0") != std::string::npos);
+        }
 }
