@@ -2,12 +2,11 @@
 // strictly less. The latch and repeated loads give ThreadSanitizer overlapping
 // resolution windows through both collection routes.
 
+#include "nucleus/config.h"
 #include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
-
-#include "nucleus/config.h"
 
 #include "nucleus/runtime/runtime_source.h"
 
@@ -115,7 +114,8 @@ std::string serialize(const nucleus::config &config)
 
 void load_repeatedly(const nucleus::config_space &space, source_factory make_sources,
                      const nucleus::load_options &options, std::size_t repetitions,
-                     std::latch &start, std::string &out, char &ok)
+                     const std::string &expected, std::latch &start,
+                     std::string &out, char &ok)
 {
     start.arrive_and_wait();
     for(std::size_t repetition = 0; repetition < repetitions; ++repetition)
@@ -125,6 +125,8 @@ void load_repeatedly(const nucleus::config_space &space, source_factory make_sou
         if(!loaded)
             return;
         out = serialize(loaded.value());
+        if(out != expected)
+            return;
     }
     ok = 1;
 }
@@ -134,6 +136,10 @@ std::vector<std::string> concurrent_results(
         const nucleus::load_options &options, std::size_t thread_count,
         std::size_t repetitions)
 {
+    const nucleus::load_result reference =
+            nucleus::load_config(space, make_sources(), options);
+    REQUIRE(reference);
+    const std::string        expected = serialize(reference.value());
     std::vector<std::string> results(thread_count);
     std::vector<char>        ok(thread_count, 0);
     std::latch               start(static_cast<std::ptrdiff_t>(thread_count));
@@ -141,14 +147,16 @@ std::vector<std::string> concurrent_results(
     threads.reserve(thread_count);
     for(std::size_t index = 0; index < thread_count; ++index)
         threads.emplace_back(load_repeatedly, std::cref(space), make_sources,
-                             std::cref(options), repetitions, std::ref(start),
-                             std::ref(results[index]), std::ref(ok[index]));
+                             std::cref(options), repetitions, std::cref(expected),
+                             std::ref(start), std::ref(results[index]),
+                             std::ref(ok[index]));
     for(std::thread &thread : threads)
         thread.join();
-    for(char status : ok)
-        REQUIRE(status);
-    for(std::size_t index = 1; index < thread_count; ++index)
-        REQUIRE(results[index] == results.front());
+    for(std::size_t index = 0; index < thread_count; ++index)
+    {
+        INFO("thread " << index << ": " << results[index]);
+        REQUIRE(ok[index]);
+    }
     return results;
 }
 
