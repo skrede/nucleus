@@ -220,7 +220,9 @@ TEST_CASE("emit_document rejects a repeated primary-key value instead of a dupli
     std::map<std::string, std::string> values{
         {"cluster/server/name[0]", "web"},
         {"cluster/server/name[1]", "db"}};
-    const nucleus::config config(std::move(values), nucleus::provenance{});
+    auto made = nucleus::config::from_values(std::move(values));
+    REQUIRE(made);
+    const nucleus::config config = std::move(made).value();
 
     std::ostringstream out;
     auto result = nucleus::xml::emit_document(config, out, projection_of(space));

@@ -73,7 +73,9 @@ nucleus_add_module(core
     EXPORT_NAME nucleus
     ALIASES nucleus::nucleus nucleus::core
     SOURCES
+        core/src/nucleus/config.cpp
         core/src/nucleus/version.cpp
+        core/src/nucleus/keyspace/storage_shape.cpp
         core/src/nucleus/resolve/configuration_space.cpp
         core/src/nucleus/tokenizer/tokenizer.cpp
         core/src/nucleus/tokenizer/token_lexer.cpp
@@ -101,6 +103,8 @@ if(NUCLEUS_BUILD_TESTS AND
         "#include <nucleus/schema/keyref_candidate_index.h>\n")
     add_library(read_api_compile_check OBJECT
         ${read_api_compile_check_tu}
+        core/src/nucleus/config.cpp
+        core/src/nucleus/keyspace/storage_shape.cpp
         core/src/nucleus/query/query.cpp
         core/src/nucleus/query/keyref.cpp
         core/src/nucleus/query/structural_selector.cpp)

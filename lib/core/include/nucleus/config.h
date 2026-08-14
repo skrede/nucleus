@@ -27,6 +27,8 @@
 
 namespace nucleus {
 
+class resolution_context;
+
 // The immutable, self-owning result of a load. Every value is copied out into an
 // owned string at the load boundary and the source buffers are dropped, so it holds
 // no view into any dropped buffer, outlives every source, and is freely thread-safe
@@ -43,35 +45,14 @@ class config
 public:
     config() = default;
 
+    static expected<config, error> from_values(
+            std::map<std::string, std::string> values,
+            provenance origins = {});
+
     // Entry point for the walk API. Returns a root-anchored cursor backed by
     // this immutable config. The cursor holds a const pointer to *this; the config
     // must outlive all cursors derived from it.
-    config_node root() const noexcept
-    {
-        return config_node{this, std::string{}};
-    }
-
-    config(std::map<std::string, std::string> values, provenance origins)
-        : m_values(std::make_move_iterator(values.begin()),
-                   std::make_move_iterator(values.end())),
-          m_provenance(std::move(origins))
-    {
-    }
-
-    // Extended constructor carrying the typed parallel map produced by convert()
-    // and the soft-capability degradations recorded during load.
-    config(std::map<std::string, std::string> values,
-           std::map<std::string, std::any> typed,
-           provenance origins,
-           std::vector<degradation> degraded = {})
-        : m_values(std::make_move_iterator(values.begin()),
-                   std::make_move_iterator(values.end())),
-          m_typed(std::make_move_iterator(typed.begin()),
-                  std::make_move_iterator(typed.end())),
-          m_provenance(std::move(origins)),
-          m_degradations(std::move(degraded))
-    {
-    }
+    config_node root() const noexcept;
 
     // The owned value at a key, or nullopt if the key carries no value. The
     // returned string is a copy -- no buffer dependency survives into it.
@@ -79,43 +60,18 @@ public:
     // container (legacy untyped surface). Use get_as() for the typed loud error
     // naming the container and instance count, or get("path[N]") / get_all() for
     // indexed access.
-    std::optional<std::string> get(std::string_view key) const
-    {
-        auto it = m_values.find(key);
-        if(it != m_values.end())
-            return it->second;
-        return std::nullopt;
-    }
+    std::optional<std::string> get(std::string_view key) const;
 
     // All values matching the path's explicit ordinals and omitted ordinal slots.
     // Results follow the complete numeric ordinal tuple across nested repeats.
-    std::vector<std::string> get_all(std::string_view key) const
-    {
-        auto direct = m_values.find(key);
-        if(direct != m_values.end())
-            return {direct->second};
+    std::vector<std::string> get_all(std::string_view key) const;
 
-        std::vector<std::pair<ordinal_key, std::string>> gathered;
-        for(const auto &[k, v] : m_values)
-        {
-            if(gather_path_matches(k, key))
-                gathered.emplace_back(ordinal_sort_key(k), v);
-        }
-        return ordered_gather(std::move(gathered));
-    }
-
-    bool contains(std::string_view key) const
-    {
-        return m_values.contains(key);
-    }
+    bool contains(std::string_view key) const;
 
     // "Why is this value X?" -- the winning source's origin for a scalar key, or
     // nullptr. For indexed paths (e.g. "cluster/node[0]/port"), returns the origin
     // for that specific indexed path.
-    const origin *provenance_of(std::string_view key) const
-    {
-        return m_provenance.of(std::string(key));
-    }
+    const origin *provenance_of(std::string_view key) const;
 
     // Returns the typed value at `key` converted by the registered converter.
     // Errors distinguish four cases:
@@ -181,29 +137,27 @@ public:
                     std::string("path '") + key + "' is absent"});
     }
 
-    std::size_t size() const noexcept { return m_values.size(); }
+    std::size_t size() const noexcept;
 
-    bool empty() const noexcept { return m_values.empty(); }
+    bool empty() const noexcept;
 
     // Every key carrying a value, in canonical order (sorted by string key).
-    std::vector<std::string> keys() const
-    {
-        std::vector<std::string> out;
-        out.reserve(m_values.size());
-        for(const auto &[key, _] : m_values)
-            out.push_back(key);
-        return out;
-    }
+    std::vector<std::string> keys() const;
 
     // The soft-capability degradations recorded during load -- load-level
     // provenance for why a value's shape changed. Empty when nothing degraded.
-    std::span<const degradation> degradations() const noexcept
-    {
-        return m_degradations;
-    }
+    std::span<const degradation> degradations() const noexcept;
 
 private:
     friend class config_node;
+    friend class resolution_context;
+
+    config(std::map<std::string, std::string> values, provenance origins);
+
+    config(std::map<std::string, std::string> values,
+           std::map<std::string, std::any> typed,
+           provenance origins,
+           std::vector<degradation> degraded);
 
     struct repeated_container_crossing
     {

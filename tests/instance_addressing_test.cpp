@@ -27,7 +27,9 @@ config                               make_config()
             values.emplace("cluster/node[" + std::to_string(outer) + "]/route[" + std::to_string(inner) + "]/port", "80");
     values.emplace("mount_a/plugin/logging/sinks/console", "on");
     values.emplace("mount_b/extension/logging/sinks/console", "on");
-    return config(std::move(values), provenance{});
+    auto made = config::from_values(std::move(values));
+    REQUIRE(made);
+    return std::move(made).value();
 }
 std::vector<std::string> paths(const std::vector<config_node> &nodes)
 {

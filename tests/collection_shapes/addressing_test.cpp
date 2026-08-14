@@ -10,6 +10,7 @@
 
 #include <string>
 #include <vector>
+#include <cstdint>
 
 namespace {
 
@@ -148,21 +149,18 @@ TEST_CASE("an empty source stack reaches resolution with no entries and produces
     REQUIRE(nested.error().code == nucleus::errc::unmet_capability);
 }
 
-TEST_CASE("a bracket-shaped segment on an undeclared-repeated container escapes the "
-          "addressing rule and is caught at conversion",
+TEST_CASE("mixed canonical storage is rejected before schema-specific conversion",
           "[collection_shapes][addressing]")
 {
-    // The addressing rule tests membership of the declared repeated containers, so a
-    // container the schema does not declare repeated is outside its reach -- while
-    // canonicalization strips the ordinal regardless, landing both keys on one
-    // element. This is the shape that still reaches the convert-time coexistence
-    // check, and it names no repeated container because there is none.
+    // A segment the schema does not declare repeated bypasses the declaration-aware
+    // addressing rule, so the schema-independent storage gate owns this conflict.
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("cluster", nucleus::anchor::root())));
     REQUIRE(builder.register_element(
         nucleus::element("x", nucleus::anchor::keyspace("cluster"))));
     REQUIRE(builder.register_element(
-        nucleus::typed_element<int>("port", nucleus::anchor::keyspace("cluster/x"))));
+        nucleus::typed_element<std::int32_t>(
+                "port", nucleus::anchor::keyspace("cluster/x"))));
     const nucleus::config_space space = builder.build();
 
     const nucleus::load_result loaded = nucleus::load_config(space,
@@ -172,8 +170,10 @@ TEST_CASE("a bracket-shaped segment on an undeclared-repeated container escapes 
     REQUIRE_FALSE(loaded);
     INFO("message: " << loaded.error().message);
     REQUIRE(loaded.error().code == nucleus::errc::schema_violation);
+    REQUIRE(loaded.error().message.find("canonical path 'cluster/x/port'")
+            != std::string::npos);
     REQUIRE(loaded.error().message.find(
-                "has both an unindexed value and indexed sibling instances")
+                "concrete paths 'cluster/x/port' and 'cluster/x[0]/port'")
             != std::string::npos);
 }
 

@@ -1,9 +1,14 @@
 #include "nucleus/config.h"
+#include "nucleus/config_space.h"
+
+#include "nucleus/schema/anchor.h"
+#include "nucleus/schema/schema.h"
+#include "nucleus/schema/converters.h"
+
+#include "nucleus/runtime/runtime_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <any>
-#include <map>
 #include <array>
 #include <string>
 #include <cstdint>
@@ -23,23 +28,40 @@ std::string route_path(std::size_t outer, std::size_t inner)
     return node_path(outer) + "/route[" + std::to_string(inner) + "]";
 }
 
+nucleus::config_space retrieval_space()
+{
+    nucleus::config_space_builder builder;
+    REQUIRE(builder.register_element(
+            nucleus::element("cluster", nucleus::anchor::root())));
+    REQUIRE(builder.register_element(nucleus::repeated_element(
+            "node", nucleus::anchor::keyspace("cluster"))));
+    REQUIRE(builder.register_element(nucleus::element(
+            "label", nucleus::anchor::keyspace("cluster/node"))));
+    REQUIRE(builder.register_element(nucleus::repeated_element(
+            "route", nucleus::anchor::keyspace("cluster/node"))));
+    REQUIRE(builder.register_element(nucleus::typed_element<std::int32_t>(
+            "port", nucleus::anchor::keyspace("cluster/node/route"))));
+    return builder.build();
+}
+
 nucleus::config repeated_values()
 {
-    std::map<std::string, std::string> raw;
-    std::map<std::string, std::any>    typed;
+    nucleus::runtime_source source;
     for(std::size_t const outer : ordinals)
     {
-        raw.emplace(node_path(outer) + "/label", "node");
+        source.set(node_path(outer) + "/label", "node");
         for(std::size_t const inner : ordinals)
         {
             const std::string path  = route_path(outer, inner) + "/port";
             const auto        value = static_cast<std::int32_t>((outer * 100) + inner);
-            raw.emplace(path, std::to_string(value));
-            typed.emplace(path, value);
+            source.set(path, std::to_string(value));
         }
     }
-    return nucleus::config(
-            std::move(raw), std::move(typed), nucleus::provenance{});
+    const nucleus::config_space space  = retrieval_space();
+    auto                        loaded = nucleus::load_config(
+            space, nucleus::source_stack{std::move(source)}, {});
+    REQUIRE(loaded);
+    return std::move(loaded).value();
 }
 
 void check_crossing(const nucleus::config &config, const std::string &query,

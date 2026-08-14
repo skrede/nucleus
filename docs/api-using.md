@@ -621,9 +621,27 @@ The immutable, self-owning output of a load. Every value is copied out into an
 owned string at the load boundary and the source buffers are dropped, so it
 outlives every source and is freely thread-safe to read.
 
+Normal resolved configurations come from `load_config()`. Low-level code that
+already owns a raw path/value map can use the checked factory:
+
+```cpp
+static expected<config, error> config::from_values(
+    std::map<std::string, std::string> values,
+    provenance origins = {});
+```
+
+The factory returns `errc::malformed_source` for a malformed key path and
+`errc::schema_violation` for a conflicting storage shape. It never returns an
+invalid `config`; the unchecked map constructors are internal to resolution.
+
 Repeated paths (both repeated containers and repeated leaves) are stored as
 indexed scalars in the internal map: `"config/tags[0]"="a"`,
 `"cluster/node[0]/port"="80"`, `"cluster/node[1]/port"="90"`.
+Every concrete instance of one canonical leaf agrees on which path segments
+are indexed. A plain leaf and indexed instances of that same leaf cannot
+coexist: `tags` conflicts with `tags[0]`, and a plain `route` leaf in one node
+conflicts with an indexed `route[0]` leaf in another. `load_config()` and
+`config::from_values()` reject that state before a `config` is constructed.
 
 ```cpp
 std::optional<std::string> get(const std::string &key) const;

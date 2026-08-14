@@ -21,13 +21,20 @@
 
 namespace {
 
+nucleus::config checked_config(std::map<std::string, std::string> values)
+{
+    auto made = nucleus::config::from_values(std::move(values));
+    REQUIRE(made);
+    return std::move(made).value();
+}
+
 nucleus::config make_repeated_config(int count)
 {
     std::map<std::string, std::string> values;
     for(int i = 0; i < count; ++i)
         values.emplace("cluster/node[" + std::to_string(i) + "]/port",
                        std::to_string(i));
-    return nucleus::config(std::move(values), nucleus::provenance{});
+    return checked_config(std::move(values));
 }
 
 std::vector<int> emitted_ordinal_values(const std::string &text)
@@ -67,7 +74,7 @@ TEST_CASE("flat emit rejects an embedded newline as malformed_source, writing no
 {
     std::map<std::string, std::string> values{
         {"server/host", std::string("localhost\n--server-admin=true")}};
-    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+    const nucleus::config cfg = checked_config(std::move(values));
 
     std::ostringstream out;
     const auto result = nucleus::env::emit_document(cfg, out);
@@ -82,7 +89,7 @@ TEST_CASE("flat emit rejects an embedded carriage return as malformed_source",
 {
     std::map<std::string, std::string> values{
         {"server/host", std::string("localhost\r--server-admin=true")}};
-    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+    const nucleus::config cfg = checked_config(std::move(values));
 
     std::ostringstream out;
     const auto result = nucleus::env::emit_document(cfg, out);
@@ -97,7 +104,7 @@ TEST_CASE("argv emit inherits the shared newline-rejection fix",
 {
     std::map<std::string, std::string> values{
         {"server/host", std::string("localhost\n--server-admin=true")}};
-    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+    const nucleus::config cfg = checked_config(std::move(values));
 
     std::ostringstream out;
     const auto result = nucleus::argv::emit_document(cfg, out);
@@ -114,7 +121,7 @@ TEST_CASE("flat emit rejects an embedded newline in a KEY, writing nothing",
     // it before anything reaches the stream.
     std::map<std::string, std::string> values{
         {std::string("server/host\n--server-admin"), std::string("true")}};
-    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+    const nucleus::config cfg = checked_config(std::move(values));
 
     std::ostringstream out;
     const auto result = nucleus::env::emit_document(cfg, out);
@@ -135,7 +142,7 @@ TEST_CASE("flat emit rejects an embedded carriage return in a KEY",
 {
     std::map<std::string, std::string> values{
         {std::string("server/host\r--server-admin"), std::string("true")}};
-    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+    const nucleus::config cfg = checked_config(std::move(values));
 
     std::ostringstream out;
     const auto result = nucleus::env::emit_document(cfg, out);

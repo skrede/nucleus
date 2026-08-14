@@ -61,7 +61,9 @@ config raw_reference(const std::size_t target_count)
     values.emplace("route/target", "alpha");
     for(std::size_t i = 0; i < target_count; ++i)
         values.emplace("endpoints/output[" + std::to_string(i) + "]/name", "alpha");
-    return config(std::move(values), provenance{});
+    auto made = config::from_values(std::move(values));
+    REQUIRE(made);
+    return std::move(made).value();
 }
 
 void require_candidate_message(const error &failure, const std::size_t count)

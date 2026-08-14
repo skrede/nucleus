@@ -10,6 +10,7 @@
 
 #include "nucleus/keyspace/keyspace.h"
 #include "nucleus/keyspace/provenance.h"
+#include "nucleus/keyspace/storage_shape.h"
 
 #include "nucleus/schema/instance_paths.h"
 #include "nucleus/schema/schema_enforcer.h"
@@ -1053,6 +1054,10 @@ public:
     // actionable; missing required fields are reported by the enforcer.
     expected<void, resolve_fold_error> validate()
     {
+        const std::vector<key_path> paths = m_building.paths();
+        if(auto shape = validate_storage_shape(paths); !shape)
+            return unexpected(std::move(shape).error());
+
         const bool has_groups = !m_schema.constraint_groups().empty()
                              || !m_schema.identity_groups().empty();
 
@@ -1139,16 +1144,12 @@ public:
             // when node is repeated) has no scalar at the plain declared path; its
             // values live at cluster/node[0]/port, cluster/node[1]/port, etc.
             bool found_any_indexed = false;
-            bool has_plain_scalar = false;
             for(const key_path &kp : m_building.paths())
             {
                 if(m_schema.canonical_text(kp) != path_str)
                     continue;
                 if(kp.str() == path_str)
-                {
-                    has_plain_scalar = true;
-                    continue; // handled below, once we know whether indexed siblings coexist
-                }
+                    continue;
                 found_any_indexed = true;
                 const value *v = m_building.find(kp);
                 if(v == nullptr)
@@ -1166,33 +1167,6 @@ public:
                             kp.str(), res.error(), layer_label)});
                 }
                 m_typed.emplace(kp.str(), std::move(res).value());
-            }
-
-            // A scalar written directly at the plain declared path cannot coexist with
-            // indexed siblings that canonicalize onto it: it bypasses the fold's own
-            // ordinal-indexing machinery and would otherwise sit in the resolved
-            // keyspace unconverted. This looks redundant with the addressing rule the
-            // fold applies, and for a DECLARED repeated container it is -- the plain
-            // arrival is rejected earlier, at the source boundary. What still reaches
-            // here is the other shape: a bracket-shaped segment on a container the
-            // schema does not declare repeated. The addressing rule cannot see it (its
-            // set holds declared repeated containers only) while canonical_text strips
-            // the ordinal regardless, so the two paths land on one declared element.
-            // The container name below is consequently empty for that shape.
-            if(found_any_indexed && has_plain_scalar)
-            {
-                std::string repeated_ancestor;
-                for(const std::string &rc : m_schema.repeated_container_paths())
-                {
-                    if(path_str.starts_with(rc + key_path::separator)
-                       && rc.size() > repeated_ancestor.size())
-                        repeated_ancestor = rc;
-                }
-                return unexpected(error{errc::schema_violation, nucleus::format(
-                    "path '{}' has both an unindexed value and indexed sibling instances "
-                    "under repeated container '{}'; a scalar may not coexist with indexed "
-                    "instances of the same repeated field",
-                    path_str, repeated_ancestor)});
             }
 
             // Direct path lookup: plain (non-indexed) scalar at the declared path.

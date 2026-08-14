@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 #include <sstream>
+#include <utility>
 
 // The config_emitter seam is genuinely multi-format: env and args are honest FLAT
 // KEY= sources, while xml is a tree format -- and all three project the SAME space
@@ -52,7 +53,9 @@ nucleus::config make_server_config()
         {"server/host", "localhost"},
         {"server/tag[0]", "alpha"},
         {"server/tag[1]", "beta"}};
-    return nucleus::config(std::move(values), nucleus::provenance{});
+    auto made = nucleus::config::from_values(std::move(values));
+    REQUIRE(made);
+    return std::move(made).value();
 }
 
 std::size_t count_occurrences(const std::string &text, const std::string &needle)
@@ -158,7 +161,9 @@ std::pair<nucleus::expected<void, nucleus::error>, std::string>
 emit_one(const std::string &key, const std::string &value)
 {
     std::map<std::string, std::string> values{{key, value}};
-    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+    auto made = nucleus::config::from_values(std::move(values));
+    REQUIRE(made);
+    const nucleus::config cfg = std::move(made).value();
     std::ostringstream out;
     auto result = nucleus::xml::emit_document(cfg, out);
     return {std::move(result), out.str()};

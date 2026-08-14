@@ -67,13 +67,21 @@ schema_registry nested_node_schema()
     return schema;
 }
 
+nucleus::config checked_configuration(
+        std::map<std::string, std::string> values)
+{
+    auto made = nucleus::config::from_values(std::move(values));
+    REQUIRE(made);
+    return std::move(made).value();
+}
+
 nucleus::config configuration(
         std::initializer_list<std::pair<const char *, const char *>> entries)
 {
     std::map<std::string, std::string> values;
     for(const auto &[path, text] : entries)
         values.emplace(path, text);
-    return nucleus::config(std::move(values), nucleus::provenance{});
+    return checked_configuration(std::move(values));
 }
 
 bool mentions(const std::vector<nucleus::schema_violation> &violations,
@@ -120,7 +128,7 @@ TEST_CASE("identity values may repeat across enclosing instances",
         for(std::size_t parent = 0; parent < parent_count; ++parent)
             values.emplace("cluster/node[" + std::to_string(parent) + "]/output[0]/name", "shared");
         const auto violations = nucleus::group_enforcer::validate(
-                schema, nucleus::config(std::move(values), nucleus::provenance{}));
+                schema, checked_configuration(std::move(values)));
         INFO("parent count: " << parent_count);
         if(!violations.empty())
             INFO(violations.front().reason);

@@ -19,15 +19,23 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <map>
-#include <algorithm>
-#include <sstream>
 #include <string>
 #include <vector>
+#include <sstream>
+#include <utility>
+#include <algorithm>
 
 using nucleus::anchor;
 using nucleus::schema_registry;
 
 namespace {
+
+nucleus::config checked_config(std::map<std::string, std::string> values)
+{
+    auto made = nucleus::config::from_values(std::move(values));
+    REQUIRE(made);
+    return std::move(made).value();
+}
 
 nucleus::xml_source xml_of(const std::string &text)
 {
@@ -326,7 +334,7 @@ TEST_CASE("xml emitter -- a sparse ordinal fails loudly and writes nothing",
     // An instance at ordinal 2 with ordinals 0 and 1 absent: the emitter must not
     // merge it into slot 0 nor drop it on a null node -- it reports the gap.
     std::map<std::string, std::string> values{{"cluster/node[2]/port", "9"}};
-    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+    const nucleus::config cfg = checked_config(std::move(values));
 
     std::ostringstream out;
     auto result = nucleus::xml::emit_document(cfg, out);
@@ -344,7 +352,7 @@ TEST_CASE("xml emitter -- a sparse indexed LEAF ordinal fails loudly",
     // The same contiguity invariant applies to an indexed leaf: tags[2] with 0/1
     // absent must not silently renumber to slot 0 on re-read -- it reports the gap.
     std::map<std::string, std::string> values{{"cluster/tags[2]", "9"}};
-    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+    const nucleus::config cfg = checked_config(std::move(values));
 
     std::ostringstream out;
     auto result = nucleus::xml::emit_document(cfg, out);
@@ -401,7 +409,7 @@ TEST_CASE("emit refuses a value placed on a declared repeated container",
     nucleus::schema_projection proj = reg.projection();
 
     std::map<std::string, std::string> values{{"cluster/node[0]", "oops"}};
-    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+    const nucleus::config cfg = checked_config(std::move(values));
 
     std::ostringstream out;
     auto result = nucleus::xml::emit_document(cfg, out, proj);
@@ -422,7 +430,7 @@ TEST_CASE("emit still writes a repeated scalar leaf value", "[xml][xml_emitter]"
 
     std::map<std::string, std::string> values{
         {"cluster/tags[0]", "a"}, {"cluster/tags[1]", "b"}};
-    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+    const nucleus::config cfg = checked_config(std::move(values));
 
     std::ostringstream out;
     REQUIRE(nucleus::xml::emit_document(cfg, out, proj));
@@ -457,7 +465,7 @@ TEST_CASE("a whitespace-only leaf value under a repeated container round-trips",
     // so its guard does not fire.
     const nucleus::config_space space = make_cluster_space_for_emitter();
     std::map<std::string, std::string> values{{"cluster/node[0]/port", " "}};
-    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+    const nucleus::config cfg = checked_config(std::move(values));
 
     std::ostringstream out;
     REQUIRE(nucleus::xml::emit_document(cfg, out));
@@ -478,7 +486,7 @@ TEST_CASE("xml emitter -- contiguous indexed leaves round-trip in order",
 
     std::map<std::string, std::string> values{
         {"cluster/tags[0]", "a"}, {"cluster/tags[1]", "b"}};
-    const nucleus::config original(std::move(values), nucleus::provenance{});
+    const nucleus::config original = checked_config(std::move(values));
 
     std::ostringstream out;
     REQUIRE(nucleus::xml::emit_document(original, out));

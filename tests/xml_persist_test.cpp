@@ -12,11 +12,12 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <map>
+#include <cstdio>
 #include <string>
 #include <vector>
-#include <cstdio>
 #include <fstream>
 #include <sstream>
+#include <utility>
 #include <filesystem>
 #include <string_view>
 
@@ -29,6 +30,13 @@
 using nucleus::anchor;
 
 namespace {
+
+nucleus::config checked_config(std::map<std::string, std::string> values)
+{
+    auto made = nucleus::config::from_values(std::move(values));
+    REQUIRE(made);
+    return std::move(made).value();
+}
 
 nucleus::source_handle xml_of(const std::string &text)
 {
@@ -170,7 +178,7 @@ TEST_CASE("emit_document wraps a multi-root config so its own reader accepts it"
     // a multi-root document the hardened reader now refuses on re-read.
     std::map<std::string, std::string> values{
         {"alpha/x", "1"}, {"beta/y", "2"}};
-    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+    const nucleus::config cfg = checked_config(std::move(values));
 
     std::ostringstream out;
     REQUIRE(nucleus::xml::emit_document(cfg, out));
@@ -195,7 +203,7 @@ TEST_CASE("emit_document + load round-trip preserves a bare single-root leaf",
     // text -- the structural walk reads only attributes and leaf children, never the
     // walked node's own text -- or the value vanishes on reload.
     std::map<std::string, std::string> values{{"port", "8080"}};
-    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+    const nucleus::config cfg = checked_config(std::move(values));
 
     std::ostringstream out;
     REQUIRE(nucleus::xml::emit_document(cfg, out));
@@ -231,7 +239,7 @@ TEST_CASE("emit_document wraps an empty config so its own reader accepts it",
     // An empty config previously emitted only the XML declaration -- a rootless
     // document the reader rejects ("no root element"). emit_document must wrap zero
     // top-level elements in <config/>, symmetric with emit_template.
-    const nucleus::config cfg(std::map<std::string, std::string>{}, nucleus::provenance{});
+    const nucleus::config cfg;
 
     std::ostringstream out;
     REQUIRE(nucleus::xml::emit_document(cfg, out));
@@ -258,7 +266,7 @@ TEST_CASE("emit_document + load round-trip preserves a whitespace-only value",
     for(const std::string &ws : {std::string(" "), std::string("\t"), std::string("\n")})
     {
         std::map<std::string, std::string> values{{"port", ws}};
-        const nucleus::config cfg(std::move(values), nucleus::provenance{});
+        const nucleus::config cfg = checked_config(std::move(values));
 
         std::ostringstream out;
         REQUIRE(nucleus::xml::emit_document(cfg, out));
@@ -281,7 +289,7 @@ TEST_CASE("emit_document + load round-trip preserves a whitespace-only repeated-
 
     std::map<std::string, std::string> values{
         {"cluster/tags[0]", " "}, {"cluster/tags[1]", "x"}};
-    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+    const nucleus::config cfg = checked_config(std::move(values));
 
     std::ostringstream out;
     REQUIRE(nucleus::xml::emit_document(cfg, out));
@@ -297,7 +305,7 @@ TEST_CASE("a whitespace-only value round-trips on the named-space path",
           "[persist][emit][fidelity]")
 {
     std::map<std::string, std::string> values{{"motd", " "}};
-    const nucleus::config cfg(std::move(values), nucleus::provenance{});
+    const nucleus::config cfg = checked_config(std::move(values));
 
     std::ostringstream out;
     REQUIRE(nucleus::xml::emit_document(cfg, out, std::string_view("server")));

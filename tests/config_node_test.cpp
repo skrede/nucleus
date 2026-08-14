@@ -463,7 +463,9 @@ nucleus::config make_large_tree()
     values.emplace("deep/a/b/c/d/leaf", "x");
     values.emplace("deep/a/b/sibling", "y");
     values.emplace("zed", "9");
-    return nucleus::config(std::move(values), nucleus::provenance{});
+    auto made = nucleus::config::from_values(std::move(values));
+    REQUIRE(made);
+    return std::move(made).value();
 }
 
 std::vector<std::string> child_paths(const std::vector<nucleus::config_node> &nodes)
