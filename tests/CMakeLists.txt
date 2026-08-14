@@ -365,10 +365,10 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # single document -- asserting both the resolved values and the provenance the
     # untouched instances keep; plus the addressing rule that rejects a path naming
     # no instance, ordinal repetition beneath a primary-keyed container, the pool a
-    # unique value competes in, per-instance displacement within a selected strain,
-    # stable compaction within each enclosing instance, and one document combining
-    # those shapes across a load, an emit and a load again. Fixture documents live
-    # beside the test.
+    # unique value competes in, the enclosing-instance pool for identity values,
+    # per-instance displacement within a selected strain, stable compaction within
+    # each enclosing instance, and one document combining those shapes across a
+    # load, an emit and a load again. Fixture documents live beside the test.
     add_executable(collection_shapes_test
         collection_shapes/collection_shapes_test.cpp
         collection_shapes/addressing_test.cpp
@@ -381,6 +381,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         collection_shapes/instance_presence_test.cpp
         collection_shapes/violation_report_test.cpp
         collection_shapes/unique_scope_test.cpp
+        collection_shapes/identity_pool_scope_test.cpp
         collection_shapes/combined_shapes_test.cpp)
     nucleus_enable_coverage(collection_shapes_test)
     nucleus_warnings(collection_shapes_test)

@@ -12,6 +12,7 @@
 #include "nucleus/keyspace/key_path.h"
 
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 #include <cstddef>
@@ -22,20 +23,26 @@ namespace nucleus {
 class identity_pass
 {
     using identity_hit  = std::pair<std::string, std::string>;
-    using identity_pool = std::map<std::string, std::vector<identity_hit>>;
+    using identity_pool = std::map<std::pair<std::string, std::string>,
+                                   std::vector<identity_hit>>;
 
 public:
+    // An identifier competes only within one concrete instance of the repeated
+    // scope enclosing the group's container. Sibling instances therefore own
+    // independent identity namespaces.
     static void check_identity_group(const schema_registry         &schema,
                                      const config                  &resolved,
                                      const identity_group_spec     &g,
                                      std::vector<schema_violation> &out)
     {
-        const std::string parent = g.container().str();
-        identity_pool     pool;
+        const std::string           parent   = g.container().str();
+        const std::set<std::string> repeated = repeated_declared_paths(schema);
+        const std::string           scope    = repeated_scope_of(repeated, parent);
+        identity_pool               pool;
         for(const std::string &m : g.members)
-            collect_member(schema, resolved, g, parent, m, pool, out);
-        for(const auto &[value, hits] : pool)
-            report_duplicate(g, value, hits, out);
+            collect_member(schema, resolved, g, parent, scope, m, pool, out);
+        for(const auto &[key, hits] : pool)
+            report_duplicate(g, key.second, hits, out);
     }
 
 private:
@@ -50,6 +57,7 @@ private:
                                const config              &resolved,
                                const identity_group_spec &g,
                                const std::string         &parent,
+                               const std::string         &scope,
                                const std::string &m, identity_pool &pool,
                                std::vector<schema_violation> &out)
     {
@@ -57,11 +65,13 @@ private:
         if(!member_kp)
             return;
         for(const std::string &mi : instances_of(schema, resolved, *member_kp))
-            collect_instance(resolved, g, m, mi, pool, out);
+            collect_instance(schema, resolved, g, scope, m, mi, pool, out);
     }
 
-    static void collect_instance(const config              &resolved,
+    static void collect_instance(const schema_registry     &schema,
+                                 const config              &resolved,
                                  const identity_group_spec &g,
+                                 const std::string         &scope,
                                  const std::string &m, const std::string &mi,
                                  identity_pool                 &pool,
                                  std::vector<schema_violation> &out)
@@ -75,7 +85,9 @@ private:
                                                                g.name, m, mi, g.field)});
             return;
         }
-        pool[*v].emplace_back(m, field_path);
+        const auto path = key_path::parse(field_path);
+        if(path)
+            pool[{pool_of(schema, *path, scope), *v}].emplace_back(m, field_path);
     }
 
     static void report_duplicate(const identity_group_spec       &g,
@@ -96,6 +108,14 @@ private:
         out.push_back(schema_violation{hits.front().second, nucleus::format("identity group '{}': identifier '{}'='{}' is not unique within the "
                                                                             "slice -- declared by {}",
                                                                             g.name, g.field, value, parties)});
+    }
+
+    static std::string pool_of(const schema_registry &schema, const key_path &path,
+                               const std::string &scope)
+    {
+        if(scope.empty())
+            return {};
+        return instance_prefix(schema, path, scope);
     }
 };
 
