@@ -64,6 +64,7 @@ nucleus_add_test(keyed_composition_test nucleus::runtime nucleus::argv nucleus::
 nucleus_add_test(keyref_test nucleus::runtime)
 if(NUCLEUS_BUILD_SOURCE_XML)
     nucleus_add_test(argv_source_test nucleus::argv nucleus::xml nucleus::runtime)
+    nucleus_add_test(retrieval_addressing_test nucleus::runtime nucleus::xml nucleus::argv)
 endif()
 nucleus_add_test(schema_cli_bijection_test nucleus::argv)
 nucleus_add_test(multispace_argv_test nucleus::argv)

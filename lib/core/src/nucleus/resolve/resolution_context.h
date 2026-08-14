@@ -268,10 +268,6 @@ public:
             // (non-indexed) under a keyed-merge container. Keyed by actual container path.
             std::map<std::string, std::size_t> keyed_flat_counter;
 
-            // Per-layer, per-actual_container record of which leaf suffixes have
-            // already been seen for the CURRENT flat instance. A suffix repeating
-            // signals a new instance starting (mirrors leaf_ordinal_counters'
-            // duplicate_keys-gated advance-on-repeat, applied to the keyed divert).
             std::map<std::string, std::set<std::string>> keyed_flat_suffixes_seen;
 
             for(keyspace_entry &entry : batch.entries)
@@ -295,92 +291,13 @@ public:
 
                 const std::string canonical_path = m_schema.canonical_text(path);
 
-                // Detect a CLI plain-ordinal path: a digit-only segment
-                // following a repeated container prefix is an ordinal index from
-                // "--cluster-node-0-endpoint-port=90" -> "cluster/node/0/endpoint/port".
-                // Re-bracket to "cluster/node[0]/endpoint/port" and enforce
-                // (override-only: ordinal must be < existing instance count). This
-                // check runs before the keyed-composition divert below so an
-                // ordinal-shaped path targeting a keyed-merge container is recognized
-                // as an override attempt, not swallowed into the divert as a flat
-                // leaf with a literal digit-shaped suffix.
-                const auto plain_ordinal_rebracketed = [&]()
-                    -> expected<std::optional<key_path>, resolve_fold_error>
-                {
-                    const std::vector<std::string> &segs = path.segments();
-                    for(std::size_t i = 1; i < segs.size(); ++i)
-                    {
-                        // Plain digit-only segment (e.g. "0", "42") -- not bracket form.
-                        const std::string &seg = segs[i];
-                        const bool all_digits = std::ranges::all_of(
-                            seg, [](char c){ return c >= '0' && c <= '9'; });
-                        if(!all_digits)
-                            continue;
-                        // Build the prefix path up to (not including) the digit segment.
-                        std::string prefix;
-                        for(std::size_t j = 0; j < i; ++j)
-                        {
-                            if(j) prefix += key_path::separator;
-                            prefix += segs[j];
-                        }
-                        if(!repeated_container_prefixes.contains(prefix))
-                            continue;
-                        // Found: "prefix/N/..." is a CLI ordinal path. Cap the digit
-                        // run at 18 (mirroring key_path::is_indexed_segment's own bound)
-                        // so a crafted, absurdly long digit run cannot wrap a size_t.
-                        if(seg.size() > 18)
-                            return unexpected(error{errc::malformed_source, nucleus::format(
-                                "source '{}': malformed key path '{}': CLI ordinal segment "
-                                "'{}' exceeds the maximum of 18 digits",
-                                lh->label, entry.path, seg)});
-                        const std::size_t ordinal = [&]() {
-                            std::size_t v = 0;
-                            for(char const c : seg) v = (v * 10) + static_cast<std::size_t>(c - '0');
-                            return v;
-                        }();
-                        // Re-bracket: "prefix/N/rest" -> "prefix[N]/rest".
-                        std::string rebracketed_str = prefix + "[" + std::to_string(ordinal) + "]";
-                        for(std::size_t j = i + 1; j < segs.size(); ++j)
-                        {
-                            rebracketed_str += key_path::separator;
-                            rebracketed_str += segs[j];
-                        }
-                        auto kp = key_path::parse(rebracketed_str);
-                        if(!kp)
-                            return unexpected(error{errc::malformed_source, nucleus::format(
-                                "source '{}': malformed key path '{}': {}",
-                                lh->label, entry.path, kp.error())});
-                        // Defer storage and check until apply_deferred_cli_overrides()
-                        // runs after slice(), so the document source is in
-                        // m_building regardless of rank.
-                        m_deferred_cli_overrides.push_back(
-                            {ordinal, prefix, std::move(kp).value(),
-                             value::owned(std::move(expanded).value()),
-                             origin{lh->rank, lh->label, lh->owner, lh->inheritance_layer}});
-                        // Signal "deferred": return a non-empty optional wrapping the
-                        // zero-segment key_path as a sentinel (empty path cannot appear
-                        // as a real indexed result, so the has_value() check below
-                        // disambiguates via a separate cli_deferred_this_entry flag).
-                        return std::optional<key_path>{key_path{}};
-                    }
-                    return std::optional<key_path>{std::nullopt};
-                }();
-                if(!plain_ordinal_rebracketed)
-                    return unexpected(plain_ordinal_rebracketed.error());
+                auto cli_deferred = defer_cli_ordinal(
+                    path, repeated_container_prefixes, entry, expanded.value(), *lh);
+                if(!cli_deferred)
+                    return unexpected(cli_deferred.error());
+                if(cli_deferred.value())
+                    continue;
 
-                const bool cli_deferred_this_entry =
-                    plain_ordinal_rebracketed.value().has_value()
-                    && plain_ordinal_rebracketed.value().value().empty();
-
-                if(cli_deferred_this_entry)
-                    continue; // storage and the ordinal-range check deferred to post-fold pass
-
-                // Keyed-composition divert: if this entry sits under a
-                // keyed-merge container, accumulate it (by identity-group key, merged
-                // post-fold) instead of storing it now -- the wholesale sweep is
-                // bypassed for these containers. The container is matched on the ACTUAL
-                // path (key segments still present pre-slice) by canonicalizing each
-                // prefix; the merge rebuilds at the actual path and slice() strips keys.
                 if(!m_keyed_modes.empty())
                 {
                     const std::vector<std::string> &segs = path.segments();
@@ -401,7 +318,6 @@ public:
                         auto mode_it = m_keyed_modes.find(canon);
                         if(mode_it == m_keyed_modes.end())
                             continue;
-                        // segs[len-1] is the container-level segment (e.g. "output[0]").
                         const std::string &cseg = segs[len - 1];
                         std::string actual_container;
                         for(std::size_t i = 0; i + 1 < len; ++i)
@@ -1041,14 +957,6 @@ public:
         return {};
     }
 
-    // Validates and stores every CLI plain-ordinal override deferred during
-    // fold(). MUST run after slice() (and therefore after
-    // merge_keyed_collections(), which itself runs before slice()) so a
-    // keyed container's override unambiguously targets the load's own
-    // selected strain at its already-unified path, and a keyed-merge
-    // container's override sees the container's real, merged instance count
-    // rather than zero (the accumulator, not m_building, holds those entries
-    // until merge_keyed_collections() runs).
     expected<void, resolve_fold_error> apply_deferred_cli_overrides()
     {
         for(pending_cli_ordinal &override : m_deferred_cli_overrides)
@@ -1075,10 +983,8 @@ public:
                     "{} instance(s) exist; out of range",
                     override.ordinal, override.container_prefix,
                     existing_ordinals.size())});
-            // Ordinal exists; store only if no higher-rank entry already exists
-            // at this path (rank-precedence: higher-rank wins even over deferred entries).
             const origin *existing = m_provenance.of(override.rebracketed.str());
-            if(existing == nullptr || existing->rank < override.prov.rank)
+            if(existing == nullptr || existing->rank <= override.prov.rank)
             {
                 m_building.set(override.rebracketed, override.val);
                 m_provenance.record(override.rebracketed.str(), override.prov);
@@ -1352,8 +1258,106 @@ private:
         origin   prov;
     };
 
+    struct cli_ordinal_path
+    {
+        std::size_t ordinal;
+        std::string container_prefix;
+        key_path rebracketed;
+    };
+
+    struct cli_rebracket_state
+    {
+        std::vector<std::string> segments;
+        std::optional<std::size_t> ordinal;
+        std::string prefix;
+    };
+
     using relayed_instance_groups =
             std::map<std::string, std::vector<std::pair<std::size_t, key_path>>>;
+
+    static bool decimal_segment(std::string_view segment) noexcept
+    {
+        if(segment.empty())
+            return false;
+        return std::ranges::all_of(segment,
+            [](char c) { return c >= '0' && c <= '9'; });
+    }
+
+    expected<std::size_t, resolve_fold_error> cli_ordinal_of(
+        std::string_view segment, std::string_view label,
+        std::string_view source_path) const
+    {
+        if(segment.size() > 18)
+            return unexpected(error{errc::malformed_source, nucleus::format(
+                "source '{}': malformed key path '{}': CLI ordinal segment "
+                "'{}' exceeds the maximum of 18 digits",
+                label, source_path, segment)});
+        std::size_t ordinal = 0;
+        for(char const c : segment)
+            ordinal = (ordinal * 10) + static_cast<std::size_t>(c - '0');
+        return ordinal;
+    }
+
+    expected<void, resolve_fold_error> rebracket_cli_segment(
+        cli_rebracket_state &state, const std::string &segment,
+        const std::set<std::string> &repeated, std::string_view label,
+        std::string_view source_path) const
+    {
+        key_path container{state.segments};
+        if(state.segments.empty() || !decimal_segment(segment)
+           || !repeated.contains(m_schema.canonical_text(container)))
+        {
+            state.segments.push_back(segment);
+            return {};
+        }
+        auto parsed = cli_ordinal_of(segment, label, source_path);
+        if(!parsed)
+            return unexpected(parsed.error());
+        state.ordinal = parsed.value();
+        state.prefix = container.str();
+        state.segments.back() += "[" + std::to_string(*state.ordinal) + "]";
+        return {};
+    }
+
+    expected<std::optional<cli_ordinal_path>, resolve_fold_error>
+    rebracket_cli_ordinals(const key_path &path,
+                           const std::set<std::string> &repeated,
+                           std::string_view label,
+                           std::string_view source_path) const
+    {
+        cli_rebracket_state state;
+        for(const std::string &segment : path.segments())
+        {
+            auto rebracketed = rebracket_cli_segment(
+                state, segment, repeated, label, source_path);
+            if(!rebracketed)
+                return unexpected(rebracketed.error());
+        }
+        if(!state.ordinal)
+            return std::optional<cli_ordinal_path>{std::nullopt};
+        return std::optional<cli_ordinal_path>{
+            cli_ordinal_path{*state.ordinal, std::move(state.prefix),
+                             key_path{std::move(state.segments)}}};
+    }
+
+    expected<bool, resolve_fold_error> defer_cli_ordinal(
+        const key_path &path, const std::set<std::string> &repeated,
+        const keyspace_entry &entry, std::string &expanded,
+        const layered_handle &layer)
+    {
+        auto target = rebracket_cli_ordinals(
+            path, repeated, layer.label, entry.path);
+        if(!target)
+            return unexpected(target.error());
+        if(!target.value())
+            return false;
+        cli_ordinal_path ordinal = std::move(*target.value());
+        m_deferred_cli_overrides.push_back(
+            {ordinal.ordinal, std::move(ordinal.container_prefix),
+             std::move(ordinal.rebracketed), value::owned(std::move(expanded)),
+             origin{layer.rank, layer.label, layer.owner, layer.inheritance_layer}});
+        return true;
+    }
 
     // Recursive single-leaf resolver for pass-2. Resolves `kp`'s value by first
     // ensuring all leaves it references are themselves resolved (depth-first).
@@ -1881,8 +1885,6 @@ private:
     // the relay_strain wide_extend bypass.
     std::vector<extend_disposition> m_dispositions;
 
-    // Keyed-composition state. One leaf of a diverted keyed-collection
-    // instance, retained between fold() and merge_keyed_collections().
     struct keyed_instance_entry
     {
         std::size_t source_rank;
@@ -1900,8 +1902,6 @@ private:
     std::map<std::string, std::vector<keyed_instance_entry>> m_keyed_accumulator;
     std::map<std::string, std::string> m_actual_to_canonical;
 
-    // A CLI plain-ordinal override recognized during fold(), held here until
-    // apply_deferred_cli_overrides() validates and stores it after slice().
     struct pending_cli_ordinal
     {
         std::size_t     ordinal;

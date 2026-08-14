@@ -10,6 +10,7 @@
 
 #include "nucleus/keyspace/key_path.h"
 #include "nucleus/keyspace/provenance.h"
+#include "nucleus/keyspace/ordinal_sort_key.h"
 
 #include <any>
 #include <map>
@@ -86,50 +87,21 @@ public:
         return std::nullopt;
     }
 
-    // All values at a key. For repeated paths (cluster/node/port), gathers all
-    // indexed instances (cluster/node[0]/port, cluster/node[1]/port, ...) whose
-    // canonical form matches, sorted by numeric ordinal. For single-value paths
-    // returns a one-element vector; for absent paths returns an empty vector.
+    // All values matching the path's explicit ordinals and omitted ordinal slots.
+    // Results follow the complete numeric ordinal tuple across nested repeats.
     std::vector<std::string> get_all(std::string_view key) const
     {
-        // Direct single-value hit (non-repeated path).
         auto direct = m_values.find(key);
         if(direct != m_values.end())
             return {direct->second};
 
-        // Gather indexed instances whose canonical form matches the key.
-        // Collect (ordinal, value) pairs; sort by numeric ordinal for correct
-        // ordering when ordinal >= 10 (lexicographic map order is wrong there).
-        std::vector<std::pair<std::size_t, std::string>> indexed;
+        std::vector<std::pair<ordinal_key, std::string>> gathered;
         for(const auto &[k, v] : m_values)
         {
-            // Fast pre-filter: key must start with the base name of a segment in k.
-            // Canonical form strips indexed segments; check if it equals `key`.
-            // To avoid calling schema here, we compute canonical inline:
-            // strip [N] suffixes from each segment and compare.
-            const std::string canonical = canonical_of(k);
-            if(canonical != key)
-                continue;
-
-            // Extract the ordinal from the first indexed segment in k
-            // that was stripped in the canonical path.
-            const std::size_t ordinal = first_ordinal_of(k);
-            indexed.emplace_back(ordinal, v);
+            if(gather_path_matches(k, key))
+                gathered.emplace_back(ordinal_sort_key(k), v);
         }
-
-        if(indexed.empty())
-            return {};
-
-        std::stable_sort(indexed.begin(), indexed.end(),
-                         [](const auto &a, const auto &b) {
-                             return a.first < b.first;
-                         });
-
-        std::vector<std::string> out;
-        out.reserve(indexed.size());
-        for(auto &[ord, val] : indexed)
-            out.push_back(std::move(val));
-        return out;
+        return ordered_gather(std::move(gathered));
     }
 
     bool contains(std::string_view key) const
@@ -200,48 +172,25 @@ public:
         return *typed;
     }
 
-    // Returns all typed elements for a repeated path, gathered in numeric ordinal order.
+    // Returns typed elements matching every explicit ordinal in full tuple order.
     template<typename T>
     expected<std::vector<T>, error> get_all_as(const std::string &key) const
     {
-        // Gather all typed indexed entries whose canonical path matches `key`.
-        std::vector<std::pair<std::size_t, T>> typed_indexed;
+        std::vector<std::pair<ordinal_key, T>> gathered;
         for(const auto &[k, v] : m_typed)
         {
-            if(canonical_of(k) != key)
+            if(!gather_path_matches(k, key))
                 continue;
             const T *typed = std::any_cast<T>(&v);
             if(typed == nullptr)
                 return unexpected(error{errc::mismatched_type,
                             std::string("type mismatch for path '") + k
                             + "': stored element type does not match requested type"});
-            typed_indexed.emplace_back(first_ordinal_of(k), *typed);
+            gathered.emplace_back(ordinal_sort_key(k), *typed);
         }
 
-        if(!typed_indexed.empty())
-        {
-            std::stable_sort(typed_indexed.begin(), typed_indexed.end(),
-                             [](const auto &a, const auto &b) {
-                                 return a.first < b.first;
-                             });
-            std::vector<T> out;
-            out.reserve(typed_indexed.size());
-            for(auto &[ord, val] : typed_indexed)
-                out.push_back(std::move(val));
-            return out;
-        }
-
-        // Single typed value at the exact key.
-        auto it = m_typed.find(key);
-        if(it != m_typed.end())
-        {
-            const T *typed = std::any_cast<T>(&it->second);
-            if(typed == nullptr)
-                return unexpected(error{errc::mismatched_type,
-                            std::string("type mismatch for path '") + key
-                            + "': stored element type does not match requested type"});
-            return std::vector<T>{*typed};
-        }
+        if(!gathered.empty())
+            return ordered_gather(std::move(gathered));
 
         if(contains(key))
             return unexpected(error{errc::missing_converter,
@@ -273,6 +222,45 @@ public:
 
 private:
     friend class config_node;
+
+    using ordinal_key = std::vector<std::pair<std::string, std::size_t>>;
+
+    static bool gather_path_matches(std::string_view candidate,
+                                    std::string_view query)
+    {
+        auto candidate_path = key_path::parse(candidate);
+        auto query_path = key_path::parse(query);
+        if(!candidate_path || !query_path
+           || candidate_path.value().size() != query_path.value().size())
+            return false;
+        for(std::size_t i = 0; i < query_path.value().size(); ++i)
+        {
+            const auto &left = candidate_path.value().segments()[i];
+            const auto &right = query_path.value().segments()[i];
+            if(key_path::base_name(left) != key_path::base_name(right))
+                return false;
+            if(key_path::is_indexed_segment(right)
+               && (!key_path::is_indexed_segment(left)
+                   || key_path::ordinal_of(left) != key_path::ordinal_of(right)))
+                return false;
+        }
+        return true;
+    }
+
+    template<typename T>
+    static std::vector<T> ordered_gather(
+        std::vector<std::pair<ordinal_key, T>> gathered)
+    {
+        std::stable_sort(gathered.begin(), gathered.end(),
+            [](const auto &left, const auto &right) {
+                return left.first < right.first;
+            });
+        std::vector<T> result;
+        result.reserve(gathered.size());
+        for(auto &[order, value] : gathered)
+            result.push_back(std::move(value));
+        return result;
+    }
 
     // The eager, already-sorted value map, shared with config_node navigation so
     // it reaches keys through ordered lower_bound range scans instead of copying
@@ -348,25 +336,6 @@ private:
             }
         }
         return result;
-    }
-
-    // Returns the ordinal of the first indexed segment in a key path.
-    // "cluster/node[0]/port" -> 0; "config/tags[2]" -> 2.
-    // Returns 0 when no indexed segment exists (non-repeated paths sort first).
-    static std::size_t first_ordinal_of(const std::string &key)
-    {
-        std::size_t start = 0;
-        for(std::size_t i = 0; i <= key.size(); ++i)
-        {
-            if(i == key.size() || key[i] == key_path::separator)
-            {
-                std::string_view const seg(key.data() + start, i - start);
-                if(key_path::is_indexed_segment(seg))
-                    return key_path::ordinal_of(seg);
-                start = i + 1;
-            }
-        }
-        return 0;
     }
 
     std::map<std::string, std::string, std::less<>> m_values;

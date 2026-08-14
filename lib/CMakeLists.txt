@@ -91,8 +91,9 @@ set_target_properties(nucleus_core PROPERTIES VERSION ${PROJECT_VERSION})
 if(NUCLEUS_BUILD_TESTS AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     set(read_api_compile_check_tu ${CMAKE_CURRENT_BINARY_DIR}/read_api_compile_check.cpp)
     file(WRITE ${read_api_compile_check_tu}
-        "#include <nucleus/config.h>\n#include <nucleus/config_node.h>\n"
-        "#include <nucleus/identity.h>\n#include <nucleus/query/query.h>\n")
+        "#include <nucleus/config.h>\n#include <nucleus/identity.h>\n"
+        "#include <nucleus/config_node.h>\n\n#include <nucleus/query/query.h>\n\n"
+        "#include <nucleus/resolve/resolution_context.h>\n")
     add_library(read_api_compile_check OBJECT EXCLUDE_FROM_ALL
         ${read_api_compile_check_tu}
         core/src/nucleus/query/query.cpp

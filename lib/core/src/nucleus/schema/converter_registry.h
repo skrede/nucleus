@@ -42,7 +42,13 @@ public:
     template<typename T>
     void set(converter fn)
     {
+#if defined(__cpp_rtti) || defined(_CPPRTTI)
         add(std::type_index(typeid(std::remove_cvref_t<T>)), std::move(fn));
+#else
+        static_assert(!std::is_same_v<T, T>,
+            "converter_registry::set<T> requires RTTI support");
+        (void)fn;
+#endif
     }
 
     // The stored converter for `id`, or nullptr when none is registered.
