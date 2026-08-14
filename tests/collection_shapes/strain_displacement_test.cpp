@@ -124,6 +124,24 @@ TEST_CASE("an empty upper layer leaves a selected strain byte-identical to the "
     REQUIRE(layered_tree == direct_tree);
 }
 
+TEST_CASE("a flat layer cannot override a selected strain identity",
+          "[collection_shapes][keyed][identity]")
+{
+    const nucleus::config_space space = server_space();
+    nucleus::load_options       options;
+    options.selection                 = "primary";
+    const nucleus::load_result loaded = nucleus::load_config(
+            space,
+            nucleus::source_stack{
+                    xml_of(server_document()),
+                    nucleus::shapes::runtime_layer({{"cluster/server/name", "other"}})},
+            options);
+    REQUIRE_FALSE(loaded);
+    REQUIRE(loaded.error().code == nucleus::errc::layering_violation);
+    REQUIRE(loaded.error().message.find("identity field 'cluster/server/name' is read-only") !=
+            std::string::npos);
+}
+
 TEST_CASE("a wide extend reopening one strain preserves both leaves and the origin "
           "of its surplus route",
           "[collection_shapes][keyed][displacement]")
@@ -135,6 +153,9 @@ TEST_CASE("a wide extend reopening one strain preserves both leaves and the orig
     const std::string      serialized = nucleus::shapes::serialize(cfg);
     INFO(serialized);
 
+    REQUIRE(cfg.get("cluster/server/name") == "primary");
+    REQUIRE(serialized.find("cluster/server/name = primary "
+                            "[1|path:derived.xml|anonymous|1]\n") != std::string::npos);
     REQUIRE(cfg.get("cluster/server/route[0]/port") == "8080");
     REQUIRE(cfg.get("cluster/server/route[0]/method") == "put");
     REQUIRE(cfg.get("cluster/server/route[1]/port") == "443");

@@ -712,7 +712,8 @@ public:
             if(!el.identity)
                 continue;
 
-            const key_path container = el.container();
+            const key_path    container     = el.container();
+            const std::string identity_path = el.declared_path().str();
 
             // Bucket every keyed leaf by its instance's key value. paths() is a
             // snapshot, so mutating the keyspace below is safe. A key value that
@@ -1018,16 +1019,18 @@ public:
                     // never rank-prune them here either.
                     if(under_keyed_merge(m_schema.canonical_text(path)))
                         continue;
-                    // Skip entries belonging to the chosen strain when it is
-                    // extend-wide: they must survive to compose via relay_strain.
-                    if(wide_extend && path.str().starts_with(chosen_prefix))
+                    // The chosen identity always survives; extend-wide preserves
+                    // every other chosen entry for relay_strain as well.
+                    if(path.str().starts_with(chosen_prefix) && (wide_extend || m_schema.canonical_text(path) == identity_path))
                         continue;
                     m_building.remove(path);
                     m_provenance.forget(path.str());
                 }
             }
 
-            if(auto r = relay_strain(strains.at(chosen), policy, Ld, Ls, wide_extend); !r)
+            if(auto r = relay_strain(strains.at(chosen), identity_path,
+                                     policy, Ld, Ls, wide_extend);
+               !r)
                 return r;
 
             // The strain's key value named the instance and was consumed; the
@@ -1413,10 +1416,10 @@ private:
     // strain remain distinct.
     expected<void, resolve_fold_error>
     relay_strain(const std::vector<key_path> &keyed_paths,
+                 std::string_view             identity_path,
                  strain_scope_policy policy, std::size_t Ld, std::size_t Ls,
                  bool wide_extend = false)
     {
-        const schema_projection     proj              = m_schema.projection();
         const std::set<std::string> repeated_declared = repeated_declared_paths(m_schema);
         const std::set<std::string> repeated_containers =
                 m_schema.repeated_container_paths();
@@ -1432,8 +1435,10 @@ private:
             // scope-policy rank pruning and the instance-displacement logic below must
             // not re-prune them. The merge_mode governs this collection's cross-layer
             // composition, overriding the default strain scope freezing.
-            const bool keyed_merge = under_keyed_merge(m_schema.canonical_text(keyed));
-            const bool excluded    = !keyed_merge && !wide_extend && (policy == strain_scope_policy::container_open_until_next_strain ? entry_rank >= Ls : entry_rank > Ld);
+            const std::string canonical_keyed = m_schema.canonical_text(keyed);
+            const bool        keyed_merge     = under_keyed_merge(canonical_keyed);
+            const bool        identity_leaf   = canonical_keyed == identity_path;
+            const bool        excluded        = !identity_leaf && !keyed_merge && !wide_extend && (policy == strain_scope_policy::container_open_until_next_strain ? entry_rank >= Ls : entry_rank > Ld);
             if(excluded)
             {
                 m_building.remove(keyed);
@@ -1484,22 +1489,14 @@ private:
             const bool    displaced = !keyed_merge && at != nullptr && at->rank > entry_rank;
             if(displaced)
             {
-                // A pkey leaf is authoritative and read-only. If the unified
-                // path IS the pkey leaf of its parent container and a higher-rank flat
-                // entry occupies it, that is a loud layering error, not a silent skip.
-                const auto slash = unified_str.rfind('/');
-                if(slash != std::string::npos)
-                {
-                    const std::string_view parent = std::string_view(unified_str).substr(0, slash);
-                    const std::string_view leaf   = std::string_view(unified_str).substr(slash + 1);
-                    const std::string     *pkey   = proj.key_of(parent);
-                    if(pkey != nullptr && *pkey == leaf)
-                        return unexpected(error{errc::layering_violation,
-                                                nucleus::format(
-                                                        "identity field '{}' is read-only; "
-                                                        "source at rank {} cannot override it",
-                                                        unified_str, at->rank)});
-                }
+                // A primary key is authoritative and read-only. A higher-rank flat
+                // entry occupying it is a loud error, never a silent skip.
+                if(identity_leaf)
+                    return unexpected(error{errc::layering_violation,
+                                            nucleus::format(
+                                                    "identity field '{}' is read-only; "
+                                                    "source at rank {} cannot override it",
+                                                    unified_str, at->rank)});
             }
             else
             {
