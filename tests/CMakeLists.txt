@@ -366,6 +366,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # untouched instances keep; plus the addressing rule that rejects a path naming
     # no instance, ordinal repetition beneath a primary-keyed container, the pool a
     # unique value competes in, the enclosing-instance pool for identity values,
+    # stable first-appearance ordering and same-layer duplicate diagnostics for keyed merges,
     # per-instance displacement within a selected strain, stable compaction within
     # each enclosing instance, and one document combining those shapes across a
     # load, an emit and a load again. Fixture documents live beside the test.
@@ -373,6 +374,8 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         collection_shapes/collection_shapes_test.cpp
         collection_shapes/addressing_test.cpp
         collection_shapes/keyed_ordinal_test.cpp
+        collection_shapes/keyed_merge_stability_test.cpp
+        collection_shapes/keyed_duplicate_test.cpp
         collection_shapes/strain_displacement_test.cpp
         collection_shapes/strain_compaction_test.cpp
         collection_shapes/strain_compaction_boundary_test.cpp

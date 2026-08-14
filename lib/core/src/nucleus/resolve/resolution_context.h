@@ -631,15 +631,15 @@ public:
                         winner[mi->key] = survivors.size();
                         survivors.push_back(mi);
                     }
+                    else if(survivors[it->second]->rank == mi->rank)
+                        return unexpected(error{errc::layering_violation, nucleus::format(
+                            "keyed collection '{}': identifier '{}'='{}' is duplicated "
+                            "within layer '{}'; replace_by_key composes across layers but "
+                            "does not admit duplicate identifiers within one layer",
+                            canon, field, mi->key, mi->prov.layer)});
                     else
                         survivors[it->second] = mi;
                 }
-                // NOLINTNEXTLINE(bugprone-nondeterministic-pointer-iteration-order): ordered by the stable rank and ordinal keys, not by pointer address, so the result is deterministic.
-                std::sort(survivors.begin(), survivors.end(),
-                          [](const merged_instance *a, const merged_instance *b) {
-                              return a->rank != b->rank ? a->rank < b->rank
-                                                        : a->ordinal < b->ordinal;
-                          });
             }
 
             std::size_t new_ordinal = 0;
