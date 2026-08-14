@@ -1398,41 +1398,30 @@ private:
         return {};
     }
 
-    // Re-lays one strain's keyed entries onto the unified (key-stripped) paths.
-    // All repeated-path entries are indexed scalars; no collection branch needed.
-    // Ordinal segments in the keyed path are preserved; only key-value segments
-    // (transient instance selectors) are stripped.
-    //
-    // Flat-override wins wholesale: for a repeated path, if any existing indexed
-    // entry at the unified canonical base has a higher rank than the keyed entry
-    // being relayed, the entire repeated collection from the keyed source is
-    // displaced (not just the individual slot). This ensures a flat override at
-    // higher rank replaces the whole collection, not just [0].
+    // Displacement is bounded by the concrete instance of the innermost repeated
+    // scope. Candidate units come from raw paths so keyed and unified forms of one
+    // strain remain distinct.
     expected<void, resolve_fold_error>
     relay_strain(const std::vector<key_path> &keyed_paths,
                  strain_scope_policy policy, std::size_t Ld, std::size_t Ls,
                  bool wide_extend = false)
     {
-        const schema_projection proj = m_schema.projection();
-
-        // Canonical bases of repeated paths that are fully displaced by a
-        // higher-rank flat override. Populated on first relay attempt per base.
-        std::set<std::string> displaced_bases;
+        const schema_projection     proj              = m_schema.projection();
+        const std::set<std::string> repeated_declared = repeated_declared_paths(m_schema);
+        const std::set<std::string> repeated_containers =
+                m_schema.repeated_container_paths();
 
         for(const key_path &keyed : keyed_paths)
         {
-            const origin *from = m_provenance.of(keyed.str());
+            const origin     *from       = m_provenance.of(keyed.str());
             std::size_t const entry_rank = from != nullptr ? from->rank : 0;
-            // A keyed-merge collection was already finalised across layers by
+            // A keyed-merge collection was already finalized across layers by
             // merge_keyed_collections(); its instances legitimately span ranks, so the
-            // scope-policy rank pruning and the wholesale-displacement logic below must
+            // scope-policy rank pruning and the instance-displacement logic below must
             // not re-prune them. The merge_mode governs this collection's cross-layer
             // composition, overriding the default strain scope freezing.
             const bool keyed_merge = under_keyed_merge(m_schema.canonical_text(keyed));
-            const bool excluded = !keyed_merge && !wide_extend && (
-                policy == strain_scope_policy::container_open_until_next_strain
-                    ? entry_rank >= Ls
-                    : entry_rank > Ld);
+            const bool excluded    = !keyed_merge && !wide_extend && (policy == strain_scope_policy::container_open_until_next_strain ? entry_rank >= Ls : entry_rank > Ld);
             if(excluded)
             {
                 m_building.remove(keyed);
@@ -1443,11 +1432,11 @@ private:
             // Compute the unified path: strip key segments but PRESERVE ordinal
             // segments so indexed repeated-leaf instances keep their ordinals.
             const std::string unified_str = relay_canonical(keyed);
-            auto unified = key_path::parse(unified_str);
+            auto              unified     = key_path::parse(unified_str);
             if(!unified)
-                return unexpected(error{errc::malformed_source, nucleus::format(
-                    "internal invariant violation: re-parsed path failed to parse "
-                    "in relay_strain()'s unification: '{}'", unified_str)});
+                return unexpected(error{errc::malformed_source, nucleus::format("internal invariant violation: re-parsed path failed to parse "
+                                                                                "in relay_strain()'s unification: '{}'",
+                                                                                unified_str)});
 
             const value *v = m_building.find(keyed);
             if(v == nullptr)
@@ -1458,44 +1447,20 @@ private:
                 continue;
             }
 
-            // For indexed unified paths, check whether the canonical base (the
-            // repeated field without the ordinal) is already wholly displaced by
-            // a higher-rank override. A higher-rank entry at ANY indexed slot of
-            // the same canonical base means the flat source replaced the entire
-            // collection, so no relay entry should be written.
-            const bool unified_is_indexed = [&]() {
-                for(const auto &seg : unified.value().segments())
-                    if(key_path::is_indexed_segment(seg))
-                        return true;
-                return false;
-            }();
-            if(unified_is_indexed && !keyed_merge)
+            const std::string canonical = m_schema.canonical_text(unified.value());
+            const std::string scope     = repeated_scope_of(repeated_declared, canonical);
+            if(!scope.empty() && !keyed_merge)
             {
-                // Canonical base: strip ordinals from all segments.
-                const std::string canonical_base = m_schema.canonical_text(unified.value());
-                if(displaced_bases.contains(canonical_base))
+                const bool        scope_is_leaf = !repeated_containers.contains(scope);
+                const std::string unit =
+                        sweep_key_of(unified.value(), scope, scope_is_leaf);
+                if(unit.empty())
+                    return unexpected(error{errc::malformed_source, nucleus::format("internal invariant violation: no prefix of '{}' canonicalizes "
+                                                                                    "to its declared repeated scope '{}' in relay_strain()'s displacement",
+                                                                                    unified_str, scope)});
+                if(instance_displaced(unified.value(), unit, scope, scope_is_leaf,
+                                      entry_rank))
                 {
-                    // Already determined the whole base is displaced; skip.
-                    m_building.remove(keyed);
-                    m_provenance.forget(keyed.str());
-                    continue;
-                }
-                // Check: is any existing entry for the canonical base at higher rank?
-                bool base_displaced = false;
-                for(const key_path &bp : m_building.paths())
-                {
-                    if(m_schema.canonical_text(bp) != canonical_base)
-                        continue;
-                    const origin *bpfrom = m_provenance.of(bp.str());
-                    if(bpfrom != nullptr && bpfrom->rank > entry_rank)
-                    {
-                        base_displaced = true;
-                        break;
-                    }
-                }
-                if(base_displaced)
-                {
-                    displaced_bases.insert(canonical_base);
                     m_building.remove(keyed);
                     m_provenance.forget(keyed.str());
                     continue;
@@ -1503,8 +1468,8 @@ private:
             }
 
             // Check if the unified path is already occupied by a higher-rank value.
-            const origin *at = m_provenance.of(unified_str);
-            const bool displaced = !keyed_merge && at != nullptr && at->rank > entry_rank;
+            const origin *at        = m_provenance.of(unified_str);
+            const bool    displaced = !keyed_merge && at != nullptr && at->rank > entry_rank;
             if(displaced)
             {
                 // A pkey leaf is authoritative and read-only. If the unified
@@ -1515,13 +1480,13 @@ private:
                 {
                     const std::string_view parent = std::string_view(unified_str).substr(0, slash);
                     const std::string_view leaf   = std::string_view(unified_str).substr(slash + 1);
-                    const std::string *pkey = proj.key_of(parent);
+                    const std::string     *pkey   = proj.key_of(parent);
                     if(pkey != nullptr && *pkey == leaf)
                         return unexpected(error{errc::layering_violation,
-                            nucleus::format(
-                                "identity field '{}' is read-only; "
-                                "source at rank {} cannot override it",
-                                unified_str, at->rank)});
+                                                nucleus::format(
+                                                        "identity field '{}' is read-only; "
+                                                        "source at rank {} cannot override it",
+                                                        unified_str, at->rank)});
                 }
             }
             else
@@ -1534,6 +1499,25 @@ private:
             m_provenance.forget(keyed.str());
         }
         return {};
+    }
+
+    bool instance_displaced(const key_path &unified, const std::string &unit,
+                            const std::string &scope, bool scope_is_leaf,
+                            std::size_t entry_rank) const
+    {
+        for(const key_path &candidate : m_building.paths())
+        {
+            const std::string candidate_unit =
+                    sweep_key_of(candidate, scope, scope_is_leaf);
+            if(candidate_unit.empty() || candidate_unit != unit)
+                continue;
+            if(!scope_is_leaf && relay_canonical(candidate) != unified.str())
+                continue;
+            const origin *from = m_provenance.of(candidate.str());
+            if(from != nullptr && from->rank > entry_rank)
+                return true;
+        }
+        return false;
     }
 
     // The sweep unit an entry belongs to. A repeated container instance carries

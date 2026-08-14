@@ -1,0 +1,5 @@
+<cluster inherit="base.xml">
+    <server name="primary" extend="wide">
+        <route><port>8080</port><method>put</method></route>
+    </server>
+</cluster>
