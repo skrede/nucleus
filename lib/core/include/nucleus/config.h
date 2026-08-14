@@ -136,31 +136,12 @@ public:
             if(contains(key))
                 return unexpected(error{errc::missing_converter,
                             "path '" + std::string(key) + "' declares no type converter"});
-            // Detect unindexed path crossing a repeated container (loud error).
-            if(auto container = crossing_repeated_container(std::string(key)); container)
-            {
-                // Count distinct ordinals at the container -- one per instance,
-                // not one per field entry.
-                std::set<std::size_t> ordinals;
-                const std::string bracket_prefix = *container + "[";
-                for(const auto &[k, ignored] : m_values)
-                {
-                    if(!k.starts_with(bracket_prefix))
-                        continue;
-                    std::string_view const rem(k.data() + container->size(),
-                                        k.size() - container->size());
-                    auto close = rem.find(']');
-                    if(close == std::string_view::npos)
-                        continue;
-                    ordinals.insert(key_path::ordinal_of(
-                        *container + std::string(rem.substr(0, close + 1))));
-                }
+            if(auto crossing = crossing_repeated_container(key); crossing)
                 return unexpected(error{errc::index_required,
                     nucleus::format(
                         "path '{}' crosses repeated container '{}' "
                         "-- index required, {} instance(s)",
-                        key, *container, ordinals.size())});
-            }
+                        key, crossing->path, crossing->count)});
             return unexpected(error{errc::absent_key,
                         "path '" + std::string(key) + "' is absent"});
         }
@@ -192,9 +173,10 @@ public:
         if(!gathered.empty())
             return ordered_gather(std::move(gathered));
 
-        if(contains(key))
-            return unexpected(error{errc::missing_converter,
-                        std::string("path '") + key + "' declares no type converter"});
+        for(const auto &[candidate, ignored] : m_values)
+            if(gather_path_matches(candidate, key))
+                return unexpected(error{errc::missing_converter,
+                            std::string("path '") + key + "' declares no type converter"});
         return unexpected(error{errc::absent_key,
                     std::string("path '") + key + "' is absent"});
     }
@@ -222,6 +204,12 @@ public:
 
 private:
     friend class config_node;
+
+    struct repeated_container_crossing
+    {
+        std::string path;
+        std::size_t count;
+    };
 
     using ordinal_key = std::vector<std::pair<std::string, std::size_t>>;
 
@@ -271,71 +259,68 @@ private:
         return m_values;
     }
 
-    // Returns the repeated container path if `key` crosses a repeated container
-    // without an ordinal index; otherwise std::nullopt. Two cases:
-    //   (a) key IS the container path: m_values has "key[N]/..." entries.
-    //   (b) key is a leaf path UNDER the container without an index:
-    //       m_values has "prefix[N]/suffix" where canonical("prefix[N]/suffix") == key.
-    // This powers the index_required error in get_as() and the nullopt contract
-    // in get() (get() is unchanged -- both absent and crossing already return nullopt).
-    std::optional<std::string> crossing_repeated_container(
-        const std::string &key) const
+    static std::optional<std::size_t> first_omitted_ordinal(
+        const key_path &candidate, const key_path &query)
     {
-        // Case (a): key is the container itself (e.g. "cluster/node").
-        const std::string direct_prefix = key + "[";
-        for(const auto &[k, _] : m_values)
-        {
-            if(k.starts_with(direct_prefix))
-                return key;
-        }
-
-        // Case (b): key is a sub-path (e.g. "cluster/node/port").
-        // For each prefix of key (split at '/'), check if m_values has entries
-        // of the form "prefix[N]/remainder" matching canonical_of(k) == key.
-        for(const auto &[k, _] : m_values)
-        {
-            if(canonical_of(k) != key)
-                continue;
-            // k has an indexed segment; extract the container prefix (up to the
-            // first indexed segment's base name).
-            std::size_t start = 0;
-            for(std::size_t i = 0; i <= k.size(); ++i)
-            {
-                if(i == k.size() || k[i] == key_path::separator)
-                {
-                    std::string_view const seg(k.data() + start, i - start);
-                    if(key_path::is_indexed_segment(seg))
-                    {
-                        // Container prefix is everything before this indexed segment.
-                        std::string container = k.substr(0, start == 0 ? 0 : start - 1);
-                        return container;
-                    }
-                    start = i + 1;
-                }
-            }
-        }
+        for(std::size_t i = 0; i < query.size(); ++i)
+            if(key_path::is_indexed_segment(candidate.segments()[i])
+               && !key_path::is_indexed_segment(query.segments()[i]))
+                return i;
         return std::nullopt;
     }
 
-    // Computes the canonical form of a key by stripping [N] ordinal suffixes from
-    // every segment. "cluster/node[0]/port" -> "cluster/node/port".
-    // Used by get_all() and get_all_as() without accessing the schema registry.
-    static std::string canonical_of(const std::string &key)
+    static std::optional<key_path> matching_prefix(
+        std::string_view candidate, const key_path &query)
     {
-        std::string result;
-        std::size_t start = 0;
-        for(std::size_t i = 0; i <= key.size(); ++i)
+        auto parsed = key_path::parse(candidate);
+        if(!parsed || parsed->size() < query.size())
+            return std::nullopt;
+        std::vector<std::string> segments(
+                parsed->segments().begin(), parsed->segments().begin()
+                    + static_cast<std::ptrdiff_t>(query.size()));
+        key_path prefix(std::move(segments));
+        if(!gather_path_matches(prefix.str(), query.str()))
+            return std::nullopt;
+        return prefix;
+    }
+
+    static void record_omitted_ordinal(
+        const key_path &candidate, const key_path &query,
+        std::optional<std::size_t> &first, std::set<std::size_t> &ordinals)
+    {
+        auto omitted = first_omitted_ordinal(candidate, query);
+        if(!omitted || (first && omitted.value() > first.value()))
+            return;
+        if(!first || omitted.value() < first.value())
         {
-            if(i == key.size() || key[i] == key_path::separator)
-            {
-                std::string_view const seg(key.data() + start, i - start);
-                if(!result.empty())
-                    result.push_back(key_path::separator);
-                result.append(key_path::base_name(seg));
-                start = i + 1;
-            }
+            first = omitted;
+            ordinals.clear();
         }
-        return result;
+        ordinals.insert(key_path::ordinal_of(candidate.segments()[first.value()]));
+    }
+
+    std::optional<repeated_container_crossing> crossing_repeated_container(
+        std::string_view key) const
+    {
+        auto query = key_path::parse(key);
+        if(!query)
+            return std::nullopt;
+        std::optional<std::size_t> first;
+        std::set<std::size_t> ordinals;
+        for(const auto &[candidate_text, ignored] : m_values)
+        {
+            auto candidate = matching_prefix(candidate_text, query.value());
+            if(candidate)
+                record_omitted_ordinal(
+                        candidate.value(), query.value(), first, ordinals);
+        }
+        if(!first)
+            return std::nullopt;
+        std::vector<std::string> segments(
+                query->segments().begin(), query->segments().begin()
+                    + static_cast<std::ptrdiff_t>(first.value() + 1));
+        return repeated_container_crossing{
+                key_path(std::move(segments)).str(), ordinals.size()};
     }
 
     std::map<std::string, std::string, std::less<>> m_values;

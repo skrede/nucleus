@@ -89,7 +89,8 @@ nucleus_add_module(core
 
 set_target_properties(nucleus_core PROPERTIES VERSION ${PROJECT_VERSION})
 
-if(NUCLEUS_BUILD_TESTS AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+if(NUCLEUS_BUILD_TESTS AND
+   (MSVC OR CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang"))
     set(read_api_compile_check_tu ${CMAKE_CURRENT_BINARY_DIR}/read_api_compile_check.cpp)
     file(WRITE ${read_api_compile_check_tu}
         "#include <nucleus/config.h>\n#include <nucleus/identity.h>\n"
@@ -98,14 +99,19 @@ if(NUCLEUS_BUILD_TESTS AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         "#include <nucleus/schema/keyref_pass.h>\n"
         "#include <nucleus/schema/instance_paths.h>\n"
         "#include <nucleus/schema/keyref_candidate_index.h>\n")
-    add_library(read_api_compile_check OBJECT EXCLUDE_FROM_ALL
+    add_library(read_api_compile_check OBJECT
         ${read_api_compile_check_tu}
         core/src/nucleus/query/query.cpp
         core/src/nucleus/query/keyref.cpp
         core/src/nucleus/query/structural_selector.cpp)
     nucleus_warnings(read_api_compile_check)
     target_compile_features(read_api_compile_check PRIVATE cxx_std_20)
-    target_compile_options(read_api_compile_check PRIVATE -fno-exceptions -fno-rtti)
+    if(MSVC)
+        target_compile_options(read_api_compile_check PRIVATE /EHs- /EHc- /GR-)
+        target_compile_definitions(read_api_compile_check PRIVATE _HAS_EXCEPTIONS=0)
+    else()
+        target_compile_options(read_api_compile_check PRIVATE -fno-exceptions -fno-rtti)
+    endif()
     target_include_directories(read_api_compile_check PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/core/src)
     target_link_libraries(read_api_compile_check PRIVATE nucleus::nucleus)

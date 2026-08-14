@@ -709,10 +709,10 @@ See [`examples/schema/typed.cpp`](../examples/schema/typed.cpp) and
 
 `#include "nucleus/config_node.h"` (included transitively by `"nucleus/config.h"`)
 
-A cheap, value-semantic cursor into the resolved configuration tree. Holds a
-`const` pointer to the immutable `config` and an owned path string — two words,
-copyable, never exposes internal storage. Lifetime is tied to the `config` it
-was derived from.
+A value-semantic cursor into the resolved configuration tree. It holds a `const`
+pointer to the immutable `config` and an owned path string. It is copyable and
+never exposes internal storage. Its lifetime is tied to the `config` it was
+derived from.
 
 **Entry point:** `config::root()` returns a root-anchored cursor.
 
