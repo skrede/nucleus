@@ -377,6 +377,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         collection_shapes/keyed_merge_stability_test.cpp
         collection_shapes/keyed_duplicate_test.cpp
         collection_shapes/error_channel_test.cpp
+        collection_shapes/keyref_repeated_namespace_test.cpp
         collection_shapes/strain_displacement_test.cpp
         collection_shapes/strain_compaction_test.cpp
         collection_shapes/strain_compaction_boundary_test.cpp

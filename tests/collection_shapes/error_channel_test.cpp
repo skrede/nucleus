@@ -141,8 +141,12 @@ TEST_CASE("multiple validation violations share one code and retain both reasons
             {});
     REQUIRE_FALSE(loaded);
     REQUIRE(loaded.error().code == nucleus::errc::schema_violation);
-    REQUIRE(mentions(loaded.error(), "unique field 'cluster/node/route/port'"));
-    REQUIRE(mentions(loaded.error(), "unique field 'cluster/node/route/method'"));
+    REQUIRE(loaded.error().message ==
+            "schema validation failed:\n"
+            "  - unique field 'cluster/node/route/port' has duplicate value '80' across sibling instances "
+            "'cluster/node[0]/route[0]/port', 'cluster/node[0]/route[1]/port'\n"
+            "  - unique field 'cluster/node/route/method' has duplicate value 'get' across sibling instances "
+            "'cluster/node[0]/route[0]/method', 'cluster/node[0]/route[1]/method'");
 }
 
 TEST_CASE("command-line ordinals address post-compaction collection slots",

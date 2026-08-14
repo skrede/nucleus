@@ -23,17 +23,33 @@ builder.register_element(
 
 | Mode | Identifier only in lower | only in higher | same identifier in both layers |
 |------|--------------------------|----------------|--------------------------------|
-| `wholesale_replace` (default) | kept, unless the higher layer addresses its ordinal | kept | higher wins (that instance replaced whole) |
+| `wholesale_replace` (default) | repeated container: kept unless the higher layer addresses its ordinal; repeated leaf: kept only when the higher layer omits the leaf | repeated container: kept; repeated leaf: the higher layer's whole list | repeated container: higher whole instance wins; repeated leaf: higher whole list wins |
 | `unite` | kept | kept | **loud error** (duplicate across layers; strict-additive, no override) |
 | `replace_by_key` | kept | kept | higher layer's **whole element** replaces the lower's |
 
-- **`wholesale_replace`** is the default and composes by ordinal position rather than by key:
+- **`wholesale_replace`** is the default. A repeated container composes by ordinal position:
   each instance the higher layer supplies replaces, whole, the lower layer's instance at that
-  ordinal, and an instance the higher layer does not address stays in place.
+  ordinal, and an instance the higher layer does not address stays in place. For a repeated leaf,
+  the unit is the whole value list under one enclosing instance: a higher layer that supplies the
+  leaf replaces the lower list entirely, even when the higher list contains one value.
 - **`unite`** unions the layers. It is strict-additive: re-introducing an existing identifier
   in a higher layer is a loud error (additions only, never an accidental override).
 - **`replace_by_key`** unions the layers, but a matching identifier replaces that whole
   element with the higher layer's version — never a per-field merge.
+
+## Primary-keyed containers without a merge mode
+
+A container with a primary key and no explicit keyed merge mode follows selected-strain
+composition. The chosen strain's transient key segment is consumed while its entries are re-laid
+onto the declared resolved paths. Within a repeated container, a higher-rank entry displaces the
+same field only in the concrete instance it addresses; other fields and sibling instances stay in
+place. A repeated leaf remains a whole-list unit under one enclosing instance.
+
+After the selected entries are re-laid, surviving instances are re-indexed to contiguous ordinals
+in their existing relative order. Layering does not reorder them; only removal renumbers a later
+instance. Every moved value retains its recorded provenance at the new ordinal. See the
+[constraint-group error channels](constraint-groups.md#error-channels) for the public codes used by
+duplicate-identifier and uniqueness failures.
 
 ## The merge key
 

@@ -3,8 +3,24 @@
 nucleus models a *relationship between sibling fields* as a **container-scoped
 constraint group** — distinct from the per-element axes (`required`, `unique`,
 `identity`). A group is declared against a container anchor and enforced on the
-resolved, sliced tree; a violation is a loud diagnostic naming the parties, surfaced
-through the `load_config` result as `errc::schema_violation`.
+resolved, sliced tree; a resolved-tree violation is a loud diagnostic naming the
+parties, surfaced through the `load_config` result as `errc::schema_violation`.
+
+## Error channels
+
+Duplicate-identifier and uniqueness failures use the vocabulary of the stage that detects them:
+
+| Detection stage | Error code | When it fires |
+|-----------------|------------|---------------|
+| Source parsing | `errc::malformed_source` | One document is malformed in itself, such as two primary-keyed instances carrying the same key. |
+| Layer composition | `errc::layering_violation` | Combining layers finds an identity collision before instances have final ordinals, so the diagnostic names layers rather than positions. |
+| Resolved-tree validation | `errc::schema_violation` | Validation finds an identity or uniqueness collision after concrete paths exist, so the diagnostic names those paths. |
+
+The error code alone is the discriminator a host branches on; the message supplies human detail in
+the vocabulary available at that stage. When one validation run finds several violations, they
+arrive as one `error` whose message begins with `schema validation failed:` and appends every reason
+as `\n  - <reason>`. Reasons are therefore separated by exactly one newline. A host reads that
+message rather than iterating a public violation structure.
 
 There are two families over one substrate (a container-anchored member set + a clause +
 a named diagnostic):
@@ -107,6 +123,17 @@ builder.register_identity_group(
   the target of a keyref.
 - Namespace names are validated against a reserved-prefix carve-out so a host identifier
   can never shadow a builtin.
+
+### Keyrefs beneath repetition
+
+An identity namespace declared beneath a repeated container is local to each concrete enclosing
+instance, so sibling instances may each declare the same identifier. A keyref into that namespace
+does not carry an enclosing-instance qualifier, and dereferencing it through the read API is not
+supported while the namespace container lies beneath repetition.
+
+Declare a referenced namespace above the repetition instead. If several repeated instances
+contribute identifiers to that lifted namespace, keep those identifiers globally distinct so a
+keyref names exactly one target.
 
 ## What is out of scope
 
