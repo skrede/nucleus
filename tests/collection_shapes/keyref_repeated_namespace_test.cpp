@@ -11,14 +11,14 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <array>
 #include <string>
+#include <vector>
 #include <cstddef>
 #include <utility>
 
 namespace {
 
-nucleus::config_space repeated_namespace_space()
+nucleus::config_space repeated_namespace_space(const bool require_global = false)
 {
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("cluster", nucleus::anchor::root())));
@@ -28,14 +28,16 @@ nucleus::config_space repeated_namespace_space()
             nucleus::repeated_element("output", nucleus::anchor::keyspace("cluster/node"))));
     REQUIRE(builder.register_element(
             nucleus::element("name", nucleus::anchor::keyspace("cluster/node/output"))));
-    REQUIRE(builder.register_identity_group(
-            nucleus::identity_group("output_names", nucleus::anchor::keyspace("cluster/node"))
-                    .members({"output"})
-                    .field("name")));
-    REQUIRE(builder.register_element(
-            nucleus::element("route", nucleus::anchor::keyspace("cluster"))));
+    REQUIRE(builder.register_identity_group(nucleus::identity_group(
+                                                    "output_names", nucleus::anchor::keyspace("cluster/node"))
+                                                    .members({"output"})
+                                                    .field("name")));
     REQUIRE(builder.register_element(nucleus::keyref_element(
-            "target", nucleus::anchor::keyspace("cluster/route"), "output_names")));
+            "local_target", nucleus::anchor::keyspace("cluster/node/output"), "output_names")));
+    auto global = nucleus::keyref_element(
+            "global_target", nucleus::anchor::keyspace("cluster"), "output_names");
+    global.required = require_global;
+    REQUIRE(builder.register_element(std::move(global)));
     return std::move(builder).build();
 }
 
@@ -45,52 +47,119 @@ nucleus::source_handle xml_of(const std::string &text)
             nucleus::xml_source::from(nucleus::xml_source_options::of_string(text)));
 }
 
-std::string repeated_document(const std::size_t parent_count, const bool reuse_identity)
+std::string node(const std::vector<std::string> &identities,
+                 const std::string              &local_reference = {})
 {
-    std::string document = "<cluster>";
-    std::string target_identity;
-    for(std::size_t parent = 0; parent < parent_count; ++parent)
+    std::string text = "<node>";
+    for(std::size_t i = 0; i < identities.size(); ++i)
     {
-        const std::string identity = reuse_identity
-                ? "shared"
-                : "node-" + std::to_string(parent);
-        target_identity            = identity;
-        document += "<node><output><name>" + identity + "</name></output></node>";
+        text += "<output><name>" + identities[i] + "</name>";
+        if(i == 0 && !local_reference.empty())
+            text += "<local_target>" + local_reference + "</local_target>";
+        text += "</output>";
     }
-    return document + "<route><target>" + target_identity + "</target></route></cluster>";
+    return text + "</node>";
 }
 
-void check_absent_dereference(const nucleus::config_space         &space,
-                              const nucleus::schema_query_context &ctx,
-                              const std::size_t parent_count, const bool reuse_identity)
+std::string bound_document()
 {
-    const nucleus::load_result loaded = nucleus::load_config(
-            space, nucleus::source_stack{xml_of(repeated_document(parent_count, reuse_identity))}, {});
-    const std::string diagnostic = loaded.has_value() ? std::string{} : loaded.error().message;
-    CAPTURE(reuse_identity, parent_count);
-    INFO(diagnostic);
+    return "<cluster>" + node({"shared"}, "shared") + node({"shared"}, "shared") + "</cluster>";
+}
+
+std::string partially_bound_document(const std::size_t match_count)
+{
+    std::vector<std::string> local{"other"};
+    local.insert(local.end(), match_count, "shared");
+    return "<cluster>" + node(local, "shared") + node({"shared"}) + "</cluster>";
+}
+
+std::string globally_unbound_document(const std::size_t match_count,
+                                      const bool        include_reference = true)
+{
+    std::string text = "<cluster>" + node({"other"});
+    for(std::size_t i = 0; i < match_count; ++i)
+        text += node({"shared"});
+    if(include_reference)
+        text += "<global_target>shared</global_target>";
+    return text + "</cluster>";
+}
+
+nucleus::load_result load(const nucleus::config_space &space, const std::string &document)
+{
+    return nucleus::load_config(space, nucleus::source_stack{xml_of(document)}, {});
+}
+
+void require_target(const nucleus::config &config, const nucleus::schema_query_context &ctx,
+                    const std::string &reference_path, const std::string &target_path)
+{
+    const auto target = nucleus::follow_keyref(
+            nucleus::config_node{&config, reference_path}, ctx);
+    REQUIRE(target.has_value());
+    REQUIRE(target->path() == target_path);
+}
+
+void require_load_error(const nucleus::config_space &space, const std::string &document,
+                        const std::string &path, const std::string &scope,
+                        const std::size_t count)
+{
+    const nucleus::load_result loaded = load(space, document);
+    REQUIRE_FALSE(loaded.has_value());
+    REQUIRE(loaded.error().code == nucleus::errc::schema_violation);
+    REQUIRE(loaded.error().message.find(path) != std::string::npos);
+    REQUIRE(loaded.error().message.find("shared") != std::string::npos);
+    REQUIRE(loaded.error().message.find("output_names") != std::string::npos);
+    REQUIRE(loaded.error().message.find(scope) != std::string::npos);
+    REQUIRE(loaded.error().message.find(std::to_string(count) + " target") != std::string::npos);
+}
+
+}
+
+TEST_CASE("Keyrefs bind a shared concrete repeated parent", "[collection_shapes][keyref]")
+{
+    const nucleus::config_space space  = repeated_namespace_space();
+    const auto                  ctx    = space.query_context();
+    const nucleus::load_result  loaded = load(space, bound_document());
+    INFO((loaded.has_value() ? std::string{} : loaded.error().message));
     REQUIRE(loaded.has_value());
-    REQUIRE(loaded->get("cluster/node[0]/output[0]/name") ==
-            (reuse_identity ? "shared" : "node-0"));
-    REQUIRE(loaded->get("cluster/node[1]/output[0]/name") ==
-            (reuse_identity ? "shared" : "node-1"));
-    const nucleus::config_node keyref = loaded->root()["cluster"]["route"]["target"];
-    REQUIRE(keyref.value() == (reuse_identity ? "shared" : "node-" + std::to_string(parent_count - 1)));
-    const nucleus::expected<nucleus::config_node, nucleus::error> target =
-            nucleus::follow_keyref(keyref, ctx);
-    REQUIRE_FALSE(target.has_value());
-    REQUIRE(target.error().code == nucleus::errc::absent_key);
+    for(const std::size_t index : {std::size_t{0}, std::size_t{1}})
+    {
+        const std::string prefix = "cluster/node[" + std::to_string(index) + "]/output[0]";
+        require_target(*loaded, ctx, prefix + "/local_target", prefix);
+    }
 }
 
-}
-
-TEST_CASE("follow_keyref reports absence when its namespace is nested beneath repetition",
-          "[collection_shapes][keyref]")
+TEST_CASE("Bound keyrefs search every unbound target instance", "[collection_shapes][keyref]")
 {
-    const nucleus::config_space         space = repeated_namespace_space();
-    const nucleus::schema_query_context ctx   = space.query_context();
-    constexpr std::array                parent_counts{std::size_t{2}, std::size_t{3}, std::size_t{5}};
-    for(const bool reuse_identity : {false, true})
-        for(const std::size_t parent_count : parent_counts)
-            check_absent_dereference(space, ctx, parent_count, reuse_identity);
+    const nucleus::config_space space  = repeated_namespace_space();
+    const auto                  ctx    = space.query_context();
+    const nucleus::load_result  loaded = load(space, partially_bound_document(1));
+    INFO((loaded.has_value() ? std::string{} : loaded.error().message));
+    REQUIRE(loaded.has_value());
+    require_target(*loaded, ctx, "cluster/node[0]/output[0]/local_target",
+                   "cluster/node[0]/output[1]");
+    for(const std::size_t count : {std::size_t{0}, std::size_t{2}, std::size_t{10}})
+        require_load_error(space, partially_bound_document(count),
+                           "cluster/node[0]/output[0]/local_target", "cluster/node[0]", count);
+}
+
+TEST_CASE("Unbound keyrefs require one global target", "[collection_shapes][keyref]")
+{
+    const nucleus::config_space space  = repeated_namespace_space();
+    const auto                  ctx    = space.query_context();
+    const nucleus::load_result  loaded = load(space, globally_unbound_document(1));
+    REQUIRE(loaded.has_value());
+    require_target(*loaded, ctx, "cluster/global_target", "cluster/node[1]/output[0]");
+    for(const std::size_t count : {std::size_t{0}, std::size_t{2}, std::size_t{10}})
+        require_load_error(space, globally_unbound_document(count),
+                           "cluster/global_target", "<unbound>", count);
+}
+
+TEST_CASE("Keyref absence remains controlled by required", "[collection_shapes][keyref]")
+{
+    const std::string document = globally_unbound_document(1, false);
+    REQUIRE(load(repeated_namespace_space(), document).has_value());
+    const nucleus::load_result required = load(repeated_namespace_space(true), document);
+    REQUIRE_FALSE(required.has_value());
+    REQUIRE(required.error().code == nucleus::errc::schema_violation);
+    REQUIRE(required.error().message.find("global_target") != std::string::npos);
 }

@@ -67,6 +67,24 @@ inline std::string instance_prefix(const schema_registry &schema, const key_path
     return {};
 }
 
+template<typename Canonicalize>
+inline std::string qualified_scope(const key_path &actual, const key_path &declared,
+                                   Canonicalize canonicalize)
+{
+    std::string concrete;
+    std::string scope;
+    for(const std::string &segment : actual.segments())
+    {
+        concrete = join_segment(concrete, segment);
+        if(!key_path::is_indexed_segment(segment))
+            continue;
+        const auto canonical = key_path::parse(canonicalize(concrete));
+        if(canonical && declared.starts_with(*canonical))
+            scope = concrete;
+    }
+    return scope;
+}
+
 // Distinct concrete container-instance prefixes whose canonical form equals the
 // declared container path -- correct under repeated/keyed ancestors (the prefix
 // keeps the [n] ordinals; the canonical compare strips them).

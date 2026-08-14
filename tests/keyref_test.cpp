@@ -1,6 +1,8 @@
 #include "nucleus/query/query.h"
-#include "nucleus/config_space.h"
 #include "nucleus/config.h"
+#include "nucleus/config_space.h"
+
+#include "nucleus/keyspace/provenance.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -10,7 +12,10 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <map>
 #include <string>
+#include <cstddef>
+#include <utility>
 
 // schema-declared references by identifier (the xs:keyref analog). A
 // `route/target` keyref points into the `endpoint_names` namespace, which pools the
@@ -48,6 +53,25 @@ runtime_source two_targets()
 bool mentions(const error &e, const char *needle)
 {
     return e.message.find(needle) != std::string::npos;
+}
+
+config raw_reference(const std::size_t target_count)
+{
+    std::map<std::string, std::string> values;
+    values.emplace("route/target", "alpha");
+    for(std::size_t i = 0; i < target_count; ++i)
+        values.emplace("endpoints/output[" + std::to_string(i) + "]/name", "alpha");
+    return config(std::move(values), provenance{});
+}
+
+void require_candidate_message(const error &failure, const std::size_t count)
+{
+    REQUIRE(mentions(failure, "route/target"));
+    REQUIRE(mentions(failure, "alpha"));
+    REQUIRE(mentions(failure, "endpoint_names"));
+    REQUIRE(mentions(failure, "<unbound>"));
+    REQUIRE(mentions(failure, (std::to_string(count) + " target").c_str()));
+    REQUIRE_FALSE(mentions(failure, "endpoints/output["));
 }
 
 }
@@ -132,5 +156,24 @@ TEST_CASE("follow_keyref dereferences to the target node", "[keyref]")
         auto target = follow_keyref(not_keyref, ctx);
         REQUIRE_FALSE(target.has_value());
         REQUIRE(target.error().code == errc::absent_key);
+    }
+}
+
+TEST_CASE("follow_keyref maps defensive candidate counts", "[keyref]")
+{
+    const auto ctx = make_space().query_context();
+    config absent = raw_reference(0);
+    const auto missing = follow_keyref(absent.root()["route"]["target"], ctx);
+    REQUIRE_FALSE(missing.has_value());
+    REQUIRE(missing.error().code == errc::absent_key);
+    require_candidate_message(missing.error(), 0);
+
+    for(const std::size_t count : {std::size_t{2}, std::size_t{10}})
+    {
+        config ambiguous = raw_reference(count);
+        const auto result = follow_keyref(ambiguous.root()["route"]["target"], ctx);
+        REQUIRE_FALSE(result.has_value());
+        REQUIRE(result.error().code == errc::ambiguous_result);
+        require_candidate_message(result.error(), count);
     }
 }
