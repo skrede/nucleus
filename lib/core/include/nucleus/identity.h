@@ -4,7 +4,6 @@
 #include <memory>
 #include <utility>
 #include <concepts>
-#include <typeinfo>
 #include <type_traits>
 
 namespace nucleus {
@@ -55,6 +54,9 @@ public:
     }
 
 private:
+    template<typename T>
+    inline static constexpr unsigned char type_tag = 0;
+
     struct concept_base
     {
         concept_base() = default;
@@ -63,7 +65,7 @@ private:
         concept_base(concept_base &&) = default;
         concept_base &operator=(concept_base &&) = default;
         virtual ~concept_base() = default;
-        virtual const std::type_info &type() const noexcept = 0;
+        virtual const void *type_key() const noexcept = 0;
         virtual bool equals(const concept_base &other) const noexcept = 0;
     };
 
@@ -72,11 +74,11 @@ private:
     {
         explicit model(T value) : held(std::move(value)) {}
 
-        const std::type_info &type() const noexcept override { return typeid(T); }
+        const void *type_key() const noexcept override { return &type_tag<T>; }
 
         bool equals(const concept_base &other) const noexcept override
         {
-            if(other.type() != typeid(T))
+            if(other.type_key() != type_key())
                 return false;
             return held == static_cast<const model &>(other).held;
         }

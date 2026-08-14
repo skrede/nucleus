@@ -123,6 +123,7 @@ target_link_libraries(concurrent_collection_load_test PRIVATE Threads::Threads)
 # use-after-free guard real.
 # ---------------------------------------------------------------------------
 if(NUCLEUS_BUILD_SOURCE_XML)
+    nucleus_add_test(instance_addressing_test nucleus::runtime nucleus::xml nucleus::argv)
     nucleus_add_test(identity_envelope_test nucleus::xml nucleus::argv)
 
     # Template emission lives in the xml module now (nucleus::xml::emit_template),

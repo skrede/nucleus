@@ -1,18 +1,19 @@
 #ifndef HPP_GUARD_NUCLEUS_QUERY_QUERY_H
 #define HPP_GUARD_NUCLEUS_QUERY_QUERY_H
 
-#include "nucleus/query/schema_query_context.h"
 #include "nucleus/query/node_role.h"
-#include "nucleus/config_node.h"
-#include "nucleus/expected.h"
-#include "nucleus/error.h"
+#include "nucleus/query/schema_query_context.h"
 
-#include <cstddef>
-#include <functional>
-#include <optional>
+#include "nucleus/error.h"
+#include "nucleus/expected.h"
+#include "nucleus/config_node.h"
+
 #include <string>
-#include <string_view>
 #include <vector>
+#include <cstddef>
+#include <optional>
+#include <functional>
+#include <string_view>
 
 namespace nucleus {
 
@@ -22,8 +23,8 @@ namespace nucleus {
 using node_predicate = std::function<bool(const config_node &, const schema_query_context *)>;
 
 // Composable, value-semantic predicate composer over the config_node walk.
-// Built by query(); callers chain structural/kind/combinator selectors, then
-// call a terminal to materialise results.
+// Structural operations refine from left to right. under() resolves relative
+// to the active roots and rebinds them for later structural operations.
 //
 // Lifetime: owns m_ctx by value (a self-contained schema snapshot); borrows
 // m_anchor (config), which must outlive the selector and its collected results.
@@ -32,25 +33,25 @@ class selector
 public:
     selector(config_node anchor, schema_query_context ctx)
         : m_anchor(std::move(anchor))
+        , m_scope_roots{m_anchor}
         , m_ctx(std::move(ctx))
         , m_predicate([](const config_node &, const schema_query_context *) { return true; })
     {}
 
-    // Structural selectors — each narrows by adding a predicate via AND-chain.
+    // Structural depth follows observable config_node edges, including the
+    // synthetic repeated node and each concrete ordinal instance.
 
-    // Nodes whose direct parent is the anchor (exactly one level below).
+    // Nodes whose direct parent is an active root (exactly one level below).
     selector children() const;
 
-    // All nodes reachable from the anchor, excluding the anchor itself.
+    // All nodes below the active roots, excluding the roots themselves.
     selector descendants() const;
 
-    // Nodes exactly `depth` `/`-separator segments below the anchor. Diverges
-    // from children() on a repeated anchor: a `[n]` instance boundary is not a
-    // separator, so at_depth(1) returns the instances' fields, whereas
-    // children() treats each `[n]` instance as one level below the anchor.
+    // Nodes exactly depth edges below the active roots. Depth zero selects the roots.
     selector at_depth(std::size_t depth) const;
 
-    // Nodes whose path starts with the given absolute subpath prefix.
+    // Inclusive subtree roots reached relative to the active roots. Omitted
+    // ordinals fan through every concrete instance; explicit ordinals are exact.
     selector under(std::string_view subpath) const;
 
     // Kind selectors — structural classification via config_node::kind().
@@ -93,7 +94,7 @@ public:
     // Lazy iteration: calls fn for every matching node in pre-order DFS ordinal-stable order.
     void each(std::function<void(const config_node &)> fn) const;
 
-    // Materialised: collects all matching nodes into a vector (ordinal-stable order).
+    // Materialized: collects all matching nodes into a vector (ordinal-stable order).
     std::vector<config_node> collect() const;
 
     // Count of matching nodes.
@@ -130,12 +131,12 @@ public:
     }
 
 private:
-    // Returns a copy of this selector with `p` AND-composed into the predicate.
-    selector with_predicate(node_predicate p) const;
+    config_node              m_anchor;
+    std::vector<config_node> m_scope_roots;
+    schema_query_context     m_ctx;
+    node_predicate           m_predicate;
 
-    config_node          m_anchor;
-    schema_query_context m_ctx;
-    node_predicate       m_predicate;
+    selector with_predicate(node_predicate p) const;
 };
 
 // Entry point: returns a selector anchored at `anchor` that copies `ctx` in.

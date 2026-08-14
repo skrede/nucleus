@@ -1,10 +1,10 @@
 #ifndef HPP_GUARD_NUCLEUS_CONFIG_H
 #define HPP_GUARD_NUCLEUS_CONFIG_H
 
-#include "nucleus/config_node.h"
 #include "nucleus/error.h"
 #include "nucleus/format.h"
 #include "nucleus/expected.h"
+#include "nucleus/config_node.h"
 
 #include "nucleus/config_source/degradation.h"
 
@@ -21,7 +21,6 @@
 #include <utility>
 #include <optional>
 #include <algorithm>
-#include <typeindex>
 #include <functional>
 #include <string_view>
 
@@ -154,7 +153,7 @@ public:
     //   errc::missing_converter -- the key has a string value but no converter
     //                              was registered (untyped path)
     //   errc::mismatched_type -- the stored type does not equal T (outright
-    //                              type_index equality; no widening or coercion)
+    //                              exact stored type; no widening or coercion)
     // Note: any_cast<T> produces a copy of the stored value.
     template<typename T>
     expected<T, error> get_as(std::string_view key) const
@@ -193,11 +192,12 @@ public:
             return unexpected(error{errc::absent_key,
                         "path '" + std::string(key) + "' is absent"});
         }
-        if(it->second.type() != typeid(T))
+        const T *typed = std::any_cast<T>(&it->second);
+        if(typed == nullptr)
             return unexpected(error{errc::mismatched_type,
                         "type mismatch for path '" + std::string(key)
                         + "': stored type does not match requested type"});
-        return std::any_cast<T>(it->second);
+        return *typed;
     }
 
     // Returns all typed elements for a repeated path, gathered in numeric ordinal order.
@@ -210,11 +210,12 @@ public:
         {
             if(canonical_of(k) != key)
                 continue;
-            if(v.type() != typeid(T))
+            const T *typed = std::any_cast<T>(&v);
+            if(typed == nullptr)
                 return unexpected(error{errc::mismatched_type,
                             std::string("type mismatch for path '") + k
                             + "': stored element type does not match requested type"});
-            typed_indexed.emplace_back(first_ordinal_of(k), std::any_cast<T>(v));
+            typed_indexed.emplace_back(first_ordinal_of(k), *typed);
         }
 
         if(!typed_indexed.empty())
@@ -234,11 +235,12 @@ public:
         auto it = m_typed.find(key);
         if(it != m_typed.end())
         {
-            if(it->second.type() != typeid(T))
+            const T *typed = std::any_cast<T>(&it->second);
+            if(typed == nullptr)
                 return unexpected(error{errc::mismatched_type,
                             std::string("type mismatch for path '") + key
                             + "': stored element type does not match requested type"});
-            return std::vector<T>{std::any_cast<T>(it->second)};
+            return std::vector<T>{*typed};
         }
 
         if(contains(key))

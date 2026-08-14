@@ -3,8 +3,10 @@
 
 #include "nucleus/error.h"
 #include "nucleus/expected.h"
+
 #include "nucleus/keyspace/key_path.h"
 
+#include <set>
 #include <string>
 #include <vector>
 #include <cstddef>
@@ -13,7 +15,6 @@
 #include <algorithm>
 #include <string_view>
 #include <type_traits>
-#include <set>
 
 namespace nucleus {
 
@@ -64,7 +65,10 @@ class config_node
 {
 public:
     // Default: invalid / null-view node.
-    config_node() noexcept = default;
+    config_node() noexcept
+        : m_config(nullptr)
+        , m_path()
+    {}
 
     // Internal constructor: used by config::root() and navigation operators.
     config_node(const config *cfg, std::string path)
@@ -113,14 +117,11 @@ public:
     template<typename T>
     expected<T, error> as() const;
 
-    // Pre-order depth-first visit. Calls fn(*this); if fn returns false, stops.
-    // Otherwise recurses into children() in ordinal/canonical order.
+    // Pre-order depth-first visit. A false callback result stops the entire
+    // visit from this anchor, including every later sibling.
     void visit(const std::function<bool(const config_node &)>& fn) const
     {
-        if(!fn(*this))
-            return;
-        for(const config_node &child : children())
-            child.visit(fn);
+        static_cast<void>(visit_until(fn));
     }
 
     // Enter/leave depth-first walk. Calls walker.enter(*this); if it returns
@@ -146,11 +147,20 @@ public:
     config_node ancestor(std::string_view name) const;
 
 private:
-    // Returns distinct ordinal values for this repeated node, sorted numerically.
-    std::vector<std::size_t> distinct_ordinals() const;
+    const config *m_config;
+    std::string m_path;
 
-    const config *m_config = nullptr;
-    std::string   m_path;
+    bool visit_until(const std::function<bool(const config_node &)> &fn) const
+    {
+        if(!fn(*this))
+            return false;
+        for(const config_node &child : children())
+            if(!child.visit_until(fn))
+                return false;
+        return true;
+    }
+
+    std::vector<std::size_t> distinct_ordinals() const;
 };
 
 } // namespace nucleus

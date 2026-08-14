@@ -1,10 +1,12 @@
 #include "nucleus/query/query.h"
-#include "nucleus/config.h"
+
 #include "nucleus/error.h"
+#include "nucleus/config.h"
 #include "nucleus/format.h"
 
 #include <string>
 #include <vector>
+#include <utility>
 
 namespace nucleus {
 
@@ -18,107 +20,6 @@ selector selector::with_predicate(node_predicate p) const
         return base(node, ctx) && added(node, ctx);
     };
     return copy;
-}
-
-selector selector::children() const
-{
-    const std::string anchor_path{m_anchor.path()};
-    return with_predicate([anchor_path](const config_node &node, const schema_query_context *) {
-        std::string_view const np = node.path();
-        if(np == anchor_path)
-            return false;
-        // The node is a direct child when its path is exactly anchor + one segment.
-        // For a plain container anchor "a/b", children are "a/b/x" or "a/b/x[n]".
-        // For a repeated anchor "a/b", direct ordinal instances are "a/b[n]".
-        std::string_view remainder;
-        if(anchor_path.empty())
-        {
-            // Root anchor: direct children have no '/' in their path.
-            remainder = np;
-        }
-        else if(np.starts_with(anchor_path))
-        {
-            // Could be "a/b/x" (child via '/') or "a/b[n]" (ordinal instance).
-            std::string_view const after = np.substr(anchor_path.size());
-            if(after.empty())
-                return false;
-            if(after[0] == '/')
-                remainder = after.substr(1);
-            else if(after[0] == '[')
-                remainder = after; // "a/b[n]" — the '[n]' is the full remainder
-            else
-                return false; // partial name match, not a child
-        }
-        else
-        {
-            return false;
-        }
-        // A direct child has no further '/' or '[' after the first segment boundary.
-        // remainder is either "name", "name[n]", or "[n]".
-        auto slash_pos = remainder.find('/');
-        return slash_pos == std::string_view::npos;
-    });
-}
-
-selector selector::descendants() const
-{
-    const std::string anchor_path{m_anchor.path()};
-    return with_predicate([anchor_path](const config_node &node, const schema_query_context *) {
-        return node.path() != anchor_path;
-    });
-}
-
-selector selector::at_depth(std::size_t depth) const
-{
-    const std::string anchor_path{m_anchor.path()};
-    return with_predicate([anchor_path, depth](const config_node &node,
-                                               const schema_query_context *) {
-        std::string_view const np = node.path();
-        if(np == anchor_path)
-            return false;
-
-        // Count '/' separators in the suffix after the anchor prefix.
-        // For a root anchor (empty path) the suffix is the full path.
-        std::string_view suffix;
-        if(anchor_path.empty())
-        {
-            suffix = np;
-        }
-        else if(np.starts_with(anchor_path))
-        {
-            std::string_view const after = np.substr(anchor_path.size());
-            if(after.empty())
-                return false;
-            // Repeated instance: "cluster/node[0]" after "cluster/node" → "[0]"
-            // Container child:   "cluster/port"   after "cluster"       → "/port"
-            if(after[0] != '/' && after[0] != '[')
-                return false; // partial name match
-            suffix = after;
-        }
-        else
-        {
-            return false;
-        }
-
-        // The number of '/' separators in the suffix equals the relative depth.
-        std::size_t const seps = static_cast<std::size_t>(
-            std::count(suffix.begin(), suffix.end(), '/'));
-        return seps == depth;
-    });
-}
-
-selector selector::under(std::string_view subpath) const
-{
-    const std::string prefix{subpath};
-    return with_predicate([prefix](const config_node &node, const schema_query_context *) {
-        std::string_view const p = node.path();
-        if(!p.starts_with(prefix))
-            return false;
-        // Ensure the match is a full segment boundary, not a partial name.
-        if(p.size() > prefix.size())
-            return p[prefix.size()] == '/';
-        return p.size() == prefix.size();
-    });
 }
 
 selector selector::leaves() const
