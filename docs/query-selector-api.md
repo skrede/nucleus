@@ -57,24 +57,79 @@ auto nodes = query(cfg.root(), ctx).leaves().collect();
 
 ## Structural Selectors
 
-Structural selectors narrow by position relative to the anchor.
+Structural selectors narrow by position relative to their active roots. A new
+selector starts with its `anchor` as its only active root. Structural operations
+compose from left to right; only `under()` replaces the active roots used by
+later structural operations.
 
 | Method | Meaning |
 |--------|---------|
-| `children()` | Nodes exactly one level below the anchor (direct children). |
-| `descendants()` | All transitive nodes reachable from the anchor, excluding the anchor itself. |
-| `at_depth(n)` | Nodes exactly `n` path segments below the anchor. |
-| `under(subpath)` | Nodes whose path starts with the given absolute subpath. |
+| `children()` | Direct children of the active roots. Equivalent to `at_depth(1)`. |
+| `descendants()` | All transitive nodes below the active roots, excluding those roots. |
+| `at_depth(n)` | Nodes exactly `n` observable tree edges below the active roots. |
+| `under(subpath)` | Inclusive subtrees reached relative to the active roots. |
 
-`at_depth` and `children` diverge on a **repeated anchor**. `at_depth` counts
-only `/` separators, while `children` treats a `[n]` instance boundary as one
-level below the anchor. So for a repeated container `servers` with instances
-`servers[0]`, `servers[1]`, each holding a `host` field &mdash;
-`query(servers, ctx).at_depth(1)` returns the instances' fields (the `host`
-leaves), whereas `query(servers, ctx).children()` returns the instances
-(`servers[0]`, `servers[1]`) themselves.
+### Relative, inclusive `under()`
 
-Selectors compose by AND-chaining:
+`under(subpath)` interprets `subpath` relative to every active root. A plugin
+given only `cfg.root()["mount_a"]["plugin"]` can therefore query
+`under("logging")` without knowing the plugin's global mount path. An empty
+subpath selects the anchored subtree itself.
+
+Selection is inclusive. From the configuration root,
+`under("cluster/node")` includes the synthetic `cluster/node` node, every
+concrete `cluster/node[n]` instance, and every descendant. An explicit ordinal
+is exact: `under("cluster/node[2]")` includes only that concrete subtree.
+
+An omitted ordinal at any repeated segment spans every concrete instance at
+that segment; no wildcard syntax is required:
+
+| Subpath | Selected repeated subtrees |
+|---------|----------------------------|
+| `cluster/node/route` | Each synthetic `route` and every `route[m]` beneath every `node[n]` |
+| `cluster/node[2]/route` | The synthetic `route` and every `route[m]` beneath only `node[2]` |
+| `cluster/node/route[10]` | Only `route[10]` beneath every `node[n]` |
+| `cluster/node[2]/route[10]` | Only `route[10]` beneath only `node[2]` |
+
+Each selected subtree includes its resolved root and descendants. For an
+omitted final ordinal, that also includes the synthetic repeated node, such as
+`cluster/node[2]/route`, before its concrete instances.
+
+### Left-to-right structural composition
+
+Structural constraints retain the roots active when they were applied.
+`under()` then rebinds the active roots for structural operations to its right.
+Call order is therefore observable:
+
+```cpp
+const config_node plugin = cfg.root()["mount_a"]["plugin"];
+
+auto sink_nodes = query(plugin, ctx)
+                      .under("logging")
+                      .at_depth(1)
+                      .collect();
+// "mount_a/plugin/logging/sinks"
+
+auto logging_node = query(plugin, ctx)
+                        .at_depth(1)
+                        .under("logging")
+                        .collect();
+// "mount_a/plugin/logging"
+```
+
+The first expression descends to `logging` and then selects its children. The
+second first constrains the result to the plugin's children, then intersects
+that constraint with the inclusive `logging` subtree.
+
+### Observable tree-edge depth
+
+Depth follows the same nodes exposed by `config_node::children()`. Synthetic
+repeated nodes and their concrete ordinal instances are both observable, so
+the edge from `cluster/node` to `cluster/node[2]` consumes one generation.
+Consequently, `children()` always equals `at_depth(1)`, including for repeated
+roots. `at_depth(0)` selects each active root itself when it exists.
+
+Structural selectors continue to compose with kind and schema filters:
 
 ```cpp
 // Leaf children of cluster:

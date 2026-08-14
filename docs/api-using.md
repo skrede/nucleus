@@ -210,8 +210,29 @@ capability (XML, argv, or the runtime source).
 | `cfg.get("cluster/node/port")` | returns `nullopt` (unindexed crossing) |
 | `cfg.get_as<T>("cluster/node[0]/port")` | returns `expected<T, error>` at that ordinal |
 | `cfg.get_as<T>("cluster/node/port")` | returns `errc::index_required` naming the container and instance count |
-| `cfg.get_all("cluster/node/port")` | gathers across all instances in numeric ordinal order |
-| `cfg.get_all_as<T>("cluster/node/port")` | typed gather across all instances in numeric ordinal order |
+| `cfg.get_all("cluster/node/port")` | gathers across all omitted ordinal dimensions in complete numeric tuple order |
+| `cfg.get_all_as<T>("cluster/node/port")` | typed gather with the same matching and ordering contract |
+
+For raw and typed gathers, each specified ordinal is exact and each omitted
+ordinal spans every concrete instance. Results compare the complete ordinal
+tuple lexicographically, using numeric order at each repeated segment. For
+example, `cluster/node[2]/route[2]/port` precedes
+`cluster/node[2]/route[10]/port`, and every result under `node[2]` precedes
+every result under `node[10]`.
+
+CLI flags address nested instances with one plain ordinal segment per repeated
+dimension. Within one argv source, two assignments to the same concrete path
+have the same rank and the later token wins. Reversing the tokens reverses the
+winner. This does not weaken source-stack precedence: a lower-rank assignment
+cannot replace a value supplied by a higher-rank source.
+
+```text
+--cluster-node-0-route-2-port=9002
+--cluster-node-0-route-2-port=8002
+```
+
+In that order, `cluster/node[0]/route[2]/port` resolves to `8002`; reversing
+the two tokens resolves it to `9002`.
 
 `get_all` skips instances that lack the sub-path; use `get_all_as` for typed
 values. The `config_node` cursor (see [`config_node`](#config_node)) is the
@@ -620,13 +641,39 @@ std::vector<std::string> keys() const;
 - `get("cluster/node[0]/port")` — scalar at an exact indexed path.
 - `get("cluster/node/port")` — returns `nullopt` when the path crosses a
   repeated container without an index.
-- `get_all("cluster/node/port")` — gathers across all instances in numeric
-  ordinal order; returns a one-element vector for non-repeated paths.
+- `get_all("cluster/node/port")` — gathers across all omitted ordinal
+  dimensions in complete numeric tuple order; returns a one-element vector for
+  non-repeated paths.
 - `get_as<T>("cluster/node[0]/port")` — typed value at an exact indexed path.
 - `get_as<T>("cluster/node/port")` — returns `errc::index_required` naming
   the container and instance count when the path crosses a repeated container.
-- `get_all_as<T>("cluster/node/port")` — typed gather across all instances in
-  numeric ordinal order.
+- `get_all_as<T>("cluster/node/port")` — typed gather with the same segment
+  matching and complete ordinal-tuple ordering as `get_all`.
+
+Gather paths may qualify any subset of repeated dimensions. Every explicit
+ordinal is an exact constraint; every omitted ordinal fans out across all
+concrete instances. The raw and typed calls return the same sequence:
+
+```cpp
+// The fixture contains outer and inner ordinals 0, 1, 2, and 10. Each port is
+// encoded as outer * 100 + inner.
+cfg.get_all("cluster/node/route/port");
+// {"0", "1", "2", "10", "100", "101", "102", "110",
+//  "200", "201", "202", "210", "1000", "1001", "1002", "1010"}
+
+cfg.get_all("cluster/node/route[10]/port");
+// {"10", "110", "210", "1010"} -- inner ordinal fixed
+
+cfg.get_all("cluster/node[2]/route/port");
+// {"200", "201", "202", "210"} -- outer fixed; route[2] precedes route[10]
+
+cfg.get_all("cluster/node[2]/route[10]/port");
+// {"210"} -- fully qualified
+```
+
+`get_all_as<std::int32_t>` produces the corresponding integer vectors for
+these paths. Numeric tuple comparison applies at every repeated segment; it
+does not stop at the first repeated ancestor.
 
 The typed reads return `expected<T, error>`; branch on the `code`, print the
 whole `error` (or its `message`) for humans:
@@ -732,9 +779,10 @@ if(nodes.kind() == nucleus::node_kind::repeated)
 }
 ```
 
-**Pre-order visit** — `visit(fn)` calls `fn` at each node; return `false` from
-`fn` to stop the walk immediately. Repeated instances are visited in numeric
-ordinal order; distinct sibling container fields in canonical order.
+**Pre-order visit** — `visit(fn)` calls `fn` at each node. Returning `false` at
+any depth cancels the entire remaining visit from that anchor, including later
+siblings. Repeated instances are visited in numeric ordinal order; distinct
+sibling container fields in canonical order.
 
 ```cpp
 cfg.root()["cluster"]["node"].visit([](const nucleus::config_node &n) {
@@ -743,9 +791,11 @@ cfg.root()["cluster"]["node"].visit([](const nucleus::config_node &n) {
 });
 ```
 
-**Enter/leave walk** — `walk(walker)` provides nesting-aware enter/leave
-callbacks via a `config_tree_walker` subclass. `enter()` returning `false`
-skips the subtree; `leave()` is called on ascent in all cases.
+**Enter/leave walk** — `walk(walker)` has a deliberately different cancellation
+contract. It provides nesting-aware callbacks through a `config_tree_walker`
+subclass. `enter()` returning `false` prunes only that node's descendants;
+later siblings are still visited, and `leave()` is still called for the pruned
+node and on every later ascent.
 
 ```cpp
 struct port_collector : nucleus::config_tree_walker

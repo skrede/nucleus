@@ -84,7 +84,10 @@ instances each occupy a distinct zero-based ordinal slot in the resolved keyspac
 (`cluster/node[0]/port`, `cluster/node[1]/port`); nesting composes
 (`node[0]/route[1]/...`). A higher-precedence source layer replaces each
 instance it addresses and leaves the rest in place. CLI flags address instances
-via a plain ordinal segment (`--cluster-node-0-port=v`). See
+via a plain ordinal segment (`--cluster-node-0-port=v`); a later same-rank flag
+wins without weakening higher-rank source authority. Raw and typed gathers may
+fix any subset of ordinals, span every omitted dimension, and sort the complete
+numeric ordinal tuple. See
 [`docs/api-using.md`](docs/api-using.md) for the full addressing rules including
 `get_all` gather and `errc::index_required`.
 
@@ -93,8 +96,10 @@ via a plain ordinal segment (`--cluster-node-0-port=v`). See
 immutable `config`. Chainable navigation (`cfg.root()["cluster"]["node"][0]["port"]`)
 never fails loudly &mdash; absent keys yield a null-view that propagates. Shape queries
 (`kind`, `count`, `children`, `exists`, `path`) and two traversal forms: a
-pre-order `visit(fn)` with bool-stop, and an enter/leave `walk(walker)` via
-`config_tree_walker`. Repeated instances are visited in numeric ordinal order.
+pre-order `visit(fn)` where `false` cancels the entire remaining visit, and an
+enter/leave `walk(walker)` where `enter()` returning `false` prunes only that
+subtree and still receives `leave()`. Repeated instances are visited in numeric
+ordinal order.
 
 * **Constraint and identity groups** \
 A relationship between sibling fields is a container-scoped **constraint group**
@@ -114,14 +119,19 @@ ordering. See [`docs/keyed-composition.md`](docs/keyed-composition.md).
 * **Keyref referential integrity** \
 A **keyref** is a field whose value names a target in a named identity namespace
 &mdash; the read-side analog of `xs:keyref`. The engine validates it against
-dangling references and lets a host dereference it to the target node, reusing
-the tree-addressing and query machinery with no new `${...}` token. See
+dangling and ambiguous references and lets a host dereference it to the target
+node. Repeated namespaces bind the maximal concrete scope shared with the
+reference, search every unbound repeated dimension, and require exactly one
+target. Optional absence remains independent. See
 [`docs/keyref.md`](docs/keyref.md).
 
 * **Query / selector API** \
 A programmatic fluent surface over the sealed schema: `query_context()` snapshots
-a space, `query(anchor, ctx)` composes structural, kind, and schema-role
-selectors with combinators, and `one()` gives loud single-match semantics. See
+a space, and `query(anchor, ctx)` composes structural, kind, and schema-role
+selectors with combinators. Structural scopes are relative and inclusive,
+omitted ordinals fan through every concrete instance, and operations refine
+from left to right over observable tree-edge depth. `one()` gives loud
+single-match semantics. See
 [`docs/query-selector-api.md`](docs/query-selector-api.md).
 
 ## Build
@@ -131,6 +141,12 @@ cmake -B build -DNUCLEUS_BUILD_TESTS=ON -DNUCLEUS_BUILD_EXAMPLES=ON
 cmake --build build
 ctest --test-dir build
 ```
+
+New library code is required to remain C++20, exception-free, and RTTI-free.
+The scoped `read_api_compile_check` target proves those constraints for the
+public read headers and query/resolver translation units it compiles, with
+exceptions and RTTI disabled. It does not claim that unrelated legacy paths
+have eliminated every throw or RTTI use.
 
 Catch2 and pugixml are fetched automatically via `FetchContent`. `std::format` is
 the diagnostic vocabulary; on a toolchain that lacks it, `{fmt}` is fetched as the
