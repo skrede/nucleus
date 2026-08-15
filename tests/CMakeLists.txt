@@ -258,10 +258,10 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     )
     add_test(NAME location_token_wiring_test COMMAND location_token_wiring_test)
 
-    # XML persistence round-trip: load a configuration from XML, write it back via
-    # the pugixml WRITE API inside the xml module, and re-load it -- keys, scalar
-    # values, and repeated collections must survive intact.
-    add_executable(xml_persist_test xml_persist_test.cpp)
+    add_executable(xml_persist_test
+        xml_persist_test.cpp
+        xml_persist_render_test.cpp
+        xml_persist_value_test.cpp)
     nucleus_enable_coverage(xml_persist_test)
     nucleus_warnings(xml_persist_test)
     target_link_libraries(xml_persist_test
