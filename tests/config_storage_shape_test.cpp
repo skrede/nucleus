@@ -37,6 +37,14 @@ bool mentions(const nucleus::error &failure, const std::string &text)
     return failure.message.find(text) != std::string::npos;
 }
 
+void require_malformed_path(const std::string &path)
+{
+    auto made = nucleus::config::from_values({{path, "value"}});
+    REQUIRE_FALSE(made);
+    CHECK(made.error().code == nucleus::errc::malformed_source);
+    CHECK(mentions(made.error(), "'" + path + "'"));
+}
+
 nucleus::runtime_source mixed_source()
 {
     nucleus::runtime_source source;
@@ -136,14 +144,18 @@ TEST_CASE("checked config construction rejects conflicting storage shapes",
         CHECK(mentions(made.error(), "cluster/node[0]/route/port"));
         CHECK(mentions(made.error(), "cluster/node[1]/route[0]/port"));
     }
+}
 
-    SECTION("malformed path")
-    {
-        auto made = nucleus::config::from_values({{"bad//path", "value"}});
-        REQUIRE_FALSE(made);
-        CHECK(made.error().code == nucleus::errc::malformed_source);
-        CHECK(mentions(made.error(), "bad//path"));
-    }
+TEST_CASE("checked config construction rejects every malformed path form",
+          "[config][storage_shape]")
+{
+    for(const std::string &path : {std::string{}, std::string("/bad"),
+                                   std::string("bad/"), std::string("bad//path"),
+                                   std::string("[3]"), std::string("node[]"),
+                                   std::string("node[01]"), std::string("node[-1]"),
+                                   std::string("node[1"), std::string("node[1]tail"),
+                                   std::string("node[1234567890123456789]")})
+        require_malformed_path(path);
 }
 
 TEST_CASE("resolved storage shape is independent of schema and typing",

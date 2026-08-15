@@ -720,12 +720,22 @@ A compiled module keeps its implementation (and any third-party parser) under
 `inheritance` if it is a document format), honoring the
 [`retained_buffer`](#buffer) contract for any view-values.
 
-**Model the output contract.** Provide `emit_template(const config_space&,
-std::ostream&)` and `emit_document(const config&, std::ostream&)` as free
-functions in a `nucleus::<fmt>` namespace, plus a stateless `struct emitter`
-whose members forward to them so the type satisfies
-[`config_emitter`](api-using.md#emit). No third-party type appears in the public
-header; it lives only in the `.cpp`.
+**Model the output contract.** Provide owned `render_template` and
+`render_document` free functions in a `nucleus::<fmt>` namespace. The emitter
+value must return `expected<std::string, error>` from
+`render_template(const config_space&)` and
+`render_document(const config&, const config_space&)` so it satisfies
+[`config_emitter`](api-using.md#emit). A flat format may ignore the sealed space
+in the emitter value after its namespace-level renderer has applied the
+format's own settings. Reference the ordinal and repeated-anchor grammar in
+[CLI Grammar and Multi-Space Addressing](cli-grammar.md#ordinal-segment-rule--repeated-containers)
+rather than defining another spelling.
+
+If the module also offers stream conveniences, adapt the owned result through
+the shared delivery adapter `nucleus::detail::deliver_rendered`. Keep rendering
+format-specific and delivery shared; do not progressively serialize into the
+destination. No third-party type appears in the public header; it lives only in
+the `.cpp`.
 
 **Register the target** via `nucleus_add_module()` in `lib/CMakeLists.txt`:
 

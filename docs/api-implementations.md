@@ -284,36 +284,47 @@ See [`examples/composition/source_stack.cpp`](../examples/composition/source_sta
 Each format module ships the output pair as free functions in its own
 namespace, plus a `struct emitter` whose members forward to them so the module
 satisfies the [`config_emitter`](api-using.md#emit) concept by type as well as
-by call surface. Both operations write into a caller-owned `std::ostream` and
-return `expected<void, error>`; the caller owns persistence. The argv pair takes
-an optional `cli_delimiter` and `key_path` anchor (`argv::emitter` carries both
-as its only state), which must match the `argv_source` it round-trips with.
+by call surface. `render_template` and `render_document` return an owned
+`expected<std::string, error>` and define the primitive contract. The argv pair
+takes an optional `cli_delimiter` and `key_path` anchor (`argv::emitter` carries
+both as its only state), which must match the `argv_source` it round-trips with.
 
-Both operations honor an **all-or-nothing partial-write contract**: on any emit
-failure nothing is written to the caller-owned stream, so a returned `error`
-leaves the stream exactly as it was on entry. A failure carries the shared
-`error` vocabulary (`errc::malformed_source` for a value or name the format
-cannot represent) — the emit side speaks the same result channel as the load
-side.
+The `emit_*` conveniences render completely before attempting delivery through
+the shared adapter. A render rejection is returned before the destination is
+inspected. A prefailed stream, a null stream buffer, a buffer that accepts zero
+bytes, or a short write returns `errc::unwritable_destination`; exact acceptance
+of the complete buffer succeeds. After a short write, the accepted prefix may
+remain in the destination. Delivery does not flush and success does not promise
+external persistence. It also does not promise rollback after delivery begins.
 
-| Header | Free functions | Rendering |
-|--------|----------------|-----------|
-| `"nucleus/xml/xml_emitter.h"`   | `nucleus::xml::emit_template` / `emit_document`   | nested XML; anchor-path nesting; constrained leaves annotated with their allowed set; a repeated path keeps all its values as sibling elements |
-| `"nucleus/env/env_emitter.h"`   | `nucleus::env::emit_template` / `emit_document`   | flat `KEY=value` lines, one per resolved value; the template emits one blank `KEY=` per declared leaf with an `# allowed: a\|b\|c` annotation on constrained leaves |
-| `"nucleus/argv/argv_emitter.h"` | `nucleus::argv::emit_template` / `emit_document`  | flat `--KEY=value` lines: the key joined by the `cli_delimiter` (default `-`), the exact flags `argv_source` parses back |
+| Header | Owned renderers | Checked delivery | Rendering |
+|--------|-----------------|------------------|-----------|
+| `"nucleus/xml/xml_emitter.h"`   | `nucleus::xml::render_template` / `render_document`   | `emit_template` / `emit_document` | nested XML; anchor-path nesting; constrained leaves annotated with their allowed set; a repeated path keeps all its values as sibling elements |
+| `"nucleus/env/env_emitter.h"`   | `nucleus::env::render_template` / `render_document`   | `emit_template` / `emit_document` | flat `KEY=value` lines, one per resolved value; the template emits one blank `KEY=` per declared leaf with an `# allowed: a\|b\|c` annotation on constrained leaves |
+| `"nucleus/argv/argv_emitter.h"` | `nucleus::argv::render_template` / `render_document`  | `emit_template` / `emit_document` | flat `--KEY=value` lines: the key joined by the `cli_delimiter` (default `-`), the exact flags `argv_source` parses back |
 
-`emit_template` projects a **sealed space's declared schema** into a blank
-document template; `emit_document` projects a **resolved configuration** into a
-populated one. A repeated path emits one entry per value in numeric ordinal
-order in every format.
+`render_template` projects a **sealed space's declared schema** into a blank
+document template; `render_document` projects a **resolved configuration** into
+a populated one. A repeated path emits one entry per value in numeric ordinal
+order in every format. The flat formats preserve concrete ordinals as overlays;
+their spelling is defined only by
+[CLI Grammar and Multi-Space Addressing](cli-grammar.md#ordinal-segment-rule--repeated-containers).
 
 ```cpp
-nucleus::xml::emit_template(space, std::cout);    // blank template from the schema
-nucleus::xml::emit_document(config, std::cout);   // populated document from a load
+auto owned = nucleus::xml::render_document(config, space);
+if(!owned)
+    return 1;
 
 std::ofstream file("config.xml");
-nucleus::xml::emit_document(config, file);        // persistence is yours
+auto delivered = nucleus::xml::emit_document(config, space, file);
+if(!delivered)
+    return 1;
 ```
+
+The XML call above is schema-aware and validates the complete subtree against
+the sealed space. Explicit `render_document_schema_blind` and
+`emit_document_schema_blind` operations expose the weaker config-only path.
+The caller owns any subsequent flush, close, rename, or durability policy.
 
 The runtime module ships no emitter — its "format" is C++ code. See
 [`examples/xml/round_trip.cpp`](../examples/xml/round_trip.cpp) (one configuration

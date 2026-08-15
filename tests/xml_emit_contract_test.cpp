@@ -60,7 +60,7 @@ void check_safe_rejection(const nucleus::config_space       &space,
 {
     const nucleus::config config = config_of(std::move(values));
     std::ostringstream    output;
-    auto                  result = nucleus::xml::emit_document(config, output, space);
+    auto                  result = nucleus::xml::emit_document(config, space, output);
     REQUIRE_FALSE(result);
     CHECK(result.error().code == nucleus::errc::malformed_source);
     CHECK(result.error().message.find(key) != std::string::npos);

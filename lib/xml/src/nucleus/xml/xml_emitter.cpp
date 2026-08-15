@@ -51,7 +51,7 @@ expected<void, error> emit_template(
 }
 
 expected<void, error> emit_document(
-        const config &config, std::ostream &out, const config_space &space,
+        const config &config, const config_space &space, std::ostream &out,
         std::string_view space_name)
 {
     return detail::deliver_rendered(

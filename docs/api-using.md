@@ -901,38 +901,67 @@ ordinal). Most schema code can skip `key_path` entirely and pass a string to
 
 Output is the inverse of a source: a sealed space's declared schema can be
 projected into a blank document template, and a resolved configuration can be
-rendered back out. The format-agnostic contract is the `config_emitter`
-concept — a stateless type with two operations, both writing into a caller-owned
-`std::ostream`:
+rendered back out. The format-agnostic `config_emitter` concept is defined by
+owned results. Rendering completes validation and serialization before any
+destination is involved; each operation returns
+`expected&lt;std::string, error&gt;`:
 
 ```cpp
 template<typename Emitter>
 concept config_emitter = requires(const Emitter e, const config_space &space,
-                                  const config &config, std::ostream &out) {
-    { e.emit_template(space, out) } -> std::same_as<void>;
-    { e.emit_document(config, out) } -> std::same_as<void>;
+                                  const config &config) {
+    { e.render_template(space) }
+        -> std::same_as<expected<std::string, error>>;
+    { e.render_document(config, space) }
+        -> std::same_as<expected<std::string, error>>;
 };
 ```
 
 Each shipped format exposes the pair as free functions in its own namespace,
-plus a `struct emitter` modeling the concept:
+plus a `struct emitter` modeling the concept. The existing `emit_*` functions
+are checked stream-delivery conveniences over the owned artifact:
 
-| Format | Header | Free functions | CMake target |
-|--------|--------|----------------|--------------|
-| XML  | `"nucleus/xml/xml_emitter.h"`   | `nucleus::xml::emit_template` / `emit_document`  | `nucleus::xml` |
-| env  | `"nucleus/env/env_emitter.h"`   | `nucleus::env::emit_template` / `emit_document`  | `nucleus::env` |
-| argv | `"nucleus/argv/argv_emitter.h"` | `nucleus::argv::emit_template` / `emit_document` | `nucleus::argv` |
+| Format | Header | Owned free functions | CMake target |
+|--------|--------|----------------------|--------------|
+| XML  | `"nucleus/xml/xml_emitter.h"`   | `nucleus::xml::render_template` / `render_document`  | `nucleus::xml` |
+| env  | `"nucleus/env/env_emitter.h"`   | `nucleus::env::render_template` / `render_document`  | `nucleus::env` |
+| argv | `"nucleus/argv/argv_emitter.h"` | `nucleus::argv::render_template` / `render_document` | `nucleus::argv` |
 
 ```cpp
-nucleus::xml::emit_document(config, std::cout);     // nested XML
-nucleus::env::emit_document(config, std::cout);     // KEY=value lines
-nucleus::argv::emit_document(config, std::cout);    // --KEY=value flags (delimiter "-", host-selectable)
+auto xml = nucleus::xml::render_document(config, space);
+auto env = nucleus::env::render_document(config);
+auto argv = nucleus::argv::render_document(config);
+
+if(!xml)
+    return 1;
+std::cout << xml.value();
 ```
 
-The seam is stream-based and the caller owns persistence — write to a file with
-a `std::ofstream`, capture into a string with a `std::ostringstream`. A repeated
-container emits N sibling elements (XML) or N indexed entries (env/argv) in
-numeric ordinal order. See
+Ordinary XML document rendering is schema-aware: pass the same sealed space
+used to load the configuration. It checks every concrete path and repeated role
+before producing XML. The weaker `render_document_schema_blind(config)`
+operation validates only universal XML representability and is deliberately
+explicit at the call site. Checked delivery has the same distinction:
+
+```cpp
+auto delivered = nucleus::xml::emit_document(config, space, std::cout);
+auto weak = nucleus::xml::emit_document_schema_blind(config, std::cout);
+```
+
+The owned artifact preserves semantic state, not source formatting: reloading
+with the same sealed schema and format settings preserves the exact concrete
+key set and stored strings. Built-in deterministic converters reproduce typed
+values; arbitrary host-converter determinism is not promised. Provenance and
+capability degradations are recomputed by the new load rather than serialized.
+XML preserves the complete validated subtree. Flat argv and environment output
+preserve concrete repeated paths as replayable overlays over the same
+structural base; the ordinal spelling and anchor behavior have one authority in
+[CLI Grammar and Multi-Space Addressing](cli-grammar.md#ordinal-segment-rule--repeated-containers).
+
+The caller still owns persistence. The `emit_*` conveniences attempt checked
+delivery of the completed artifact but do not make persistence durable. A
+repeated container renders N sibling elements in XML or N indexed entries in
+env/argv, in numeric ordinal order. See
 [`examples/xml/round_trip.cpp`](../examples/xml/round_trip.cpp),
 [`examples/xml/xml_persist.cpp`](../examples/xml/xml_persist.cpp), and
 [`examples/xml/emit_template.cpp`](../examples/xml/emit_template.cpp).

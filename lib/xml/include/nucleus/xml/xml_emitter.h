@@ -33,7 +33,7 @@ expected<void, error> emit_template(
         std::string_view space_name = {});
 
 expected<void, error> emit_document(
-        const config &config, std::ostream &out, const config_space &space,
+        const config &config, const config_space &space, std::ostream &out,
         std::string_view space_name = {});
 
 expected<void, error> emit_document_schema_blind(
@@ -81,10 +81,10 @@ public:
     }
 
     expected<void, error> emit_document(
-            const config &config, std::ostream &out,
-            const config_space &space) const
+            const config &config, const config_space &space,
+            std::ostream &out) const
     {
-        return nucleus::xml::emit_document(config, out, space, m_space_name);
+        return nucleus::xml::emit_document(config, space, out, m_space_name);
     }
 
 private:

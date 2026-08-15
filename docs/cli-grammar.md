@@ -43,6 +43,31 @@ wildcard: after the user types `--cluster-node-2`, the sub-path completions
 (`-port`, etc.) are offered for any digit value. Completion scripts have no
 knowledge of the actual instance count at the time they are generated.
 
+### Flat replay and repeated anchors
+
+Rendered argv and environment artifacts are overlays over the same structural
+base from which the configuration was loaded. They preserve concrete ordinals;
+they do not append collection members or create an out-of-base instance. With
+the default argv delimiter, the corresponding replay forms are:
+
+```text
+--cluster-node-0-port=8000  ⇄  cluster/node[0]/port = "8000"
+--cluster-node-1-port=8001  ⇄  cluster/node[1]/port = "8001"
+```
+
+The argv renderer and source must use the same delimiter and anchor. A
+canonical repeated anchor such as `cluster/node` selects every concrete
+instance and retains its ordinal in the relative flag: `--0-port=8000`,
+`--1-port=8001`. A concrete repeated anchor such as `cluster/node[1]` selects
+only that instance and removes the fixed ordinal from the relative flag:
+`--port=8001`. Environment emission has no anchor setting; it emits exact
+concrete key paths such as `cluster/node[1]/port=8001`.
+
+Replay equality is semantic: the exact concrete key set and stored strings are
+preserved, with numeric ordinal ordering. Schema converters rerun and load
+metadata such as provenance and degradations are recomputed rather than encoded
+in the artifact.
+
 ## Multi-space CLI addressing
 
 When a process hosts more than one independently-declared configuration space
@@ -135,8 +160,9 @@ each source's pull.
 | Env prefix | Environment variable prefix (env_source prefix filter) | `ALPHA_X=1` → key `x` |
 
 Symmetric emission follows the same principle: `xml::emit_template(space, out,
-"alpha")` wraps the output in `<alpha>…</alpha>`, and `xml::emit_document(cfg,
-out, "alpha")` wraps the emitted document in the same envelope, so
+"alpha")` wraps the output in `<alpha>…</alpha>`, and
+`xml::emit_document(cfg, space, out, "alpha")` wraps the emitted document in
+the same envelope, so
 `xml_source::with_space_name("alpha")` can parse the result directly.
 
 ## Canonical user-documentation paragraph
