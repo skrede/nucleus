@@ -1,136 +1,66 @@
-#include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "identity_envelope_test_support.h"
 
-#include "nucleus/schema/anchor.h"
-#include "nucleus/schema/schema.h"
-
-#include "nucleus/xml/xml_source.h"
-#include "nucleus/xml/xml_emitter.h"
-
-#include "nucleus/config_source/source_stack.h"
+#include "nucleus/error.h"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
-#include <sstream>
-#include <string_view>
 
 using namespace nucleus;
-
-namespace {
-
-nucleus::load_options make_opts(std::string xml, std::string_view space_name = {})
-{
-    load_options opts;
-    opts.document_paths = {"doc.xml"};
-    opts.make_document = [body = std::move(xml), space = std::string(space_name)](
-                             const std::string &)
-    {
-        auto src = xml_source::from(xml_source_options::of_string(body));
-        if(!space.empty())
-            src.with_space_name(space);
-        return source_handle(std::move(src));
-    };
-    return opts;
-}
-
-// Schema with plugin/x declared as a typed element so emit_template can project it.
-nucleus::config_space make_plugin_space_typed()
-{
-    config_space_builder b;
-    REQUIRE(b.register_element(element("plugin", anchor::root())));
-    REQUIRE(b.register_element(element("x", anchor::keyspace("plugin"))));
-    return b.build();
-}
-
-// Schema with plugin/x as a plain schema path (register_schema only).
-nucleus::config_space make_plugin_space()
-{
-    config_space_builder b;
-    REQUIRE(b.register_schema("plugin/x"));
-    return b.build();
-}
-
-}
+namespace envelope_test = nucleus::identity_envelope_test;
 
 TEST_CASE("xml_source: root mismatch returns malformed_source naming both names",
           "[identity_envelope][xml]")
 {
-    auto space = make_plugin_space();
-    auto opts = make_opts("<other><plugin><x>1</x></plugin></other>", "engine");
+    const config_space space   = envelope_test::plugin_space();
+    const load_options options = envelope_test::make_options(
+            "<other><plugin><x>1</x></plugin></other>", "engine");
 
-    auto result = load_config(space, source_stack{}, opts);
+    const load_result result = load_config(space, source_stack{}, options);
     REQUIRE_FALSE(result);
     REQUIRE(result.error().code == errc::malformed_source);
-    const std::string &msg = result.error().message;
-    REQUIRE(msg.find("engine") != std::string::npos);
-    REQUIRE(msg.find("other") != std::string::npos);
+    REQUIRE(result.error().message.find("engine") != std::string::npos);
+    REQUIRE(result.error().message.find("other") != std::string::npos);
 }
 
 TEST_CASE("xml_source: named-space transparency strips root from key paths",
           "[identity_envelope][xml]")
 {
-    auto space = make_plugin_space();
-    auto opts = make_opts("<engine><plugin><x>1</x></plugin></engine>", "engine");
+    const config_space space   = envelope_test::plugin_space();
+    const load_options options = envelope_test::make_options(
+            "<engine><plugin><x>1</x></plugin></engine>", "engine");
 
-    auto result = load_config(space, source_stack{}, opts);
+    const load_result result = load_config(space, source_stack{}, options);
     REQUIRE(result);
-    // Key is plugin/x, NOT engine/plugin/x.
-    REQUIRE(result.value().get("plugin/x") == "1");
-    REQUIRE_FALSE(result.value().get("engine/plugin/x"));
+    REQUIRE(result->get("plugin/x") == "1");
+    REQUIRE_FALSE(result->get("engine/plugin/x"));
 }
 
 TEST_CASE("xml_source: a root-anchored leaf under a named space keeps its value",
           "[identity_envelope][xml]")
 {
-    // motd is a single-segment key: under a named space its element is a direct
-    // child of the transparent root. The read path must classify it as a leaf and
-    // read its text, not walk it as a container (which would drop the value).
-    config_space_builder b;
-    REQUIRE(b.register_schema("motd"));
-    REQUIRE(b.register_schema("plugin/x"));
-    auto space = b.build();
-    auto opts = make_opts(
-        "<engine><motd>hello</motd><plugin><x>1</x></plugin></engine>", "engine");
+    config_space_builder builder;
+    REQUIRE(builder.register_schema("motd"));
+    REQUIRE(builder.register_schema("plugin/x"));
+    const config_space space   = builder.build();
+    const load_options options = envelope_test::make_options(
+            "<engine><motd>hello</motd><plugin><x>1</x></plugin></engine>",
+            "engine");
 
-    auto result = load_config(space, source_stack{}, opts);
+    const load_result result = load_config(space, source_stack{}, options);
     REQUIRE(result);
-    REQUIRE(result.value().get("motd") == "hello");
-    REQUIRE(result.value().get("plugin/x") == "1");
-}
-
-TEST_CASE("emit_document + load round-trip preserves a root-anchored leaf under a named space",
-          "[identity_envelope][xml][round-trip]")
-{
-    config_space_builder b;
-    REQUIRE(b.register_schema("motd"));
-    auto space = b.build();
-
-    auto opts = make_opts("<engine><motd>hello</motd></engine>", "engine");
-    auto loaded = load_config(space, source_stack{}, opts);
-    REQUIRE(loaded);
-    REQUIRE(loaded.value().get("motd") == "hello");
-
-    std::ostringstream out;
-    REQUIRE(nucleus::xml::emit_document(loaded.value(), out, "engine"));
-
-    auto reopts = make_opts(out.str(), "engine");
-    auto reloaded = load_config(space, source_stack{}, reopts);
-    REQUIRE(reloaded);
-    REQUIRE(reloaded.value().get("motd") == "hello");
+    REQUIRE(result->get("motd") == "hello");
+    REQUIRE(result->get("plugin/x") == "1");
 }
 
 TEST_CASE("xml_source: mixed content on a named-space root is rejected loudly",
           "[identity_envelope][xml]")
 {
-    // The transparent root carries character data alongside its child elements.
-    // The same shape on any non-root element is a loud error; enforce it here too
-    // rather than silently discarding the stray text.
-    auto space = make_plugin_space();
-    auto opts = make_opts(
-        "<engine>stray text<plugin><x>1</x></plugin></engine>", "engine");
+    const config_space space   = envelope_test::plugin_space();
+    const load_options options = envelope_test::make_options(
+            "<engine>stray text<plugin><x>1</x></plugin></engine>", "engine");
 
-    auto result = load_config(space, source_stack{}, opts);
+    const load_result result = load_config(space, source_stack{}, options);
     REQUIRE_FALSE(result);
     REQUIRE(result.error().code == errc::malformed_source);
     REQUIRE(result.error().message.find("mixes character data") != std::string::npos);
@@ -139,14 +69,11 @@ TEST_CASE("xml_source: mixed content on a named-space root is rejected loudly",
 TEST_CASE("xml_source: pure character data as a named-space root body is rejected loudly",
           "[identity_envelope][xml]")
 {
-    // <engine>hello</engine> under space "engine": the root's text has no
-    // representable key (the transparent root name is stripped). It passes the
-    // mixed-content check (no structure alongside the text) but must not be silently
-    // discarded.
-    auto space = make_plugin_space();
-    auto opts = make_opts("<engine>hello</engine>", "engine");
+    const config_space space   = envelope_test::plugin_space();
+    const load_options options = envelope_test::make_options(
+            "<engine>hello</engine>", "engine");
 
-    auto result = load_config(space, source_stack{}, opts);
+    const load_result result = load_config(space, source_stack{}, options);
     REQUIRE_FALSE(result);
     REQUIRE(result.error().code == errc::malformed_source);
     REQUIRE(result.error().message.find("no representable key") != std::string::npos);
@@ -156,188 +83,40 @@ TEST_CASE("xml_source: character data beside an attribute on a named-space root 
           "rejected as mixed content",
           "[identity_envelope][xml]")
 {
-    // The no-representable-key rejection claims the pure-text root only; text that
-    // coexists with an attribute is mixed content and keeps that message.
-    auto space = make_plugin_space();
-    auto opts = make_opts("<engine version=\"2\">stray text</engine>", "engine");
+    const config_space space   = envelope_test::plugin_space();
+    const load_options options = envelope_test::make_options(
+            "<engine version=\"2\">stray text</engine>", "engine");
 
-    auto result = load_config(space, source_stack{}, opts);
+    const load_result result = load_config(space, source_stack{}, options);
     REQUIRE_FALSE(result);
     REQUIRE(result.error().code == errc::malformed_source);
     REQUIRE(result.error().message.find("mixes character data") != std::string::npos);
 }
 
-TEST_CASE("xml_source: a non-grammar attribute on a named-space root is discarded, "
-          "yielding neither a key nor an error",
-          "[identity_envelope][xml]")
-{
-    // The root envelope's own attributes never reach the keyspace. Stated here as
-    // the current contract, not as an endorsement: emitting them would turn names no
-    // schema declares into bare top-level keys, so documents that load today would
-    // begin failing on an unknown path.
-    auto space = make_plugin_space();
-    auto opts = make_opts("<engine version=\"2\"><plugin><x>1</x></plugin></engine>",
-                          "engine");
-
-    auto result = load_config(space, source_stack{}, opts);
-    REQUIRE(result);
-    REQUIRE(result.value().get("plugin/x") == "1");
-    REQUIRE_FALSE(result.value().contains("version"));
-    REQUIRE_FALSE(result.value().contains("engine/version"));
-}
-
-TEST_CASE("xml_source: inherit= on a named-space root yields no keyspace entry",
-          "[identity_envelope][xml]")
-{
-    config_space_builder b;
-    REQUIRE(b.register_schema("plugin/x"));
-    auto space = b.build();
-    auto opts = make_opts("<engine inherit=\"none\"><plugin><x>1</x></plugin></engine>",
-                          "engine");
-
-    auto result = load_config(space, source_stack{}, opts);
-    REQUIRE(result);
-    REQUIRE(result.value().get("plugin/x") == "1");
-    REQUIRE_FALSE(result.value().contains("inherit"));
-}
-
-TEST_CASE("xml_source: a duplicate attribute on a named-space root is rejected",
-          "[identity_envelope][xml]")
-{
-    auto space = make_plugin_space();
-    auto opts = make_opts("<engine a=\"1\" a=\"2\"><plugin><x>1</x></plugin></engine>",
-                          "engine");
-
-    auto result = load_config(space, source_stack{}, opts);
-    REQUIRE_FALSE(result);
-    REQUIRE(result.error().code == errc::malformed_source);
-    REQUIRE(result.error().message.find("duplicate attribute") != std::string::npos);
-}
-
 TEST_CASE("xml_source: unnamed space keeps root name as first key segment",
           "[identity_envelope][xml]")
 {
-    config_space_builder b;
-    REQUIRE(b.register_schema("engine/plugin/x"));
-    auto space = b.build();
-    auto opts = make_opts("<engine><plugin><x>1</x></plugin></engine>");
+    config_space_builder builder;
+    REQUIRE(builder.register_schema("engine/plugin/x"));
+    const config_space space   = builder.build();
+    const load_options options = envelope_test::make_options(
+            "<engine><plugin><x>1</x></plugin></engine>");
 
-    auto result = load_config(space, source_stack{}, opts);
+    const load_result result = load_config(space, source_stack{}, options);
     REQUIRE(result);
-    REQUIRE(result.value().get("engine/plugin/x") == "1");
-    REQUIRE_FALSE(result.value().get("plugin/x"));
-}
-
-TEST_CASE("xml_source: inherit= on transparent root is accepted",
-          "[identity_envelope][xml]")
-{
-    // inherit= on root is consumed by inheritance(); the source should not reject it.
-    config_space_builder b;
-    REQUIRE(b.register_schema("plugin/x"));
-    auto space = b.build();
-
-    load_options opts;
-    opts.document_paths = {"derived.xml"};
-    // The source has inherit= on the transparent root; pull() must succeed.
-    opts.make_document = [](const std::string &path) -> source_handle
-    {
-        std::string xml;
-        if(path == "derived.xml")
-            xml = "<engine inherit=\"base.xml\"><plugin><x>1</x></plugin></engine>";
-        else
-            xml = "<engine><plugin><x>99</x></plugin></engine>";
-        auto src = xml_source::from(xml_source_options::of_string(xml));
-        src.with_space_name("engine");
-        return source_handle(std::move(src));
-    };
-
-    auto result = load_config(space, source_stack{}, opts);
-    REQUIRE(result);
-    // Derived overrides base: x = 1.
-    REQUIRE(result.value().get("plugin/x") == "1");
-}
-
-TEST_CASE("xml_source: inherit= on a non-root child is a malformed_source error",
-          "[identity_envelope][xml]")
-{
-    auto space = make_plugin_space();
-    // extend= on non-root (no primary key registered here so extend= fires the grammar check).
-    auto opts = make_opts("<engine><plugin inherit=\"base.xml\"><x>1</x></plugin></engine>", "engine");
-
-    auto result = load_config(space, source_stack{}, opts);
-    REQUIRE_FALSE(result);
-    REQUIRE(result.error().code == errc::malformed_source);
-    REQUIRE(result.error().message.find("plugin") != std::string::npos);
-}
-
-TEST_CASE("xml::emit_template with space_name wraps output in a named root element",
-          "[identity_envelope][xml][emitter]")
-{
-    // emit_template projects schema_elements(), so we need register_element.
-    auto space = make_plugin_space_typed();
-    std::ostringstream out;
-    REQUIRE(nucleus::xml::emit_template(space, out, "engine"));
-    const std::string xml = out.str();
-
-    REQUIRE(xml.find("<engine>") != std::string::npos);
-    REQUIRE(xml.find("</engine>") != std::string::npos);
-    // The inner plugin element is present inside the envelope.
-    REQUIRE(xml.find("<plugin") != std::string::npos);
-}
-
-TEST_CASE("xml::emit_document with space_name wraps the document in a named root element",
-          "[identity_envelope][xml][emitter]")
-{
-    config_space_builder b;
-    REQUIRE(b.register_schema("plugin/x"));
-    auto space = b.build();
-    auto opts = make_opts("<engine><plugin><x>42</x></plugin></engine>", "engine");
-    auto config_result = load_config(space, source_stack{}, opts);
-    REQUIRE(config_result);
-
-    std::ostringstream out;
-    REQUIRE(nucleus::xml::emit_document(config_result.value(), out, "engine"));
-    const std::string xml = out.str();
-
-    REQUIRE(xml.find("<engine>") != std::string::npos);
-    REQUIRE(xml.find("</engine>") != std::string::npos);
-    REQUIRE(xml.find("42") != std::string::npos);
-}
-
-TEST_CASE("emit_template + xml_source round-trip with space_name reproduces keys",
-          "[identity_envelope][xml][round-trip]")
-{
-    // Typed space so emit_template produces actual XML.
-    auto space = make_plugin_space_typed();
-
-    std::ostringstream tmpl_out;
-    REQUIRE(nucleus::xml::emit_template(space, tmpl_out, "engine"));
-    const std::string tmpl = tmpl_out.str();
-
-    // The template is valid XML parseable by xml_source with the same space name.
-    REQUIRE(tmpl.find("<engine>") != std::string::npos);
-
-    // The template XML parses without error under the same space_name.
-    auto opts = make_opts(tmpl, "engine");
-    auto result = load_config(space, source_stack{}, opts);
-    REQUIRE(result);
-    // The template placeholder is an empty leaf (`<x/>`, no attributes, no child
-    // elements), which reads as an empty-string value: empty leaves carry "".
-    REQUIRE(result.value().get("plugin/x") == "");
+    REQUIRE(result->get("engine/plugin/x") == "1");
+    REQUIRE_FALSE(result->get("plugin/x"));
 }
 
 TEST_CASE("config_space::space_name() returns the name set on the builder",
           "[identity_envelope][space]")
 {
-    {
-        config_space_builder b;
-        b.name("mynamespace");
-        auto space = b.build();
-        REQUIRE(space.space_name() == "mynamespace");
-    }
-    {
-        config_space_builder b;
-        auto space = b.build();
-        REQUIRE(space.space_name().empty());
-    }
+    config_space_builder named_builder;
+    named_builder.name("mynamespace");
+    const config_space named_space = named_builder.build();
+    REQUIRE(named_space.space_name() == "mynamespace");
+
+    config_space_builder unnamed_builder;
+    const config_space   unnamed_space = unnamed_builder.build();
+    REQUIRE(unnamed_space.space_name().empty());
 }

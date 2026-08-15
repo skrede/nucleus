@@ -130,7 +130,18 @@ target_link_libraries(concurrent_collection_load_test PRIVATE Threads::Threads)
 # ---------------------------------------------------------------------------
 if(NUCLEUS_BUILD_SOURCE_XML)
     nucleus_add_test(instance_addressing_test nucleus::runtime nucleus::xml nucleus::argv)
-    nucleus_add_test(identity_envelope_test nucleus::xml nucleus::argv)
+    add_executable(identity_envelope_test
+        identity_envelope_test.cpp
+        identity_envelope_emit_test.cpp
+        identity_envelope_inheritance_test.cpp)
+    nucleus_enable_coverage(identity_envelope_test)
+    nucleus_warnings(identity_envelope_test)
+    target_link_libraries(identity_envelope_test
+        PRIVATE nucleus::nucleus nucleus::xml nucleus::argv Catch2::Catch2WithMain)
+    target_include_directories(identity_envelope_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/lib/core/src
+    )
+    add_test(NAME identity_envelope_test COMMAND identity_envelope_test)
     nucleus_add_test(xml_emit_contract_test nucleus::xml)
 
     # Template emission lives in the xml module now (nucleus::xml::emit_template),
@@ -460,7 +471,9 @@ if(NUCLEUS_BUILD_SOURCE_XML)
 
     # Round-trip: runtime_source + XML repeated field -> load -> emit -> reload;
     # asserts C2 == C1 by value (key set, scalars, repeated-field multiplicity).
-    add_executable(system_round_trip_test system_round_trip_test.cpp)
+    add_executable(system_round_trip_test
+        system_round_trip_test.cpp
+        system_value_round_trip_test.cpp)
     nucleus_enable_coverage(system_round_trip_test)
     nucleus_warnings(system_round_trip_test)
     target_link_libraries(system_round_trip_test
