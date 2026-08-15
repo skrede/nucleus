@@ -4,8 +4,6 @@
 #include "nucleus/config_space.h"
 #include "nucleus/strain_scope.h"
 
-#include "nucleus/schema/projection.h"
-
 #include "nucleus/xml/xml_emitter.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -66,24 +64,11 @@ nucleus::load_result load_narrow_extend(const nucleus::config_space &space,
     return nucleus::load_config(space, nucleus::source_stack{}, opts);
 }
 
-nucleus::schema_projection projection_of(const nucleus::config_space &space)
-{
-    nucleus::schema_projection projection;
-    for(const nucleus::schema_element &element : space.schema_elements())
-    {
-        if(element.identity)
-            projection.set_key(element.container().str(), element.name);
-        if(element.repeated)
-            projection.set_repeated_container(element.container().str());
-    }
-    return projection;
-}
-
 nucleus::load_result reload_emitted(const nucleus::config_space &space,
                                     const nucleus::config       &config)
 {
     std::ostringstream emitted;
-    REQUIRE(nucleus::xml::emit_document(config, emitted, projection_of(space)));
+    REQUIRE(nucleus::xml::emit_document(config, space, emitted));
     nucleus::load_options options;
     options.selection = "primary";
     return nucleus::load_config(

@@ -211,7 +211,9 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_test(NAME keyed_selection_test COMMAND keyed_selection_test)
 
     # pkey-identity-as-data acceptance suite.
-    add_executable(pkey_identity_test pkey_identity_test.cpp)
+    add_executable(pkey_identity_test
+        pkey_identity_test.cpp
+        pkey_identity_read_test.cpp)
     nucleus_enable_coverage(pkey_identity_test)
     nucleus_warnings(pkey_identity_test)
     target_link_libraries(pkey_identity_test
@@ -220,6 +222,8 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
     add_test(NAME pkey_identity_test COMMAND pkey_identity_test)
+
+    nucleus_add_test(xml_identity_contract_test nucleus::xml)
 
     add_executable(inherit_chain_test inherit_chain_test.cpp)
     nucleus_enable_coverage(inherit_chain_test)
@@ -396,7 +400,8 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         collection_shapes/violation_report_test.cpp
         collection_shapes/unique_scope_test.cpp
         collection_shapes/identity_pool_scope_test.cpp
-        collection_shapes/combined_shapes_test.cpp)
+        collection_shapes/combined_shapes_test.cpp
+        collection_shapes/identity_projection_round_trip_test.cpp)
     nucleus_enable_coverage(collection_shapes_test)
     nucleus_warnings(collection_shapes_test)
     target_link_libraries(collection_shapes_test
