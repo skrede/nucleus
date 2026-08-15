@@ -1,6 +1,8 @@
 #ifndef HPP_GUARD_NUCLEUS_DETAIL_FLAT_EMITTER_H
 #define HPP_GUARD_NUCLEUS_DETAIL_FLAT_EMITTER_H
 
+#include "nucleus/detail/flat_anchor.h"
+
 #include "nucleus/error.h"
 #include "nucleus/config.h"
 #include "nucleus/format.h"
@@ -16,153 +18,154 @@
 #include <string>
 #include <vector>
 #include <cstddef>
-#include <ostream>
+#include <utility>
 #include <algorithm>
 #include <string_view>
 
 namespace nucleus::detail {
 
-// A flat source has no nesting: the anchor path becomes the key. An element is a
-// leaf iff no other declared element is anchored beneath it; container elements
-// carry no value of their own and so produce no line.
-inline bool is_flat_leaf(const schema_element &el,
-                                       std::span<const schema_element> all)
+struct selected_flat_key
 {
-    const std::string prefix = el.declared_path().str() + key_path::separator;
-    for(const schema_element &other : all)
-    {
-        const std::string path = other.declared_path().str();
-        if(path.size() > prefix.size() && path.starts_with(prefix))
+    std::string concrete;
+    key_path    relative;
+};
+
+inline bool is_flat_leaf(const schema_element           &element,
+                         std::span<const schema_element> elements)
+{
+    const std::string prefix = element.declared_path().str() + key_path::separator;
+    for(const schema_element &other : elements)
+        if(other.declared_path().str().starts_with(prefix))
             return false;
-    }
     return true;
 }
 
-// Strips `anchor` (a canonical '/'-joined prefix) off `key` in place. Returns
-// false for a key not strictly under the anchor -- such a key is not addressable
-// in an anchored flat grammar, so the caller skips it. An empty anchor keeps
-// every key absolute.
-inline bool strip_flat_anchor(std::string_view &key,
-                                            std::string_view anchor)
+inline bool has_flat_line_break(std::string_view text) noexcept
 {
-    if(anchor.empty())
-        return true;
-    if(key.size() <= anchor.size() + 1 || !key.starts_with(anchor)
-       || key[anchor.size()] != key_path::separator)
-        return false;
-    key.remove_prefix(anchor.size() + 1);
-    return true;
+    return text.find('\n') != std::string_view::npos || text.find('\r') != std::string_view::npos;
 }
 
-// Renders a '/'-joined key with `key_separator` standing in for every separator,
-// so a flat format can speak its own delimiter (argv flags) over the same paths.
-// Indexed segments (e.g. "node[0]") are stripped to their base name ("node") so
-// repeated instances render at the same canonical key (e.g. "cluster/node/port").
-inline std::string render_flat_key(std::string_view key,
-                                                 std::string_view key_separator)
+inline expected<void, error> validate_flat_key(std::string_view key)
 {
-    std::string out;
-    out.reserve(key.size());
-    std::size_t start = 0;
-    bool first_seg = true;
-    for(std::size_t i = 0; i <= key.size(); ++i)
+    if(!has_flat_line_break(key))
+        return {};
+    return unexpected(error{errc::malformed_source, nucleus::format("flat render: key '{}' carries an embedded newline or carriage return", key)});
+}
+
+inline expected<void, error> validate_flat_value(std::string_view key,
+                                                 std::string_view value)
+{
+    if(!has_flat_line_break(value))
+        return {};
+    return unexpected(error{errc::malformed_source, nucleus::format("flat render: value for key '{}' carries an embedded newline or carriage "
+                                                                    "return",
+                                                                    key)});
+}
+
+inline expected<key_path, error> parse_flat_key(std::string_view key)
+{
+    auto parsed = key_path::parse(key);
+    if(parsed)
+        return std::move(parsed).value();
+    return unexpected(error{errc::malformed_source, nucleus::format("flat render: key '{}' is malformed: {}", key, parsed.error())});
+}
+
+inline expected<std::vector<selected_flat_key>, error>
+select_flat_keys(const config &config, const key_path &anchor)
+{
+    std::vector<std::string> keys = config.keys();
+    std::stable_sort(keys.begin(), keys.end(), [](const std::string &left, const std::string &right)
+                     { return ordinal_sort_key(left) < ordinal_sort_key(right); });
+    std::vector<selected_flat_key> selected;
+    for(std::string &key : keys)
     {
-        if(i == key.size() || key[i] == key_path::separator)
+        auto parsed = parse_flat_key(key);
+        if(!parsed)
+            return unexpected(parsed.error());
+        auto relative = select_flat_path(parsed.value(), anchor);
+        if(!relative)
+            return unexpected(relative.error());
+        if(relative.value())
+            selected.push_back({std::move(key), std::move(*relative.value())});
+    }
+    return selected;
+}
+
+inline void append_flat_line(std::string &output, std::string_view prefix,
+                             std::string_view key, std::string_view value)
+{
+    output.append(prefix);
+    output.append(key);
+    output.push_back('=');
+    output.append(value);
+    output.push_back('\n');
+}
+
+template<typename RenderKey>
+expected<std::string, error> render_flat_document(const config    &config,
+                                                  std::string_view prefix, const key_path &anchor, RenderKey render_key)
+{
+    auto selected = select_flat_keys(config, anchor);
+    if(!selected)
+        return unexpected(selected.error());
+    std::string output;
+    for(const selected_flat_key &key : selected.value())
+    {
+        if(auto valid = validate_flat_key(key.concrete); !valid)
+            return unexpected(valid.error());
+        auto rendered = render_key(key.relative);
+        if(!rendered)
+            return unexpected(rendered.error());
+        if(auto valid = validate_flat_key(rendered.value()); !valid)
+            return unexpected(valid.error());
+        for(const std::string &value : config.get_all(key.concrete))
         {
-            const std::string_view seg = key.substr(start, i - start);
-            const std::string_view base = key_path::base_name(seg);
-            if(!first_seg)
-                out.append(key_separator);
-            out.append(base);
-            first_seg = false;
-            start = i + 1;
+            if(auto valid = validate_flat_value(key.concrete, value); !valid)
+                return unexpected(valid.error());
+            append_flat_line(output, prefix, rendered.value(), value);
         }
     }
-    return out;
+    return output;
 }
 
-// Projects the declared schema into flat KEY= template lines: one line per declared
-// LEAF path (its path joined by `key_separator`), blank value (template only), with
-// `key_prefix` prepended to every key. A constrained leaf annotates its allowed
-// set as a trailing `# allowed: a|b|c`.
-inline expected<void, error> emit_flat_template(const config_space &space, std::ostream &out,
-                               std::string_view key_prefix,
-                               std::string_view key_separator = "/",
-                               std::string_view anchor = {})
+inline void append_allowed_values(std::string          &output,
+                                  const schema_element &element)
+{
+    if(element.allowed_values.empty())
+        return;
+    output.append(" # allowed: ");
+    for(std::size_t i = 0; i < element.allowed_values.size(); ++i)
+    {
+        if(i != 0)
+            output.push_back('|');
+        output.append(element.allowed_values[i]);
+    }
+}
+
+template<typename RenderKey>
+expected<std::string, error> render_flat_template(const config_space &space,
+                                                  std::string_view prefix, const key_path &anchor, RenderKey render_key)
 {
     const std::span<const schema_element> elements = space.schema_elements();
-    for(const schema_element &el : elements)
+    std::string                           output;
+    for(const schema_element &element : elements)
     {
-        if(!is_flat_leaf(el, elements))
+        if(!is_flat_leaf(element, elements))
             continue;
-        const std::string full = el.declared_path().str();
-        std::string_view key = full;
-        if(!strip_flat_anchor(key, anchor))
+        auto relative = select_flat_path(element.declared_path(), anchor);
+        if(!relative)
+            return unexpected(relative.error());
+        if(!relative.value())
             continue;
-        out << key_prefix << render_flat_key(key, key_separator) << '=';
-        if(!el.allowed_values.empty())
-        {
-            out << " # allowed: ";
-            for(std::size_t i = 0; i < el.allowed_values.size(); ++i)
-            {
-                if(i != 0)
-                    out << '|';
-                out << el.allowed_values[i];
-            }
-        }
-        out << '\n';
+        auto rendered = render_key(*relative.value());
+        if(!rendered)
+            return unexpected(rendered.error());
+        append_flat_line(output, prefix, rendered.value(), "");
+        output.pop_back();
+        append_allowed_values(output, element);
+        output.push_back('\n');
     }
-    return {};
-}
-
-// Projects a resolved config into flat KEY=value lines: one line per resolved
-// value, so a repeated path emits one line per value in order, with `key_prefix`
-// prepended to every key. Keys are sorted by numeric ordinal so repeated
-// instances round-trip in order (node[2] before node[10]) at N >= 11 rather than
-// in lexicographic map order. A key OR value carrying an embedded newline or
-// carriage return is rejected before any write: the line-oriented flat grammar
-// would let such text forge an extra flag/var line on round-trip.
-inline expected<void, error> emit_flat_document(const config &config, std::ostream &out,
-                               std::string_view key_prefix,
-                               std::string_view key_separator = "/",
-                               std::string_view anchor = {})
-{
-    std::vector<std::string> sorted_keys = config.keys();
-    std::stable_sort(sorted_keys.begin(), sorted_keys.end(),
-        [](const std::string &a, const std::string &b) {
-            return ordinal_sort_key(a) < ordinal_sort_key(b);
-        });
-
-    for(const std::string &key : sorted_keys)
-    {
-        std::string_view rendered = key;
-        if(!strip_flat_anchor(rendered, anchor))
-            continue;
-        if(key.find('\n') != std::string::npos
-           || key.find('\r') != std::string::npos)
-            return unexpected(error{errc::malformed_source, nucleus::format(
-                "flat emit: key '{}' carries an embedded newline or carriage "
-                "return, which the line-oriented flat format cannot represent "
-                "without forging an extra line", key)});
-        for(const std::string &value : config.get_all(key))
-            if(value.find('\n') != std::string::npos
-               || value.find('\r') != std::string::npos)
-                return unexpected(error{errc::malformed_source, nucleus::format(
-                    "flat emit: value for key '{}' carries an embedded newline or "
-                    "carriage return, which the line-oriented flat format cannot "
-                    "represent without forging an extra line", key)});
-    }
-
-    for(const std::string &key : sorted_keys)
-    {
-        std::string_view rendered = key;
-        if(!strip_flat_anchor(rendered, anchor))
-            continue;
-        for(const std::string &value : config.get_all(key))
-            out << key_prefix << render_flat_key(rendered, key_separator) << '='
-                << value << '\n';
-    }
-    return {};
+    return output;
 }
 
 }

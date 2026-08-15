@@ -58,15 +58,6 @@ nucleus::config make_server_config()
     return std::move(made).value();
 }
 
-std::size_t count_occurrences(const std::string &text, const std::string &needle)
-{
-    std::size_t count = 0;
-    for(std::size_t pos = text.find(needle); pos != std::string::npos;
-        pos = text.find(needle, pos + needle.size()))
-        ++count;
-    return count;
-}
-
 }
 
 TEST_CASE("env and args project a schema into flat KEY= templates", "[emit][seam]")
@@ -117,7 +108,8 @@ TEST_CASE("an anchored argv document renders keys relative to the anchor", "[emi
                                  nucleus::key_path::parse("server").value()));
     const std::string args = out.str();
     REQUIRE(args.find("--host=localhost") != std::string::npos);
-    REQUIRE(count_occurrences(args, "--tag=") == 2);
+    REQUIRE(args.find("--tag-0=alpha") != std::string::npos);
+    REQUIRE(args.find("--tag-1=beta") != std::string::npos);
     REQUIRE(args.find("--server") == std::string::npos);
 }
 
@@ -129,15 +121,14 @@ TEST_CASE("env and args emit one flat line per resolved value", "[emit][seam]")
     REQUIRE(nucleus::env::emit_document(config, env_out));
     const std::string env = env_out.str();
     REQUIRE(env.find("server/host=localhost") != std::string::npos);
-    // The repeated path persists ALL its values, one line each (no last-wins loss).
-    REQUIRE(count_occurrences(env, "server/tag=") == 2);
-    REQUIRE(env.find("server/tag=alpha") != std::string::npos);
-    REQUIRE(env.find("server/tag=beta") != std::string::npos);
+    REQUIRE(env.find("server/tag[0]=alpha") != std::string::npos);
+    REQUIRE(env.find("server/tag[1]=beta") != std::string::npos);
 
     std::ostringstream args_out;
     REQUIRE(nucleus::argv::emit_document(config, args_out));
     const std::string args = args_out.str();
-    REQUIRE(count_occurrences(args, "--server-tag=") == 2);
+    REQUIRE(args.find("--server-tag-0=alpha") != std::string::npos);
+    REQUIRE(args.find("--server-tag-1=beta") != std::string::npos);
 }
 
 TEST_CASE("xml projects the SAME space into nested tree markup", "[emit][seam]")

@@ -1,23 +1,28 @@
-#include "nucleus/error.h"
 #include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
-#include "nucleus/keyspace/provenance.h"
+#include "nucleus/schema/anchor.h"
+#include "nucleus/schema/schema.h"
 
+#include "nucleus/config_source/source_stack.h"
+
+#include "nucleus/env/env_source.h"
 #include "nucleus/env/env_emitter.h"
+
+#include "nucleus/argv/argv_source.h"
 #include "nucleus/argv/argv_emitter.h"
+
+#include "nucleus/runtime/runtime_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <map>
 #include <string>
 #include <vector>
-#include <numeric>
+#include <cstddef>
 #include <sstream>
-
-// The flat (argv/env) emitters share one helper (emit_flat_document): repeated
-// instances must round-trip in numeric ordinal order, and a value carrying a
-// line break must be refused before anything is written -- otherwise a
-// lower-precedence value could forge an extra well-formed flag/var line.
+#include <utility>
+#include <string_view>
 
 namespace {
 
@@ -28,125 +33,168 @@ nucleus::config checked_config(std::map<std::string, std::string> values)
     return std::move(made).value();
 }
 
-nucleus::config make_repeated_config(int count)
+nucleus::config ordinal_config()
 {
-    std::map<std::string, std::string> values;
-    for(int i = 0; i < count; ++i)
-        values.emplace("cluster/node[" + std::to_string(i) + "]/port",
-                       std::to_string(i));
-    return checked_config(std::move(values));
+    return checked_config({{"cluster/node[0]/port", "8000"},
+                           {"cluster/node[1]/port", "9000"},
+                           {"cluster/node[2]/port", "10000"},
+                           {"cluster/node[10]/port", "18000"}});
 }
 
-std::vector<int> emitted_ordinal_values(const std::string &text)
+nucleus::key_path path_of(std::string_view text)
 {
-    std::vector<int> out;
-    std::istringstream lines(text);
-    std::string line;
-    while(std::getline(lines, line))
+    auto parsed = nucleus::key_path::parse(text);
+    REQUIRE(parsed);
+    return std::move(parsed).value();
+}
+
+std::vector<std::string> lines_of(const std::string &text)
+{
+    std::vector<std::string> lines;
+    std::istringstream       input(text);
+    for(std::string line; std::getline(input, line);)
+        lines.push_back(std::move(line));
+    return lines;
+}
+
+nucleus::config_space repeated_space()
+{
+    nucleus::config_space_builder builder;
+    REQUIRE(builder.register_element(
+            nucleus::element("cluster", nucleus::anchor::root())));
+    REQUIRE(builder.register_element(
+            nucleus::repeated_element("node", nucleus::anchor::keyspace("cluster"))));
+    REQUIRE(builder.register_element(
+            nucleus::element("port", nucleus::anchor::keyspace("cluster/node"))));
+    return builder.build();
+}
+
+}
+
+TEST_CASE("owned argv rendering retains concrete ordinals in numeric order",
+          "[flat][emit][argv][ordinal]")
+{
+    const auto argv_template = nucleus::argv::render_template(repeated_space());
+    const auto env_template  = nucleus::env::render_template(repeated_space());
+    REQUIRE(argv_template);
+    REQUIRE(argv_template->find("--cluster-node-port=") != std::string::npos);
+    REQUIRE(env_template);
+    REQUIRE(env_template->find("cluster/node/port=") != std::string::npos);
+    const auto rendered = nucleus::argv::render_document(ordinal_config());
+    REQUIRE(rendered);
+    REQUIRE(lines_of(rendered.value()) == std::vector<std::string>{"--cluster-node-0-port=8000", "--cluster-node-1-port=9000", "--cluster-node-2-port=10000", "--cluster-node-10-port=18000"});
+}
+
+TEST_CASE("owned argv output reparses to the same concrete instances",
+          "[flat][emit][argv][round_trip]")
+{
+    const nucleus::config original = checked_config({{"cluster/node[0]/port", "8000"},
+                                                     {"cluster/node[1]/port", "9000"}});
+    const auto            rendered = nucleus::argv::render_document(original);
+    REQUIRE(rendered);
+
+    nucleus::runtime_source base;
+    base.set("cluster/node[0]/port", "80")
+            .set("cluster/node[1]/port", "90");
+    nucleus::argv_source        replay(lines_of(rendered.value()));
+    const nucleus::config_space space = repeated_space();
+    replay.recognize_with(nucleus::recognizer_of(space));
+
+    auto loaded = nucleus::load_config(
+            space, nucleus::source_stack{std::move(base), std::move(replay)}, {});
+    REQUIRE(loaded);
+    REQUIRE(loaded->keys() == original.keys());
+    REQUIRE(loaded->get("cluster/node[0]/port") == "8000");
+    REQUIRE(loaded->get("cluster/node[1]/port") == "9000");
+}
+
+TEST_CASE("structural anchors select ordinary and repeated descendants",
+          "[flat][emit][argv][anchor]")
+{
+    const nucleus::config config   = ordinal_config();
+    const auto            ordinary = nucleus::argv::render_document(
+            config, {}, path_of("cluster"));
+    REQUIRE(ordinary);
+    REQUIRE(lines_of(ordinary.value()) == std::vector<std::string>{"--node-0-port=8000", "--node-1-port=9000", "--node-2-port=10000", "--node-10-port=18000"});
+
+    const auto canonical = nucleus::argv::render_document(
+            config, {}, path_of("cluster/node"));
+    REQUIRE(canonical);
+    REQUIRE(lines_of(canonical.value()) == std::vector<std::string>{"--0-port=8000", "--1-port=9000", "--2-port=10000", "--10-port=18000"});
+
+    const auto concrete = nucleus::argv::render_document(
+            config, {}, path_of("cluster/node[1]"));
+    REQUIRE(concrete);
+    REQUIRE(concrete.value() == "--port=9000\n");
+}
+
+TEST_CASE("flat rendering preserves complete nested ordinal tuples",
+          "[flat][emit][argv][env][ordinal]")
+{
+    const nucleus::config config = checked_config({{"cluster/node[0]/route[10]/port", "a"},
+                                                   {"cluster/node[1]/route[2]/port", "b"},
+                                                   {"cluster/node[1]/route[10]/port", "c"}});
+    const auto            argv   = nucleus::argv::render_document(config);
+    REQUIRE(argv);
+    REQUIRE(lines_of(argv.value()) == std::vector<std::string>{"--cluster-node-0-route-10-port=a", "--cluster-node-1-route-2-port=b", "--cluster-node-1-route-10-port=c"});
+
+    const auto environment = nucleus::env::render_document(config);
+    REQUIRE(environment);
+    REQUIRE(lines_of(environment.value()) == std::vector<std::string>{"cluster/node[0]/route[10]/port=a", "cluster/node[1]/route[2]/port=b", "cluster/node[1]/route[10]/port=c"});
+    nucleus::env_source replay;
+    for(const std::string &line : lines_of(environment.value()))
     {
-        const auto eq = line.find('=');
-        REQUIRE(eq != std::string::npos);
-        REQUIRE(line.substr(0, eq) == "cluster/node/port");
-        out.push_back(std::stoi(line.substr(eq + 1)));
+        const std::size_t split = line.find('=');
+        REQUIRE(split != std::string::npos);
+        replay.set(line.substr(0, split), line.substr(split + 1));
     }
-    return out;
+    auto pulled = replay.pull();
+    REQUIRE(pulled);
+    REQUIRE(pulled->entries.front().path == "cluster/node[0]/route[10]/port");
 }
 
-}
-
-TEST_CASE("flat emit orders repeated instances by numeric ordinal at N >= 11",
-          "[flat][emit][env][ordering]")
+TEST_CASE("flat validation is scoped to the selected subtree",
+          "[flat][emit][argv][anchor][error]")
 {
-    // std::map stores keys lexicographically (node[10] before node[2]); the
-    // emitter must re-order them so the instances round-trip in ordinal order.
-    const nucleus::config cfg = make_repeated_config(12);
+    const nucleus::config config   = checked_config({{"cluster/port", "8000"},
+                                                     {std::string("outside/bad\nkey"), "ignored"}});
+    const auto            selected = nucleus::argv::render_document(
+            config, {}, path_of("cluster"));
+    REQUIRE(selected);
+    REQUIRE(selected.value() == "--port=8000\n");
 
-    std::ostringstream out;
-    REQUIRE(nucleus::env::emit_document(cfg, out));
-
-    std::vector<int> expected(12);
-    std::iota(expected.begin(), expected.end(), 0);
-    REQUIRE(emitted_ordinal_values(out.str()) == expected);
+    const auto invalid = nucleus::argv::render_document(
+            config, {}, path_of("outside"));
+    REQUIRE_FALSE(invalid);
+    REQUIRE(invalid.error().code == nucleus::errc::malformed_source);
+    REQUIRE(invalid.error().message.find("outside/bad\nkey") != std::string::npos);
 }
 
-TEST_CASE("flat emit rejects an embedded newline as malformed_source, writing nothing",
-          "[flat][emit][env][injection]")
+TEST_CASE("a scalar anchor fails before stream output",
+          "[flat][emit][argv][anchor][error]")
 {
-    std::map<std::string, std::string> values{
-        {"server/host", std::string("localhost\n--server-admin=true")}};
-    const nucleus::config cfg = checked_config(std::move(values));
-
-    std::ostringstream out;
-    const auto result = nucleus::env::emit_document(cfg, out);
+    const nucleus::config config = checked_config({{"cluster/port", "8000"}});
+    std::ostringstream    output;
+    const auto            result = nucleus::argv::emit_document(
+            config, output, {}, path_of("cluster/port"));
     REQUIRE_FALSE(result);
     REQUIRE(result.error().code == nucleus::errc::malformed_source);
-    REQUIRE(result.error().message.find("server/host") != std::string::npos);
-    REQUIRE(out.str().empty());
+    REQUIRE(result.error().message.find("cluster/port") != std::string::npos);
+    REQUIRE(output.str().empty());
 }
 
-TEST_CASE("flat emit rejects an embedded carriage return as malformed_source",
-          "[flat][emit][env][injection]")
+TEST_CASE("selected line-breaking values fail before stream output",
+          "[flat][emit][env][error]")
 {
-    std::map<std::string, std::string> values{
-        {"server/host", std::string("localhost\r--server-admin=true")}};
-    const nucleus::config cfg = checked_config(std::move(values));
-
-    std::ostringstream out;
-    const auto result = nucleus::env::emit_document(cfg, out);
-    REQUIRE_FALSE(result);
-    REQUIRE(result.error().code == nucleus::errc::malformed_source);
-    REQUIRE(result.error().message.find("server/host") != std::string::npos);
-    REQUIRE(out.str().empty());
-}
-
-TEST_CASE("argv emit inherits the shared newline-rejection fix",
-          "[flat][emit][argv][injection]")
-{
-    std::map<std::string, std::string> values{
-        {"server/host", std::string("localhost\n--server-admin=true")}};
-    const nucleus::config cfg = checked_config(std::move(values));
-
-    std::ostringstream out;
-    const auto result = nucleus::argv::emit_document(cfg, out);
-    REQUIRE_FALSE(result);
-    REQUIRE(result.error().code == nucleus::errc::malformed_source);
-    REQUIRE(out.str().empty());
-}
-
-TEST_CASE("flat emit rejects an embedded newline in a KEY, writing nothing",
-          "[flat][emit][env][injection]")
-{
-    // A key -- not just a value -- carrying a line break would forge a second
-    // well-formed assignment line on the flat grammar. The pre-scan must reject
-    // it before anything reaches the stream.
-    std::map<std::string, std::string> values{
-        {std::string("server/host\n--server-admin"), std::string("true")}};
-    const nucleus::config cfg = checked_config(std::move(values));
-
-    std::ostringstream out;
-    const auto result = nucleus::env::emit_document(cfg, out);
-    REQUIRE_FALSE(result);
-    REQUIRE(result.error().code == nucleus::errc::malformed_source);
-    REQUIRE(result.error().message.find("key") != std::string::npos);
-    REQUIRE(out.str().empty());
-
-    std::ostringstream args_out;
-    const auto args_result = nucleus::argv::emit_document(cfg, args_out);
-    REQUIRE_FALSE(args_result);
-    REQUIRE(args_result.error().code == nucleus::errc::malformed_source);
-    REQUIRE(args_out.str().empty());
-}
-
-TEST_CASE("flat emit rejects an embedded carriage return in a KEY",
-          "[flat][emit][env][injection]")
-{
-    std::map<std::string, std::string> values{
-        {std::string("server/host\r--server-admin"), std::string("true")}};
-    const nucleus::config cfg = checked_config(std::move(values));
-
-    std::ostringstream out;
-    const auto result = nucleus::env::emit_document(cfg, out);
-    REQUIRE_FALSE(result);
-    REQUIRE(result.error().code == nucleus::errc::malformed_source);
-    REQUIRE(out.str().empty());
+    for(const std::string &value : {std::string("line\nbreak"),
+                                    std::string("line\rbreak")})
+    {
+        const nucleus::config config = checked_config({{"cluster/port", value}});
+        std::ostringstream    output;
+        const auto            result = nucleus::env::emit_document(config, output);
+        REQUIRE_FALSE(result);
+        REQUIRE(result.error().code == nucleus::errc::malformed_source);
+        REQUIRE(result.error().message.find("cluster/port") != std::string::npos);
+        REQUIRE(output.str().empty());
+    }
 }
