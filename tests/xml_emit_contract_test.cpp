@@ -152,19 +152,13 @@ TEST_CASE("safe XML enforces primary-key requiredness and cardinality",
                              {{"cluster/node/port", "80"}},
                              "cluster/node/id");
     }
-    SECTION("one parent carries multiple key values")
+    SECTION("one parent carries indexed key values")
     {
-        nucleus::schema_projection projection;
-        projection.set_key("cluster/node", "id");
-        const nucleus::config config = config_of(
+        check_safe_rejection(
+                make_document_space(),
                 {{"cluster/node/id[0]", "left"},
-                 {"cluster/node/id[1]", "right"}});
-        std::ostringstream output;
-        auto               result = nucleus::xml::emit_document(config, output, projection);
-        REQUIRE_FALSE(result);
-        CHECK(result.error().message.find("cluster/node/id[1]") !=
-              std::string::npos);
-        CHECK(output.str().empty());
+                 {"cluster/node/id[1]", "right"}},
+                "cluster/node/id[0]");
     }
 }
 

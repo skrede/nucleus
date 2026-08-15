@@ -113,26 +113,29 @@ TEST_CASE("env and args emit one flat line per resolved value", "[emit][seam]")
 TEST_CASE("xml projects the SAME space into nested tree markup", "[emit][seam]")
 {
     const nucleus::config_space space = make_server_space();
-
-    std::ostringstream xml_out;
-    REQUIRE(nucleus::xml::emit_template(space, xml_out));
-    const std::string xml = xml_out.str();
-
-    REQUIRE(xml.find("<server>") != std::string::npos);
-    REQUIRE(xml.find("<host") != std::string::npos);
+    const auto                  xml   = nucleus::xml::render_template(space);
+    REQUIRE(xml);
+    REQUIRE(xml->find("<server>") != std::string::npos);
+    REQUIRE(xml->find("<host") != std::string::npos);
+    const auto made = nucleus::config::from_values(
+            {{"server/host", "localhost"}});
+    REQUIRE(made);
+    const auto document = nucleus::xml::render_document(made.value(), space);
+    REQUIRE(document);
+    REQUIRE(document->find("<host>localhost</host>") != std::string::npos);
 }
 
 namespace {
 
 std::pair<nucleus::expected<void, nucleus::error>, std::string>
-emit_one(const std::string &key, const std::string &value)
+emit_one_schema_blind(const std::string &key, const std::string &value)
 {
     std::map<std::string, std::string> values{{key, value}};
     auto                               made = nucleus::config::from_values(std::move(values));
     REQUIRE(made);
     const nucleus::config cfg = std::move(made).value();
     std::ostringstream    out;
-    auto                  result = nucleus::xml::emit_document(cfg, out);
+    auto                  result = nucleus::xml::emit_document_schema_blind(cfg, out);
     return {std::move(result), out.str()};
 }
 
@@ -153,7 +156,7 @@ TEST_CASE("xml emit rejects a key segment that is not a valid XML name",
 
     for(const std::string &key : hostile_keys)
     {
-        auto [result, emitted] = emit_one(key, "value");
+        auto [result, emitted] = emit_one_schema_blind(key, "value");
         REQUIRE_FALSE(result);
         REQUIRE(result.error().code == nucleus::errc::malformed_source);
         // All-or-nothing: nothing reached the stream.
@@ -168,7 +171,7 @@ TEST_CASE("xml emit rejects a value carrying a control byte or a bare CR",
                                                 "b"),
                                     std::string("a\rb")})
     {
-        auto [result, emitted] = emit_one("server/host", value);
+        auto [result, emitted] = emit_one_schema_blind("server/host", value);
         REQUIRE_FALSE(result);
         REQUIRE(result.error().code == nucleus::errc::malformed_source);
         REQUIRE(emitted.empty());
@@ -179,13 +182,14 @@ TEST_CASE("xml emit accepts a high-byte (UTF-8) name and a newline-bearing value
           "[emit][seam][xml]")
 {
     // A legal international element name is permitted un-decoded.
-    auto [name_ok, name_out] = emit_one("caf\xc3\xa9/host", "value");
+    auto [name_ok, name_out] = emit_one_schema_blind("caf\xc3\xa9/host", "value");
     REQUIRE(name_ok);
     REQUIRE(name_out.find("caf\xc3\xa9") != std::string::npos);
 
     // Tab and newline are legal XML characters and round-trip-stable, so a value
     // carrying them still emits (only bare CR and other C0 controls are refused).
-    auto [value_ok, value_out] = emit_one("server/host", "line1\nline2\ttab");
+    auto [value_ok, value_out] = emit_one_schema_blind(
+            "server/host", "line1\nline2\ttab");
     REQUIRE(value_ok);
     REQUIRE(value_out.find("line1") != std::string::npos);
 }

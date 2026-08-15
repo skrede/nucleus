@@ -167,27 +167,6 @@ expected<validated_document_plan, error> validate_document(
     return plan;
 }
 
-expected<validated_document_plan, error> validate_document(
-        const config &config, const schema_projection &projection,
-        std::string_view space_name)
-{
-    return build_plan(config, space_name,
-                      [&projection](const std::string &key, const key_path &path)
-                              -> expected<bool, error>
-                      {
-                          const auto       &segments  = path.segments();
-                          const std::string canonical = document_path_prefix(
-                                  segments, segments.size(), true);
-                          if(projection.is_repeated_container(canonical))
-                              return unexpected(xml_incompatible(key,
-                                                                 "a repeated structural container carries a scalar"));
-                          const std::string parent = document_path_prefix(
-                                  segments, segments.size() - 1, true);
-                          const std::string *primary = projection.key_of(parent);
-                          return primary != nullptr && *primary == key_path::base_name(segments.back());
-                      });
-}
-
 expected<validated_document_plan, error> validate_document_schema_blind(
         const config &config, std::string_view space_name)
 {

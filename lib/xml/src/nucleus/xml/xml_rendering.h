@@ -6,8 +6,6 @@
 #include "nucleus/expected.h"
 #include "nucleus/config_space.h"
 
-#include "nucleus/schema/projection.h"
-
 #include "nucleus/keyspace/key_path.h"
 
 #include <pugixml.hpp>
@@ -73,10 +71,6 @@ expected<std::string, error> render_xml_template(
 
 expected<validated_document_plan, error> validate_document(
         const config &config, const config_space &space,
-        std::string_view space_name);
-
-expected<validated_document_plan, error> validate_document(
-        const config &config, const schema_projection &projection,
         std::string_view space_name);
 
 expected<validated_document_plan, error> validate_document_schema_blind(

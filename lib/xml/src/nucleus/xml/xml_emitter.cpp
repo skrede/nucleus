@@ -66,21 +66,6 @@ expected<void, error> emit_document_schema_blind(
             render_document_schema_blind(config, space_name), out);
 }
 
-expected<void, error> emit_document(
-        const config &config, std::ostream &out,
-        std::string_view space_name)
-{
-    return emit_document_schema_blind(config, out, space_name);
-}
-
-expected<void, error> emit_document(
-        const config &config, std::ostream &out,
-        const schema_projection &projection, std::string_view space_name)
-{
-    return detail::deliver_rendered(
-            render_plan(validate_document(config, projection, space_name)), out);
-}
-
 static_assert(config_emitter<emitter>);
 
 }

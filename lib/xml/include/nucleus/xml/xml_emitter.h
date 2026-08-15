@@ -4,8 +4,6 @@
 #include "nucleus/error.h"
 #include "nucleus/expected.h"
 
-#include "nucleus/schema/projection.h"
-
 #include <iosfwd>
 #include <string>
 #include <utility>
@@ -39,15 +37,6 @@ expected<void, error> emit_document(
 expected<void, error> emit_document_schema_blind(
         const config &config, std::ostream &out,
         std::string_view space_name = {});
-
-expected<void, error> emit_document(
-        const config &config, std::ostream &out,
-        std::string_view space_name = {});
-
-expected<void, error> emit_document(
-        const config &config, std::ostream &out,
-        const schema_projection &projection,
-        std::string_view         space_name = {});
 
 class emitter
 {
