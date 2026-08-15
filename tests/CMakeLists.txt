@@ -271,9 +271,11 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     )
     add_test(NAME xml_persist_test COMMAND xml_persist_test)
 
-    # Ordinal emission for repeated-container instances: xml_source assigns zero-based
-    # ordinals to sibling elements under a repeated schema container.
-    add_executable(xml_repeated_container_test xml_repeated_container_test.cpp)
+    add_executable(xml_repeated_container_test
+        xml_repeated_container_test.cpp
+        xml_repeated_round_trip_test.cpp
+        xml_repeated_contract_test.cpp
+        xml_repeated_value_test.cpp)
     nucleus_enable_coverage(xml_repeated_container_test)
     nucleus_warnings(xml_repeated_container_test)
     target_link_libraries(xml_repeated_container_test
