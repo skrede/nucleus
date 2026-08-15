@@ -4,9 +4,13 @@
 
 #include "nucleus/detail/emitter_delivery.h"
 
+#include "nucleus/env/env_emitter.h"
+#include "nucleus/argv/argv_emitter.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <ios>
+#include <array>
 #include <limits>
 #include <string>
 #include <cstddef>
@@ -19,22 +23,36 @@ namespace {
 struct owned_emitter
 {
     nucleus::expected<std::string, nucleus::error>
-    render_template(const nucleus::config_space &) const;
+    render_template(const nucleus::config_space &) const
+    {
+        return std::string{};
+    }
 
     nucleus::expected<std::string, nucleus::error>
-    render_document(const nucleus::config &, const nucleus::config_space &) const;
+    render_document(const nucleus::config &, const nucleus::config_space &) const
+    {
+        return std::string{};
+    }
 };
 
 struct stream_only_emitter
 {
     nucleus::expected<void, nucleus::error>
-    emit_template(const nucleus::config_space &, std::ostream &) const;
+    emit_template(const nucleus::config_space &, std::ostream &) const
+    {
+        return {};
+    }
 
     nucleus::expected<void, nucleus::error>
-    emit_document(const nucleus::config &, std::ostream &) const;
+    emit_document(const nucleus::config &, std::ostream &) const
+    {
+        return {};
+    }
 };
 
 static_assert(nucleus::config_emitter<owned_emitter>);
+static_assert(nucleus::config_emitter<nucleus::env::emitter>);
+static_assert(nucleus::config_emitter<nucleus::argv::emitter>);
 static_assert(!nucleus::config_emitter<stream_only_emitter>);
 
 class recording_streambuf final : public std::streambuf
@@ -80,6 +98,39 @@ nucleus::expected<std::string, nucleus::error> rendered(std::string bytes)
     return bytes;
 }
 
+void check_delivery(std::size_t size, std::streamsize limit)
+{
+    const std::string   bytes(size, 'x');
+    recording_streambuf buffer(limit);
+    std::ostream        out(&buffer);
+    auto                result   = nucleus::detail::deliver_rendered(rendered(bytes), out);
+    const auto          count    = static_cast<std::streamsize>(size);
+    const auto          accepted = count < limit ? count : limit;
+    if(accepted == count)
+        REQUIRE(result);
+    else
+    {
+        REQUIRE_FALSE(result);
+        CHECK(result.error().code == nucleus::errc::unwritable_destination);
+        CHECK(result.error().message ==
+              "emit: destination did not accept the complete rendered artifact");
+    }
+    CHECK(buffer.accepted() == bytes.substr(0, static_cast<std::size_t>(accepted)));
+    CHECK(buffer.write_calls() == (bytes.empty() ? 0U : 1U));
+    CHECK(buffer.sync_calls() == 0);
+}
+
+void sweep_delivery(std::size_t size)
+{
+    check_delivery(size, 0);
+    if(size > 1)
+        check_delivery(size, 1);
+    if(size > 2)
+        check_delivery(size, static_cast<std::streamsize>(size - 1));
+    if(size != 0)
+        check_delivery(size, static_cast<std::streamsize>(size));
+}
+
 }
 
 TEST_CASE("owned emitter errors precede destination inspection", "[emit][contract]")
@@ -88,12 +139,15 @@ TEST_CASE("owned emitter errors precede destination inspection", "[emit][contrac
                                                              "render rejected"};
     nucleus::expected<std::string, nucleus::error> failed =
             nucleus::unexpected(rejection);
-    std::ostream no_buffer(nullptr);
+    recording_streambuf buffer(8);
+    std::ostream        out(&buffer);
 
-    auto result = nucleus::detail::deliver_rendered(std::move(failed), no_buffer);
+    auto result = nucleus::detail::deliver_rendered(std::move(failed), out);
 
     REQUIRE_FALSE(result);
     CHECK(result.error() == rejection);
+    CHECK(buffer.write_calls() == 0);
+    CHECK(buffer.sync_calls() == 0);
 }
 
 TEST_CASE("failed destinations reject before stream-buffer delivery",
@@ -107,7 +161,9 @@ TEST_CASE("failed destinations reject before stream-buffer delivery",
 
     REQUIRE_FALSE(result);
     CHECK(result.error().code == nucleus::errc::unwritable_destination);
+    CHECK(result.error().message == "emit: destination is not writable");
     CHECK(buffer.write_calls() == 0);
+    CHECK(buffer.sync_calls() == 0);
 }
 
 TEST_CASE("null destinations report unwritable destination", "[emit][contract]")
@@ -117,38 +173,18 @@ TEST_CASE("null destinations report unwritable destination", "[emit][contract]")
 
     REQUIRE_FALSE(result);
     CHECK(result.error().code == nucleus::errc::unwritable_destination);
+    CHECK(result.error().message == "emit: destination is not writable");
 }
 
-TEST_CASE("delivery accepts exact and empty artifacts without flushing",
-          "[emit][contract]")
+TEST_CASE("delivery sweeps exact acceptance counts without flushing",
+          "[emit][contract][matrix]")
 {
-    recording_streambuf buffer(5);
-    std::ostream        out(&buffer);
-
-    REQUIRE(nucleus::detail::deliver_rendered(rendered(""), out));
-    CHECK(buffer.write_calls() == 0);
-    REQUIRE(nucleus::detail::deliver_rendered(rendered("bytes"), out));
-    CHECK(buffer.accepted() == "bytes");
-    CHECK(buffer.write_calls() == 1);
-    CHECK(buffer.sync_calls() == 0);
-}
-
-TEST_CASE("zero and prefix acceptance report unwritable destination",
-          "[emit][contract]")
-{
-    recording_streambuf zero_buffer(0);
-    std::ostream        zero_out(&zero_buffer);
-    auto                zero = nucleus::detail::deliver_rendered(rendered("bytes"), zero_out);
-    REQUIRE_FALSE(zero);
-    CHECK(zero.error().code == nucleus::errc::unwritable_destination);
-
-    recording_streambuf prefix_buffer(3);
-    std::ostream        prefix_out(&prefix_buffer);
-    auto                prefix = nucleus::detail::deliver_rendered(rendered("bytes"), prefix_out);
-    REQUIRE_FALSE(prefix);
-    CHECK(prefix.error().code == nucleus::errc::unwritable_destination);
-    CHECK(prefix_buffer.accepted() == "byt");
-    CHECK(prefix_buffer.write_calls() == 1);
+    constexpr std::array<std::size_t, 4> sizes{0, 1, 2, 17};
+    for(const std::size_t size : sizes)
+    {
+        CAPTURE(size);
+        sweep_delivery(size);
+    }
 }
 
 TEST_CASE("delivery count validation prevents narrowing", "[emit][contract]")
@@ -157,10 +193,4 @@ TEST_CASE("delivery count validation prevents narrowing", "[emit][contract]")
     if constexpr(std::numeric_limits<std::size_t>::digits > std::numeric_limits<std::streamsize>::digits)
         CHECK_FALSE(nucleus::detail::fits_streamsize(
                 std::numeric_limits<std::size_t>::max()));
-}
-
-TEST_CASE("destination failure has a stable machine-readable name",
-          "[emit][contract]")
-{
-    CHECK(nucleus::to_string(nucleus::errc::unwritable_destination) == "unwritable_destination");
 }

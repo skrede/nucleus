@@ -1,11 +1,8 @@
-#include "nucleus/config_emitter.h"
 #include "nucleus/config.h"
 #include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
-
-#include "nucleus/keyspace/provenance.h"
 
 #include "nucleus/env/env_emitter.h"
 #include "nucleus/argv/argv_emitter.h"
@@ -19,9 +16,6 @@
 #include <vector>
 #include <sstream>
 #include <utility>
-
-static_assert(nucleus::config_emitter<nucleus::env::emitter>);
-static_assert(nucleus::config_emitter<nucleus::argv::emitter>);
 
 namespace {
 
