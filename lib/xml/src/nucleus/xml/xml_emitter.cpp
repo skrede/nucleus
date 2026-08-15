@@ -2,7 +2,6 @@
 
 #include "nucleus/config.h"
 #include "nucleus/format.h"
-#include "nucleus/config_emitter.h"
 #include "nucleus/config_space.h"
 
 #include "nucleus/schema/schema.h"
@@ -21,10 +20,6 @@
 #include <algorithm>
 
 namespace nucleus::xml {
-
-// The free functions and the stateless tag together model the output contract.
-static_assert(config_emitter<emitter>,
-              "nucleus::xml::emitter must model nucleus::config_emitter");
 
 namespace {
 

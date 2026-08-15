@@ -7,6 +7,7 @@
 #include "nucleus/config_space.h"
 
 #include "nucleus/detail/flat_emitter.h"
+#include "nucleus/detail/emitter_delivery.h"
 
 #include "nucleus/schema/cli_flag.h"
 
@@ -57,11 +58,8 @@ inline expected<void, error> emit_template(
         const cli_delimiter &delimiter = {}, const key_path &anchor = {},
         std::string_view space_name = {})
 {
-    auto rendered = render_template(space, delimiter, anchor, space_name);
-    if(!rendered)
-        return unexpected(rendered.error());
-    out << rendered.value();
-    return {};
+    return nucleus::detail::deliver_rendered(
+            render_template(space, delimiter, anchor, space_name), out);
 }
 
 inline expected<void, error> emit_document(
@@ -69,11 +67,8 @@ inline expected<void, error> emit_document(
         const cli_delimiter &delimiter = {}, const key_path &anchor = {},
         std::string_view space_name = {})
 {
-    auto rendered = render_document(config, delimiter, anchor, space_name);
-    if(!rendered)
-        return unexpected(rendered.error());
-    out << rendered.value();
-    return {};
+    return nucleus::detail::deliver_rendered(
+            render_document(config, delimiter, anchor, space_name), out);
 }
 
 struct emitter
@@ -87,7 +82,8 @@ struct emitter
         return nucleus::argv::render_template(space, delimiter, anchor, space_name);
     }
 
-    expected<std::string, error> render_document(const config &config) const
+    expected<std::string, error> render_document(
+            const config &config, const config_space &) const
     {
         return nucleus::argv::render_document(config, delimiter, anchor, space_name);
     }

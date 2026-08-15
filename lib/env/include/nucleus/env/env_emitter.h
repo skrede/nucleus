@@ -7,6 +7,7 @@
 #include "nucleus/config_space.h"
 
 #include "nucleus/detail/flat_emitter.h"
+#include "nucleus/detail/emitter_delivery.h"
 
 #include <string>
 #include <ostream>
@@ -30,21 +31,13 @@ inline expected<std::string, error> render_document(const config &config)
 inline expected<void, error> emit_template(const config_space &space,
                                            std::ostream       &out)
 {
-    auto rendered = render_template(space);
-    if(!rendered)
-        return unexpected(rendered.error());
-    out << rendered.value();
-    return {};
+    return nucleus::detail::deliver_rendered(render_template(space), out);
 }
 
 inline expected<void, error> emit_document(const config &config,
                                            std::ostream &out)
 {
-    auto rendered = render_document(config);
-    if(!rendered)
-        return unexpected(rendered.error());
-    out << rendered.value();
-    return {};
+    return nucleus::detail::deliver_rendered(render_document(config), out);
 }
 
 struct emitter
@@ -54,7 +47,8 @@ struct emitter
         return nucleus::env::render_template(space);
     }
 
-    static expected<std::string, error> render_document(const config &config)
+    static expected<std::string, error> render_document(
+            const config &config, const config_space &)
     {
         return nucleus::env::render_document(config);
     }

@@ -16,6 +16,7 @@ enum class errc
 {
     unreadable_source,
     malformed_source,
+    unwritable_destination,
     invalid_inheritance,
     unmet_capability,
     layering_violation,
@@ -36,22 +37,23 @@ constexpr std::string_view to_string(errc code) noexcept
 {
     switch(code)
     {
-        case errc::unreadable_source:     return "unreadable_source";
-        case errc::malformed_source:      return "malformed_source";
-        case errc::invalid_inheritance:   return "invalid_inheritance";
-        case errc::unmet_capability:      return "unmet_capability";
-        case errc::layering_violation:    return "layering_violation";
-        case errc::unresolved_token:      return "unresolved_token";
-        case errc::invalid_selection:     return "invalid_selection";
-        case errc::schema_violation:      return "schema_violation";
-        case errc::failed_conversion:     return "failed_conversion";
-        case errc::rejected_registration: return "rejected_registration";
-        case errc::sealed_builder:        return "sealed_builder";
-        case errc::absent_key:            return "absent_key";
-        case errc::index_required:        return "index_required";
-        case errc::missing_converter:     return "missing_converter";
-        case errc::mismatched_type:       return "mismatched_type";
-        case errc::ambiguous_result:      return "ambiguous_result";
+        case errc::unreadable_source:      return "unreadable_source";
+        case errc::malformed_source:       return "malformed_source";
+        case errc::unwritable_destination: return "unwritable_destination";
+        case errc::invalid_inheritance:    return "invalid_inheritance";
+        case errc::unmet_capability:       return "unmet_capability";
+        case errc::layering_violation:     return "layering_violation";
+        case errc::unresolved_token:       return "unresolved_token";
+        case errc::invalid_selection:      return "invalid_selection";
+        case errc::schema_violation:       return "schema_violation";
+        case errc::failed_conversion:      return "failed_conversion";
+        case errc::rejected_registration:  return "rejected_registration";
+        case errc::sealed_builder:         return "sealed_builder";
+        case errc::absent_key:             return "absent_key";
+        case errc::index_required:         return "index_required";
+        case errc::missing_converter:      return "missing_converter";
+        case errc::mismatched_type:        return "mismatched_type";
+        case errc::ambiguous_result:       return "ambiguous_result";
     }
     return "unknown";
 }
@@ -109,7 +111,9 @@ inline std::error_code make_error_code(errc code) noexcept
 
 }
 
-template <>
-struct std::is_error_code_enum<nucleus::errc> : std::true_type {};
+template<>
+struct std::is_error_code_enum<nucleus::errc> : std::true_type
+{
+};
 
 #endif
