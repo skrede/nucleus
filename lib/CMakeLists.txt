@@ -202,8 +202,34 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         SOURCES
             xml/src/nucleus/xml/xml_source.cpp
             xml/src/nucleus/xml/xml_emitter.cpp
+            xml/src/nucleus/xml/xml_compatibility.cpp
+            xml/src/nucleus/xml/xml_template_renderer.cpp
+            xml/src/nucleus/xml/xml_document_renderer.cpp
         LINK_PUBLIC nucleus::nucleus
         LINK_PRIVATE pugixml::pugixml)
+
+    if(NUCLEUS_BUILD_TESTS AND
+       (MSVC OR CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang"))
+        set(emit_api_compile_check_tu
+            ${CMAKE_CURRENT_BINARY_DIR}/emit_api_compile_check.cpp)
+        file(WRITE ${emit_api_compile_check_tu}
+            "#include <nucleus/xml/xml_emitter.h>\n")
+        add_library(emit_api_compile_check OBJECT
+            ${emit_api_compile_check_tu})
+        nucleus_warnings(emit_api_compile_check)
+        target_compile_features(emit_api_compile_check PRIVATE cxx_std_20)
+        if(MSVC)
+            target_compile_options(emit_api_compile_check PRIVATE /EHs- /EHc- /GR-)
+            target_compile_definitions(emit_api_compile_check PRIVATE _HAS_EXCEPTIONS=0)
+        else()
+            target_compile_options(emit_api_compile_check PRIVATE -fno-exceptions -fno-rtti)
+        endif()
+        target_include_directories(emit_api_compile_check PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/xml/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/xml/src)
+        target_link_libraries(emit_api_compile_check
+            PRIVATE nucleus::nucleus pugixml::pugixml)
+    endif()
 
     # The package config (root scope) requires pugixml when the module is installed.
     set(NUCLEUS_XML_INSTALLED TRUE PARENT_SCOPE)

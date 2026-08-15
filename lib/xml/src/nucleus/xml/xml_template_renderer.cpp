@@ -1,0 +1,181 @@
+#include "nucleus/xml/xml_rendering.h"
+
+#include "nucleus/format.h"
+
+#include "nucleus/schema/schema.h"
+
+#include <string>
+#include <vector>
+#include <cstddef>
+#include <algorithm>
+#include <string_view>
+
+namespace nucleus::xml {
+
+namespace {
+
+class string_writer final : public pugi::xml_writer
+{
+public:
+    explicit string_writer(std::string &output)
+            : m_output(output)
+    {
+    }
+
+    void write(const void *data, std::size_t size) override
+    {
+        m_output.append(static_cast<const char *>(data), size);
+    }
+
+private:
+    std::string &m_output;
+};
+
+pugi::xml_node child_or_append(pugi::xml_node parent, const std::string &name)
+{
+    const pugi::xml_node existing = parent.child(name.c_str());
+    if(existing)
+        return existing;
+    return parent.append_child(name.c_str());
+}
+
+std::string join_values(const std::vector<std::string> &values)
+{
+    std::string joined;
+    for(const std::string &value : values)
+    {
+        if(!joined.empty())
+            joined.push_back('|');
+        joined += value;
+    }
+    return joined;
+}
+
+void append_template_element(pugi::xml_document   &document,
+                             const schema_element &element)
+{
+    pugi::xml_node                 current  = document;
+    const std::vector<std::string> segments = element.declared_path().segments();
+    for(const std::string &segment : segments)
+        current = child_or_append(current, segment);
+    if(!element.allowed_values.empty())
+        current.append_attribute("allowed").set_value(
+                join_values(element.allowed_values).c_str());
+}
+
+std::size_t root_count(const pugi::xml_document &document)
+{
+    std::size_t count = 0;
+    for(pugi::xml_node child = document.first_child(); child;
+        child                = child.next_sibling())
+        if(child.type() == pugi::node_element)
+            ++count;
+    return count;
+}
+
+void wrap_roots(pugi::xml_document &document, const std::string &name)
+{
+    std::vector<pugi::xml_node> roots;
+    for(pugi::xml_node child = document.first_child(); child;
+        child                = child.next_sibling())
+        roots.push_back(child);
+    pugi::xml_node wrapper = document.append_child(name.c_str());
+    for(const pugi::xml_node root : roots)
+        wrapper.append_move(root);
+}
+
+}
+
+error xml_incompatible(const std::string &key, std::string reason)
+{
+    return error{errc::malformed_source,
+                 nucleus::format("xml emit: key '{}': {}", key, reason)};
+}
+
+namespace {
+
+bool is_name_start(unsigned char byte)
+{
+    return byte >= 0x80 || (byte >= 'A' && byte <= 'Z') ||
+            (byte >= 'a' && byte <= 'z') || byte == '_' || byte == ':';
+}
+
+bool is_name_byte(unsigned char byte)
+{
+    return is_name_start(byte) || (byte >= '0' && byte <= '9') ||
+            byte == '-' || byte == '.';
+}
+
+}
+
+bool is_valid_xml_name(std::string_view name)
+{
+    if(name.empty() || !is_name_start(static_cast<unsigned char>(name.front())))
+        return false;
+    return std::all_of(name.begin() + 1, name.end(), [](char byte)
+                       { return is_name_byte(static_cast<unsigned char>(byte)); });
+}
+
+bool is_forbidden_xml_value(char byte)
+{
+    const auto value = static_cast<unsigned char>(byte);
+    return value < 0x20 && value != 0x09 && value != 0x0A;
+}
+
+bool schema_path_has_children(const config_space &space,
+                              const std::string  &path)
+{
+    const auto elements = space.schema_elements();
+    return std::any_of(elements.begin(), elements.end(),
+                       [&path](const schema_element &child)
+                       { return child.container().str() == path; });
+}
+
+std::string document_path_prefix(const std::vector<std::string> &segments,
+                                 std::size_t count, bool canonical)
+{
+    std::string result;
+    for(std::size_t index = 0; index < count; ++index)
+    {
+        if(!result.empty())
+            result.push_back(key_path::separator);
+        const std::string_view segment = canonical
+                ? key_path::base_name(segments[index])
+                : segments[index];
+        result.append(segment);
+    }
+    return result;
+}
+
+expected<void, error> validate_xml_space_name(std::string_view space_name)
+{
+    if(!space_name.empty() && !is_valid_xml_name(space_name))
+        return unexpected(error{errc::malformed_source, nucleus::format("xml emit: space name '{}' is not a valid XML name", space_name)});
+    return {};
+}
+
+expected<std::string, error> serialize_xml(const pugi::xml_document &document,
+                                           unsigned int              flags)
+{
+    std::string   output;
+    string_writer writer(output);
+    document.save(writer, "  ", flags, pugi::encoding_utf8);
+    return output;
+}
+
+expected<std::string, error> render_xml_template(
+        const config_space &space, std::string_view space_name)
+{
+    pugi::xml_document document;
+    for(const schema_element &element : space.schema_elements())
+        append_template_element(document, element);
+    const std::string wrapper = !space_name.empty()
+            ? std::string(space_name)
+            : (root_count(document) == 1 ? std::string{} : "config");
+    if(!wrapper.empty())
+        wrap_roots(document, wrapper);
+    return serialize_xml(document,
+                         pugi::format_default | pugi::format_no_declaration);
+}
+
+}
