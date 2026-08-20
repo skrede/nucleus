@@ -80,7 +80,7 @@ TEST_CASE("xml emitter -- repeated container round-trip",
 }
 
 TEST_CASE("xml emitter -- repeated container round-trip with N >= 11 instances",
-          "[xml][xml_emitter][round_trip][CR01]")
+          "[xml][xml_emitter][round_trip][multi_digit_ordinal]")
 {
     const nucleus::config_space space = test::simple_cluster_space();
     nucleus::runtime_source     source;
