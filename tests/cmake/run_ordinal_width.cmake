@@ -76,6 +76,31 @@ function(require_m32_toolchain)
     endif()
 endfunction()
 
+# The Win32 counterpart of require_m32_toolchain: a trivial project proves the x86
+# toolchain resolves, so a later failure is the library rather than the host. Without
+# this the two are one status code and a broken 32-bit build reports as a missing
+# compiler -- the shape that hid the narrowing regression on the GNU leg.
+function(require_win32_toolchain)
+    set(tree "${WORK_DIR}/ordinal-width-win32-toolchain")
+    file(WRITE "${tree}/CMakeLists.txt"
+         "cmake_minimum_required(VERSION 3.24)\n"
+         "project(ordinal_width_win32_toolchain CXX)\n"
+         "add_executable(ordinal_width_toolchain \"${tree}/main.cpp\")\n")
+    file(WRITE "${tree}/main.cpp" "int main() { return 0; }\n")
+    set(attempted "${CMAKE_COMMAND} -S ${tree} -B ${tree}/build -A Win32")
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" -S "${tree}" -B "${tree}/build" -A Win32
+        RESULT_VARIABLE status ERROR_VARIABLE diagnostic OUTPUT_QUIET)
+    if(status EQUAL 0)
+        execute_process(
+            COMMAND "${CMAKE_COMMAND}" --build "${tree}/build" --config Release
+            RESULT_VARIABLE status ERROR_VARIABLE diagnostic OUTPUT_QUIET)
+    endif()
+    if(NOT status EQUAL 0)
+        report_unavailable("${attempted}" "${diagnostic}")
+    endif()
+endfunction()
+
 # One throwaway Win32-generator project, which is how MSVC selects a 32-bit target.
 function(build_win32_probe out)
     set(tree "${WORK_DIR}/ordinal-width-win32")
@@ -97,8 +122,8 @@ if(NATIVE_POINTER_SIZE EQUAL 4)
 endif()
 
 if(CXX_COMPILER_ID STREQUAL "MSVC")
+    require_win32_toolchain()
     build_win32_probe(tree)
-    set(attempted "${CMAKE_COMMAND} -S ${tree} -B ${tree}/build -A Win32")
     execute_process(
         COMMAND "${CMAKE_COMMAND}" -S "${tree}" -B "${tree}/build" -A Win32
         RESULT_VARIABLE status ERROR_VARIABLE diagnostic OUTPUT_QUIET)
@@ -108,7 +133,8 @@ if(CXX_COMPILER_ID STREQUAL "MSVC")
             RESULT_VARIABLE status ERROR_VARIABLE diagnostic OUTPUT_QUIET)
     endif()
     if(NOT status EQUAL 0)
-        report_unavailable("${attempted}" "${diagnostic}")
+        message(FATAL_ERROR
+                "ordinal-width: the probe does not build at 32 bits: ${diagnostic}")
     endif()
     file(GLOB built "${tree}/build/*/ordinal_width_probe_win32.exe")
     list(GET built 0 binary)

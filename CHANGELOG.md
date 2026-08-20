@@ -5,6 +5,62 @@ upgrader: each entry names a behavior that *used to be silent* and is now *loud*
 so you can predict what a previously clean load or build will now reject &mdash; and
 why. Entries describe behavior, not internals.
 
+## 0.4.2 (unreleased)
+
+This release makes the emitters honest. Where a previous version would render
+something other than what was resolved &mdash; an ambiguous record, an invalid XML
+name, a collapsed instance ordinal &mdash; the emitter now reports before producing
+any output. Every entry below can turn a previously clean emit into a failure. One
+entry narrows what a document may contain at all; read that one first.
+
+### Instance ordinals
+
+- **An instance ordinal above 4294967295 is now rejected.** The bracket grammar
+  previously accepted up to 18 digits, but the engine represented an ordinal in
+  `std::size_t`, so on a 32-bit build every ordinal past `UINT32_MAX` saturated to
+  the same value: two distinct instances compared equal, matched the same anchor,
+  and rendered identically. The accepted domain is now 1 to 10 decimal digits with
+  a value no greater than 4294967295 &mdash; what every supported platform holds
+  losslessly &mdash; and anything larger fails as a malformed key path naming the
+  source and the path. This is the one change here that can reject a document that
+  loaded before. Nothing else in the release narrows an input domain.
+
+### Flat emission (argv and env)
+
+- **A key containing `=`, a carriage return, or a line feed is now rejected.** Such
+  a key had no unambiguous flat spelling: `bad=key` rendered as the record
+  `bad=key=value`, which reads back as the key `bad` with the value `key=value`. It
+  is now refused both when the configuration is constructed from a raw map and when
+  an emitter is asked to render it, in each case naming the offending key. Values
+  are unaffected &mdash; `=` remains ordinary data to the right of the split.
+- **An argv space name or CLI delimiter carrying those bytes is now rejected.** The
+  space name is concatenated into the flag prefix and was not checked; a delimiter
+  carrying a newline broke the record the same way a key did.
+- **Flat template rendering now validates.** Template output previously ran no
+  preflight at all &mdash; not even the line-break check the document path already
+  performed &mdash; so a template could emit a record no reader could parse back.
+
+### XML emission
+
+- **Element names and text are validated against XML 1.0 before anything is
+  emitted.** Malformed UTF-8, a name that is not a valid `NameStartChar`/`NameChar`
+  sequence, and code points outside `Char` (including U+FFFE and U+FFFF) previously
+  produced a success result and an unparseable document. They now report.
+- **XML template rendering now validates at all.** Template emission previously
+  checked nothing, including the wrapper element, despite the document path
+  validating it. A schema element whose name carries bracket-index notation is now
+  reported rather than emitted as the invalid name `<node[0] />`.
+
+### Delivery
+
+- **`unwritable_destination` is documented as the delivery failure it is.** An
+  emitter renders and validates a complete document in owned storage before
+  delivering it; a failure to accept those bytes is reported as
+  `unwritable_destination`, distinct from the renderer's `malformed_source`. An
+  emitter never flushes: success means the stream buffer accepted every byte, and a
+  later flush, close or persistence failure is the caller's and lies outside the
+  emitter result. A short write's accepted prefix is not rolled back.
+
 ## 0.4.1
 
 This release closes a large backlog of silent failure modes. In almost every case
