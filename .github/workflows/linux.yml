@@ -11,7 +11,7 @@ on:
       - "docs/**"
       - ".gitignore"
   pull_request:
-    branches: [ master ]
+    branches: [ develop, master ]
     paths-ignore:
       - "**.md"
       - "docs/**"
@@ -243,3 +243,50 @@ jobs:
       # 32-bit toolchain into a failure rather than the usual skip.
       - name: Check ordinal width at 32 bits
         run: cmake --build build --target ordinal_32bit_check
+
+  size-gate:
+    runs-on: ubuntu-24.04
+    steps:
+      # Full history: the gate compares each changed unit against the merge base
+      # with the target branch, and the default shallow clone has neither a
+      # common ancestor to find nor origin/<target> as a fetched ref.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install measurement tools
+        run: sudo apt-get update && sudo apt-get install -y universal-ctags jq
+
+      # Exuberant Ctags installs under the same command name and accepts no JSON
+      # output format, so every function would measure 0 and the gate would pass
+      # without having measured anything. Here that has to be loud, unlike the
+      # local hook, which warns and lets the commit through.
+      - name: Assert the ctags flavor
+        run: |
+          if ! ctags --version | head -n 1 | grep -q 'Universal Ctags'; then
+            ctags --version | head -n 1 >&2
+            echo "universal-ctags is required to measure function spans" >&2
+            exit 1
+          fi
+
+      # The base ref is not optional: in CI the working tree is HEAD, so at the
+      # script's HEAD default every no-growth comparison pits a file against an
+      # identical copy of itself and can never fail. ACMR drops deletions, since
+      # the script treats a path it cannot open as a hard failure.
+      - name: Size-ceiling gate
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "no target branch to compute a merge base against; gate skipped"
+            exit 0
+          fi
+          base=$(git merge-base "origin/${{ github.base_ref }}" HEAD)
+          echo "measuring against $base"
+          files=$(git diff --name-only --diff-filter=ACMR "$base"...HEAD |
+            grep -E '\.(h|hpp|cpp|cc|cmake)$|(^|/)CMakeLists\.txt$' |
+            paste -sd';') || true
+          if [ -z "$files" ]; then
+            echo "no measurable units changed"
+            exit 0
+          fi
+          cmake -DNUCLEUS_SIZE_BASE_REF="$base" -DNUCLEUS_SIZE_FILES="$files" \
+            -P tests/cmake/check_local_size_growth.cmake
