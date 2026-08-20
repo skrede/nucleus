@@ -8,8 +8,11 @@
 #include "nucleus/resolve/resolve_types.h"
 #include "nucleus/resolve/strain_relay.h"
 #include "nucleus/resolve/repeated_sweep.h"
+#include "nucleus/resolve/strain_bucketing.h"
+#include "nucleus/resolve/strain_selection.h"
 #include "nucleus/resolve/keyed_merge_state.h"
 #include "nucleus/resolve/relayed_compaction.h"
+#include "nucleus/resolve/strain_layer_rules.h"
 #include "nucleus/resolve/keyed_collection_merge.h"
 
 #include "nucleus/error.h"
@@ -99,6 +102,8 @@ public:
                   m_provenance, m_schema, m_tokenizer, m_tree_tokenizer)
         , m_compaction(m_building, m_provenance, m_schema, m_keyed)
         , m_relay(m_building, m_provenance, m_sweep, m_compaction, m_schema, m_keyed)
+        , m_selection(m_building, m_provenance, m_schema)
+        , m_layer_rules(m_building, m_provenance, m_schema, m_dispositions)
     {
     }
 
@@ -180,23 +185,8 @@ public:
     slice(const std::optional<std::string> &selection = std::nullopt,
           strain_scope_policy policy = strain_scope_policy::space_open_container_closed)
     {
-        // When the caller supplies a selection, the schema must declare a
-        // primary key: without one there is no slice selector at all. Check
-        // before the per-element loop because the loop body is only entered
-        // for identity elements -- if there are none it would never fire.
-        if(selection.has_value())
-        {
-            bool has_identity = false;
-            for(const schema_element &any : m_schema.elements())
-            {
-                if(any.identity) { has_identity = true; break; }
-            }
-            if(!has_identity)
-                return unexpected(error{errc::invalid_selection, nucleus::format(
-                    "selection '{}' cannot be applied: the schema declares "
-                    "no primary key",
-                    selection.value())});
-        }
+        if(auto declared = m_selection.require_declared_key(selection); !declared)
+            return unexpected(declared.error());
 
         for(const schema_element &el : m_schema.elements())
         {
@@ -206,267 +196,24 @@ public:
             const key_path    container     = el.container();
             const std::string identity_path = el.declared_path().str();
 
-            // Bucket every keyed leaf by its instance's key value. paths() is a
-            // snapshot, so mutating the keyspace below is safe. A key value that
-            // shadows a declared element name can never be bucketed -- report it
-            // loudly here instead of letting validation fail later with an
-            // unrelated unknown-key suggestion.
-            std::map<std::string, std::vector<key_path>> strains;
-            for(const key_path &path : m_building.paths())
-            {
-                // Skip paths where the segment after the container is an ordinal
-                // index -- those are flat-source repeated leaves, not keyed instances.
-                // An indexed-shaped segment is only a legitimate ordinal when a
-                // repeated element is genuinely declared directly at this container
-                // under that base name; otherwise it is a strain whose primary-key
-                // value merely happens to be bracket-shaped, and must not vanish here.
-                if(path.size() > container.size()
-                   && key_path::is_indexed_segment(path.segments()[container.size()]))
-                {
-                    const std::string base = std::string(
-                        key_path::base_name(path.segments()[container.size()]));
-                    const key_path declared_child = container.child(base);
-                    bool declared_repeated_child = false;
-                    for(const schema_element &child_el : m_schema.elements())
-                    {
-                        if(child_el.repeated && child_el.declared_path() == declared_child)
-                        {
-                            declared_repeated_child = true;
-                            break;
-                        }
-                    }
-                    if(declared_repeated_child)
-                        continue;
-                    return unexpected(error{errc::schema_violation, nucleus::format(
-                        "primary-key value '{}' in container '{}' is shaped like a "
-                        "repeated-instance ordinal ('[n]'), which this container does "
-                        "not declare a repeated child at; rename the key value",
-                        path.segments()[container.size()], container.str())});
-                }
-
-                if(m_schema.keyed_instance_path(container, path))
-                    strains[path.segments()[container.size()]].push_back(path);
-                else if(m_schema.key_value_collision(container, path))
-                    return unexpected(error{errc::schema_violation, nucleus::format(
-                        "primary-key value '{}' in container '{}' collides with "
-                        "a declared element of the same name: a strain cannot "
-                        "be keyed by a sibling element's name",
-                        path.segments()[container.size()], container.str())});
-            }
-
+            const auto selected = m_selection.select(container, selection);
+            if(!selected)
+                return unexpected(selected.error());
+            const strain_buckets &strains = selected.value().strains;
             if(strains.empty())
-            {
-                // A selection against a container holding no keyed instances is
-                // unsatisfiable and must fail loudly, never silently resolve to
-                // whatever template content exists.
-                if(selection.has_value())
-                    return unexpected(error{errc::invalid_selection, nucleus::format(
-                        "selection '{}' does not match any strain in container "
-                        "'{}': the container holds no primary-keyed instances",
-                        selection.value(), container.str())});
                 continue;
-            }
+            const std::string &chosen = selected.value().chosen;
+            const std::size_t  Ld     = selected.value().defining_layer;
 
-            // Resolve WHICH strain survives: the explicit selection, or the
-            // single named strain present. Several named strains with no
-            // selection is the undefined resolve the model rejects.
-            std::string chosen;
-            if(selection.has_value())
-            {
-                // If the requested value is not among the bucketed strains,
-                // fail loudly listing every available value.
-                if(!strains.contains(selection.value()))
-                {
-                    std::string available;
-                    for(const auto &[key_value, _] : strains)
-                    {
-                        if(!available.empty())
-                            available += ", ";
-                        available += nucleus::format("'{}'", key_value);
-                    }
-                    return unexpected(error{errc::invalid_selection, nucleus::format(
-                        "selection '{}' does not match any strain in container "
-                        "'{}'; available: {}",
-                        selection.value(), container.str(), available)});
-                }
-                chosen = selection.value();
-            }
-            else if(strains.size() > 1)
-            {
-                std::string keys;
-                for(const auto &[key_value, _] : strains)
-                {
-                    if(!keys.empty())
-                        keys += ", ";
-                    keys += nucleus::format("'{}'", key_value);
-                }
-                return unexpected(error{errc::invalid_selection, nucleus::format(
-                    "container '{}' holds {} primary-keyed instances ({}) and "
-                    "no instance is selected: a config space resolves "
-                    "exactly one",
-                    container.str(), strains.size(), keys)});
-            }
-            else
-                chosen = strains.begin()->first;
-
-            // Ld: the chosen strain's defining layer -- the minimum
-            // first-introduction rank among its keyed entries. A later overwrite
-            // of an entry does not move the defining layer. No recorded rank for
-            // any entry is an invariant violation (the fold records provenance
-            // with every set), never a silent default.
-            std::size_t Ld = 0;
-            {
-                bool found_any = false;
-                for(const key_path &keyed : strains.at(chosen))
-                {
-                    const std::size_t *first = m_provenance.first_rank_of(keyed.str());
-                    if(first != nullptr && (!found_any || *first < Ld))
-                    {
-                        Ld = *first;
-                        found_any = true;
-                    }
-                }
-                if(!found_any)
-                    return unexpected(error{errc::layering_violation, nucleus::format(
-                        "strain '{}' in container '{}' has no recorded "
-                        "provenance: resolve cannot bound its defining layer",
-                        chosen, container.str())});
-            }
-
-            // Ls: the first layer ABOVE the defining layer that introduces a
-            // competing named strain. A competitor introduced at or below Ld is
-            // not the "next" strain and never bounds the chosen one. Unbounded
-            // (max size_t) when no competitor is introduced above Ld.
-            std::size_t Ls = std::numeric_limits<std::size_t>::max();
-            for(const auto &[key_value, paths] : strains)
-            {
-                if(key_value == chosen)
-                    continue;
-                for(const key_path &keyed : paths)
-                {
-                    const std::size_t *first = m_provenance.first_rank_of(keyed.str());
-                    if(first != nullptr && *first > Ld && *first < Ls)
-                        Ls = *first;
-                }
-            }
-
-            // Build a disposition index for fast lookup in the checks
-            // below and in the relay_strain call.
-            std::map<std::pair<std::string, std::string>, extend_strength> disp_index;
-            for(const extend_disposition &d : m_dispositions)
-                disp_index[{d.container_path, d.key_value}] = d.strength;
-
-            // Cross-layer re-open and extend-without-base checks.
-            // These checks apply only to inheritance-chain entries, identified by
-            // the explicit inheritance-layer channel on each origin. Flat source
-            // layering (env, argv, defaults) carries no inheritance layer, forms a
-            // single flat layer by design, and is never a re-open error.
-            // For each named strain: compute the set of distinct inheritance-chain
-            // layer ordinals at which entries were laid down, combining
-            // first-introduction layers with winning layers. An entry overwritten by
-            // a higher chain layer has its first-introduction layer (the base) AND
-            // its winning layer (the deriving file) both recorded -- so a chain
-            // re-open via overwrite is detected as multi-layer even when the
-            // overwrite collapses the building keyspace to a single path. A strain
-            // present at more than one inheritance layer without an extend
-            // disposition is a re-open error. A strain with an extend disposition but
-            // entries at only one inheritance layer has no base (extend without base).
-            for(const auto &[key_value, keyed_paths] : strains)
-            {
-                std::set<std::size_t> intro_layers;
-                for(const key_path &kp : keyed_paths)
-                {
-                    const std::size_t *first =
-                        m_provenance.first_inheritance_layer_of(kp.str());
-                    if(first != nullptr)
-                        intro_layers.insert(*first);
-                    // Also include the winning layer: an overwrite by a higher chain
-                    // layer means the winner and the first-introducer differ, and both
-                    // inheritance layers must be counted as contributing to this strain.
-                    const origin *win = m_provenance.of(kp.str());
-                    if(win != nullptr && win->inheritance_layer.has_value())
-                        intro_layers.insert(win->inheritance_layer.value());
-                }
-
-                // No inheritance-chain entries for this strain: flat-source only,
-                // skip the inheritance chain checks.
-                if(intro_layers.empty())
-                    continue;
-
-                const bool has_cross_layer = (intro_layers.size() > 1);
-                auto disp_it = disp_index.find({container.str(), key_value});
-                const bool has_disposition = (disp_it != disp_index.end());
-
-                if(has_cross_layer && !has_disposition)
-                    return unexpected(error{errc::layering_violation,
-                        nucleus::format(
-                            "primary-key value '{}' in container '{}' is introduced "
-                            "at multiple layers without an extend disposition: "
-                            "re-opening a named instance in a derived file requires "
-                            "an explicit extend attribute",
-                            key_value, container.str())});
-
-                if(has_disposition && !has_cross_layer)
-                    return unexpected(error{errc::layering_violation,
-                        nucleus::format(
-                            "extend disposition for '{}' in container '{}' has no "
-                            "base: no layer below the extending layer provides "
-                            "entries for this instance",
-                            key_value, container.str())});
-            }
-
-            // Unique-value enforcement across sibling instances.
-            // For every non-identity unique field in this container, collect the
-            // field value across all named strains and fail if any value appears
-            // more than once. Runs before pruning so all strains are visible.
-            for(const schema_element &uel : m_schema.elements())
-            {
-                if(!uel.unique || uel.identity)
-                    continue;
-                if(uel.container() != container)
-                    continue;
-
-                // For each strain bucket, look up the unique field's keyed path
-                // and collect its value.
-                std::map<std::string, std::vector<std::string>> value_to_strains;
-                for(const auto &[kv, keyed_paths] : strains)
-                {
-                    // The unique field's path under this instance:
-                    // container / kv / unique_field_name
-                    const std::string unique_path =
-                        container.str() + key_path::separator
-                        + kv + key_path::separator + uel.name;
-                    auto unique_kp = key_path::parse(unique_path);
-                    if(!unique_kp.has_value())
-                        continue;
-                    const value *v = m_building.find(unique_kp.value());
-                    if(v)
-                        value_to_strains[std::string(v->text())].push_back(kv);
-                }
-
-                for(const auto &[val_text, kv_list] : value_to_strains)
-                {
-                    if(kv_list.size() > 1)
-                    {
-                        std::string which;
-                        for(const std::string &strain_kv : kv_list)
-                        {
-                            if(!which.empty())
-                                which += ", ";
-                            which += nucleus::format("'{}'", strain_kv);
-                        }
-                        return unexpected(error{errc::layering_violation,
-                            nucleus::format(
-                                "unique field '{}' in container '{}' has duplicate "
-                                "value '{}' across instances: {}",
-                                uel.name, container.str(), val_text, which)});
-                    }
-                }
-            }
+            const auto bounds = m_layer_rules.enforce(container, strains, chosen, Ld);
+            if(!bounds)
+                return unexpected(bounds.error());
+            const std::size_t Ls          = bounds.value().competitor_layer;
+            const bool        wide_extend = bounds.value().wide_extend;
 
             // Prune every non-chosen named strain: remove its keyed paths from
             // the building keyspace and forget their provenance.
-            for(auto &[key_value, paths] : strains)
+            for(const auto &[key_value, paths] : strains)
             {
                 if(key_value == chosen)
                     continue;
@@ -475,14 +222,6 @@ public:
                     m_building.remove(keyed);
                     m_provenance.forget(keyed.str());
                 }
-            }
-
-            // Determine if the chosen strain has a wide-extend disposition.
-            bool wide_extend = false;
-            {
-                auto it = disp_index.find({container.str(), chosen});
-                if(it != disp_index.end() && it->second == extend_strength::wide)
-                    wide_extend = true;
             }
 
             // file_level general pre-pass: prune ALL paths whose winning rank
@@ -843,8 +582,8 @@ private:
     // even though the key field was consumed and never appears as a leaf.
     std::vector<std::string> m_keyed_satisfied;
     // Re-open dispositions collected from all source batches during fold().
-    // Consumed by slice() to enforce cross-layer re-open rules and drive
-    // the relay_strain wide_extend bypass.
+    // Borrowed by strain_layer_rules to enforce the cross-layer re-open rules
+    // and to answer whether the chosen strain extends wide.
     std::vector<extend_disposition> m_dispositions;
 
     keyed_merge_state m_keyed;
@@ -856,6 +595,8 @@ private:
     fold_entry m_entry;
     relayed_compaction m_compaction;
     strain_relay m_relay;
+    strain_selection m_selection;
+    strain_layer_rules m_layer_rules;
 };
 
 }
