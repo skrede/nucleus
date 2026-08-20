@@ -40,7 +40,7 @@ None.
 
 ## Carried — library files over the 200-line ceiling
 
-16 of 123 units.
+15 of 123 units.
 
 | File | Lines |
 |---|---|
@@ -49,7 +49,7 @@ None.
 | `lib/xml/src/nucleus/xml/xml_source.cpp` | 630 |
 | `lib/core/include/nucleus/detail/expected.h` | 543 |
 | `lib/core/src/nucleus/schema/schema_registry.h` | 534 |
-| `lib/core/include/nucleus/config.h` | 500 |
+| `lib/core/include/nucleus/config.h` | 501 |
 | `lib/core/include/nucleus/schema/converters.h` | 387 |
 | `lib/core/src/nucleus/tokenizer/token_lexer.cpp` | 335 |
 | `lib/core/src/nucleus/tokenizer/resolver_scope.cpp` | 305 |
@@ -59,7 +59,6 @@ None.
 | `lib/core/src/nucleus/completion/completion.cpp` | 240 |
 | `lib/argv/include/nucleus/argv/multispace_argv_source.h` | 233 |
 | `lib/core/include/nucleus/schema/schema.h` | 217 |
-| `lib/core/include/nucleus/keyspace/key_path.h` | 203 |
 
 ## Carried — library functions over the 25-line ceiling
 

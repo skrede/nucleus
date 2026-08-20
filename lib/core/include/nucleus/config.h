@@ -19,6 +19,7 @@
 #include <string>
 #include <vector>
 #include <cstddef>
+#include <cstdint>
 #include <utility>
 #include <optional>
 #include <algorithm>
@@ -165,7 +166,7 @@ private:
         std::size_t count;
     };
 
-    using ordinal_key = std::vector<std::pair<std::string, std::size_t>>;
+    using ordinal_key = std::vector<std::pair<std::string, std::uint64_t>>;
 
     static bool gather_path_matches(std::string_view candidate,
                                     std::string_view query)

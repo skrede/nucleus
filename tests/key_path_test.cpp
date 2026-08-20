@@ -1,9 +1,12 @@
 #include "nucleus/keyspace/key_path.h"
+#include "nucleus/keyspace/ordinal_sort_key.h"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
 #include <vector>
+#include <cstdint>
+#include <type_traits>
 
 using nucleus::key_path;
 
@@ -163,4 +166,35 @@ TEST_CASE("is_indexed_segment rejects leading-zero ordinals", "[key_path][indexe
     auto result = key_path::parse("cluster/node[01]/port");
     REQUIRE_FALSE(result);
     REQUIRE(result.error().find("malformed indexed segment") != std::string::npos);
+}
+
+TEST_CASE("indexed ordinals keep their exact identity at fixed width",
+          "[key_path][indexed]")
+{
+    static_assert(std::is_same_v<decltype(key_path::ordinal_of("n[0]")),
+                                 std::uint64_t>);
+
+    constexpr std::uint64_t boundary = 4294967295ULL;
+    constexpr std::uint64_t widest   = 999999999999999999ULL;
+    for(std::uint64_t const value : {boundary - 1, boundary, boundary + 1,
+                                     widest - 1, widest})
+    {
+        const std::string segment = "node[" + std::to_string(value) + "]";
+        REQUIRE(key_path::is_indexed_segment(segment));
+        REQUIRE(key_path::ordinal_of(segment) == value);
+        REQUIRE(key_path::parse("cluster/" + segment + "/port"));
+    }
+}
+
+TEST_CASE("numeric ordinal order outranks decimal lexical order",
+          "[key_path][indexed]")
+{
+    REQUIRE(nucleus::ordinal_sort_key("cluster/node[4294967295]/port")
+            < nucleus::ordinal_sort_key("cluster/node[4294967296]/port"));
+    REQUIRE(nucleus::ordinal_sort_key("cluster/node[4294967296]/port")
+            < nucleus::ordinal_sort_key("cluster/node[4294967297]/port"));
+    REQUIRE(nucleus::ordinal_sort_key("node[2]/route[9]")
+            < nucleus::ordinal_sort_key("node[2]/route[10]"));
+    REQUIRE(nucleus::ordinal_sort_key("node[2]/route[10]")
+            < nucleus::ordinal_sort_key("node[10]/route[2]"));
 }

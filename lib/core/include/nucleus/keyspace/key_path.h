@@ -3,10 +3,10 @@
 
 #include "nucleus/expected.h"
 
-#include <limits>
 #include <string>
 #include <vector>
 #include <cstddef>
+#include <cstdint>
 #include <utility>
 #include <algorithm>
 #include <string_view>
@@ -154,24 +154,16 @@ public:
     }
 
     // Parses the decimal ordinal from a bracket-indexed segment. Precondition:
-    // is_indexed_segment(seg). Result is the integer between `[` and `]`.
-    // is_indexed_segment admits up to 18 digits, which overflows a 32-bit size_t;
-    // the accumulation saturates at the max rather than wrapping, so a huge ordinal
-    // never compares below a smaller one nor collapses a gap check on a narrow
-    // word size. This keeps the shared emit-ordering primitive width-safe.
-    static std::size_t ordinal_of(std::string_view seg) noexcept
+    // is_indexed_segment(seg). Result is the integer between `[` and `]`. The
+    // grammar's 18-digit cap keeps every accepted ordinal inside the fixed
+    // 64-bit width, so the host word size cannot narrow one.
+    static std::uint64_t ordinal_of(std::string_view seg) noexcept
     {
         auto lb = seg.find('[');
         auto digits = seg.substr(lb + 1, seg.size() - lb - 2);
-        constexpr std::size_t ceiling = std::numeric_limits<std::size_t>::max();
-        std::size_t value = 0;
+        std::uint64_t value = 0;
         for(char const c : digits)
-        {
-            const auto digit = static_cast<std::size_t>(c - '0');
-            if(value > (ceiling - digit) / 10)
-                return ceiling;
-            value = (value * 10) + digit;
-        }
+            value = (value * 10) + static_cast<std::uint64_t>(c - '0');
         return value;
     }
 

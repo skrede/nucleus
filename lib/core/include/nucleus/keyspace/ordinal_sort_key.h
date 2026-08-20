@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <cstddef>
+#include <cstdint>
 #include <utility>
 #include <string_view>
 
@@ -16,10 +17,10 @@ namespace nucleus {
 // (base_name, ordinal) pair; non-indexed segments use ordinal = 0.
 // "cluster/node[10]/port" < "cluster/node[2]/port" lexicographically, but this
 // key correctly orders node[2] before node[10].
-inline std::vector<std::pair<std::string, std::size_t>>
+inline std::vector<std::pair<std::string, std::uint64_t>>
 ordinal_sort_key(const std::string &key)
 {
-    std::vector<std::pair<std::string, std::size_t>> parts;
+    std::vector<std::pair<std::string, std::uint64_t>> parts;
     std::size_t start = 0;
     for(std::size_t i = 0; i <= key.size(); ++i)
     {
@@ -30,7 +31,7 @@ ordinal_sort_key(const std::string &key)
                 parts.emplace_back(std::string(key_path::base_name(seg)),
                                    key_path::ordinal_of(seg));
             else
-                parts.emplace_back(std::string(seg), std::size_t{0});
+                parts.emplace_back(std::string(seg), std::uint64_t{0});
             start = i + 1;
         }
     }
