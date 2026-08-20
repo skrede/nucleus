@@ -3,6 +3,8 @@
 
 #include "nucleus/resolve/cli_ordinal.h"
 #include "nucleus/resolve/resolve_types.h"
+#include "nucleus/resolve/repeated_sweep.h"
+#include "nucleus/resolve/keyed_merge_state.h"
 
 #include "nucleus/error.h"
 #include "nucleus/format.h"
@@ -82,6 +84,7 @@ public:
         , m_tokenizer(tokenizer)
         , m_converters(converters)
         , m_tree_tokenizer(tree_tokenizer)
+        , m_sweep(m_building, m_provenance, m_schema)
         , m_cli_ordinal(m_building, m_provenance, m_schema)
     {
     }
@@ -128,53 +131,11 @@ public:
         const std::set<std::string> repeated_container_prefixes =
             m_schema.repeated_container_paths();
 
-        // Keyed-composition setup: for every repeated element declaring a
-        // non-default merge mode, find the identity-group field that keys it. A keyed
-        // mode with no covering identity group has no merge key -- a loud error.
-        for(const schema_element &el : m_schema.elements())
-        {
-            if(!el.repeated || el.merge == merge_mode::wholesale_replace)
-                continue;
-            const std::string cpath = el.declared_path().str();
-            std::string field;
-            for(const identity_group_spec &g : m_schema.identity_groups())
-            {
-                const std::string parent = g.container().str();
-                for(const std::string &m : g.members)
-                {
-                    std::string mp = parent;
-                    if(!mp.empty())
-                        mp += key_path::separator;
-                    mp += m;
-                    if(mp == cpath) { field = g.field; break; }
-                }
-                if(!field.empty())
-                    break;
-            }
-            if(field.empty())
-                return unexpected(error{errc::schema_violation, nucleus::format(
-                    "repeated element '{}' declares a keyed merge mode but no identity "
-                    "group provides its merge key", cpath)});
-            m_keyed_modes[cpath] = el.merge;
-            m_keyed_fields[cpath] = field;
-        }
-
-        // Declared leaf names per keyed-merge container, used by the flat
-        // multi-leaf grouping below to detect field-major arrival (schema-known,
-        // not incrementally learned from the data -- see the grouping's own
-        // comment for why that distinction matters). Computed once per fold(),
-        // shared across every layer.
-        std::map<std::string, std::set<std::string>> keyed_declared_suffixes;
-        for(const auto &[cpath, mode] : m_keyed_modes)
-        {
-            auto container_kp = key_path::parse(cpath);
-            if(!container_kp)
-                continue;
-            std::set<std::string> &declared = keyed_declared_suffixes[cpath];
-            for(const schema_element &child : m_schema.elements())
-                if(child.container() == container_kp.value())
-                    declared.insert(child.name);
-        }
+        // Keyed-composition setup: the merge modes, the identity-group field keying
+        // each of them, and the declared leaf names the flat grouping matches
+        // against. Computed once per fold() and shared across every layer.
+        if(auto built = m_keyed.build(m_schema); !built)
+            return unexpected(built.error());
 
         // Deferred checks: CLI plain-ordinal overrides recognized here but
         // validated/applied only by apply_deferred_cli_overrides(), which the
@@ -275,7 +236,7 @@ public:
                 if(cli_deferred.value())
                     continue;
 
-                if(!m_keyed_modes.empty())
+                if(m_keyed.any_declared())
                 {
                     const std::vector<std::string> &segs = path.segments();
                     bool diverted = false;
@@ -292,8 +253,7 @@ public:
                         if(!prefix_kp)
                             continue;
                         const std::string canon = m_schema.canonical_text(*prefix_kp);
-                        auto mode_it = m_keyed_modes.find(canon);
-                        if(mode_it == m_keyed_modes.end())
+                        if(!m_keyed.declares(canon))
                             continue;
                         const std::string &cseg = segs[len - 1];
                         std::string actual_container;
@@ -340,7 +300,7 @@ public:
                             else if(entry.capabilities.supports(capability::duplicate_keys))
                             {
                                 const std::set<std::string> &declared =
-                                    keyed_declared_suffixes[canon];
+                                    m_keyed.declared_suffixes(canon);
                                 if(!declared.empty() && seen != declared)
                                     return unexpected(error{errc::layering_violation, nucleus::format(
                                         "source '{}': flat entries for keyed collection '{}' "
@@ -362,12 +322,12 @@ public:
                                     lh->label, entry.path, canon)});
                             }
                         }
-                        m_actual_to_canonical[actual_container] = canon;
-                        m_keyed_accumulator[actual_container].push_back(keyed_instance_entry{
-                            lh->rank, static_cast<std::size_t>(ordinal), suffix,
-                            // NOLINTNEXTLINE(bugprone-use-after-move): the move runs only on the diverted branch which immediately continues to the next entry, so expanded is never read afterward.
-                            std::move(expanded).value(),
-                            origin{lh->rank, lh->label, lh->owner, lh->inheritance_layer}});
+                        m_keyed.divert(actual_container, canon,
+                            keyed_merge_state::keyed_instance_entry{
+                                lh->rank, static_cast<std::size_t>(ordinal), suffix,
+                                // NOLINTNEXTLINE(bugprone-use-after-move): the move runs only on the diverted branch which immediately continues to the next entry, so expanded is never read afterward.
+                                std::move(expanded).value(),
+                                origin{lh->rank, lh->label, lh->owner, lh->inheritance_layer}});
                         diverted = true;
                     }
                     if(diverted)
@@ -382,7 +342,8 @@ public:
                 // than the leaf itself addresses no instance of it and stores plainly.
                 if(!scope.empty() && (!scope_is_leaf || canonical_path == scope))
                 {
-                    const std::string sweep_key = sweep_key_of(path, scope, scope_is_leaf);
+                    const std::string sweep_key =
+                        m_sweep.sweep_key_of(path, scope, scope_is_leaf);
                     if(sweep_key.empty())
                         return unexpected(error{errc::malformed_source, nucleus::format(
                             "internal invariant violation: no prefix of '{}' canonicalizes "
@@ -390,7 +351,8 @@ public:
                             entry.path, scope)});
 
                     const std::string unaddressed =
-                        unindexed_repeated_container(repeated_container_prefixes, path);
+                        m_sweep.unindexed_repeated_container(
+                            repeated_container_prefixes, path);
                     if(!unaddressed.empty())
                         return unexpected(error{errc::malformed_source, nucleus::format(
                             "source '{}': key path '{}' addresses repeated container '{}' "
@@ -399,8 +361,8 @@ public:
                     key_path target = path;
                     if(scope_is_leaf && !key_path::is_indexed_segment(path.leaf()))
                     {
-                        auto minted = mint_leaf_ordinal(entry, sweep_key, lh->label,
-                                                        leaf_ordinal_counters);
+                        auto minted = repeated_sweep::mint_leaf_ordinal(
+                            entry, sweep_key, lh->label, leaf_ordinal_counters);
                         if(!minted)
                             return unexpected(std::move(minted).error());
                         target = std::move(minted).value();
@@ -410,10 +372,11 @@ public:
                     {
                         swept_instances_this_layer.insert(sweep_key);
                         if(!instance_buckets.contains(scope))
-                            instance_buckets[scope] = bucket_by_instance(scope, scope_is_leaf);
-                        sweep_instance(instance_buckets[scope][sweep_key]);
+                            instance_buckets[scope] =
+                                m_sweep.bucket_by_instance(scope, scope_is_leaf);
+                        m_sweep.sweep_instance(instance_buckets[scope][sweep_key]);
                     }
-                    store_entry(target, std::move(expanded).value(), *lh);
+                    m_sweep.store_entry(target, std::move(expanded).value(), *lh);
                 }
                 else
                 {
@@ -442,11 +405,11 @@ public:
     // still present; slice() later strips the transient strain-key segments.
     expected<void, resolve_fold_error> merge_keyed_collections()
     {
-        for(auto &[actual_container, entries] : m_keyed_accumulator)
+        for(auto &[actual_container, entries] : m_keyed.accumulator())
         {
-            const std::string &canon = m_actual_to_canonical.at(actual_container);
-            const merge_mode mode = m_keyed_modes.at(canon);
-            const std::string &field = m_keyed_fields.at(canon);
+            const std::string &canon = m_keyed.canonical_of_actual(actual_container);
+            const merge_mode mode = m_keyed.mode_of(canon);
+            const std::string &field = m_keyed.field_of(canon);
 
             struct merged_instance
             {
@@ -455,10 +418,10 @@ public:
                 std::string key;
                 bool        has_key = false;
                 origin      prov;
-                std::vector<keyed_instance_entry *> leaves;
+                std::vector<keyed_merge_state::keyed_instance_entry *> leaves;
             };
             std::map<std::pair<std::size_t, std::size_t>, merged_instance> grouped;
-            for(keyed_instance_entry &e : entries)
+            for(keyed_merge_state::keyed_instance_entry &e : entries)
             {
                 merged_instance &mi = grouped[{e.source_rank, e.source_ordinal}];
                 mi.rank = e.source_rank;
@@ -540,7 +503,7 @@ public:
             {
                 const std::string base =
                     actual_container + "[" + std::to_string(new_ordinal) + "]";
-                for(const keyed_instance_entry *leaf : mi->leaves)
+                for(const keyed_merge_state::keyed_instance_entry *leaf : mi->leaves)
                 {
                     const std::string new_path = leaf->suffix.empty()
                         ? base : base + key_path::separator + leaf->suffix;
@@ -910,7 +873,7 @@ public:
                         continue;
                     // Keyed-merge collections were finalised across layers already;
                     // never rank-prune them here either.
-                    if(under_keyed_merge(m_schema.canonical_text(path)))
+                    if(m_keyed.under_keyed_merge(m_schema.canonical_text(path)))
                         continue;
                     // The chosen identity always survives; extend-wide preserves
                     // every other chosen entry for relay_strain as well.
@@ -1050,7 +1013,7 @@ public:
             for(const schema_violation &v : checked.error())
             {
                 report += nucleus::format("\n  - {}", v.reason);
-                if(!m_schema.recognizes_text(canonical_of(v.path)))
+                if(!m_schema.recognizes_text(m_sweep.canonical_of(v.path)))
                 {
                     auto near = suggest_keys(v.path, known, 1);
                     if(!near.empty())
@@ -1261,7 +1224,7 @@ private:
             // not re-prune them. The merge_mode governs this collection's cross-layer
             // composition, overriding the default strain scope freezing.
             const std::string canonical_keyed = m_schema.canonical_text(keyed);
-            const bool        keyed_merge     = under_keyed_merge(canonical_keyed);
+            const bool        keyed_merge     = m_keyed.under_keyed_merge(canonical_keyed);
             const bool        identity_leaf   = canonical_keyed == identity_path;
             const bool        excluded        = !identity_leaf && !keyed_merge && !wide_extend && (policy == strain_scope_policy::container_open_until_next_strain ? entry_rank >= Ls : entry_rank > Ld);
             if(excluded)
@@ -1295,7 +1258,7 @@ private:
             {
                 const bool        scope_is_leaf = !repeated_containers.contains(scope);
                 const std::string unit =
-                        sweep_key_of(unified.value(), scope, scope_is_leaf);
+                        m_sweep.sweep_key_of(unified.value(), scope, scope_is_leaf);
                 if(unit.empty())
                     return unexpected(error{errc::malformed_source, nucleus::format("internal invariant violation: no prefix of '{}' canonicalizes "
                                                                                     "to its declared repeated scope '{}' in relay_strain()'s displacement",
@@ -1343,7 +1306,7 @@ private:
         for(const key_path &path : paths)
         {
             const std::string canonical = m_schema.canonical_text(path);
-            if(under_keyed_merge(canonical))
+            if(m_keyed.under_keyed_merge(canonical))
                 continue;
             for(const std::string &scope : containers)
                 if(canonical == scope || canonical.starts_with(scope + key_path::separator))
@@ -1512,135 +1475,13 @@ private:
         for(const key_path &candidate : m_building.paths())
         {
             const std::string candidate_unit =
-                    sweep_key_of(candidate, scope, scope_is_leaf);
+                    m_sweep.sweep_key_of(candidate, scope, scope_is_leaf);
             if(candidate_unit.empty() || candidate_unit != unit)
                 continue;
             if(!scope_is_leaf && relay_canonical(candidate) != unified.str())
                 continue;
             const origin *from = m_provenance.of(candidate.str());
             if(from != nullptr && from->rank > entry_rank)
-                return true;
-        }
-        return false;
-    }
-
-    // The sweep unit an entry belongs to. A repeated container instance carries
-    // fields, so it is addressable on its own; a repeated leaf ordinal carries
-    // nothing, so its unit is the whole value list under one enclosing instance and
-    // the trailing ordinal is dropped. Empty when the scope is unreachable.
-    std::string sweep_key_of(const key_path &path, const std::string &scope,
-                             bool scope_is_leaf) const
-    {
-        if(!scope_is_leaf)
-            return instance_prefix(m_schema, path, scope);
-        return join_segment(path.parent().str(),
-                            std::string(key_path::base_name(path.leaf())));
-    }
-
-    // The declared form of a violation path, so a concrete instance path
-    // (cluster/node[0]/port) is recognized as the element it already names and draws
-    // no nearest-key suggestion. A path that does not parse falls through unchanged.
-    std::string canonical_of(const std::string &path) const
-    {
-        const auto parsed = key_path::parse(path);
-        return parsed ? m_schema.canonical_text(parsed.value()) : path;
-    }
-
-    // The declared repeated container a path names without naming one of its
-    // instances, empty when every repeated-container segment carries an ordinal. A
-    // repeated leaf's own segment is never a member of `containers`, so the plain
-    // arrival that mints a leaf ordinal is exempt without a second rule.
-    std::string unindexed_repeated_container(const std::set<std::string> &containers,
-                                             const key_path &path) const
-    {
-        std::string prefix;
-        for(const std::string &segment : path.segments())
-        {
-            prefix = join_segment(prefix, segment);
-            const auto parsed = key_path::parse(prefix);
-            if(!parsed || key_path::is_indexed_segment(segment))
-                continue;
-            const std::string declared = m_schema.canonical_text(parsed.value());
-            if(containers.contains(declared))
-                return declared;
-        }
-        return {};
-    }
-
-    // One keyspace scan per scope per layer: every existing entry under the scope is
-    // filed under the same sweep key the entry loop derives, so each instance sweeps
-    // from its bucket and resolution stays linear in the instance count.
-    std::map<std::string, std::vector<key_path>>
-    bucket_by_instance(const std::string &scope, bool scope_is_leaf) const
-    {
-        const std::string terminated = scope + key_path::separator;
-        std::map<std::string, std::vector<key_path>> buckets;
-        for(const key_path &existing : m_building.paths())
-        {
-            const std::string canonical = m_schema.canonical_text(existing);
-            if(canonical != scope && !canonical.starts_with(terminated))
-                continue;
-            const std::string key = sweep_key_of(existing, scope, scope_is_leaf);
-            if(!key.empty())
-                buckets[key].push_back(existing);
-        }
-        return buckets;
-    }
-
-    // Removal and its provenance forget live together so the pair cannot drift.
-    void sweep_instance(const std::vector<key_path> &bucket)
-    {
-        for(const key_path &existing : bucket)
-        {
-            m_building.remove(existing);
-            m_provenance.forget(existing.str());
-        }
-    }
-
-    // The store and its provenance record live together for the same reason.
-    void store_entry(const key_path &target, std::string &&text, const layered_handle &lh)
-    {
-        m_building.set(target, value::owned(std::move(text)));
-        m_provenance.record(target.str(),
-                            origin{lh.rank, lh.label, lh.owner, lh.inheritance_layer});
-    }
-
-    // The indexed path a repeated leaf arriving without an ordinal is stored at,
-    // taken from the layer's counter for its value list.
-    static expected<key_path, resolve_fold_error>
-    mint_leaf_ordinal(const keyspace_entry &entry, const std::string &sweep_key,
-                      const std::string &label,
-                      std::map<std::string, std::size_t> &counters)
-    {
-        if(!entry.capabilities.supports(capability::duplicate_keys)
-           && counters.contains(sweep_key))
-            return unexpected(error{errc::layering_violation,
-                nucleus::format(
-                    "source '{}': repeated field '{}' received multiple "
-                    "values from a source that does not support "
-                    "duplicate_keys; a flat source can supply at most one "
-                    "value per repeated field per layer",
-                    label, entry.path)});
-        const std::string indexed =
-            sweep_key + "[" + std::to_string(counters[sweep_key]++) + "]";
-        auto indexed_kp = key_path::parse(indexed);
-        if(!indexed_kp)
-            return unexpected(error{errc::malformed_source, nucleus::format(
-                "internal invariant violation: re-parsed path failed to parse "
-                "in fold()'s repeated-leaf re-indexing: '{}'", indexed)});
-        return std::move(indexed_kp).value();
-    }
-
-    // True when a canonical path is at or under a container declaring a keyed merge
-    // mode (unite/replace_by_key). Such collections were finalised across layers by
-    // merge_keyed_collections(); slice() must relay them verbatim, never rank-prune.
-    bool under_keyed_merge(const std::string &canonical_path) const
-    {
-        for(const auto &[cpath, mode] : m_keyed_modes)
-        {
-            const std::string cslash = cpath + key_path::separator;
-            if(canonical_path == cpath
-               || canonical_path.starts_with(cslash))
                 return true;
         }
         return false;
@@ -1706,23 +1547,8 @@ private:
     // the relay_strain wide_extend bypass.
     std::vector<extend_disposition> m_dispositions;
 
-    struct keyed_instance_entry
-    {
-        std::size_t source_rank;
-        std::size_t source_ordinal;
-        std::string suffix;
-        std::string value;
-        origin      prov;
-    };
-    // Canonical container path -> non-default merge mode and merge-key field (from the
-    // schema + its identity groups), built in fold(); read by merge_keyed_collections().
-    std::map<std::string, merge_mode> m_keyed_modes;
-    std::map<std::string, std::string> m_keyed_fields;
-    // ACTUAL container path (key segments still present pre-slice) -> diverted leaves,
-    // and its canonical form (to look up mode/field).
-    std::map<std::string, std::vector<keyed_instance_entry>> m_keyed_accumulator;
-    std::map<std::string, std::string> m_actual_to_canonical;
-
+    keyed_merge_state m_keyed;
+    repeated_sweep m_sweep;
     cli_ordinal m_cli_ordinal;
 };
 
