@@ -89,8 +89,12 @@ expected<void, error> validate_template_element(const schema_element &element)
 {
     const key_path    declared = element.declared_path();
     const std::string subject  = declared.str();
-    if(auto valid = validate_xml_name_segments(subject, declared.segments()); !valid)
-        return unexpected(std::move(valid).error());
+    // A declared path is an anchor path: it names elements, never instances, so the
+    // template emits each segment verbatim and validates the same text it emits. The
+    // document surface reads base_name instead because its input is an instance path.
+    for(const std::string &segment : declared.segments())
+        if(!is_valid_xml_name(segment))
+            return unexpected(xml_grammar_error(subject, nucleus::format("segment '{}' is not a valid XML name", segment)));
     return validate_xml_annotations(subject, element.allowed_values);
 }
 

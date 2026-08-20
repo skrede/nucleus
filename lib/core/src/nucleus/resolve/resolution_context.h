@@ -337,7 +337,7 @@ public:
                                 suffix += key_path::separator;
                             suffix += segs[i];
                         }
-                        std::size_t ordinal = 0;
+                        std::uint64_t ordinal = 0;
                         if(key_path::is_indexed_segment(cseg))
                         {
                             ordinal = key_path::ordinal_of(cseg);
@@ -388,7 +388,7 @@ public:
                         }
                         m_actual_to_canonical[actual_container] = canon;
                         m_keyed_accumulator[actual_container].push_back(keyed_instance_entry{
-                            lh->rank, ordinal, suffix,
+                            lh->rank, static_cast<std::size_t>(ordinal), suffix,
                             // NOLINTNEXTLINE(bugprone-use-after-move): the move runs only on the diverted branch which immediately continues to the next entry, so expanded is never read afterward.
                             std::move(expanded).value(),
                             origin{lh->rank, lh->label, lh->owner, lh->inheritance_layer}});
@@ -1562,9 +1562,9 @@ private:
                 return unexpected(error{errc::malformed_source, nucleus::format("internal invariant violation: enumerated instance failed to parse "
                                                                                 "in compact_relayed_instances(): '{}'",
                                                                                 text)});
-            const std::size_t ordinal = key_path::ordinal_of(actual->leaf());
+            const std::uint64_t ordinal = key_path::ordinal_of(actual->leaf());
             groups[actual->parent().str()].emplace_back(
-                    ordinal, std::move(actual).value());
+                    static_cast<std::size_t>(ordinal), std::move(actual).value());
         }
         for(auto &[_, instances] : groups)
             std::sort(instances.begin(), instances.end(),

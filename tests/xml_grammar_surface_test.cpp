@@ -98,3 +98,30 @@ TEST_CASE("XML repeated containers name a domain-boundary ordinal gap exactly",
     REQUIRE_FALSE(beyond);
     CHECK(beyond.error().code == nucleus::errc::malformed_source);
 }
+
+TEST_CASE("XML template element names are checked as the template emits them",
+          "[xml][emit][grammar]")
+{
+    SECTION("a declared name carrying bracket-index notation is reported")
+    {
+        const auto rendered = nucleus::xml::render_template(space_with("node[0]", {}));
+        REQUIRE_FALSE(rendered);
+        CHECK(rendered.error().code == nucleus::errc::malformed_source);
+        CHECK(rendered.error().message.find("not a valid XML name") != std::string::npos);
+        CHECK(rendered.error().message.find("node[0]") != std::string::npos);
+    }
+    SECTION("an ordinary declared name still renders")
+    {
+        const auto rendered = nucleus::xml::render_template(space_with("node", {}));
+        REQUIRE(rendered);
+        CHECK(rendered.value().find("<node") != std::string::npos);
+    }
+    SECTION("the document surface still reads an ordinal as a sibling index")
+    {
+        const auto rendered = nucleus::xml::render_document_schema_blind(
+                config_of("node[0]/port", "80"));
+        REQUIRE(rendered);
+        CHECK(rendered.value().find("<node>") != std::string::npos);
+        CHECK(rendered.value().find("node[0]") == std::string::npos);
+    }
+}

@@ -239,9 +239,8 @@ private:
         return prefix;
     }
 
-    static void record_omitted_ordinal(
-        const key_path &candidate, const key_path &query,
-        std::optional<std::size_t> &first, std::set<std::size_t> &ordinals)
+    static void record_omitted_ordinal(const key_path &candidate, const key_path &query,
+                                       std::optional<std::size_t> &first, std::set<std::size_t> &ordinals)
     {
         auto omitted = first_omitted_ordinal(candidate, query);
         if(!omitted || (first && omitted.value() > first.value()))
@@ -251,7 +250,8 @@ private:
             first = omitted;
             ordinals.clear();
         }
-        ordinals.insert(key_path::ordinal_of(candidate.segments()[first.value()]));
+        const std::uint64_t ordinal = key_path::ordinal_of(candidate.segments()[first.value()]);
+        ordinals.insert(static_cast<std::size_t>(ordinal));
     }
 
     std::optional<repeated_container_crossing> crossing_repeated_container(

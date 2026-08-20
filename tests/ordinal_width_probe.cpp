@@ -38,6 +38,22 @@ std::int32_t check_parses(const std::string &at_bound)
                    "the maximum ordinal spells back exactly");
 }
 
+// Every other check reads the ordinal through a std::uint64_t carrier, which is
+// exact at any width. The bound exists for the std::size_t sinks that index and
+// group instances, so the gate has to cross into that type to test it at all.
+std::int32_t check_size_t_carrier(const std::string &at_bound)
+{
+    const auto parsed = nucleus::key_path::parse(indexed(at_bound));
+    if(!parsed)
+        return broken(false, "the maximum ordinal parses for the narrow carrier");
+    const std::uint64_t wide   = nucleus::key_path::ordinal_of(parsed->segments()[1]);
+    const std::size_t   narrow = static_cast<std::size_t>(wide);
+    return broken(static_cast<std::uint64_t>(narrow) == wide,
+                  "the maximum ordinal survives a std::size_t carrier") +
+            broken(std::to_string(narrow) == at_bound,
+                   "the std::size_t carrier spells the maximum ordinal back exactly");
+}
+
 std::int32_t check_sorts(const std::string &at_bound)
 {
     return broken(nucleus::ordinal_sort_key(indexed("2")) < nucleus::ordinal_sort_key(indexed(at_bound)),
@@ -78,7 +94,7 @@ std::int32_t verify_bound()
     const std::string past_bound =
             std::to_string(nucleus::key_path::max_ordinal + 1);
     const std::int32_t failures =
-            broken(sizeof(std::size_t) == 4, "size_t is four bytes on this target") + check_parses(at_bound) + check_sorts(at_bound) + check_anchors(at_bound) + check_past_bound(past_bound);
+            broken(sizeof(std::size_t) == 4, "size_t is four bytes on this target") + check_parses(at_bound) + check_size_t_carrier(at_bound) + check_sorts(at_bound) + check_anchors(at_bound) + check_past_bound(past_bound);
     if(failures != 0)
         return 1;
     std::cout << "ordinal-width=32 max-ordinal=" << at_bound << " lossless\n";

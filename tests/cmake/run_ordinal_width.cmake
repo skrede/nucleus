@@ -14,6 +14,12 @@ endif()
 if(NOT DEFINED WORK_DIR)
     set(WORK_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 endif()
+# The portable core of the first-party warning set: the probe is compiled as a
+# first-party target is, so a narrowing at a std::size_t sink fails this gate
+# instead of passing through it unseen. Only flags both GNU and Clang accept.
+if(NOT DEFINED PROBE_WARNINGS)
+    set(PROBE_WARNINGS -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Werror)
+endif()
 if(NOT DEFINED REMEDIATION)
     if(CMAKE_HOST_WIN32)
         set(REMEDIATION "install the x86 MSVC build tools so the Win32 generator resolves")
@@ -52,6 +58,22 @@ function(run_probe_binary binary)
         message(FATAL_ERROR "ordinal-width: the 32-bit probe reported ${status}")
     endif()
     ordinal_exit(0)
+endfunction()
+
+# A trivial unit separates a host that cannot target 32 bits from a library that
+# does not compile at 32 bits. The first is a skip; the second is the property this
+# gate exists to report, so it must not be reported as an absent toolchain.
+function(require_m32_toolchain)
+    set(source "${WORK_DIR}/ordinal-width-toolchain.cpp")
+    file(WRITE "${source}" "int main() { return 0; }\n")
+    set(probe "${CXX_COMPILER}" -m32 -std=c++20 "${source}"
+              -o "${WORK_DIR}/ordinal-width-toolchain")
+    string(JOIN " " attempted ${probe})
+    execute_process(COMMAND ${probe}
+                    RESULT_VARIABLE status ERROR_VARIABLE diagnostic OUTPUT_QUIET)
+    if(NOT status EQUAL 0)
+        report_unavailable("${attempted}" "${diagnostic}")
+    endif()
 endfunction()
 
 # One throwaway Win32-generator project, which is how MSVC selects a 32-bit target.
@@ -98,13 +120,17 @@ if(NOT CXX_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$")
                        "the gate knows -m32 for GNU/Clang and the Win32 generator for MSVC")
 endif()
 
+require_m32_toolchain()
+
 set(binary "${WORK_DIR}/ordinal_width_probe_m32")
-set(command "${CXX_COMPILER}" -m32 -std=c++20 "-I${INCLUDE_DIRS}"
+set(command "${CXX_COMPILER}" -m32 -std=c++20 ${PROBE_WARNINGS} "-I${INCLUDE_DIRS}"
             "${PROBE_SOURCE}" -o "${binary}")
 string(JOIN " " attempted ${command})
 execute_process(COMMAND ${command}
                 RESULT_VARIABLE status ERROR_VARIABLE diagnostic OUTPUT_QUIET)
 if(NOT status EQUAL 0)
-    report_unavailable("${attempted}" "${diagnostic}")
+    message(FATAL_ERROR "ordinal-width: the probe does not compile at 32 bits\n"
+                        "ordinal-width: attempted command: ${attempted}\n"
+                        "${diagnostic}")
 endif()
 run_probe_binary("${binary}")

@@ -3,6 +3,7 @@
 
 #include "nucleus/expected.h"
 
+#include <limits>
 #include <string>
 #include <vector>
 #include <cstddef>
@@ -124,9 +125,9 @@ public:
             m_segments.end()));
     }
 
-    // The largest value std::size_t holds losslessly on every supported platform:
-    // capping acceptance here is what keeps the read APIs on std::size_t unnarrowed.
+    // The largest value a 32-bit std::size_t holds; ordinals narrow to that type where instances are indexed.
     static constexpr std::uint64_t max_ordinal = 4294967295;
+    static_assert(max_ordinal <= std::numeric_limits<std::size_t>::max(), "max_ordinal must be representable in std::size_t");
 
     // The value of a decimal digit run of at most ten in-domain digits, else nullopt.
     static std::optional<std::uint64_t> ordinal_in_domain(std::string_view digits) noexcept

@@ -38,7 +38,10 @@ config_node select_segment(const config_node &base, const std::string &segment)
 {
     config_node selected = base[std::string(key_path::base_name(segment))];
     if(key_path::is_indexed_segment(segment))
-        selected = selected[key_path::ordinal_of(segment)];
+    {
+        const std::uint64_t ordinal = key_path::ordinal_of(segment);
+        selected                    = selected[static_cast<std::size_t>(ordinal)];
+    }
     return selected;
 }
 
