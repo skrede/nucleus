@@ -2,9 +2,11 @@
 #define HPP_GUARD_NUCLEUS_RESOLVE_RESOLUTION_CONTEXT_H
 
 #include "nucleus/resolve/cli_ordinal.h"
+#include "nucleus/resolve/keyed_divert.h"
 #include "nucleus/resolve/resolve_types.h"
 #include "nucleus/resolve/repeated_sweep.h"
 #include "nucleus/resolve/keyed_merge_state.h"
+#include "nucleus/resolve/keyed_collection_merge.h"
 
 #include "nucleus/error.h"
 #include "nucleus/format.h"
@@ -84,6 +86,8 @@ public:
         , m_tokenizer(tokenizer)
         , m_converters(converters)
         , m_tree_tokenizer(tree_tokenizer)
+        , m_divert(m_keyed, m_schema)
+        , m_merge(m_building, m_provenance, m_keyed)
         , m_sweep(m_building, m_provenance, m_schema)
         , m_cli_ordinal(m_building, m_provenance, m_schema)
     {
@@ -202,11 +206,7 @@ public:
             std::map<std::string, std::map<std::string, std::vector<key_path>>>
                 instance_buckets;
 
-            // Per-layer ordinal counter for diverted keyed entries arriving flat
-            // (non-indexed) under a keyed-merge container. Keyed by actual container path.
-            std::map<std::string, std::size_t> keyed_flat_counter;
-
-            std::map<std::string, std::set<std::string>> keyed_flat_suffixes_seen;
+            m_divert.reset();
 
             for(keyspace_entry &entry : batch.entries)
             {
@@ -236,103 +236,11 @@ public:
                 if(cli_deferred.value())
                     continue;
 
-                if(m_keyed.any_declared())
-                {
-                    const std::vector<std::string> &segs = path.segments();
-                    bool diverted = false;
-                    for(std::size_t len = 1; len <= segs.size() && !diverted; ++len)
-                    {
-                        std::string prefix;
-                        for(std::size_t i = 0; i < len; ++i)
-                        {
-                            if(!prefix.empty())
-                                prefix += key_path::separator;
-                            prefix += segs[i];
-                        }
-                        auto prefix_kp = key_path::parse(prefix);
-                        if(!prefix_kp)
-                            continue;
-                        const std::string canon = m_schema.canonical_text(*prefix_kp);
-                        if(!m_keyed.declares(canon))
-                            continue;
-                        const std::string &cseg = segs[len - 1];
-                        std::string actual_container;
-                        for(std::size_t i = 0; i + 1 < len; ++i)
-                        {
-                            if(!actual_container.empty())
-                                actual_container += key_path::separator;
-                            actual_container += segs[i];
-                        }
-                        if(!actual_container.empty())
-                            actual_container += key_path::separator;
-                        actual_container += key_path::base_name(cseg);
-                        std::string suffix;
-                        for(std::size_t i = len; i < segs.size(); ++i)
-                        {
-                            if(!suffix.empty())
-                                suffix += key_path::separator;
-                            suffix += segs[i];
-                        }
-                        std::uint64_t ordinal = 0;
-                        if(key_path::is_indexed_segment(cseg))
-                        {
-                            ordinal = key_path::ordinal_of(cseg);
-                        }
-                        else
-                        {
-                            // Flat (non-indexed) entry: group per (rank, container) --
-                            // a suffix repeating within the current instance means a
-                            // NEW instance is starting, gated on duplicate_keys exactly
-                            // as leaf_ordinal_counters gates Case A's analogous repeat.
-                            // This grouping REQUIRES instance-major arrival (all of one
-                            // instance's fields before the next instance's fields begin);
-                            // a suffix reappearing before every declared field has been
-                            // seen for the current instance means the source emitted
-                            // fields field-major instead, which this grouping cannot
-                            // safely disambiguate -- fail loudly rather than silently
-                            // mis-pairing leaves across instances.
-                            std::set<std::string> &seen = keyed_flat_suffixes_seen[actual_container];
-                            if(!seen.contains(suffix))
-                            {
-                                ordinal = keyed_flat_counter[actual_container];
-                                seen.insert(suffix);
-                            }
-                            else if(entry.capabilities.supports(capability::duplicate_keys))
-                            {
-                                const std::set<std::string> &declared =
-                                    m_keyed.declared_suffixes(canon);
-                                if(!declared.empty() && seen != declared)
-                                    return unexpected(error{errc::layering_violation, nucleus::format(
-                                        "source '{}': flat entries for keyed collection '{}' "
-                                        "must supply every field of one instance before the "
-                                        "next instance begins (instance-major order); field "
-                                        "'{}' repeated after only {} of {} declared fields were "
-                                        "seen for the current instance",
-                                        lh->label, canon, suffix, seen.size(), declared.size())});
-                                ordinal = ++keyed_flat_counter[actual_container];
-                                seen.clear();
-                                seen.insert(suffix);
-                            }
-                            else
-                            {
-                                return unexpected(error{errc::layering_violation, nucleus::format(
-                                    "source '{}': flat entry '{}' cannot address keyed "
-                                    "collection '{}': a source without duplicate_keys can "
-                                    "supply at most one instance's worth of leaves per layer",
-                                    lh->label, entry.path, canon)});
-                            }
-                        }
-                        m_keyed.divert(actual_container, canon,
-                            keyed_merge_state::keyed_instance_entry{
-                                lh->rank, static_cast<std::size_t>(ordinal), suffix,
-                                // NOLINTNEXTLINE(bugprone-use-after-move): the move runs only on the diverted branch which immediately continues to the next entry, so expanded is never read afterward.
-                                std::move(expanded).value(),
-                                origin{lh->rank, lh->label, lh->owner, lh->inheritance_layer}});
-                        diverted = true;
-                    }
-                    if(diverted)
-                        continue;
-                }
+                auto diverted = m_divert.divert(path, entry, expanded.value(), *lh);
+                if(!diverted)
+                    return unexpected(diverted.error());
+                if(diverted.value())
+                    continue;
 
                 const std::string scope =
                     repeated_scope_of(repeated_declared, canonical_path);
@@ -397,128 +305,12 @@ public:
     }
 
     // Pass between fold() and slice(): applies the per-collection merge mode to the
-    // diverted keyed collections. union/replace_by_key combine layers by the
-    // identity-group key VALUE (never by ordinal), then re-index survivors to contiguous
-    // ordinals in a stable order (defining-layer rank, then source ordinal), carrying
-    // provenance through every move. wholesale_replace never enters here (it stays on the
-    // fold's sweep path). Runs before slice() so the merge sees all layers and the key is
-    // still present; slice() later strips the transient strain-key segments.
+    // diverted keyed collections. Runs before slice() so the merge sees every layer
+    // while the key is still present; slice() later strips the transient
+    // strain-key segments.
     expected<void, resolve_fold_error> merge_keyed_collections()
     {
-        for(auto &[actual_container, entries] : m_keyed.accumulator())
-        {
-            const std::string &canon = m_keyed.canonical_of_actual(actual_container);
-            const merge_mode mode = m_keyed.mode_of(canon);
-            const std::string &field = m_keyed.field_of(canon);
-
-            struct merged_instance
-            {
-                std::size_t rank = 0;
-                std::size_t ordinal = 0;
-                std::string key;
-                bool        has_key = false;
-                origin      prov;
-                std::vector<keyed_merge_state::keyed_instance_entry *> leaves;
-            };
-            std::map<std::pair<std::size_t, std::size_t>, merged_instance> grouped;
-            for(keyed_merge_state::keyed_instance_entry &e : entries)
-            {
-                merged_instance &mi = grouped[{e.source_rank, e.source_ordinal}];
-                mi.rank = e.source_rank;
-                mi.ordinal = e.source_ordinal;
-                mi.leaves.push_back(&e);
-                if(e.suffix == field)
-                {
-                    mi.key = e.value;
-                    mi.has_key = true;
-                    mi.prov = e.prov;
-                }
-            }
-
-            std::vector<merged_instance *> instances;
-            instances.reserve(grouped.size());
-            for(auto &[k, mi] : grouped)
-                instances.push_back(&mi);
-            // NOLINTNEXTLINE(bugprone-nondeterministic-pointer-iteration-order): ordered by the stable rank and ordinal keys, not by pointer address, so the result is deterministic.
-            std::sort(instances.begin(), instances.end(),
-                      [](const merged_instance *a, const merged_instance *b) {
-                          return a->rank != b->rank ? a->rank < b->rank
-                                                    : a->ordinal < b->ordinal;
-                      });
-
-            for(const merged_instance *mi : instances)
-                if(!mi->has_key)
-                    return unexpected(error{errc::schema_violation, nucleus::format(
-                        "keyed collection '{}' has an instance with no '{}' identifier; "
-                        "the keyed merge modes require the merge key on every element",
-                        canon, field)});
-
-            std::vector<merged_instance *> survivors;
-            if(mode == merge_mode::unite)
-            {
-                std::map<std::string, merged_instance *> by_key;
-                for(merged_instance *mi : instances)
-                {
-                    auto it = by_key.find(mi->key);
-                    if(it != by_key.end() && it->second->rank == mi->rank)
-                        return unexpected(error{errc::layering_violation, nucleus::format(
-                            "keyed collection '{}': identifier '{}'='{}' is duplicated "
-                            "within layer '{}'; unite is strict-additive (no duplicate "
-                            "identifiers within one layer)",
-                            canon, field, mi->key, mi->prov.layer)});
-                    if(it != by_key.end())
-                        return unexpected(error{errc::layering_violation, nucleus::format(
-                            "keyed collection '{}': identifier '{}'='{}' is introduced at "
-                            "two layers ('{}' and '{}'); unite is strict-additive "
-                            "(no override across layers)",
-                            canon, field, mi->key, it->second->prov.layer, mi->prov.layer)});
-                    by_key.emplace(mi->key, mi);
-                    survivors.push_back(mi);
-                }
-            }
-            else // replace_by_key: highest-rank instance per key wins
-            {
-                std::map<std::string, std::size_t> winner;
-                for(merged_instance *mi : instances)
-                {
-                    auto it = winner.find(mi->key);
-                    if(it == winner.end())
-                    {
-                        winner[mi->key] = survivors.size();
-                        survivors.push_back(mi);
-                    }
-                    else if(survivors[it->second]->rank == mi->rank)
-                        return unexpected(error{errc::layering_violation, nucleus::format(
-                            "keyed collection '{}': identifier '{}'='{}' is duplicated "
-                            "within layer '{}'; replace_by_key composes across layers but "
-                            "does not admit duplicate identifiers within one layer",
-                            canon, field, mi->key, mi->prov.layer)});
-                    else
-                        survivors[it->second] = mi;
-                }
-            }
-
-            std::size_t new_ordinal = 0;
-            for(const merged_instance *mi : survivors)
-            {
-                const std::string base =
-                    actual_container + "[" + std::to_string(new_ordinal) + "]";
-                for(const keyed_merge_state::keyed_instance_entry *leaf : mi->leaves)
-                {
-                    const std::string new_path = leaf->suffix.empty()
-                        ? base : base + key_path::separator + leaf->suffix;
-                    auto kp = key_path::parse(new_path);
-                    if(!kp)
-                        return unexpected(error{errc::malformed_source, nucleus::format(
-                            "internal invariant violation: re-parsed path failed to parse "
-                            "in merge_keyed_collections()'s rebuild: '{}'", new_path)});
-                    m_building.set(kp.value(), value::owned(leaf->value));
-                    m_provenance.record(new_path, leaf->prov);
-                }
-                ++new_ordinal;
-            }
-        }
-        return {};
+        return m_merge.merge();
     }
 
     // Collapses keyed-container instances into the ONE unified hierarchy the
@@ -1548,6 +1340,8 @@ private:
     std::vector<extend_disposition> m_dispositions;
 
     keyed_merge_state m_keyed;
+    keyed_divert m_divert;
+    keyed_collection_merge m_merge;
     repeated_sweep m_sweep;
     cli_ordinal m_cli_ordinal;
 };
