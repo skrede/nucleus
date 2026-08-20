@@ -29,6 +29,9 @@ coverage.*
 *.gcda
 *.gcno
 
+# Scratch copies the size gate stages when run from the repository root
+size-gate-base-*
+
 # Editor and merge leftovers
 *~
 *.orig

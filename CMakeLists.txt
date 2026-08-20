@@ -10,6 +10,29 @@ option(NUCLEUS_BUILD_SANITIZER "Build with AddressSanitizer" OFF)
 option(NUCLEUS_COVERAGE "Instrument the library and tests for coverage (gcc/clang)" OFF)
 option(NUCLEUS_FETCH_TEST_DEPS "Fetch test dependencies (Catch2) via FetchContent" ON)
 
+# Repo-local hook wiring, written to this clone's .git/config only. The default
+# follows nucleus_IS_TOP_LEVEL for the same reason NUCLEUS_WERROR's does: a project
+# that pulls nucleus in via add_subdirectory()/FetchContent must never have its own
+# hook path rewritten by a dependency. A core.hooksPath that is already pointing
+# somewhere else is left alone -- a developer's existing hook setup outranks this one.
+option(NUCLEUS_INSTALL_GIT_HOOKS "Point core.hooksPath at .githooks for this clone"
+       ${nucleus_IS_TOP_LEVEL})
+
+if(NUCLEUS_INSTALL_GIT_HOOKS AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
+    execute_process(COMMAND git config --get core.hooksPath
+                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                    OUTPUT_VARIABLE nucleus_hooks_path OUTPUT_STRIP_TRAILING_WHITESPACE
+                    ERROR_QUIET)
+    if(nucleus_hooks_path STREQUAL "" OR nucleus_hooks_path STREQUAL ".githooks")
+        execute_process(COMMAND git config core.hooksPath .githooks
+                        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+        message(STATUS "nucleus: core.hooksPath points at .githooks for this clone")
+    else()
+        message(STATUS "nucleus: core.hooksPath is already '${nucleus_hooks_path}' "
+                       "-- leaving it as it is")
+    endif()
+endif()
+
 include(cmake/buildflags.cmake)
 
 # ---------------------------------------------------------------------------

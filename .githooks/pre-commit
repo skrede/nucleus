@@ -1,0 +1,52 @@
+#!/bin/sh
+# Ceiling gate over the staged change: every staged C++ and CMake unit is measured
+# against the file and function ceilings before the commit is written.
+#
+# This is fast local feedback, not enforcement. It is bypassable with --no-verify,
+# it is absent in any clone that never configured a build, and it does not run in
+# CI, so the blocking check on a pull request remains the thing that decides.
+set -eu
+
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+
+gate=tests/cmake/check_local_size_growth.cmake
+[ -f "$gate" ] || exit 0
+
+# A developer without the measurement tools must not be blocked from committing;
+# the pull-request check is where an incomplete toolchain has to be loud.
+for tool in cmake ctags jq; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        printf 'size gate skipped: %s is not installed.\n' "$tool" >&2
+        exit 0
+    fi
+done
+
+# Exuberant Ctags accepts no JSON output format, so every function would measure 0
+# and the gate would pass without having measured anything. That silent pass is the
+# one failure mode worth a warning rather than a quiet skip.
+if ! ctags --version 2>/dev/null | head -n 1 | grep -q 'Universal Ctags'; then
+    printf 'size gate skipped: ctags is not Universal Ctags, so function spans\n' >&2
+    printf 'cannot be measured. Install universal-ctags to gate them locally.\n' >&2
+    exit 0
+fi
+
+# ACMR drops deletions: a removed path is still listed by the index otherwise, and
+# a path the gate cannot open is a hard failure rather than a skip.
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+files=
+while IFS= read -r path; do
+    case "$path" in
+        *.h|*.hpp|*.cpp|*.cc|*.cmake|CMakeLists.txt|*/CMakeLists.txt)
+            files="${files:+$files;}$path" ;;
+    esac
+done <<STAGED
+$staged
+STAGED
+[ -n "$files" ] || exit 0
+
+if ! cmake -DNUCLEUS_SIZE_FILES="$files" -P "$gate"; then
+    printf '\nCommit refused: a staged unit is over a size ceiling.\n' >&2
+    printf 'Decompose it rather than widening the budget.\n' >&2
+    exit 1
+fi
