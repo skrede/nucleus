@@ -211,8 +211,6 @@ public:
             const std::size_t Ls          = bounds.value().competitor_layer;
             const bool        wide_extend = bounds.value().wide_extend;
 
-            // Prune every non-chosen named strain: remove its keyed paths from
-            // the building keyspace and forget their provenance.
             for(const auto &[key_value, paths] : strains)
             {
                 if(key_value == chosen)
