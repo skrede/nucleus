@@ -133,8 +133,9 @@ A comment that says what the next line already says is noise: delete it.
   commits, code, comments, docs, or examples.
 * Branching: `master` (releases) &larr; `develop` (integration) &larr;
   `milestone/<version>` (work). Work lands on the milestone branch and merges
-  milestone &rarr; develop &rarr; master. `develop` is never deleted. CI runs
-  on pushes to `develop` and `milestone/**` and on pull requests into `master`.
+  milestone &rarr; develop &rarr; master. `develop` is never deleted. CI runs on
+  pushes to `master`, `develop` and `milestone/**`, and on pull requests into
+  `develop` and `master`.
 * Never tag, merge, or force-push around `.gitignore`.
 
 ## Versioning
