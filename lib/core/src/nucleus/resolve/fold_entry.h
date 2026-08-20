@@ -36,6 +36,11 @@ namespace nucleus {
 // and stores whatever no interceptor claimed. Every collaborator it consults is
 // borrowed and outlives the resolve; the substitution budget is the one piece of
 // per-load state it owns, because the ceiling is per load rather than per value.
+//
+// Unified storage: ALL repeated paths, leaves and containers alike, are stored as
+// indexed scalars -- "config/tag" with duplicate entries becomes "config/tag[0]",
+// "config/tag[1]" and so on, and "cluster/node[0]/port" from a document source is
+// stored directly. No collection map is used.
 class fold_entry
 {
 public:

@@ -39,6 +39,8 @@ public:
     {
     }
 
+    // Runs between fold() and slice(), so the merge sees every layer while the key
+    // is still present; slice() later strips the transient strain-key segments.
     expected<void, resolve_fold_error> merge()
     {
         for(auto &[container, entries] : m_keyed.accumulator())
