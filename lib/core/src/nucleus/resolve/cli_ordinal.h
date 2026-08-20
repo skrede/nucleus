@@ -74,10 +74,10 @@ public:
         const layered_handle &layer)
     {
         cli_rebracket_state state{repeated, layer.label, entry.path, {}, {}, {}};
-        auto target = rebracket_cli_ordinals(state, path);
-        if(!target)
-            return unexpected(target.error());
-        if(!target.value())
+        auto rebracketed = rebracket_cli_ordinals(state, path);
+        if(!rebracketed)
+            return unexpected(rebracketed.error());
+        if(!state.ordinal)
             return false;
         m_deferred_cli_overrides.push_back(
             {*state.ordinal, std::move(state.prefix),
@@ -108,7 +108,7 @@ private:
     const schema_registry   &m_schema;
     std::vector<pending_cli_ordinal> m_deferred_cli_overrides;
 
-    expected<bool, resolve_fold_error>
+    expected<void, resolve_fold_error>
     rebracket_cli_ordinals(cli_rebracket_state &state, const key_path &path) const
     {
         for(const std::string &segment : path.segments())
@@ -117,7 +117,7 @@ private:
             if(!rebracketed)
                 return unexpected(rebracketed.error());
         }
-        return state.ordinal.has_value();
+        return {};
     }
 
     expected<void, resolve_fold_error>
