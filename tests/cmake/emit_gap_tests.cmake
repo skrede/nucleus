@@ -12,3 +12,62 @@ nucleus_add_test(ordinal_domain_test nucleus::env nucleus::argv nucleus::runtime
 # boundaries, so they compile into the flat-emit target rather than one of their own.
 target_sources(flat_emit_test
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/flat_emit_record_test.cpp)
+
+# The ordinal bound has to hold where std::size_t is 32 bits, so this probe compiles
+# against the production headers alone and is run at that actual width rather than
+# simulated at 64. It links no library: the bound, the sort key and the anchor match
+# are header-only, so a single translation unit can be built for the narrower target.
+add_executable(ordinal_width_probe ${CMAKE_CURRENT_SOURCE_DIR}/ordinal_width_probe.cpp)
+nucleus_warnings(ordinal_width_probe)
+target_compile_features(ordinal_width_probe PRIVATE cxx_std_20)
+target_include_directories(ordinal_width_probe PRIVATE
+    ${CMAKE_SOURCE_DIR}/lib/core/include)
+
+set(ordinal_width_driver ${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_ordinal_width.cmake)
+set(ordinal_width_args
+    -DPROBE_EXE=$<TARGET_FILE:ordinal_width_probe>
+    -DPROBE_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/ordinal_width_probe.cpp
+    -DINCLUDE_DIRS=${CMAKE_SOURCE_DIR}/lib/core/include
+    -DCXX_COMPILER=${CMAKE_CXX_COMPILER}
+    -DCXX_COMPILER_ID=${CMAKE_CXX_COMPILER_ID}
+    -DNATIVE_POINTER_SIZE=${CMAKE_SIZEOF_VOID_P}
+    -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR})
+
+add_test(NAME ordinal_32bit_test
+    COMMAND ${CMAKE_COMMAND} ${ordinal_width_args} -DREQUIRE_32BIT=OFF
+            -P ${ordinal_width_driver})
+set_tests_properties(ordinal_32bit_test PROPERTIES SKIP_RETURN_CODE 77)
+
+add_custom_target(ordinal_32bit_check
+    COMMAND ${CMAKE_COMMAND} ${ordinal_width_args} -DREQUIRE_32BIT=ON
+            -P ${ordinal_width_driver}
+    DEPENDS ordinal_width_probe
+    VERBATIM)
+
+# The unavailable branch has to execute on every host, not only on one without a
+# 32-bit toolchain, so both statuses are driven from fixed simulation arguments.
+set(ordinal_width_simulation
+    -DSIMULATE_UNAVAILABLE=ON
+    -DATTEMPTED_COMMAND=simulated-32-bit-compile
+    -DCOMPILER_DIAGNOSTIC=simulated-multilib-rejection
+    -DREMEDIATION=install-32-bit-toolchain)
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.29)
+    add_test(NAME ordinal_32bit_unavailable_normal_test
+        COMMAND ${CMAKE_COMMAND} ${ordinal_width_args} ${ordinal_width_simulation}
+                -DREQUIRE_32BIT=OFF -P ${ordinal_width_driver})
+    add_test(NAME ordinal_32bit_unavailable_strict_test
+        COMMAND ${CMAKE_COMMAND} ${ordinal_width_args} ${ordinal_width_simulation}
+                -DREQUIRE_32BIT=ON -P ${ordinal_width_driver})
+else()
+    add_test(NAME ordinal_32bit_unavailable_normal_test
+        COMMAND ordinal_width_probe --unsupported normal
+                simulated-32-bit-compile simulated-multilib-rejection
+                install-32-bit-toolchain)
+    add_test(NAME ordinal_32bit_unavailable_strict_test
+        COMMAND ordinal_width_probe --unsupported strict
+                simulated-32-bit-compile simulated-multilib-rejection
+                install-32-bit-toolchain)
+endif()
+set_tests_properties(ordinal_32bit_unavailable_normal_test
+    PROPERTIES SKIP_RETURN_CODE 77)
+set_tests_properties(ordinal_32bit_unavailable_strict_test PROPERTIES WILL_FAIL TRUE)

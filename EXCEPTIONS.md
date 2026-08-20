@@ -95,7 +95,7 @@ sets the decomposition problem.
 
 ## Carried — test files over the 200-line ceiling
 
-29 of 142 units. Test units are held to the same ceiling: the two most recent decomposition
+29 of 144 units. Test units are held to the same ceiling: the two most recent decomposition
 commits on this branch split test files, not library files.
 
 | File | Lines |

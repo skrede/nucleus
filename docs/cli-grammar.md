@@ -3,12 +3,36 @@
 ## Single-space CLI
 
 `argv_source` maps `--a-b-c=v` flags onto the same keyspace every other source
-feeds. The default delimiter is `-`, but any non-empty, non-`=` string may be
-chosen via `argv_source::delimit_with()`. With delimiter `_`:
+feeds. The default delimiter is `-`; any other choice passes through
+`cli_delimiter::parse` before `argv_source::delimit_with()` can hold it. With
+delimiter `_`:
 
 ```
 --server_host=127.0.0.1  →  server/host = "127.0.0.1"
 ```
+
+### Delimiter grammar
+
+`cli_delimiter::parse` accepts a delimiter only when all of the following hold.
+A rejected delimiter comes back as a reason string; it is never silently
+repaired.
+
+- It is nonempty.
+- It does not contain `=` — the flag's key/value split would move.
+- It contains neither a carriage return (CR) nor a line feed (LF) — a rendered
+  record would end early. The flat renderers reject those same two bytes, and
+  `=`, anywhere in a rendered key, and `config::from_values` rejects them in a
+  submitted key.
+- It does not contain `[` or `]`, which spell the ordinal index.
+- It is not all ASCII digits, which would be indistinguishable from an ordinal
+  segment.
+- A multi-character delimiter must not contain `/`. The single-character `/`
+  form is accepted, and is the one delimiter that is itself the keyspace
+  separator: the flag body and the key path are then the same string.
+
+Invertibility remains the host's contract: no schema segment may contain the
+chosen delimiter as a substring, exactly as no segment may contain `-` under the
+default.
 
 The mapping is a pure bijection: the schema's `flag_of()` projects every
 declared key back to exactly one flag, so `emit_template` / `emit_document` /
@@ -25,6 +49,16 @@ FQN keyspace path:
 --cluster-node-0-port=v  ⇄  cluster/node[0]/port
 --cluster-node-1-port=v  ⇄  cluster/node[1]/port
 ```
+
+**Accepted ordinal domain.** An instance ordinal is 1 to 10 decimal digits
+whose value is no greater than `key_path::max_ordinal`, which is 4294967295. A
+longer digit run, or a larger value, is rejected as a malformed key path: it is
+never truncated and never wrapped, in either direction of the bijection. The
+bound is not arbitrary. It is the largest ordinal every supported platform
+represents losslessly in the type the read API hands back, so a key path that
+parses on one target parses to the same number on all of them. The header
+carries this bound as that named constant, and this document and the constant
+state one figure.
 
 **Disambiguation rule.** Schema element names must not start with a digit
 (enforced at schema registration; XML element names already forbid this). A

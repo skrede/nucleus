@@ -902,12 +902,11 @@ ordinal). Most schema code can skip `key_path` entirely and pass a string to
 
 `#include "nucleus/config_emitter.h"` (the concept)
 
-Output is the inverse of a source: a sealed space's declared schema can be
-projected into a blank document template, and a resolved configuration can be
-rendered back out. The format-agnostic `config_emitter` concept is defined by
-owned results. Rendering completes validation and serialization before any
-destination is involved; each operation returns
-`expected&lt;std::string, error&gt;`:
+Output is the inverse of a source: a sealed space's declared schema projects
+into a blank document template, and a resolved configuration renders back out.
+The format-agnostic `config_emitter` concept is defined by owned results, and
+rendering completes validation and serialization before any destination is
+involved:
 
 ```cpp
 template<typename Emitter>
@@ -921,8 +920,7 @@ concept config_emitter = requires(const Emitter e, const config_space &space,
 ```
 
 Each shipped format exposes the pair as free functions in its own namespace,
-plus a `struct emitter` modeling the concept. The existing `emit_*` functions
-are checked stream-delivery conveniences over the owned artifact:
+plus a `struct emitter` modeling the concept:
 
 | Format | Header | Owned free functions | CMake target |
 |--------|--------|----------------------|--------------|
@@ -952,19 +950,26 @@ auto weak = nucleus::xml::emit_document_schema_blind(config, std::cout);
 ```
 
 The owned artifact preserves semantic state, not source formatting: reloading
-with the same sealed schema and format settings preserves the exact concrete
-key set and stored strings. Built-in deterministic converters reproduce typed
-values; arbitrary host-converter determinism is not promised. Provenance and
-capability degradations are recomputed by the new load rather than serialized.
-XML preserves the complete validated subtree. Flat argv and environment output
-preserve concrete repeated paths as replayable overlays over the same
-structural base; the ordinal spelling and anchor behavior have one authority in
-[CLI Grammar and Multi-Space Addressing](cli-grammar.md#ordinal-segment-rule--repeated-containers).
+with the same sealed schema and format settings preserves the exact concrete key
+set and stored strings. Built-in deterministic converters reproduce typed values;
+arbitrary host-converter determinism is not promised. Provenance and capability
+degradations are recomputed by the new load rather than serialized. XML preserves
+the complete validated subtree; flat argv and environment output preserve
+concrete repeated paths as replayable overlays over the same structural base,
+spelled and anchored only as
+[CLI Grammar and Multi-Space Addressing](cli-grammar.md#ordinal-segment-rule--repeated-containers)
+defines.
 
-The caller still owns persistence. The `emit_*` conveniences attempt checked
-delivery of the completed artifact but do not make persistence durable. A
-repeated container renders N sibling elements in XML or N indexed entries in
-env/argv, in numeric ordinal order. See
+The `emit_*` conveniences deliver the finished artifact to the destination's
+stream buffer, and succeed only when that stream buffer accepted every byte of
+it; a prefailed stream, a null or zero-accepting buffer, or a short write
+returns `errc::unwritable_destination`. That code is a delivery failure; a
+configuration the format cannot represent is rejected earlier by the renderer as
+`errc::malformed_source`. An emitter never flushes: a later flush, close, or
+persistence failure is the caller's and lies outside the emitter result, and the
+prefix a short write already accepted is not rolled back. A repeated container
+renders N sibling elements in XML or N indexed entries in env/argv, in numeric
+ordinal order. See
 [`examples/xml/round_trip.cpp`](../examples/xml/round_trip.cpp),
 [`examples/xml/xml_persist.cpp`](../examples/xml/xml_persist.cpp), and
 [`examples/xml/emit_template.cpp`](../examples/xml/emit_template.cpp).
@@ -986,11 +991,11 @@ Every public result channel carries `nucleus::error` as its `E`:
 
 ```cpp
 enum class errc {
-    unreadable_source, malformed_source, invalid_inheritance, unmet_capability,
-    layering_violation, unresolved_token, invalid_selection, schema_violation,
-    failed_conversion, rejected_registration, sealed_builder,
-    absent_key, index_required, missing_converter, mismatched_type,
-    ambiguous_result,
+    unreadable_source, malformed_source, unwritable_destination,
+    invalid_inheritance, unmet_capability, layering_violation, unresolved_token,
+    invalid_selection, schema_violation, failed_conversion,
+    rejected_registration, sealed_builder, absent_key, index_required,
+    missing_converter, mismatched_type, ambiguous_result,
 };
 constexpr std::string_view to_string(errc code) noexcept;
 
@@ -1004,7 +1009,8 @@ std::ostream &operator<<(std::ostream &os, const error &e); // same rendering
 
 The codes follow the load pipeline (source → inheritance → gate → fold →
 tokens → selection → schema → conversion), then registration, then typed
-reads. A host branches on `code`; the human detail travels in `message`.
+reads; `unwritable_destination` is the one output-side code, reported when a
+destination will not accept a rendered artifact. A host branches on `code`; the human detail travels in `message`.
 Host-supplied seams (converters, the registration policy verdict) still
 traffic in plain reason strings — the engine attaches the code at the seam
 where the failure class is known.

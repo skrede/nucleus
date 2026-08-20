@@ -170,10 +170,11 @@ See [`examples/sources/env.cpp`](../examples/sources/env.cpp).
 `#include "nucleus/argv/argv_source.h"` · target `nucleus::argv`
 
 Consumes raw argv tokens and maps `--a-b-c=v` onto the key path `a/b/c` via the
-[`cli_surface`](api-extending.md#transforms) bijection. The flag delimiter is
-`-` by default and host-selectable via a validated `cli_delimiter` (multi-character
-delimiters such as `__` are legal). `pull()` runs in two stages: the pure
-syntactic mapping, then an optional schema-validation pass driven by a recognizer.
+[`cli_surface`](api-extending.md#transforms) bijection. The flag delimiter is `-`
+by default; `cli_delimiter::parse` validates every other choice against the
+[delimiter grammar](cli-grammar.md#delimiter-grammar). `pull()` runs in two
+stages: the pure syntactic mapping, then an optional schema-validation pass
+driven by a recognizer.
 
 ```cpp
 enum class unknown_key_policy { strict, lenient };
@@ -286,16 +287,18 @@ namespace, plus a `struct emitter` whose members forward to them so the module
 satisfies the [`config_emitter`](api-using.md#emit) concept by type as well as
 by call surface. `render_template` and `render_document` return an owned
 `expected<std::string, error>` and define the primitive contract. The argv pair
-takes an optional `cli_delimiter` and `key_path` anchor (`argv::emitter` carries
-both as its only state), which must match the `argv_source` it round-trips with.
+takes an optional `cli_delimiter`, `key_path` anchor and `space_name`
+(`argv::emitter` carries those three as its only state), all of which must match
+the `argv_source` it round-trips with. The space name is rendered into the flag
+prefix `--<space_name><delimiter>`, so a `space_name` carrying `=`, a carriage
+return (CR) or a line feed (LF) is rejected as `errc::malformed_source` while
+rendering, before any byte reaches the destination.
 
 The `emit_*` conveniences render completely before attempting delivery through
-the shared adapter. A render rejection is returned before the destination is
-inspected. A prefailed stream, a null stream buffer, a buffer that accepts zero
-bytes, or a short write returns `errc::unwritable_destination`; exact acceptance
-of the complete buffer succeeds. After a short write, the accepted prefix may
-remain in the destination. Delivery does not flush and success does not promise
-external persistence. It also does not promise rollback after delivery begins.
+the shared adapter, so a render rejection is returned before the destination is
+inspected at all. The delivery contract itself — stream-buffer acceptance, no
+flush, no rollback — is stated in
+[Emitting: templates and documents](api-using.md#emit).
 
 | Header | Owned renderers | Checked delivery | Rendering |
 |--------|-----------------|------------------|-----------|

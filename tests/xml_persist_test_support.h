@@ -1,6 +1,8 @@
 #ifndef HPP_GUARD_NUCLEUS_TESTS_XML_PERSIST_TEST_SUPPORT_H
 #define HPP_GUARD_NUCLEUS_TESTS_XML_PERSIST_TEST_SUPPORT_H
 
+#include "xml_persist_artifact.h"
+
 #include "nucleus/config.h"
 #include "nucleus/config_space.h"
 
@@ -16,6 +18,31 @@
 #include <utility>
 
 namespace nucleus::xml_persist_test {
+
+// A failed lifecycle step carries the operation and the system reason; surface that
+// in the assertion rather than letting a bare false say only that something broke.
+inline void check_step(const expected<void, std::string> &step)
+{
+    INFO((step ? std::string() : step.error()));
+    REQUIRE(step);
+}
+
+template<typename T>
+T checked(const expected<T, std::string> &step)
+{
+    INFO((step ? std::string() : step.error()));
+    REQUIRE(step);
+    return step.value();
+}
+
+// Every transition of a checked write, so a case whose subject is elsewhere states
+// the write once instead of restating the lifecycle.
+inline void write_text(temporary_artifact &artifact, std::string_view text)
+{
+    check_step(artifact.open_out());
+    artifact.out() << text;
+    check_step(artifact.flush_and_close());
+}
 
 inline constexpr char server_document[] =
         "<server>\n"

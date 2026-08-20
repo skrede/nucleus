@@ -6,26 +6,9 @@
 
 #include <string>
 #include <vector>
-#include <fstream>
-#include <sstream>
-#include <filesystem>
 #include <string_view>
 
 namespace test = nucleus::xml_persist_test;
-
-namespace {
-
-std::string read_and_remove(const std::filesystem::path &path)
-{
-    std::ifstream     input(path);
-    std::stringstream buffer;
-    buffer << input.rdbuf();
-    input.close();
-    std::filesystem::remove(path);
-    return buffer.str();
-}
-
-}
 
 TEST_CASE("emit_document wraps a multi-root config so its own reader accepts it",
           "[persist][emit]")
@@ -111,17 +94,20 @@ TEST_CASE("emit_document to a file persists a config that re-reads identically",
             test::document_options(test::server_document));
     REQUIRE(first);
 
-    const std::filesystem::path path =
-            std::filesystem::temp_directory_path() / "nucleus_xml_persist_test.xml";
-    {
-        std::ofstream output(path);
-        REQUIRE(nucleus::xml::emit_document(first.value(), space, output));
-    }
+    auto artifact = test::temporary_artifact::claim("persisted.xml");
+    REQUIRE(artifact);
+    test::check_step(artifact->open_out());
+    const auto delivered =
+            nucleus::xml::emit_document(first.value(), space, artifact->out());
+    INFO((delivered ? std::string() : nucleus::to_string(delivered.error())));
+    REQUIRE(delivered);
+    test::check_step(artifact->flush_and_close());
 
     const auto second = nucleus::load_config(
             space, nucleus::source_stack{},
-            test::document_options(read_and_remove(path)));
+            test::document_options(test::checked(artifact->read())));
     REQUIRE(second);
     REQUIRE(second->keys() == first->keys());
     REQUIRE(second->get_all("server/tag") == std::vector<std::string>{"alpha", "beta"});
+    test::check_step(artifact->clean_up());
 }
