@@ -56,8 +56,6 @@ class schema_registry
 public:
     schema_registry() = default;
 
-    // --- path-tagged registration surface (used by the facade) ---------------
-
     void add(schema_spec spec, owner_token owner)
     {
         // A path-tagged registration also defines that path as a recognized
@@ -74,11 +72,6 @@ public:
 
     const std::vector<registration<schema_spec>> &entries() const noexcept { return m_entries; }
 
-    // --- schema element authority --------------------------------------------
-
-    // Attaches a schema element, enforcing referential integrity. A keyspace
-    // anchor must resolve to an already-defined node; otherwise the attach is
-    // rejected and the element is not stored.
     schema_attach_result attach(schema_element el)
     {
         if(auto rejected = admissible(el); !rejected)
@@ -89,8 +82,6 @@ public:
     }
 
     const std::vector<schema_element> &elements() const noexcept { return m_elements; }
-
-    // --- container-scoped constraint groups -----------------------------------
 
     schema_attach_result attach_constraint_group(constraint_group group)
     {
