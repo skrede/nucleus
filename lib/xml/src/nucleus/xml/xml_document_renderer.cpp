@@ -1,3 +1,4 @@
+#include "nucleus/xml/xml_grammar.h"
 #include "nucleus/xml/xml_rendering.h"
 
 #include "nucleus/format.h"
@@ -5,8 +6,8 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <cstdint>
 #include <utility>
-#include <algorithm>
 
 namespace nucleus::xml {
 
@@ -21,10 +22,10 @@ pugi::xml_node child_or_append(pugi::xml_node parent, const std::string &name)
 }
 
 expected<pugi::xml_node, error> indexed_child(
-        pugi::xml_node parent, const std::string &name, std::size_t ordinal,
+        pugi::xml_node parent, const std::string &name, std::uint64_t ordinal,
         const std::string &path)
 {
-    std::size_t count = 0;
+    std::uint64_t count = 0;
     for(pugi::xml_node child = parent.first_child(); child;
         child                = child.next_sibling())
     {
@@ -144,14 +145,11 @@ expected<validated_document_entry, error> make_document_entry(
         const config &config, const std::string &key, const key_path &path,
         bool primary)
 {
-    for(const std::string &segment : path.segments())
-        if(!is_valid_xml_name(key_path::base_name(segment)))
-            return unexpected(xml_incompatible(key, nucleus::format("segment '{}' is not a valid XML name", key_path::base_name(segment))));
+    if(auto valid = validate_xml_name_segments(key, path.segments()); !valid)
+        return unexpected(std::move(valid).error());
     std::vector<std::string> values = config.get_all(key);
-    for(const std::string &value : values)
-        if(std::any_of(value.begin(), value.end(), is_forbidden_xml_value))
-            return unexpected(xml_incompatible(
-                    key, "value contains a control byte XML cannot round-trip"));
+    if(auto valid = validate_xml_stored_values(key, values); !valid)
+        return unexpected(std::move(valid).error());
     const auto &segments = path.segments();
     return validated_document_entry{key, std::move(values), segments,
                                     document_path_prefix(segments, segments.size(), true),

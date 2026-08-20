@@ -1,3 +1,4 @@
+#include "nucleus/xml/xml_grammar.h"
 #include "nucleus/xml/xml_rendering.h"
 
 #include "nucleus/format.h"
@@ -84,42 +85,34 @@ void wrap_roots(pugi::xml_document &document, const std::string &name)
         wrapper.append_move(root);
 }
 
+expected<void, error> validate_template_element(const schema_element &element)
+{
+    const key_path    declared = element.declared_path();
+    const std::string subject  = declared.str();
+    if(auto valid = validate_xml_name_segments(subject, declared.segments()); !valid)
+        return unexpected(std::move(valid).error());
+    return validate_xml_annotations(subject, element.allowed_values);
+}
+
+// The public template surface emits the whole schema, so invalid content anywhere
+// in it blocks success rather than being skipped over.
+expected<void, error> validate_template(const config_space &space,
+                                        std::string_view    space_name)
+{
+    if(auto valid = validate_xml_space_name(space_name); !valid)
+        return unexpected(std::move(valid).error());
+    for(const schema_element &element : space.schema_elements())
+        if(auto valid = validate_template_element(element); !valid)
+            return unexpected(std::move(valid).error());
+    return {};
+}
+
 }
 
 error xml_incompatible(const std::string &key, std::string reason)
 {
     return error{errc::malformed_source,
                  nucleus::format("xml emit: key '{}': {}", key, reason)};
-}
-
-namespace {
-
-bool is_name_start(unsigned char byte)
-{
-    return byte >= 0x80 || (byte >= 'A' && byte <= 'Z') ||
-            (byte >= 'a' && byte <= 'z') || byte == '_' || byte == ':';
-}
-
-bool is_name_byte(unsigned char byte)
-{
-    return is_name_start(byte) || (byte >= '0' && byte <= '9') ||
-            byte == '-' || byte == '.';
-}
-
-}
-
-bool is_valid_xml_name(std::string_view name)
-{
-    if(name.empty() || !is_name_start(static_cast<unsigned char>(name.front())))
-        return false;
-    return std::all_of(name.begin() + 1, name.end(), [](char byte)
-                       { return is_name_byte(static_cast<unsigned char>(byte)); });
-}
-
-bool is_forbidden_xml_value(char byte)
-{
-    const auto value = static_cast<unsigned char>(byte);
-    return value < 0x20 && value != 0x09 && value != 0x0A;
 }
 
 bool schema_path_has_children(const config_space &space,
@@ -166,6 +159,8 @@ expected<std::string, error> serialize_xml(const pugi::xml_document &document,
 expected<std::string, error> render_xml_template(
         const config_space &space, std::string_view space_name)
 {
+    if(auto valid = validate_template(space, space_name); !valid)
+        return unexpected(std::move(valid).error());
     pugi::xml_document document;
     for(const schema_element &element : space.schema_elements())
         append_template_element(document, element);

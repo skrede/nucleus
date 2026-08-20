@@ -142,7 +142,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
     add_test(NAME identity_envelope_test COMMAND identity_envelope_test)
-    nucleus_add_test(xml_emit_contract_test nucleus::xml)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/xml_emit_gap_tests.cmake)
 
     # Template emission lives in the xml module now (nucleus::xml::emit_template),
     # so this test links the module; its header arrives via the nucleus::xml link.

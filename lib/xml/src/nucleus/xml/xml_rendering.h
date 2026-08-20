@@ -41,10 +41,6 @@ struct validated_document_plan
 
 error xml_incompatible(const std::string &key, std::string reason);
 
-bool is_valid_xml_name(std::string_view name);
-
-bool is_forbidden_xml_value(char byte);
-
 bool schema_path_has_children(const config_space &space,
                               const std::string  &path);
 
