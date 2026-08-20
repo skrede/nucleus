@@ -1,7 +1,9 @@
 #ifndef HPP_GUARD_NUCLEUS_RESOLVE_RESOLUTION_CONTEXT_H
 #define HPP_GUARD_NUCLEUS_RESOLVE_RESOLUTION_CONTEXT_H
 
+#include "nucleus/resolve/fold_entry.h"
 #include "nucleus/resolve/cli_ordinal.h"
+#include "nucleus/resolve/layer_fold.h"
 #include "nucleus/resolve/keyed_divert.h"
 #include "nucleus/resolve/resolve_types.h"
 #include "nucleus/resolve/repeated_sweep.h"
@@ -90,6 +92,9 @@ public:
         , m_merge(m_building, m_provenance, m_keyed)
         , m_sweep(m_building, m_provenance, m_schema)
         , m_cli_ordinal(m_building, m_provenance, m_schema)
+        , m_layers(m_schema, m_buffers, m_dispositions)
+        , m_entry(m_layers, m_sweep, m_cli_ordinal, m_divert, m_building,
+                  m_provenance, m_schema, m_tokenizer, m_tree_tokenizer)
     {
     }
 
@@ -105,9 +110,9 @@ public:
     provenance &origins() noexcept { return m_provenance; }
 
     // Fold overload that consumes a sequence of layered_handle descriptors.
-    // The caller assigns ascending ranks for cross-source precedence; the
-    // stable_sort folds low rank first. Each handle is pulled exactly once per
-    // load; the project->pull->inherit lifecycle contract holds unchanged.
+    // The caller assigns ascending ranks for cross-source precedence; low rank
+    // folds first and equal ranks keep their input order. Each handle is pulled
+    // exactly once per load; the project->pull->inherit contract holds unchanged.
     //
     // Unified storage: ALL repeated paths (leaves and containers) are stored as
     // indexed scalars in m_building. "config/tag" with duplicate entries becomes
@@ -116,191 +121,25 @@ public:
     expected<void, resolve_fold_error>
     fold(std::span<layered_handle> layers)
     {
-        std::vector<layered_handle *> ordered;
-        ordered.reserve(layers.size());
-        for(layered_handle &lh : layers)
-            ordered.push_back(&lh);
-        // NOLINTNEXTLINE(bugprone-nondeterministic-pointer-iteration-order): ordered by the stable rank key, not by pointer address, so the result is deterministic.
-        std::stable_sort(ordered.begin(), ordered.end(),
-                         [](const layered_handle *a, const layered_handle *b) {
-                             return a->rank < b->rank;
-                         });
-
-        const schema_projection projection = m_schema.projection();
-
-        const std::set<std::string> repeated_declared = repeated_declared_paths(m_schema);
-
-        // Repeated container prefixes: declared paths of repeated elements that
-        // have child elements. Used for wholesale-replace and extend= guard.
-        const std::set<std::string> repeated_container_prefixes =
-            m_schema.repeated_container_paths();
-
-        // Keyed-composition setup: the merge modes, the identity-group field keying
-        // each of them, and the declared leaf names the flat grouping matches
-        // against. Computed once per fold() and shared across every layer.
+        const std::vector<layered_handle *> ordered = m_layers.begin_fold(layers);
         if(auto built = m_keyed.build(m_schema); !built)
             return unexpected(built.error());
-
-        // Deferred checks: CLI plain-ordinal overrides recognized here but
-        // validated/applied only by apply_deferred_cli_overrides(), which the
-        // caller runs after slice() (and therefore after
-        // merge_keyed_collections()) so the check sees the load's fully
-        // materialized, selected-strain keyspace regardless of a keyed or
-        // keyed-merge container standing between the fold and the argv layer's rank.
         m_cli_ordinal.reset();
-
-        // One pass-1 budget shared by every value in this load: a
-        // bounded-depth fanout spanning several values is charged against a single
-        // running count, so the total-substitution ceiling holds across the load.
-        substitution_budget budget(m_expansion_budget);
-
+        m_entry.begin_fold(m_expansion_budget);
         for(layered_handle *lh : ordered)
         {
-            // A chain layer's batch was already pulled during the inheritance
-            // walk; consume the cached batch here instead of pulling the same
-            // handle again. Stack/argv/env layers have no walk phase and are
-            // pulled for the first (and only) time here.
-            config_source_result pulled;
-            config_source_batch *batch_ptr = nullptr;
-            if(lh->cached_batch != nullptr)
-            {
-                batch_ptr = lh->cached_batch;
-            }
-            else
-            {
-                lh->handle->apply_projection(projection);
-                pulled = lh->handle->pull();
-                if(!pulled)
-                    return unexpected(error{pulled.error().code,
-                                            nucleus::format("source '{}': {}",
-                                                lh->label, pulled.error().message)});
-                batch_ptr = &pulled.value();
-            }
-
-            config_source_batch &batch = *batch_ptr;
-
-            // Extend= targeting a repeated container is not supported.
-            for(const extend_disposition &d : batch.dispositions)
-            {
-                if(repeated_container_prefixes.contains(d.container_path))
-                    return unexpected(error{errc::layering_violation,
-                        nucleus::format(
-                            "extend= targeting repeated container '{}' is not "
-                            "supported: a repeated container composes across layers "
-                            "by ordinal instance, not by extension",
-                            d.container_path)});
-            }
-
-            // Per-layer counters for repeated leaves arriving as plain paths
-            // (duplicate_keys sources like runtime_source or tree sources with flat
-            // repeated leaves). Keyed by the sweep key of the leaf's value list.
-            std::map<std::string, std::size_t> leaf_ordinal_counters;
-
-            // Tracks which concrete instances have had their wholesale-replace
-            // sweep done in this layer.
-            std::set<std::string> swept_instances_this_layer;
-
-            // Existing entries of a repeated scope, bucketed by sweep key. Filled
-            // by one keyspace scan the first time a layer touches the scope, so an
-            // instance sweep never rescans. Keyed by scope, then by sweep key.
-            std::map<std::string, std::map<std::string, std::vector<key_path>>>
-                instance_buckets;
-
+            auto acquired = m_layers.acquire(*lh);
+            if(!acquired)
+                return unexpected(acquired.error());
+            config_source_batch &batch = acquired.value();
+            if(auto begun = m_layers.begin_layer(batch); !begun)
+                return unexpected(begun.error());
             m_divert.reset();
-
-            for(keyspace_entry &entry : batch.entries)
-            {
-                token_result expanded = lh->origin_file
-                    ? resolve_tokens(entry.value.text(), m_tokenizer, *lh->origin_file,
-                                     budget, &m_tree_tokenizer)
-                    : resolve_tokens(entry.value.text(), m_tokenizer, budget,
-                                     &m_tree_tokenizer);
-                if(!expanded)
-                    return unexpected(error{errc::unresolved_token, nucleus::format(
-                        "source '{}': token resolution failed for key '{}': {}",
-                        lh->label, entry.path, expanded.error().message)});
-
-                auto path_res = key_path::parse(entry.path);
-                if(!path_res)
-                    return unexpected(error{errc::malformed_source, nucleus::format(
-                        "source '{}': malformed key path '{}': {}",
-                        lh->label, entry.path, path_res.error())});
-                key_path path = std::move(path_res).value();
-
-                const std::string canonical_path = m_schema.canonical_text(path);
-
-                auto cli_deferred = m_cli_ordinal.defer(
-                    path, repeated_container_prefixes, entry, expanded.value(), *lh);
-                if(!cli_deferred)
-                    return unexpected(cli_deferred.error());
-                if(cli_deferred.value())
-                    continue;
-
-                auto diverted = m_divert.divert(path, entry, expanded.value(), *lh);
-                if(!diverted)
-                    return unexpected(diverted.error());
-                if(diverted.value())
-                    continue;
-
-                const std::string scope =
-                    repeated_scope_of(repeated_declared, canonical_path);
-                const bool scope_is_leaf =
-                    !scope.empty() && !repeated_container_prefixes.contains(scope);
-                // A repeated leaf has no declared sub-structure, so an entry deeper
-                // than the leaf itself addresses no instance of it and stores plainly.
-                if(!scope.empty() && (!scope_is_leaf || canonical_path == scope))
-                {
-                    const std::string sweep_key =
-                        m_sweep.sweep_key_of(path, scope, scope_is_leaf);
-                    if(sweep_key.empty())
-                        return unexpected(error{errc::malformed_source, nucleus::format(
-                            "internal invariant violation: no prefix of '{}' canonicalizes "
-                            "to its declared repeated scope '{}' in fold()'s sweep",
-                            entry.path, scope)});
-
-                    const std::string unaddressed =
-                        m_sweep.unindexed_repeated_container(
-                            repeated_container_prefixes, path);
-                    if(!unaddressed.empty())
-                        return unexpected(error{errc::malformed_source, nucleus::format(
-                            "source '{}': key path '{}' addresses repeated container '{}' "
-                            "without naming an instance", lh->label, entry.path, unaddressed)});
-
-                    key_path target = path;
-                    if(scope_is_leaf && !key_path::is_indexed_segment(path.leaf()))
-                    {
-                        auto minted = repeated_sweep::mint_leaf_ordinal(
-                            entry, sweep_key, lh->label, leaf_ordinal_counters);
-                        if(!minted)
-                            return unexpected(std::move(minted).error());
-                        target = std::move(minted).value();
-                    }
-
-                    if(!swept_instances_this_layer.contains(sweep_key))
-                    {
-                        swept_instances_this_layer.insert(sweep_key);
-                        if(!instance_buckets.contains(scope))
-                            instance_buckets[scope] =
-                                m_sweep.bucket_by_instance(scope, scope_is_leaf);
-                        m_sweep.sweep_instance(instance_buckets[scope][sweep_key]);
-                    }
-                    m_sweep.store_entry(target, std::move(expanded).value(), *lh);
-                }
-                else
-                {
-                    m_building.set(path, value::owned(std::move(expanded).value()));
-                    m_provenance.record(entry.path,
-                                        origin{lh->rank, lh->label, lh->owner,
-                                               lh->inheritance_layer});
-                }
-            }
-
-            for(const extend_disposition &d : batch.dispositions)
-                m_dispositions.push_back(d);
-
-            m_buffers.push_back(std::move(batch.buffer));
+            for(const keyspace_entry &entry : batch.entries)
+                if(auto folded = m_entry.fold_one(entry, *lh); !folded)
+                    return unexpected(folded.error());
+            m_layers.end_layer(batch);
         }
-
         return {};
     }
 
@@ -1344,6 +1183,8 @@ private:
     keyed_collection_merge m_merge;
     repeated_sweep m_sweep;
     cli_ordinal m_cli_ordinal;
+    layer_fold m_layers;
+    fold_entry m_entry;
 };
 
 }
