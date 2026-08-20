@@ -6,8 +6,10 @@
 #include "nucleus/resolve/layer_fold.h"
 #include "nucleus/resolve/keyed_divert.h"
 #include "nucleus/resolve/resolve_types.h"
+#include "nucleus/resolve/strain_relay.h"
 #include "nucleus/resolve/repeated_sweep.h"
 #include "nucleus/resolve/keyed_merge_state.h"
+#include "nucleus/resolve/relayed_compaction.h"
 #include "nucleus/resolve/keyed_collection_merge.h"
 
 #include "nucleus/error.h"
@@ -95,6 +97,8 @@ public:
         , m_layers(m_schema, m_buffers, m_dispositions)
         , m_entry(m_layers, m_sweep, m_cli_ordinal, m_divert, m_building,
                   m_provenance, m_schema, m_tokenizer, m_tree_tokenizer)
+        , m_compaction(m_building, m_provenance, m_schema, m_keyed)
+        , m_relay(m_building, m_provenance, m_sweep, m_compaction, m_schema, m_keyed)
     {
     }
 
@@ -515,8 +519,8 @@ public:
                 }
             }
 
-            if(auto r = relay_strain(strains.at(chosen), identity_path,
-                                     policy, Ld, Ls, wide_extend);
+            if(auto r = m_relay.relay_strain(strains.at(chosen), identity_path,
+                                             policy, Ld, Ls, wide_extend);
                !r)
                 return r;
 
@@ -764,16 +768,6 @@ public:
     }
 
 private:
-    struct relayed_value
-    {
-        key_path path;
-        value    val;
-        origin   prov;
-    };
-
-    using relayed_instance_groups =
-            std::map<std::string, std::vector<std::pair<std::size_t, key_path>>>;
-
     // Recursive single-leaf resolver for pass-2. Resolves `kp`'s value by first
     // ensuring all leaves it references are themselves resolved (depth-first).
     // The expansion_guard detects cycles; the cache prevents repeated work.
@@ -830,331 +824,6 @@ private:
         return {};
     }
 
-    // Displacement is bounded by the concrete instance of the innermost repeated
-    // scope. Candidate units come from raw paths so keyed and unified forms of one
-    // strain remain distinct.
-    expected<void, resolve_fold_error>
-    relay_strain(const std::vector<key_path> &keyed_paths,
-                 std::string_view             identity_path,
-                 strain_scope_policy policy, std::size_t Ld, std::size_t Ls,
-                 bool wide_extend = false)
-    {
-        const std::set<std::string> repeated_declared = repeated_declared_paths(m_schema);
-        const std::set<std::string> repeated_containers =
-                m_schema.repeated_container_paths();
-        const std::set<std::string> relayed_containers =
-                relayed_container_scopes(keyed_paths, repeated_containers);
-
-        for(const key_path &keyed : keyed_paths)
-        {
-            const origin     *from       = m_provenance.of(keyed.str());
-            std::size_t const entry_rank = from != nullptr ? from->rank : 0;
-            // A keyed-merge collection was already finalized across layers by
-            // merge_keyed_collections(); its instances legitimately span ranks, so the
-            // scope-policy rank pruning and the instance-displacement logic below must
-            // not re-prune them. The merge_mode governs this collection's cross-layer
-            // composition, overriding the default strain scope freezing.
-            const std::string canonical_keyed = m_schema.canonical_text(keyed);
-            const bool        keyed_merge     = m_keyed.under_keyed_merge(canonical_keyed);
-            const bool        identity_leaf   = canonical_keyed == identity_path;
-            const bool        excluded        = !identity_leaf && !keyed_merge && !wide_extend && (policy == strain_scope_policy::container_open_until_next_strain ? entry_rank >= Ls : entry_rank > Ld);
-            if(excluded)
-            {
-                m_building.remove(keyed);
-                m_provenance.forget(keyed.str());
-                continue;
-            }
-
-            // Compute the unified path: strip key segments but PRESERVE ordinal
-            // segments so indexed repeated-leaf instances keep their ordinals.
-            const std::string unified_str = relay_canonical(keyed);
-            auto              unified     = key_path::parse(unified_str);
-            if(!unified)
-                return unexpected(error{errc::malformed_source, nucleus::format("internal invariant violation: re-parsed path failed to parse "
-                                                                                "in relay_strain()'s unification: '{}'",
-                                                                                unified_str)});
-
-            const value *v = m_building.find(keyed);
-            if(v == nullptr)
-            {
-                // Nothing to relay (path exists in bucket but no value).
-                m_building.remove(keyed);
-                m_provenance.forget(keyed.str());
-                continue;
-            }
-
-            const std::string canonical = m_schema.canonical_text(unified.value());
-            const std::string scope     = repeated_scope_of(repeated_declared, canonical);
-            if(!scope.empty() && !keyed_merge)
-            {
-                const bool        scope_is_leaf = !repeated_containers.contains(scope);
-                const std::string unit =
-                        m_sweep.sweep_key_of(unified.value(), scope, scope_is_leaf);
-                if(unit.empty())
-                    return unexpected(error{errc::malformed_source, nucleus::format("internal invariant violation: no prefix of '{}' canonicalizes "
-                                                                                    "to its declared repeated scope '{}' in relay_strain()'s displacement",
-                                                                                    unified_str, scope)});
-                if(instance_displaced(unified.value(), unit, scope, scope_is_leaf,
-                                      entry_rank))
-                {
-                    m_building.remove(keyed);
-                    m_provenance.forget(keyed.str());
-                    continue;
-                }
-            }
-
-            // Check if the unified path is already occupied by a higher-rank value.
-            const origin *at        = m_provenance.of(unified_str);
-            const bool    displaced = !keyed_merge && at != nullptr && at->rank > entry_rank;
-            if(displaced)
-            {
-                // A primary key is authoritative and read-only. A higher-rank flat
-                // entry occupying it is a loud error, never a silent skip.
-                if(identity_leaf)
-                    return unexpected(error{errc::layering_violation,
-                                            nucleus::format(
-                                                    "identity field '{}' is read-only; "
-                                                    "source at rank {} cannot override it",
-                                                    unified_str, at->rank)});
-            }
-            else
-            {
-                m_building.set(unified.value(), *v);
-                if(from != nullptr)
-                    m_provenance.record(unified_str, *from);
-            }
-            m_building.remove(keyed);
-            m_provenance.forget(keyed.str());
-        }
-        return compact_relayed_instances(relayed_containers);
-    }
-
-    std::set<std::string>
-    relayed_container_scopes(const std::vector<key_path> &paths,
-                             const std::set<std::string> &containers) const
-    {
-        std::set<std::string> scopes;
-        for(const key_path &path : paths)
-        {
-            const std::string canonical = m_schema.canonical_text(path);
-            if(m_keyed.under_keyed_merge(canonical))
-                continue;
-            for(const std::string &scope : containers)
-                if(canonical == scope || canonical.starts_with(scope + key_path::separator))
-                    scopes.insert(scope);
-        }
-        return scopes;
-    }
-
-    // Repeated leaves are whole value-list units and cannot form an interior gap.
-    expected<void, resolve_fold_error>
-    compact_relayed_instances(const std::set<std::string> &scopes)
-    {
-        auto declared = ordered_relayed_scopes(scopes);
-        if(!declared)
-            return unexpected(std::move(declared).error());
-        for(const key_path &scope : declared.value())
-        {
-            if(auto compacted = compact_relayed_scope(scope); !compacted)
-                return compacted;
-        }
-        return {};
-    }
-
-    expected<std::vector<key_path>, resolve_fold_error>
-    ordered_relayed_scopes(const std::set<std::string> &scopes) const
-    {
-        std::vector<key_path> declared;
-        declared.reserve(scopes.size());
-        for(const std::string &scope : scopes)
-        {
-            auto parsed = key_path::parse(scope);
-            if(!parsed)
-                return unexpected(error{errc::malformed_source, nucleus::format("internal invariant violation: declared scope failed to parse "
-                                                                                "in compact_relayed_instances(): '{}'",
-                                                                                scope)});
-            declared.push_back(std::move(parsed).value());
-        }
-        std::sort(declared.begin(), declared.end(),
-                  [](const key_path &a, const key_path &b)
-                  {
-                      return a.size() != b.size() ? a.size() < b.size()
-                                                  : a.str() < b.str();
-                  });
-        return declared;
-    }
-
-    std::vector<std::string> building_key_texts() const
-    {
-        std::vector<std::string> keys;
-        keys.reserve(m_building.size());
-        for(const key_path &path : m_building.paths())
-            keys.push_back(path.str());
-        return keys;
-    }
-
-    expected<relayed_instance_groups, resolve_fold_error>
-    grouped_relayed_instances(const key_path &declared) const
-    {
-        const std::vector<std::string> keys = building_key_texts();
-        relayed_instance_groups        groups;
-        for(const std::string &text : instances_of(m_schema, keys, declared))
-        {
-            auto actual = key_path::parse(text);
-            if(!actual)
-                return unexpected(error{errc::malformed_source, nucleus::format("internal invariant violation: enumerated instance failed to parse "
-                                                                                "in compact_relayed_instances(): '{}'",
-                                                                                text)});
-            const std::uint64_t ordinal = key_path::ordinal_of(actual->leaf());
-            groups[actual->parent().str()].emplace_back(
-                    static_cast<std::size_t>(ordinal), std::move(actual).value());
-        }
-        for(auto &[_, instances] : groups)
-            std::sort(instances.begin(), instances.end(),
-                      [](const auto &a, const auto &b)
-                      { return a.first < b.first; });
-        return groups;
-    }
-
-    expected<void, resolve_fold_error>
-    compact_relayed_scope(const key_path &declared)
-    {
-        auto groups = grouped_relayed_instances(declared);
-        if(!groups)
-            return unexpected(std::move(groups).error());
-        for(const auto &[_, instances] : groups.value())
-        {
-            std::size_t target_ordinal = 0;
-            for(const auto &[source_ordinal, source] : instances)
-            {
-                if(source_ordinal != target_ordinal)
-                {
-                    const auto segment = std::string(key_path::base_name(source.leaf())) +
-                            "[" + std::to_string(target_ordinal) + "]";
-                    if(auto moved = compact_relayed_instance(
-                               source, source.parent().child(segment));
-                       !moved)
-                        return moved;
-                }
-                ++target_ordinal;
-            }
-        }
-        return {};
-    }
-
-    expected<std::vector<relayed_value>, resolve_fold_error>
-    relayed_values_of(const key_path &instance) const
-    {
-        std::vector<relayed_value> values;
-        const std::string          exact = instance.str();
-        const std::string          below = exact + key_path::separator;
-        for(const key_path &path : m_building.paths())
-        {
-            if(path.str() != exact && !path.str().starts_with(below))
-                continue;
-            const value  *val  = m_building.find(path);
-            const origin *prov = m_provenance.of(path.str());
-            if(val == nullptr || prov == nullptr)
-                return unexpected(error{errc::malformed_source, nucleus::format("internal invariant violation: value and provenance diverged "
-                                                                                "in compact_relayed_instances(): '{}'",
-                                                                                path.str())});
-            values.push_back(relayed_value{path, *val, *prov});
-        }
-        return values;
-    }
-
-    expected<void, resolve_fold_error>
-    move_relayed_value(const relayed_value &entry, const key_path &source,
-                       const key_path &target)
-    {
-        const std::string suffix      = entry.path.str().substr(source.str().size());
-        const std::string rewritten   = target.str() + suffix;
-        auto              destination = key_path::parse(rewritten);
-        if(!destination)
-            return unexpected(error{errc::malformed_source, nucleus::format("internal invariant violation: re-parsed path failed to parse in "
-                                                                            "compact_relayed_instances()'s rebuild: '{}'",
-                                                                            rewritten)});
-        if(m_building.contains(destination.value()))
-            return unexpected(error{errc::malformed_source, nucleus::format("internal invariant violation: compact_relayed_instances() would "
-                                                                            "overwrite occupied path '{}' while moving '{}'",
-                                                                            rewritten, entry.path.str())});
-        m_building.set(destination.value(), entry.val);
-        m_provenance.record(rewritten, entry.prov);
-        m_building.remove(entry.path);
-        m_provenance.forget(entry.path.str());
-        return {};
-    }
-
-    expected<void, resolve_fold_error>
-    compact_relayed_instance(const key_path &source, const key_path &target)
-    {
-        auto values = relayed_values_of(source);
-        if(!values)
-            return unexpected(std::move(values).error());
-        for(const relayed_value &entry : values.value())
-        {
-            if(auto moved = move_relayed_value(entry, source, target); !moved)
-                return moved;
-        }
-        return {};
-    }
-
-    bool instance_displaced(const key_path &unified, const std::string &unit,
-                            const std::string &scope, bool scope_is_leaf,
-                            std::size_t entry_rank) const
-    {
-        for(const key_path &candidate : m_building.paths())
-        {
-            const std::string candidate_unit =
-                    m_sweep.sweep_key_of(candidate, scope, scope_is_leaf);
-            if(candidate_unit.empty() || candidate_unit != unit)
-                continue;
-            if(!scope_is_leaf && relay_canonical(candidate) != unified.str())
-                continue;
-            const origin *from = m_provenance.of(candidate.str());
-            if(from != nullptr && from->rank > entry_rank)
-                return true;
-        }
-        return false;
-    }
-
-    // Computes the unified relay path for a keyed+possibly-indexed path:
-    // strips key-value segments (transient primary-key values) but preserves
-    // ordinal segments (indexed repeated leaves keep their [N] suffix).
-    std::string relay_canonical(const key_path &path) const
-    {
-        std::string canonical;
-        for(const auto & segment : path.segments())
-        {
-            std::string extended = canonical;
-            if(!extended.empty())
-                extended += key_path::separator;
-            extended += segment;
-
-            // Indexed segments (e.g. "tags[0]"): keep as-is (preserve ordinal).
-            if(key_path::is_indexed_segment(segment))
-            {
-                canonical = std::move(extended);
-                continue;
-            }
-
-            // Key-value segment: the schema says this extended path is a keyed
-            // instance path one level past the keyed container. Skip the key value.
-            const auto canonical_kp = key_path::parse(canonical);
-            if(canonical_kp.has_value())
-            {
-                // Build a fake "extended" key_path to check keyed_instance_path.
-                const auto ext_kp = key_path::parse(extended);
-                if(ext_kp.has_value()
-                   && m_schema.keyed_instance_path(canonical_kp.value(), ext_kp.value()))
-                    continue;
-            }
-
-            canonical = std::move(extended);
-        }
-        return canonical;
-    }
-
     const schema_registry           &m_schema;
     const tokenizer_registry        &m_tokenizer;
     const converter_registry        &m_converters;
@@ -1185,6 +854,8 @@ private:
     cli_ordinal m_cli_ordinal;
     layer_fold m_layers;
     fold_entry m_entry;
+    relayed_compaction m_compaction;
+    strain_relay m_relay;
 };
 
 }
