@@ -82,9 +82,6 @@ public:
     const tokenizer_registry &tokenizer() const noexcept { return m_tokenizer; }
     const converter_registry &converters() const noexcept { return m_converters; }
 
-    keyspace &building() noexcept { return m_building; }
-    provenance &origins() noexcept { return m_provenance; }
-
     // The caller assigns ascending ranks for cross-source precedence; low rank folds first and
     // equal ranks keep input order. Each handle is pulled once, so project->pull->inherit holds.
     expected<void, resolve_fold_error>
