@@ -135,20 +135,19 @@ TEST_CASE("indexed segment helpers", "[key_path][indexed]")
         REQUIRE(empty_idx.error().find("malformed indexed segment") != std::string::npos);
     }
 
-    SECTION("is_indexed_segment rejects digit runs longer than 18 chars -- overflow guard")
+    SECTION("is_indexed_segment ends the accepted domain at the ordinal bound")
     {
-        // 19-digit ordinal -- exceeds safe 64-bit range.
-        REQUIRE_FALSE(key_path::is_indexed_segment("node[9999999999999999999]"));
-        // 20-digit ordinal.
-        REQUIRE_FALSE(key_path::is_indexed_segment("node[99999999999999999999]"));
-        // 18-digit ordinal is still accepted (max safe range).
-        REQUIRE(key_path::is_indexed_segment("node[999999999999999999]"));
+        REQUIRE(key_path::is_indexed_segment("node[4294967295]"));
+        REQUIRE_FALSE(key_path::is_indexed_segment("node[4294967296]"));
+        REQUIRE_FALSE(key_path::is_indexed_segment("node[9999999999]"));
+        REQUIRE_FALSE(key_path::is_indexed_segment("node[99999999999]"));
+        REQUIRE_FALSE(key_path::is_indexed_segment("node[999999999999999999]"));
     }
 
-    SECTION("parse treats 19-digit ordinal as a malformed indexed segment")
+    SECTION("parse treats an above-bound ordinal as a malformed indexed segment")
     {
         // is_indexed_segment rejects it, so parse() surfaces the malformed-segment error.
-        auto result = key_path::parse("cluster/node[9999999999999999999]/port");
+        auto result = key_path::parse("cluster/node[4294967296]/port");
         REQUIRE_FALSE(result);
         REQUIRE(result.error().find("malformed indexed segment") != std::string::npos);
     }
@@ -174,25 +173,26 @@ TEST_CASE("indexed ordinals keep their exact identity at fixed width",
     static_assert(std::is_same_v<decltype(key_path::ordinal_of("n[0]")),
                                  std::uint64_t>);
 
-    constexpr std::uint64_t boundary = 4294967295ULL;
-    constexpr std::uint64_t widest   = 999999999999999999ULL;
-    for(std::uint64_t const value : {boundary - 1, boundary, boundary + 1,
-                                     widest - 1, widest})
+    constexpr std::uint64_t bound = 4294967295ULL;
+    for(std::uint64_t const value : {std::uint64_t{0}, bound - 1, bound})
     {
         const std::string segment = "node[" + std::to_string(value) + "]";
         REQUIRE(key_path::is_indexed_segment(segment));
         REQUIRE(key_path::ordinal_of(segment) == value);
         REQUIRE(key_path::parse("cluster/" + segment + "/port"));
     }
+    const std::string above = "node[" + std::to_string(bound + 1) + "]";
+    REQUIRE_FALSE(key_path::is_indexed_segment(above));
+    REQUIRE_FALSE(key_path::parse("cluster/" + above + "/port"));
 }
 
 TEST_CASE("numeric ordinal order outranks decimal lexical order",
           "[key_path][indexed]")
 {
-    REQUIRE(nucleus::ordinal_sort_key("cluster/node[4294967295]/port")
-            < nucleus::ordinal_sort_key("cluster/node[4294967296]/port"));
-    REQUIRE(nucleus::ordinal_sort_key("cluster/node[4294967296]/port")
-            < nucleus::ordinal_sort_key("cluster/node[4294967297]/port"));
+    REQUIRE(nucleus::ordinal_sort_key("cluster/node[4294967294]/port")
+            < nucleus::ordinal_sort_key("cluster/node[4294967295]/port"));
+    REQUIRE(nucleus::ordinal_sort_key("cluster/node[999999999]/port")
+            < nucleus::ordinal_sort_key("cluster/node[4294967295]/port"));
     REQUIRE(nucleus::ordinal_sort_key("node[2]/route[9]")
             < nucleus::ordinal_sort_key("node[2]/route[10]"));
     REQUIRE(nucleus::ordinal_sort_key("node[2]/route[10]")

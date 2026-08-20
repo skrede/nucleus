@@ -97,8 +97,8 @@ TEST_CASE("a named instance's scalar and a top-level repeated leaf are untouched
     REQUIRE(top_leaf.value().get_all("cluster/zone") == std::vector<std::string>{"zzz"});
 }
 
-TEST_CASE("an ordinal segment longer than the digit cap fails, naming the source, the "
-          "path and the cap",
+TEST_CASE("an ordinal segment outside the accepted domain fails, naming the source, "
+          "the path and the bound",
           "[collection_shapes][diagnostics]")
 {
     const nucleus::config_space space = cluster_space();
@@ -110,7 +110,7 @@ TEST_CASE("an ordinal segment longer than the digit cap fails, naming the source
     REQUIRE(loaded.error().code == nucleus::errc::malformed_source);
     REQUIRE(loaded.error().message.find("stack[1]") != std::string::npos);
     REQUIRE(loaded.error().message.find(key) != std::string::npos);
-    REQUIRE(loaded.error().message.find("18") != std::string::npos);
+    REQUIRE(loaded.error().message.find("4294967295") != std::string::npos);
 }
 
 TEST_CASE("a segment of non-ASCII digit characters is not read as an ordinal",

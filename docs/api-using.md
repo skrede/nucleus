@@ -881,12 +881,15 @@ std::string str() const;                    // canonical "/"-joined form
 
 static bool is_indexed_segment(std::string_view seg) noexcept;  // "node[0]" -> true
 static std::string_view base_name(std::string_view seg) noexcept; // "node[0]" -> "node"
-static std::size_t ordinal_of(std::string_view seg) noexcept;   // "node[0]" -> 0
+static std::uint64_t ordinal_of(std::string_view seg) noexcept;  // "node[0]" -> 0
 ```
 
 `parse` rejects leading/trailing separators and empty segments. A segment
 containing `[` must be a valid indexed segment: non-empty base name, decimal
-ordinal with no leading zeros (except a lone `0`), max 18 digits, closing `]`.
+ordinal with no leading zeros (except a lone `0`), no greater than
+`key_path::max_ordinal`, closing `]`. That bound is the largest value
+`std::size_t` holds losslessly on every supported platform, so an ordinal beyond
+it is reported as a malformed path rather than narrowed to fit.
 Element names must not start with a digit — this keeps the CLI bijection
 invertible (a digit-led segment after a repeated container is unambiguously an
 ordinal). Most schema code can skip `key_path` entirely and pass a string to

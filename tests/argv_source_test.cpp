@@ -371,7 +371,7 @@ TEST_CASE("argv out-of-range ordinal -- loud error", "[argv][repeated_container]
     REQUIRE(loaded.error().message.find('2') != std::string::npos);
 }
 
-TEST_CASE("cli ordinal digit run over 18 digits is rejected, not silently wrapped",
+TEST_CASE("cli ordinal above the accepted bound is rejected, not silently wrapped",
           "[argv][repeated_container]")
 {
     const nucleus::config_space space = make_cluster_space();
@@ -381,9 +381,9 @@ TEST_CASE("cli ordinal digit run over 18 digits is rejected, not silently wrappe
         "<node><endpoint><port>80</port></endpoint></node>"
         "</cluster>");
 
-    // 19 digits: one past the 18-digit cap key_path::is_indexed_segment also enforces.
+    // One past the ordinal bound key_path::is_indexed_segment also enforces.
     argv_source argv(std::vector<std::string>{
-        "--cluster-node-9999999999999999999-endpoint-port=90"});
+        "--cluster-node-4294967296-endpoint-port=90"});
     argv.recognize_with(nucleus::recognizer_of(space));
 
     auto loaded = nucleus::load_config(
@@ -394,7 +394,7 @@ TEST_CASE("cli ordinal digit run over 18 digits is rejected, not silently wrappe
     REQUIRE(loaded.error().code == nucleus::errc::malformed_source);
 }
 
-TEST_CASE("cli ordinal digit run at 18 digits is still accepted (boundary)",
+TEST_CASE("cli ordinal at the accepted bound is still admitted (boundary)",
           "[argv][repeated_container]")
 {
     const nucleus::config_space space = make_cluster_space();
@@ -404,10 +404,10 @@ TEST_CASE("cli ordinal digit run at 18 digits is still accepted (boundary)",
         "<node><endpoint><port>80</port></endpoint></node>"
         "</cluster>");
 
-    // 18 digits, out of instance range (only 1 exists) -- must fail on range,
-    // not on the digit cap, proving the boundary itself is not rejected.
+    // At the bound and out of instance range (only 1 exists) -- must fail on
+    // range, not on the bound, proving the boundary itself is not rejected.
     argv_source argv(std::vector<std::string>{
-        "--cluster-node-999999999999999999-endpoint-port=90"});
+        "--cluster-node-4294967295-endpoint-port=90"});
     argv.recognize_with(nucleus::recognizer_of(space));
 
     auto loaded = nucleus::load_config(

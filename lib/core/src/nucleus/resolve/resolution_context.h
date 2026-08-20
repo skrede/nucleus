@@ -1261,15 +1261,13 @@ private:
         std::string_view segment, std::string_view label,
         std::string_view source_path) const
     {
-        if(segment.size() > 18)
+        auto ordinal = key_path::ordinal_in_domain(segment);
+        if(!ordinal)
             return unexpected(error{errc::malformed_source, nucleus::format(
                 "source '{}': malformed key path '{}': CLI ordinal segment "
-                "'{}' exceeds the maximum of 18 digits",
-                label, source_path, segment)});
-        std::size_t ordinal = 0;
-        for(char const c : segment)
-            ordinal = (ordinal * 10) + static_cast<std::size_t>(c - '0');
-        return ordinal;
+                "'{}' is above the maximum ordinal {}",
+                label, source_path, segment, key_path::max_ordinal)});
+        return static_cast<std::size_t>(*ordinal);
     }
 
     expected<void, resolve_fold_error> rebracket_cli_segment(

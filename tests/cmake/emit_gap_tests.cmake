@@ -3,3 +3,7 @@
 nucleus_add_test(flat_emit_test nucleus::env nucleus::argv nucleus::runtime)
 target_sources(flat_emit_test
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/flat_emit_ordinal_test.cpp)
+
+# The ordinal-domain rejection proof drives argv, env and runtime sources, so it
+# links the flat surfaces alongside the core.
+nucleus_add_test(ordinal_domain_test nucleus::env nucleus::argv nucleus::runtime)

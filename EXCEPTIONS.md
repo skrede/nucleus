@@ -44,7 +44,7 @@ None.
 
 | File | Lines |
 |---|---|
-| `lib/core/src/nucleus/resolve/resolution_context.h` | 1892 |
+| `lib/core/src/nucleus/resolve/resolution_context.h` | 1890 |
 | `lib/core/src/nucleus/resolve/configuration_space.cpp` | 656 |
 | `lib/xml/src/nucleus/xml/xml_source.cpp` | 630 |
 | `lib/core/include/nucleus/detail/expected.h` | 543 |

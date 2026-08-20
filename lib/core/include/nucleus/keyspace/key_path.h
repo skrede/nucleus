@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <utility>
+#include <optional>
 #include <algorithm>
 #include <string_view>
 
@@ -123,26 +124,36 @@ public:
             m_segments.end()));
     }
 
-    // True iff seg is a bracket-indexed token: non-empty base, `[`, one or more
-    // decimal digits (no leading zeros, max 18 digits), `]`.
-    // E.g. "node[0]" -> true, "node[]" -> false, "[0]" -> false.
+    // The largest value std::size_t holds losslessly on every supported platform:
+    // capping acceptance here is what keeps the read APIs on std::size_t unnarrowed.
+    static constexpr std::uint64_t max_ordinal = 4294967295;
+
+    // The value of a decimal digit run of at most ten in-domain digits, else nullopt.
+    static std::optional<std::uint64_t> ordinal_in_domain(std::string_view digits) noexcept
+    {
+        if(digits.empty() || digits.size() > 10)
+            return std::nullopt;
+        std::uint64_t value = 0;
+        for(char const c : digits)
+        {
+            if(c < '0' || c > '9')
+                return std::nullopt;
+            value = (value * 10) + static_cast<std::uint64_t>(c - '0');
+        }
+        return value <= max_ordinal ? std::optional<std::uint64_t>{value} : std::nullopt;
+    }
+
+    // True iff seg is a bracket-indexed token: non-empty base, `[`, an in-domain
+    // decimal ordinal with no leading zeros, `]`.
     static bool is_indexed_segment(std::string_view seg) noexcept
     {
         auto lb = seg.find('[');
-        if(lb == std::string_view::npos || lb == 0)
-            return false;
-        if(seg.back() != ']')
+        if(lb == std::string_view::npos || lb == 0 || seg.back() != ']')
             return false;
         auto digits = seg.substr(lb + 1, seg.size() - lb - 2);
-        if(digits.empty() || digits.size() > 18)
-            return false;
-        // Reject leading zeros (except a lone "0").
         if(digits.size() > 1 && digits[0] == '0')
             return false;
-        for(char const c : digits)
-            if(c < '0' || c > '9')
-                return false;
-        return true;
+        return ordinal_in_domain(digits).has_value();
     }
 
     // The base name of a segment (everything before `[`), or the whole segment
@@ -153,18 +164,11 @@ public:
         return lb == std::string_view::npos ? seg : seg.substr(0, lb);
     }
 
-    // Parses the decimal ordinal from a bracket-indexed segment. Precondition:
-    // is_indexed_segment(seg). Result is the integer between `[` and `]`. The
-    // grammar's 18-digit cap keeps every accepted ordinal inside the fixed
-    // 64-bit width, so the host word size cannot narrow one.
+    // The ordinal of a bracket-indexed segment. Precondition: is_indexed_segment(seg).
     static std::uint64_t ordinal_of(std::string_view seg) noexcept
     {
         auto lb = seg.find('[');
-        auto digits = seg.substr(lb + 1, seg.size() - lb - 2);
-        std::uint64_t value = 0;
-        for(char const c : digits)
-            value = (value * 10) + static_cast<std::uint64_t>(c - '0');
-        return value;
+        return ordinal_in_domain(seg.substr(lb + 1, seg.size() - lb - 2)).value_or(0);
     }
 
     // The canonical `/`-joined string -- the same shape the source seam emits, so
