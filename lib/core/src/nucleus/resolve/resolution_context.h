@@ -1,6 +1,9 @@
 #ifndef HPP_GUARD_NUCLEUS_RESOLVE_RESOLUTION_CONTEXT_H
 #define HPP_GUARD_NUCLEUS_RESOLVE_RESOLUTION_CONTEXT_H
 
+#include "nucleus/resolve/cli_ordinal.h"
+#include "nucleus/resolve/resolve_types.h"
+
 #include "nucleus/error.h"
 #include "nucleus/format.h"
 #include "nucleus/expected.h"
@@ -46,15 +49,6 @@
 
 namespace nucleus {
 
-// The error a resolve fold can report: a source pull failure or a token
-// resolution failure, surfaced verbatim with the offending layer named.
-using resolve_fold_error = error;
-
-// Maximum total reference substitutions across one pass-2 resolve. Stops billion-laughs amplification.
-inline constexpr std::size_t default_reference_budget = 10000;
-// Maximum cross-leaf reference chain depth. Per-value nesting cap (16) stays in expansion_guard.h.
-inline constexpr std::size_t default_reference_depth_cap = 64;
-
 // The transient hand-off vehicle and the convergence keystone. It BORROWS (holds
 // references to) the flat sibling registries it actually consults during a
 // resolve; it does not own them and lives only for the duration of one
@@ -78,6 +72,8 @@ inline constexpr std::size_t default_reference_depth_cap = 64;
 class resolution_context
 {
 public:
+    using layered_handle = nucleus::layered_handle;
+
     resolution_context(const schema_registry &schema,
                         const tokenizer_registry &tokenizer,
                         const converter_registry &converters,
@@ -86,6 +82,7 @@ public:
         , m_tokenizer(tokenizer)
         , m_converters(converters)
         , m_tree_tokenizer(tree_tokenizer)
+        , m_cli_ordinal(m_building, m_provenance, m_schema)
     {
     }
 
@@ -99,27 +96,6 @@ public:
 
     keyspace &building() noexcept { return m_building; }
     provenance &origins() noexcept { return m_provenance; }
-
-    // One entry in the handle-based fold: the erased source, its ascending rank
-    // (cross-source precedence), a human-readable label for provenance, and an
-    // optional inheritance-chain layer ordinal. The layer is present only for
-    // inheritance-chain entries (base lowest); flat sources leave it absent and
-    // are treated as a single flat layer exempt from the slice re-open rules.
-    struct layered_handle
-    {
-        source_handle *handle;
-        std::size_t    rank;
-        std::string    label;
-        owner_token    owner;
-        std::optional<std::size_t>          inheritance_layer;
-        // Set for document sources (derives from entries[i].path); absent for stack/argv/env sources.
-        std::optional<std::filesystem::path> origin_file;
-        // Set for chain-layer handles: points at the batch chain_walker already
-        // pulled during the inheritance walk, so fold() consumes it instead of
-        // pulling the same handle a second time. Null for stack/argv/env layers,
-        // which have no walk phase and are pulled here for the first time.
-        config_source_batch *cached_batch = nullptr;
-    };
 
     // Fold overload that consumes a sequence of layered_handle descriptors.
     // The caller assigns ascending ranks for cross-source precedence; the
@@ -206,7 +182,7 @@ public:
         // merge_keyed_collections()) so the check sees the load's fully
         // materialized, selected-strain keyspace regardless of a keyed or
         // keyed-merge container standing between the fold and the argv layer's rank.
-        m_deferred_cli_overrides.clear();
+        m_cli_ordinal.reset();
 
         // One pass-1 budget shared by every value in this load: a
         // bounded-depth fanout spanning several values is charged against a single
@@ -292,7 +268,7 @@ public:
 
                 const std::string canonical_path = m_schema.canonical_text(path);
 
-                auto cli_deferred = defer_cli_ordinal(
+                auto cli_deferred = m_cli_ordinal.defer(
                     path, repeated_container_prefixes, entry, expanded.value(), *lh);
                 if(!cli_deferred)
                     return unexpected(cli_deferred.error());
@@ -960,38 +936,7 @@ public:
 
     expected<void, resolve_fold_error> apply_deferred_cli_overrides()
     {
-        for(pending_cli_ordinal &override : m_deferred_cli_overrides)
-        {
-            const std::string bracket_prefix = override.container_prefix + "[";
-            std::set<std::size_t> existing_ordinals;
-            for(const key_path &bp : m_building.paths())
-            {
-                const std::string bps = bp.str();
-                if(!bps.starts_with(bracket_prefix))
-                    continue;
-                const auto lb = bps.find('[', override.container_prefix.size());
-                const auto rb = bps.find(']', lb);
-                if(lb == std::string::npos || rb == std::string::npos)
-                    continue;
-                std::size_t slot = 0;
-                for(std::size_t k = lb + 1; k < rb; ++k)
-                    slot = (slot * 10) + static_cast<std::size_t>(bps[k] - '0');
-                existing_ordinals.insert(slot);
-            }
-            if(!existing_ordinals.contains(override.ordinal))
-                return unexpected(error{errc::schema_violation, nucleus::format(
-                    "argv ordinal {} for '{}' is out of range: "
-                    "{} instance(s) exist; out of range",
-                    override.ordinal, override.container_prefix,
-                    existing_ordinals.size())});
-            const origin *existing = m_provenance.of(override.rebracketed.str());
-            if(existing == nullptr || existing->rank <= override.prov.rank)
-            {
-                m_building.set(override.rebracketed, override.val);
-                m_provenance.record(override.rebracketed.str(), override.prov);
-            }
-        }
-        return {};
+        return m_cli_ordinal.apply();
     }
 
     // Pass-2 tree-reference resolution: runs after slice() and before validate().
@@ -1232,104 +1177,8 @@ private:
         origin   prov;
     };
 
-    struct cli_ordinal_path
-    {
-        std::size_t ordinal;
-        std::string container_prefix;
-        key_path rebracketed;
-    };
-
-    struct cli_rebracket_state
-    {
-        std::vector<std::string> segments;
-        std::optional<std::size_t> ordinal;
-        std::string prefix;
-    };
-
     using relayed_instance_groups =
             std::map<std::string, std::vector<std::pair<std::size_t, key_path>>>;
-
-    static bool decimal_segment(std::string_view segment) noexcept
-    {
-        if(segment.empty())
-            return false;
-        return std::ranges::all_of(segment,
-            [](char c) { return c >= '0' && c <= '9'; });
-    }
-
-    expected<std::size_t, resolve_fold_error> cli_ordinal_of(
-        std::string_view segment, std::string_view label,
-        std::string_view source_path) const
-    {
-        auto ordinal = key_path::ordinal_in_domain(segment);
-        if(!ordinal)
-            return unexpected(error{errc::malformed_source, nucleus::format(
-                "source '{}': malformed key path '{}': CLI ordinal segment "
-                "'{}' is above the maximum ordinal {}",
-                label, source_path, segment, key_path::max_ordinal)});
-        return static_cast<std::size_t>(*ordinal);
-    }
-
-    expected<void, resolve_fold_error> rebracket_cli_segment(
-        cli_rebracket_state &state, const std::string &segment,
-        const std::set<std::string> &repeated, std::string_view label,
-        std::string_view source_path) const
-    {
-        key_path container{state.segments};
-        if(state.segments.empty() || !decimal_segment(segment)
-           || !repeated.contains(m_schema.canonical_text(container)))
-        {
-            state.segments.push_back(segment);
-            return {};
-        }
-        auto parsed = cli_ordinal_of(segment, label, source_path);
-        if(!parsed)
-            return unexpected(parsed.error());
-        state.ordinal = parsed.value();
-        state.prefix = container.str();
-        state.segments.back() += "[" + std::to_string(*state.ordinal) + "]";
-        return {};
-    }
-
-    expected<std::optional<cli_ordinal_path>, resolve_fold_error>
-    rebracket_cli_ordinals(const key_path &path,
-                           const std::set<std::string> &repeated,
-                           std::string_view label,
-                           std::string_view source_path) const
-    {
-        cli_rebracket_state state;
-        for(const std::string &segment : path.segments())
-        {
-            auto rebracketed = rebracket_cli_segment(
-                state, segment, repeated, label, source_path);
-            if(!rebracketed)
-                return unexpected(rebracketed.error());
-        }
-        if(!state.ordinal)
-            return std::optional<cli_ordinal_path>{std::nullopt};
-        return std::optional<cli_ordinal_path>{
-            cli_ordinal_path{*state.ordinal, std::move(state.prefix),
-                             key_path{std::move(state.segments)}}};
-    }
-
-    expected<bool, resolve_fold_error> defer_cli_ordinal(
-        const key_path &path, const std::set<std::string> &repeated,
-        const keyspace_entry &entry, std::string &expanded,
-        const layered_handle &layer)
-    {
-        auto target = rebracket_cli_ordinals(
-            path, repeated, layer.label, entry.path);
-        if(!target)
-            return unexpected(target.error());
-        if(!target.value())
-            return false;
-        cli_ordinal_path ordinal = std::move(*target.value());
-        m_deferred_cli_overrides.push_back(
-            {ordinal.ordinal, std::move(ordinal.container_prefix),
-             std::move(ordinal.rebracketed), value::owned(std::move(expanded)),
-             origin{layer.rank, layer.label, layer.owner, layer.inheritance_layer}});
-        return true;
-    }
 
     // Recursive single-leaf resolver for pass-2. Resolves `kp`'s value by first
     // ensuring all leaves it references are themselves resolved (depth-first).
@@ -1874,15 +1723,7 @@ private:
     std::map<std::string, std::vector<keyed_instance_entry>> m_keyed_accumulator;
     std::map<std::string, std::string> m_actual_to_canonical;
 
-    struct pending_cli_ordinal
-    {
-        std::size_t     ordinal;
-        std::string     container_prefix;
-        key_path        rebracketed;
-        value           val;
-        origin          prov;
-    };
-    std::vector<pending_cli_ordinal> m_deferred_cli_overrides;
+    cli_ordinal m_cli_ordinal;
 };
 
 }
