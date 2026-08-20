@@ -1,3 +1,13 @@
+// xml_persist: load a config from XML, then persist it back to XML.
+//
+// nucleus::xml::render_document takes a resolved config together with the space that
+// declared it and builds a well-formed XML document through the pugixml write API --
+// entirely inside the xml module, so no pugixml type crosses into core. The space is
+// what lets the emitter distinguish a repeated leaf from a scalar one, so all of a
+// repeated leaf's values persist. This is the resolved-config -> XML direction (the
+// inverse of reading); the document comes back as owned storage and the user owns
+// persistence (here, std::cout).
+
 #include "nucleus/config.h"
 #include "nucleus/config_space.h"
 
@@ -12,9 +22,15 @@
 
 namespace {
 
+// A server container with a host leaf and a repeated tag leaf.
 bool define_space(nucleus::config_space_builder &builder)
 {
-    return builder.register_element(nucleus::element("server", nucleus::anchor::root())) && builder.register_element(nucleus::element("host", nucleus::anchor::keyspace("server"))) && builder.register_element(nucleus::repeated_element("tag", nucleus::anchor::keyspace("server")));
+    return builder.register_element(
+                   nucleus::element("server", nucleus::anchor::root())) &&
+            builder.register_element(
+                    nucleus::element("host", nucleus::anchor::keyspace("server"))) &&
+            builder.register_element(
+                    nucleus::repeated_element("tag", nucleus::anchor::keyspace("server")));
 }
 
 nucleus::load_result load_values(const nucleus::config_space &space)

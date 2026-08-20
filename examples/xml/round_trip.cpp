@@ -1,3 +1,14 @@
+// round_trip: resolve one config, then render it through three source formats.
+//
+// A runtime_source builds the scalar base in code via chained .set() -- no document,
+// no parser. A small XML overlay supplies the repeated tag values (a flat source can
+// carry at most one value per repeated field per layer, so the duplicate_keys-capable
+// XML source is what genuinely supplies a repeated field). load unifies them, then
+// the ONE resolved config is rendered as XML (nested), env (KEY=value), and
+// args (--KEY=value). Each emitter models the format-agnostic config_emitter seam and
+// returns owned storage, so the caller decides what reaches a stream. The repeated
+// tag keeps all its values in every format.
+
 #include "nucleus/config.h"
 #include "nucleus/config_space.h"
 
@@ -19,11 +30,24 @@
 
 namespace {
 
+// A server container with a host leaf, a constrained mode leaf, and a repeated
+// tag leaf.
 bool define_space(nucleus::config_space_builder &builder)
 {
-    return builder.register_element(nucleus::element("server", nucleus::anchor::root())) && builder.register_element(nucleus::element("host", nucleus::anchor::keyspace("server"))) && builder.register_element(nucleus::enum_element("mode", nucleus::anchor::keyspace("server"), {"primary", "secondary"})) && builder.register_element(nucleus::repeated_element("tag", nucleus::anchor::keyspace("server")));
+    return builder.register_element(
+                   nucleus::element("server", nucleus::anchor::root())) &&
+            builder.register_element(
+                    nucleus::element("host", nucleus::anchor::keyspace("server"))) &&
+            builder.register_element(
+                    nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
+                                          {"primary", "secondary"})) &&
+            builder.register_element(
+                    nucleus::repeated_element("tag", nucleus::anchor::keyspace("server")));
 }
 
+// The runtime_source sits at stack[0] and carries the scalars; the document
+// overlay arrives through load_options at higher precedence and is the only
+// layer that can supply more than one `tag`.
 nucleus::load_result load_values(const nucleus::config_space &space)
 {
     nucleus::runtime_source base;
@@ -70,7 +94,15 @@ int main()
         return 1;
     }
     const nucleus::config &config = loaded.value();
-    if(!print_artifact("# xml template", nucleus::xml::render_template(space)) || !print_artifact("\n# xml document", nucleus::xml::render_document(config, space)) || !print_artifact("\n# env document", nucleus::env::render_document(config)) || !print_artifact("\n# args document", nucleus::argv::render_document(config)))
+    // The blank schema template first, for contrast with the resolved config
+    // rendered through each of the three formats.
+    if(!print_artifact("# xml template", nucleus::xml::render_template(space)))
+        return 1;
+    if(!print_artifact("\n# xml document", nucleus::xml::render_document(config, space)))
+        return 1;
+    if(!print_artifact("\n# env document", nucleus::env::render_document(config)))
+        return 1;
+    if(!print_artifact("\n# args document", nucleus::argv::render_document(config)))
         return 1;
     return 0;
 }
