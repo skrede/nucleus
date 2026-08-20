@@ -221,3 +221,25 @@ jobs:
 
       - name: Run consumer test
         run: ./build-consumer/integration_test
+
+  ordinal-32bit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # No compiler is pinned in this job: g++-multilib carries 32-bit support for
+      # the runner's default g++ only, so pinning a versioned compiler without its
+      # matching multilib package is how this check silently loses its toolchain.
+      - name: Install 32-bit toolchain
+        run: sudo apt-get update && sudo apt-get install -y g++-multilib
+
+      - name: Configure
+        run: >-
+          cmake . -B build
+          -DNUCLEUS_BUILD_TESTS=ON
+
+      # The width check is a custom target outside ALL, so it needs the explicit
+      # --target; it runs the driver with REQUIRE_32BIT on, which turns an absent
+      # 32-bit toolchain into a failure rather than the usual skip.
+      - name: Check ordinal width at 32 bits
+        run: cmake --build build --target ordinal_32bit_check
