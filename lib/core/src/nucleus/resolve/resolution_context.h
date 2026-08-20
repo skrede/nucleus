@@ -8,6 +8,7 @@
 #include "nucleus/resolve/resolve_types.h"
 #include "nucleus/resolve/strain_relay.h"
 #include "nucleus/resolve/repeated_sweep.h"
+#include "nucleus/resolve/strain_pruning.h"
 #include "nucleus/resolve/strain_bucketing.h"
 #include "nucleus/resolve/strain_selection.h"
 #include "nucleus/resolve/keyed_merge_state.h"
@@ -104,6 +105,7 @@ public:
         , m_relay(m_building, m_provenance, m_sweep, m_compaction, m_schema, m_keyed)
         , m_selection(m_building, m_provenance, m_schema)
         , m_layer_rules(m_building, m_provenance, m_schema, m_dispositions)
+        , m_pruning(m_building, m_provenance, m_schema, m_keyed)
     {
     }
 
@@ -192,78 +194,8 @@ public:
         {
             if(!el.identity)
                 continue;
-
-            const key_path    container     = el.container();
-            const std::string identity_path = el.declared_path().str();
-
-            const auto selected = m_selection.select(container, selection);
-            if(!selected)
-                return unexpected(selected.error());
-            const strain_buckets &strains = selected.value().strains;
-            if(strains.empty())
-                continue;
-            const std::string &chosen = selected.value().chosen;
-            const std::size_t  Ld     = selected.value().defining_layer;
-
-            const auto bounds = m_layer_rules.enforce(container, strains, chosen, Ld);
-            if(!bounds)
-                return unexpected(bounds.error());
-            const std::size_t Ls          = bounds.value().competitor_layer;
-            const bool        wide_extend = bounds.value().wide_extend;
-
-            for(const auto &[key_value, paths] : strains)
-            {
-                if(key_value == chosen)
-                    continue;
-                for(const key_path &keyed : paths)
-                {
-                    m_building.remove(keyed);
-                    m_provenance.forget(keyed.str());
-                }
-            }
-
-            // file_level general pre-pass: prune ALL paths whose winning rank
-            // exceeds Ld. This sweeps keyed and general entries alike, and runs
-            // on a snapshot to avoid iterator invalidation during removal.
-            // Guard: if the chosen strain is extend-wide, its entries must survive
-            // the pre-pass to compose regardless of the scope policy.
-            if(policy == strain_scope_policy::file_level)
-            {
-                const std::string chosen_prefix =
-                    container.str() + key_path::separator + chosen + key_path::separator;
-                const std::vector<key_path> snapshot = m_building.paths();
-                for(const key_path &path : snapshot)
-                {
-                    const origin *orig = m_provenance.of(path.str());
-                    // Flat unified-path writes (argv/env) carry no inheritance_layer
-                    // and always win by plain stack precedence, per strain_scope.h's
-                    // documented contract; exempt them from the rank-bounded prune.
-                    if(orig != nullptr && !orig->inheritance_layer.has_value())
-                        continue;
-                    const std::size_t path_rank = orig != nullptr ? orig->rank : 0;
-                    if(path_rank == 0 || path_rank <= Ld)
-                        continue;
-                    // Keyed-merge collections were finalised across layers already;
-                    // never rank-prune them here either.
-                    if(m_keyed.under_keyed_merge(m_schema.canonical_text(path)))
-                        continue;
-                    // The chosen identity always survives; extend-wide preserves
-                    // every other chosen entry for relay_strain as well.
-                    if(path.str().starts_with(chosen_prefix) && (wide_extend || m_schema.canonical_text(path) == identity_path))
-                        continue;
-                    m_building.remove(path);
-                    m_provenance.forget(path.str());
-                }
-            }
-
-            if(auto r = m_relay.relay_strain(strains.at(chosen), identity_path,
-                                             policy, Ld, Ls, wide_extend);
-               !r)
-                return r;
-
-            // The strain's key value named the instance and was consumed; the
-            // enforcer's identity-presence check is satisfied structurally.
-            m_keyed_satisfied.push_back(container.str());
+            if(auto sliced = slice_container(el, selection, policy); !sliced)
+                return sliced;
         }
 
         return {};
@@ -505,6 +437,46 @@ public:
     }
 
 private:
+    expected<void, resolve_fold_error>
+    slice_container(const schema_element &el,
+                    const std::optional<std::string> &selection,
+                    strain_scope_policy policy)
+    {
+        const key_path container = el.container();
+        const auto     selected  = m_selection.select(container, selection);
+        if(!selected)
+            return unexpected(selected.error());
+        if(selected.value().strains.empty())
+            return {};
+        return apply_strain(container, el.declared_path().str(),
+                            selected.value(), policy);
+    }
+
+    // Bounds the chosen strain, removes what it displaces, and relays it onto
+    // the unified hierarchy.
+    expected<void, resolve_fold_error>
+    apply_strain(const key_path &container, std::string_view identity_path,
+                 const strain_selection::chosen_strain &selected,
+                 strain_scope_policy policy)
+    {
+        const strain_buckets &strains = selected.strains;
+        const std::string    &chosen  = selected.chosen;
+        const std::size_t     Ld      = selected.defining_layer;
+        const auto bounds = m_layer_rules.enforce(container, strains, chosen, Ld);
+        if(!bounds)
+            return unexpected(bounds.error());
+        const bool wide = bounds.value().wide_extend;
+        m_pruning.prune(container, identity_path, strains, chosen, policy, Ld, wide);
+        if(auto r = m_relay.relay_strain(strains.at(chosen), identity_path, policy,
+                                         Ld, bounds.value().competitor_layer, wide);
+           !r)
+            return r;
+        // The strain's key value named the instance and was consumed; the
+        // enforcer's identity-presence check is satisfied structurally.
+        m_keyed_satisfied.push_back(container.str());
+        return {};
+    }
+
     // Recursive single-leaf resolver for pass-2. Resolves `kp`'s value by first
     // ensuring all leaves it references are themselves resolved (depth-first).
     // The expansion_guard detects cycles; the cache prevents repeated work.
@@ -595,6 +567,7 @@ private:
     strain_relay m_relay;
     strain_selection m_selection;
     strain_layer_rules m_layer_rules;
+    strain_pruning m_pruning;
 };
 
 }
