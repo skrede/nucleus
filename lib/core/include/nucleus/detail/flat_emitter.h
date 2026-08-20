@@ -2,6 +2,7 @@
 #define HPP_GUARD_NUCLEUS_DETAIL_FLAT_EMITTER_H
 
 #include "nucleus/detail/flat_anchor.h"
+#include "nucleus/detail/flat_record.h"
 
 #include "nucleus/error.h"
 #include "nucleus/config.h"
@@ -17,7 +18,6 @@
 #include <span>
 #include <string>
 #include <vector>
-#include <cstddef>
 #include <utility>
 #include <algorithm>
 #include <string_view>
@@ -38,28 +38,6 @@ inline bool is_flat_leaf(const schema_element           &element,
         if(other.declared_path().str().starts_with(prefix))
             return false;
     return true;
-}
-
-inline bool has_flat_line_break(std::string_view text) noexcept
-{
-    return text.find('\n') != std::string_view::npos || text.find('\r') != std::string_view::npos;
-}
-
-inline expected<void, error> validate_flat_key(std::string_view key)
-{
-    if(!has_flat_line_break(key))
-        return {};
-    return unexpected(error{errc::malformed_source, nucleus::format("flat render: key '{}' carries an embedded newline or carriage return", key)});
-}
-
-inline expected<void, error> validate_flat_value(std::string_view key,
-                                                 std::string_view value)
-{
-    if(!has_flat_line_break(value))
-        return {};
-    return unexpected(error{errc::malformed_source, nucleus::format("flat render: value for key '{}' carries an embedded newline or carriage "
-                                                                    "return",
-                                                                    key)});
 }
 
 inline expected<key_path, error> parse_flat_key(std::string_view key)
@@ -91,63 +69,88 @@ select_flat_keys(const config &config, const key_path &anchor)
     return selected;
 }
 
-inline void append_flat_line(std::string &output, std::string_view prefix,
-                             std::string_view key, std::string_view value)
+template<typename RenderKey>
+expected<flat_record, error> preflight_flat_record(
+        const config &config, const selected_flat_key &key, RenderKey render_key)
 {
-    output.append(prefix);
-    output.append(key);
-    output.push_back('=');
-    output.append(value);
-    output.push_back('\n');
+    if(auto valid = validate_flat_key(key.concrete); !valid)
+        return unexpected(valid.error());
+    auto rendered = render_key(key.relative);
+    if(!rendered)
+        return unexpected(rendered.error());
+    if(auto valid = validate_flat_key(rendered.value()); !valid)
+        return unexpected(valid.error());
+    std::vector<std::string> values = config.get_all(key.concrete);
+    for(const std::string &value : values)
+        if(auto valid = validate_flat_value(key.concrete, value); !valid)
+            return unexpected(valid.error());
+    return flat_record{std::move(rendered).value(), std::move(values)};
 }
 
+template<typename RenderKey>
+expected<std::vector<flat_record>, error> preflight_flat_document(
+        const config    &config,
+        std::string_view prefix, const key_path &anchor, RenderKey render_key)
+{
+    if(auto valid = validate_flat_prefix(prefix); !valid)
+        return unexpected(valid.error());
+    auto selected = select_flat_keys(config, anchor);
+    if(!selected)
+        return unexpected(selected.error());
+    std::vector<flat_record> records;
+    records.reserve(selected.value().size());
+    for(const selected_flat_key &key : selected.value())
+    {
+        auto record = preflight_flat_record(config, key, render_key);
+        if(!record)
+            return unexpected(record.error());
+        records.push_back(std::move(record).value());
+    }
+    return records;
+}
+
+// The whole selection is proven renderable before the first byte is appended, so a
+// rejected selection can never leave a partially spelled artifact behind.
 template<typename RenderKey>
 expected<std::string, error> render_flat_document(const config    &config,
                                                   std::string_view prefix, const key_path &anchor, RenderKey render_key)
 {
-    auto selected = select_flat_keys(config, anchor);
-    if(!selected)
-        return unexpected(selected.error());
+    auto records = preflight_flat_document(config, prefix, anchor, render_key);
+    if(!records)
+        return unexpected(records.error());
     std::string output;
-    for(const selected_flat_key &key : selected.value())
-    {
-        if(auto valid = validate_flat_key(key.concrete); !valid)
-            return unexpected(valid.error());
-        auto rendered = render_key(key.relative);
-        if(!rendered)
-            return unexpected(rendered.error());
-        if(auto valid = validate_flat_key(rendered.value()); !valid)
-            return unexpected(valid.error());
-        for(const std::string &value : config.get_all(key.concrete))
-        {
-            if(auto valid = validate_flat_value(key.concrete, value); !valid)
-                return unexpected(valid.error());
-            append_flat_line(output, prefix, rendered.value(), value);
-        }
-    }
+    for(const flat_record &record : records.value())
+        for(const std::string &value : record.values)
+            append_flat_line(output, prefix, record.key, value);
     return output;
 }
 
-inline void append_allowed_values(std::string          &output,
-                                  const schema_element &element)
+template<typename RenderKey>
+expected<flat_template_record, error> preflight_flat_template_record(
+        const schema_element &element, const key_path &relative, RenderKey render_key)
 {
-    if(element.allowed_values.empty())
-        return;
-    output.append(" # allowed: ");
-    for(std::size_t i = 0; i < element.allowed_values.size(); ++i)
-    {
-        if(i != 0)
-            output.push_back('|');
-        output.append(element.allowed_values[i]);
-    }
+    if(auto valid = validate_flat_key(element.declared_path().str()); !valid)
+        return unexpected(valid.error());
+    auto rendered = render_key(relative);
+    if(!rendered)
+        return unexpected(rendered.error());
+    if(auto valid = validate_flat_key(rendered.value()); !valid)
+        return unexpected(valid.error());
+    for(const std::string &allowed : element.allowed_values)
+        if(auto valid = validate_flat_value(rendered.value(), allowed); !valid)
+            return unexpected(valid.error());
+    return flat_template_record{std::move(rendered).value(), allowed_values_annotation(element.allowed_values)};
 }
 
 template<typename RenderKey>
-expected<std::string, error> render_flat_template(const config_space &space,
-                                                  std::string_view prefix, const key_path &anchor, RenderKey render_key)
+expected<std::vector<flat_template_record>, error> preflight_flat_template(
+        const config_space &space,
+        std::string_view prefix, const key_path &anchor, RenderKey render_key)
 {
+    if(auto valid = validate_flat_prefix(prefix); !valid)
+        return unexpected(valid.error());
     const std::span<const schema_element> elements = space.schema_elements();
-    std::string                           output;
+    std::vector<flat_template_record>     records;
     for(const schema_element &element : elements)
     {
         if(!is_flat_leaf(element, elements))
@@ -157,14 +160,24 @@ expected<std::string, error> render_flat_template(const config_space &space,
             return unexpected(relative.error());
         if(!relative.value())
             continue;
-        auto rendered = render_key(*relative.value());
-        if(!rendered)
-            return unexpected(rendered.error());
-        append_flat_line(output, prefix, rendered.value(), "");
-        output.pop_back();
-        append_allowed_values(output, element);
-        output.push_back('\n');
+        auto record = preflight_flat_template_record(element, *relative.value(), render_key);
+        if(!record)
+            return unexpected(record.error());
+        records.push_back(std::move(record).value());
     }
+    return records;
+}
+
+template<typename RenderKey>
+expected<std::string, error> render_flat_template(const config_space &space,
+                                                  std::string_view prefix, const key_path &anchor, RenderKey render_key)
+{
+    auto records = preflight_flat_template(space, prefix, anchor, render_key);
+    if(!records)
+        return unexpected(records.error());
+    std::string output;
+    for(const flat_template_record &record : records.value())
+        append_flat_line(output, prefix, record.key, record.annotation);
     return output;
 }
 

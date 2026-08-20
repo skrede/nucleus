@@ -14,8 +14,9 @@ namespace nucleus {
 // The flag-side separator of the CLI bijection: the string standing in for the
 // keyspace separator `/` inside a flag (`--a-b-c` <-> `a/b/c`). A validated value
 // type, so a held delimiter is always usable: never empty, never containing `=`
-// (the key/value split would eat it), and never containing `/` unless it IS `/`
-// (the identity mapping). Multi-character delimiters such as `__` are legal.
+// or a line break (the key/value split and the record boundary would move), and
+// never containing `/` unless it IS `/` (the identity mapping). Multi-character
+// delimiters such as `__` are legal.
 //
 // Invertibility stays the host's contract: no schema segment may contain the
 // chosen delimiter as a substring, exactly as segments may not contain `-` under
@@ -27,25 +28,11 @@ public:
 
     static expected<cli_delimiter, std::string> parse(std::string_view text)
     {
-        if(text.empty())
-            return unexpected(std::string("CLI delimiter is empty"));
-        if(text.find('=') != std::string_view::npos)
-            return unexpected(std::string("CLI delimiter '") + std::string(text)
-                        + "' must not contain '='");
-        if(text.size() > 1 && text.find(key_path::separator) != std::string_view::npos)
-            return unexpected(std::string("CLI delimiter '") + std::string(text)
-                        + "' must not contain the keyspace separator '/'");
-        if(text.find('[') != std::string_view::npos
-                || text.find(']') != std::string_view::npos)
-            return unexpected(std::string("CLI delimiter '") + std::string(text)
-                        + "' must not contain '[' or ']' (ordinal-index notation)");
-        bool all_digits = true;
-        for(const char c : text)
-            all_digits = all_digits && (c >= '0' && c <= '9');
-        if(all_digits)
-            return unexpected(std::string("CLI delimiter '") + std::string(text)
-                        + "' must not be all digits (ordinal-index notation)");
-        return cli_delimiter(std::string(text));
+        const std::string reason = rejection_of(text);
+        if(reason.empty())
+            return cli_delimiter(std::string(text));
+        return unexpected(std::string("CLI delimiter '") + std::string(text)
+                    + "' " + reason);
     }
 
     const std::string &str() const noexcept { return m_text; }
@@ -68,6 +55,34 @@ private:
     }
 
     std::string m_text = "-";
+
+    static bool is_all_digits(std::string_view text) noexcept
+    {
+        for(const char c : text)
+            if(c < '0' || c > '9')
+                return false;
+        return true;
+    }
+
+    // Empty when `text` is a usable delimiter, else why it is not.
+    static std::string rejection_of(std::string_view text)
+    {
+        if(text.empty())
+            return "is empty";
+        if(text.find('=') != std::string_view::npos)
+            return "must not contain '='";
+        if(text.find('\n') != std::string_view::npos
+                || text.find('\r') != std::string_view::npos)
+            return "must not contain a newline or a carriage return";
+        if(text.size() > 1 && text.find(key_path::separator) != std::string_view::npos)
+            return "must not contain the keyspace separator '/'";
+        if(text.find('[') != std::string_view::npos
+                || text.find(']') != std::string_view::npos)
+            return "must not contain '[' or ']' (ordinal-index notation)";
+        if(is_all_digits(text))
+            return "must not be all digits (ordinal-index notation)";
+        return {};
+    }
 };
 
 // The inverse projection: a keyspace path back to its canonical CLI flag under the

@@ -7,9 +7,22 @@
 #include <vector>
 #include <utility>
 #include <iterator>
+#include <string_view>
 
 namespace nucleus {
 namespace {
+
+// A key carrying `=`, CR or LF has no faithful flat spelling on any shipped
+// emitter: it would move the record's key/value split or its line boundary. Such a
+// key is malformed input, not an unwritable destination.
+expected<void, error> reject_unrenderable_key(std::string_view key)
+{
+    if(key.find('=') == std::string_view::npos && key.find('\r') == std::string_view::npos && key.find('\n') == std::string_view::npos)
+        return {};
+    return unexpected(error{errc::malformed_source, nucleus::format("config value path '{}' carries '=', a newline or a carriage return, which "
+                                                                    "no flat record can spell",
+                                                                    key)});
+}
 
 expected<std::vector<key_path>, error> parse_value_paths(
         const std::map<std::string, std::string> &values)
@@ -18,6 +31,8 @@ expected<std::vector<key_path>, error> parse_value_paths(
     paths.reserve(values.size());
     for(const auto &[text, ignored] : values)
     {
+        if(auto renderable = reject_unrenderable_key(text); !renderable)
+            return unexpected(std::move(renderable).error());
         auto parsed = key_path::parse(text);
         if(!parsed)
             return unexpected(error{errc::malformed_source, nucleus::format("invalid config value path '{}': {}", text, parsed.error())});

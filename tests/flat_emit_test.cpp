@@ -157,7 +157,7 @@ TEST_CASE("flat validation is scoped to the selected subtree",
           "[flat][emit][argv][anchor][error]")
 {
     const nucleus::config config   = checked_config({{"cluster/port", "8000"},
-                                                     {std::string("outside/bad\nkey"), "ignored"}});
+                                                     {std::string("outside/bad-key"), "ignored"}});
     const auto            selected = nucleus::argv::render_document(
             config, {}, path_of("cluster"));
     REQUIRE(selected);
@@ -167,7 +167,7 @@ TEST_CASE("flat validation is scoped to the selected subtree",
             config, {}, path_of("outside"));
     REQUIRE_FALSE(invalid);
     REQUIRE(invalid.error().code == nucleus::errc::malformed_source);
-    REQUIRE(invalid.error().message.find("outside/bad\nkey") != std::string::npos);
+    REQUIRE(invalid.error().message.find("bad-key") != std::string::npos);
 }
 
 TEST_CASE("a scalar anchor fails before stream output",
