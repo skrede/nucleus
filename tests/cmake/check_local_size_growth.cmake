@@ -1,27 +1,20 @@
-# Ceiling gate for the units one change actually touches. A source that is new, or
-# that already meets the ceilings at the base revision, must meet them now; a source
-# that is already over a ceiling there must not grow past that measurement.
+# Ceiling gate for the units one change actually touches. Every measured unit is inside the
+# line and function ceilings, or inside the figure EXCEPTIONS.md records for it -- a row in
+# the register is the only sanctioned escape. No base revision is read, so a unit is held to
+# the rule as written rather than to whatever an earlier commit happened to measure.
 # C++ and CMake units are measured; anything else is skipped.
 #
 # Usage: cmake -DNUCLEUS_SIZE_FILES='a.h;b.cpp' -P tests/cmake/check_local_size_growth.cmake
-#
-# NUCLEUS_SIZE_BASE_REF names the revision each unit is compared against and defaults
-# to HEAD, which pits staged or working-tree content against the last commit. A caller
-# whose working tree already equals HEAD -- a pull-request check on a merged result --
-# must pass a merge base instead, or every no-growth comparison is against an identical
-# copy and can never fail.
 
 cmake_minimum_required(VERSION 3.20)
+
+include(${CMAKE_CURRENT_LIST_DIR}/size_register.cmake)
 
 set(file_ceiling 200)
 set(function_ceiling 25)
 
 if(NOT DEFINED NUCLEUS_SIZE_FILES)
     message(FATAL_ERROR "NUCLEUS_SIZE_FILES must name the sources to measure")
-endif()
-
-if(NOT DEFINED NUCLEUS_SIZE_BASE_REF)
-    set(NUCLEUS_SIZE_BASE_REF HEAD)
 endif()
 
 find_program(ctags_exe NAMES ctags)
@@ -52,39 +45,36 @@ function(measure_longest_function path out)
     set(${out} ${longest} PARENT_SCOPE)
 endfunction()
 
-# The same source as recorded at the base revision, staged into a scratch copy that keeps
-# the original suffix so ctags still recognizes the language. Empty when the source is new.
-function(base_revision_of path out)
-    get_filename_component(name "${path}" NAME)
-    set(scratch "${CMAKE_CURRENT_BINARY_DIR}/size-gate-base-${name}")
-    execute_process(COMMAND git show "${NUCLEUS_SIZE_BASE_REF}:${path}"
-                    OUTPUT_FILE "${scratch}" ERROR_QUIET RESULT_VARIABLE status)
-    if(NOT status EQUAL 0)
-        file(REMOVE "${scratch}")
-        set(scratch "")
+# Each metric is judged alone. Coupling them refuses a unit that crossed back under one
+# ceiling because the other is still over, which is exactly the work a ceiling wants.
+#
+# The register is consulted even for a metric already inside its ceiling: a row whose unit
+# has fallen back under the ceiling is a row to delete, and the passing path would never
+# reach the lookup that notices. Drift is reported and never refused -- refusing a unit for
+# measuring better than its row would refuse work that improves the tree.
+#
+# A refusal is worded verdict first so the words a caller greps for stay on the first line
+# of the paragraph CMake wraps a fatal message into, however long the path trailing them is.
+function(judge_metric path metric measured ceiling registry out_refusal out_note)
+    set(${out_refusal} "" PARENT_SCOPE)
+    set(${out_note} "${metric} ${measured}" PARENT_SCOPE)
+    registered_figure(${registry} "${path}" figure)
+    if(NOT figure STREQUAL "none" AND measured LESS figure)
+        message(STATUS "${path}: ${metric} ${measured} sits under its registered ${figure} -- tighten that row")
     endif()
-    set(${out} "${scratch}" PARENT_SCOPE)
+    if(NOT measured GREATER ceiling)
+        set(${out_note} "${metric} ${measured} within ${ceiling}" PARENT_SCOPE)
+    elseif(figure STREQUAL "none")
+        set(${out_refusal} "over the ${metric} ceiling of ${ceiling}: ${measured}, no register row -- ${path}" PARENT_SCOPE)
+    elseif(measured GREATER figure)
+        set(${out_refusal} "exceeds the registered ${figure} on ${metric}: ${measured} -- ${path}" PARENT_SCOPE)
+    else()
+        set(${out_note} "${metric} ${measured} within its registered ${figure}" PARENT_SCOPE)
+    endif()
 endfunction()
 
-function(enforce_ceilings path lines longest)
-    if(lines GREATER file_ceiling)
-        message(FATAL_ERROR "${path}: ${lines} lines exceeds the ${file_ceiling}-line ceiling")
-    endif()
-    if(longest GREATER function_ceiling)
-        message(FATAL_ERROR "${path}: longest function is ${longest} lines, over the ${function_ceiling}-line ceiling")
-    endif()
-    message(STATUS "${path}: ${lines} lines, longest function ${longest} -- within ceilings")
-endfunction()
-
-function(enforce_no_growth path lines longest base_lines base_longest)
-    if(lines GREATER base_lines)
-        message(FATAL_ERROR "${path}: grew from ${base_lines} to ${lines} lines while already over a ceiling")
-    endif()
-    if(longest GREATER base_longest)
-        message(FATAL_ERROR "${path}: longest function grew from ${base_longest} to ${longest} lines")
-    endif()
-    message(STATUS "${path}: ${lines} lines (was ${base_lines}), longest function ${longest} (was ${base_longest}) -- no growth")
-endfunction()
+read_size_register()
+set(refusals "")
 
 foreach(path IN LISTS NUCLEUS_SIZE_FILES)
     if(NOT EXISTS "${path}")
@@ -97,17 +87,23 @@ foreach(path IN LISTS NUCLEUS_SIZE_FILES)
     endif()
     measure_lines("${path}" lines)
     measure_longest_function("${path}" longest)
-    base_revision_of("${path}" base_copy)
-    if(base_copy STREQUAL "")
-        enforce_ceilings("${path}" ${lines} ${longest})
-        continue()
+    judge_metric("${path}" "line count" ${lines} ${file_ceiling}
+                 size_register_lines line_refusal line_note)
+    judge_metric("${path}" "function span" ${longest} ${function_ceiling}
+                 size_register_functions span_refusal span_note)
+    if(line_refusal STREQUAL "" AND span_refusal STREQUAL "")
+        message(STATUS "${path}: ${line_note}, ${span_note}")
     endif()
-    measure_lines("${base_copy}" base_lines)
-    measure_longest_function("${base_copy}" base_longest)
-    file(REMOVE "${base_copy}")
-    if(base_lines GREATER file_ceiling OR base_longest GREATER function_ceiling)
-        enforce_no_growth("${path}" ${lines} ${longest} ${base_lines} ${base_longest})
-    else()
-        enforce_ceilings("${path}" ${lines} ${longest})
+    if(NOT line_refusal STREQUAL "")
+        list(APPEND refusals "${line_refusal}")
+    endif()
+    if(NOT span_refusal STREQUAL "")
+        list(APPEND refusals "${span_refusal}")
     endif()
 endforeach()
+
+if(NOT refusals STREQUAL "")
+    list(LENGTH refusals refused)
+    string(REPLACE ";" "\n" report "${refusals}")
+    message(FATAL_ERROR "${refused} refused metric(s):\n${report}")
+endif()

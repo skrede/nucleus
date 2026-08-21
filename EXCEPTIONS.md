@@ -61,10 +61,18 @@ find lib \( -name '*.h' -o -name '*.cpp' \) | sort \
               | sort_by(-.longest, .f) | .[] | "\(.f)\t\(.n)\t\(.longest)"'
 ```
 
-These are the same tool and the same thresholds `tests/cmake/check_local_size_growth.cmake` uses
-to gate a change, so the register and the gate cannot disagree about a unit. The measurements
-below were taken with Universal Ctags 6.2.1 and jq 1.8.2 at the head of the current working
-branch.
+`tests/cmake/check_local_size_growth.cmake` reads this file. A unit within both ceilings passes;
+a unit over one passes only when a table below records a figure it does not exceed, and is refused
+outright when no row names it. The gate uses the same tool and the same thresholds as the recipes
+above, so a row's figure and a gate measurement of the same unit are the same number.
+
+Adding a row is therefore the only way past a ceiling, which is to say it is also a bypass. It is
+accepted as one because it cannot be done quietly: the row is a diff a reviewer reads, arguing for
+the exception in the same change that takes it. Growing past a figure already recorded needs the
+row edited, which is the same diff again.
+
+The measurements below were taken with Universal Ctags 6.2.1 and jq 1.8.2 at the head of the
+current working branch.
 
 ## Where the count stands
 

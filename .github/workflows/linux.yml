@@ -247,9 +247,9 @@ jobs:
   size-gate:
     runs-on: ubuntu-24.04
     steps:
-      # Full history: the gate compares each changed unit against the merge base
-      # with the target branch, and the default shallow clone has neither a
-      # common ancestor to find nor origin/<target> as a fetched ref.
+      # Full history: computing the changed-unit listing needs a common ancestor
+      # with the target branch, and the default shallow clone has neither one to
+      # find nor origin/<target> as a fetched ref.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -269,10 +269,10 @@ jobs:
             exit 1
           fi
 
-      # The base ref is not optional: in CI the working tree is HEAD, so at the
-      # script's HEAD default every no-growth comparison pits a file against an
-      # identical copy of itself and can never fail. ACMR drops deletions, since
-      # the script treats a path it cannot open as a hard failure.
+      # The merge base scopes which units are measured; EXCEPTIONS.md decides what
+      # an over-ceiling unit is held to. Neither role substitutes for the other.
+      # ACMR drops deletions, since the script treats a path it cannot open as a
+      # hard failure.
       - name: Size-ceiling gate
         run: |
           if [ "${{ github.event_name }}" != "pull_request" ]; then
@@ -280,7 +280,7 @@ jobs:
             exit 0
           fi
           base=$(git merge-base "origin/${{ github.base_ref }}" HEAD)
-          echo "measuring against $base"
+          echo "listing units changed since $base"
           files=$(git diff --name-only --diff-filter=ACMR "$base"...HEAD |
             grep -E '\.(h|hpp|cpp|cc|cmake)$|(^|/)CMakeLists\.txt$' |
             paste -sd';') || true
@@ -288,5 +288,5 @@ jobs:
             echo "no measurable units changed"
             exit 0
           fi
-          cmake -DNUCLEUS_SIZE_BASE_REF="$base" -DNUCLEUS_SIZE_FILES="$files" \
+          cmake -DNUCLEUS_SIZE_FILES="$files" \
             -P tests/cmake/check_local_size_growth.cmake
