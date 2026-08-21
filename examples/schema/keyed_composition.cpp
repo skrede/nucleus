@@ -66,41 +66,24 @@ static runtime_source override_output(const char *name, const char *addr)
     return s;
 }
 
-// The override supplies output[0] alone, so {a} is replaced and {b} stays.
-static void show_wholesale_replace()
+int main()
 {
+    // The override supplies output[0] alone, so {a} is replaced and {b} stays.
     show("wholesale_replace (default): base {a,b} + override {c}",
          merge_mode::wholesale_replace, false, base_outputs(),
          override_output("c", "over-c"));
-}
 
-// Layers union -> {a,b,c}.
-static void show_unite()
-{
+    // Layers union -> {a,b,c}.
     show("unite: base {a,b} + override {c}",
          merge_mode::unite, true, base_outputs(), override_output("c", "over-c"));
-}
 
-// A duplicate identifier across layers is loud (strict-additive).
-static void show_unite_duplicate()
-{
+    // A duplicate identifier across layers is loud (strict-additive).
     show("unite: base {a,b} + override redefines {a} (loud)",
          merge_mode::unite, true, base_outputs(), override_output("a", "over-a"));
-}
 
-// Matching 'b' is replaced by the override's whole element -> {a,b,...}.
-static void show_replace_by_key()
-{
+    // Matching 'b' is replaced by the override's whole element -> {a,b,...}.
     show("replace_by_key: base {a,b} + override redefines {b}",
          merge_mode::replace_by_key, true, base_outputs(),
          override_output("b", "over-b"));
-}
-
-int main()
-{
-    show_wholesale_replace();
-    show_unite();
-    show_unite_duplicate();
-    show_replace_by_key();
     return 0;
 }
