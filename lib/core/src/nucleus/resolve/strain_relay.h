@@ -125,7 +125,7 @@ private:
                              canonical == bounds.identity_path};
     }
 
-    // A keyed-merge collection was finalised across layers before the slice ran, so
+    // A keyed-merge collection was finalized across layers before the slice ran, so
     // its instances legitimately span ranks and this pruning must leave them alone:
     // the merge mode overrides the default strain scope freezing.
     static bool excluded(const relayed_entry &entry, const relay_bounds &bounds)

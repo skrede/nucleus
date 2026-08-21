@@ -11,8 +11,8 @@
 #include "nucleus/keyspace/key_path.h"
 
 #include <span>
-#include <string>
 #include <cctype>
+#include <string>
 #include <algorithm>
 
 namespace nucleus {

@@ -48,6 +48,9 @@ public:
     }
 
 private:
+    const keyspace        &m_building;
+    const schema_registry &m_schema;
+
     expected<void, resolve_fold_error>
     check_field(const key_path &container, const schema_element &el,
                 const strain_buckets &strains) const
@@ -81,9 +84,6 @@ private:
         }
         return holders;
     }
-
-    const keyspace        &m_building;
-    const schema_registry &m_schema;
 };
 
 }

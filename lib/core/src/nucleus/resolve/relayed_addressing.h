@@ -72,7 +72,7 @@ public:
 
     // True when a higher-rank instance of the innermost declared repeated scope
     // already holds this unit. A keyed-merge collection is exempt: its instances
-    // legitimately span ranks, having been finalised across layers beforehand.
+    // legitimately span ranks, having been finalized across layers beforehand.
     expected<bool, resolve_fold_error>
     scope_displaced(const unified_target &unified, bool keyed_merge,
                     std::size_t entry_rank) const

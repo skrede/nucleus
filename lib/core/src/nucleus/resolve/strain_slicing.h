@@ -1,8 +1,8 @@
 #ifndef HPP_GUARD_NUCLEUS_RESOLVE_STRAIN_SLICING_H
 #define HPP_GUARD_NUCLEUS_RESOLVE_STRAIN_SLICING_H
 
-#include "nucleus/resolve/resolve_types.h"
 #include "nucleus/resolve/strain_relay.h"
+#include "nucleus/resolve/resolve_types.h"
 #include "nucleus/resolve/repeated_sweep.h"
 #include "nucleus/resolve/strain_pruning.h"
 #include "nucleus/resolve/strain_bucketing.h"
@@ -99,6 +99,14 @@ public:
     }
 
 private:
+    const schema_registry    &m_schema;
+    std::vector<std::string> &m_keyed_satisfied;
+    relayed_compaction        m_compaction;
+    strain_relay              m_relay;
+    strain_pruning            m_pruning;
+    strain_selection          m_selection;
+    strain_layer_rules        m_layer_rules;
+
     expected<void, resolve_fold_error>
     slice_container(const schema_element &el,
                     const std::optional<std::string> &selection,
@@ -138,15 +146,6 @@ private:
         m_keyed_satisfied.push_back(container.str());
         return {};
     }
-
-    const schema_registry    &m_schema;
-    std::vector<std::string> &m_keyed_satisfied;
-
-    relayed_compaction m_compaction;
-    strain_relay       m_relay;
-    strain_pruning     m_pruning;
-    strain_selection   m_selection;
-    strain_layer_rules m_layer_rules;
 };
 
 }

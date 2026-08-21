@@ -13,8 +13,8 @@
 
 #include "nucleus/tokenizer/resolve_error.h"
 #include "nucleus/tokenizer/expansion_guard.h"
-#include "nucleus/tokenizer/tree_resolver_scope.h"
 #include "nucleus/tokenizer/substitution_budget.h"
+#include "nucleus/tokenizer/tree_resolver_scope.h"
 #include "nucleus/tokenizer/tree_tokenizer_registry.h"
 
 #include <string>
@@ -65,6 +65,9 @@ public:
     }
 
 private:
+    keyspace                      &m_building;
+    const tree_tokenizer_registry &m_tree_tokenizer;
+
     // The tree shape is frozen by slice(), so a reference may only appear in a
     // value; one in a key segment would make the tree untraversable.
     expected<void, resolve_fold_error> scan_structural_keys() const
@@ -158,9 +161,6 @@ private:
         m_building.set(kp, value::owned(std::move(resolved).value()));
         return {};
     }
-
-    keyspace                      &m_building;
-    const tree_tokenizer_registry &m_tree_tokenizer;
 };
 
 }

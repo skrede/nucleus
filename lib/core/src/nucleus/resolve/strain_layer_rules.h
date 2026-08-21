@@ -19,9 +19,9 @@
 
 #include <map>
 #include <set>
+#include <limits>
 #include <string>
 #include <vector>
-#include <limits>
 #include <cstddef>
 #include <utility>
 
@@ -68,6 +68,10 @@ public:
     }
 
 private:
+    strain_unique_fields                   m_unique;
+    const provenance                      &m_provenance;
+    const std::vector<extend_disposition> &m_dispositions;
+
     // The first layer ABOVE the defining layer that introduces a competing named
     // strain. A competitor introduced at or below it is not the "next" strain and
     // never bounds the chosen one; unbounded when there is none above.
@@ -164,10 +168,6 @@ private:
                 key_value, container.str())});
         return {};
     }
-
-    strain_unique_fields                   m_unique;
-    const provenance                      &m_provenance;
-    const std::vector<extend_disposition> &m_dispositions;
 };
 
 }

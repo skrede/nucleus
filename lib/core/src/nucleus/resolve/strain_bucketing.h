@@ -44,8 +44,8 @@ inline std::string strain_values(const strain_buckets &strains)
 }
 
 // Sorts one container's paths into strains. It BORROWS the building keyspace it
-// snapshots and the schema it asks what a keyed instance is; it stores neither
-// and keeps no state between calls.
+// snapshots and the schema it asks what a keyed instance is, holding both as
+// references for its lifetime, and keeps no state between calls.
 class strain_bucketing
 {
 public:
@@ -78,6 +78,9 @@ public:
     }
 
 private:
+    const keyspace        &m_building;
+    const schema_registry &m_schema;
+
     // An indexed-shaped segment is a legitimate ordinal only when a repeated
     // element is genuinely declared directly at this container under that base
     // name; otherwise it is a strain whose key value merely happens to be
@@ -114,9 +117,6 @@ private:
             "be keyed by a sibling element's name",
             path.segments()[container.size()], container.str())};
     }
-
-    const keyspace        &m_building;
-    const schema_registry &m_schema;
 };
 
 }

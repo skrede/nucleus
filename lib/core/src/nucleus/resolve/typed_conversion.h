@@ -60,6 +60,12 @@ public:
     }
 
 private:
+    const keyspace                  &m_building;
+    const provenance                &m_provenance;
+    const schema_registry           &m_schema;
+    const converter_registry        &m_converters;
+    std::map<std::string, std::any> &m_typed;
+
     // The element's own converter wins; a typed element carrying none falls back
     // to the registry. Absent for an untyped element, and for a typed one no
     // converter covers at all.
@@ -127,12 +133,6 @@ private:
             "conversion failed for '{}': {} (layer: {})",
             path_str, reason, layer_label)};
     }
-
-    const keyspace                  &m_building;
-    const provenance                &m_provenance;
-    const schema_registry           &m_schema;
-    const converter_registry        &m_converters;
-    std::map<std::string, std::any> &m_typed;
 };
 
 }

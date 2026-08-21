@@ -75,6 +75,10 @@ public:
     }
 
 private:
+    strain_bucketing       m_bucketing;
+    const provenance      &m_provenance;
+    const schema_registry &m_schema;
+
     // A selection against a container holding no keyed instances is
     // unsatisfiable and must fail loudly, never silently resolve to whatever
     // template content exists.
@@ -153,10 +157,6 @@ private:
             "provenance: resolve cannot bound its defining layer",
             chosen, container.str())});
     }
-
-    strain_bucketing       m_bucketing;
-    const provenance      &m_provenance;
-    const schema_registry &m_schema;
 };
 
 }

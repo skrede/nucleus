@@ -1,8 +1,8 @@
 #ifndef HPP_GUARD_NUCLEUS_RESOLVE_RELAYED_COMPACTION_H
 #define HPP_GUARD_NUCLEUS_RESOLVE_RELAYED_COMPACTION_H
 
-#include "nucleus/resolve/resolve_types.h"
 #include "nucleus/resolve/relayed_move.h"
+#include "nucleus/resolve/resolve_types.h"
 #include "nucleus/resolve/keyed_merge_state.h"
 
 #include "nucleus/error.h"

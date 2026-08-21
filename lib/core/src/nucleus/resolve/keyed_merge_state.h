@@ -92,7 +92,7 @@ public:
     }
 
     // True when a canonical path is at or under a container declaring a keyed merge
-    // mode (unite/replace_by_key). Such collections are finalised across layers by
+    // mode (unite/replace_by_key). Such collections are finalized across layers by
     // the keyed merge; the strain slice must relay them verbatim, never rank-prune.
     bool under_keyed_merge(const std::string &canonical_path) const
     {

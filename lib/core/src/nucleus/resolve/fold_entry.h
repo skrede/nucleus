@@ -1,8 +1,8 @@
 #ifndef HPP_GUARD_NUCLEUS_RESOLVE_FOLD_ENTRY_H
 #define HPP_GUARD_NUCLEUS_RESOLVE_FOLD_ENTRY_H
 
-#include "nucleus/resolve/cli_ordinal.h"
 #include "nucleus/resolve/layer_fold.h"
+#include "nucleus/resolve/cli_ordinal.h"
 #include "nucleus/resolve/keyed_divert.h"
 #include "nucleus/resolve/resolve_types.h"
 #include "nucleus/resolve/repeated_sweep.h"

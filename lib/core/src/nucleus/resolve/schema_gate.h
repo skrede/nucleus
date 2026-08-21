@@ -78,6 +78,12 @@ public:
     }
 
 private:
+    const keyspace                 &m_building;
+    const schema_registry          &m_schema;
+    const repeated_sweep           &m_sweep;
+    const std::vector<std::string> &m_keyed_satisfied;
+    config_snapshot_fn              m_snapshot_cb;
+
     // Container-scoped constraint and identity groups enforce over the resolved,
     // sliced tree, on a transient config snapshot so the host-validator valve and
     // member navigation use the real config_node walk. Skipped when no group is
@@ -129,12 +135,6 @@ private:
             known.push_back(path.str());
         return known;
     }
-
-    const keyspace                 &m_building;
-    const schema_registry          &m_schema;
-    const repeated_sweep           &m_sweep;
-    const std::vector<std::string> &m_keyed_satisfied;
-    config_snapshot_fn              m_snapshot_cb;
 };
 
 }

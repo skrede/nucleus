@@ -21,10 +21,10 @@ namespace nucleus {
 
 // Removes what the chosen strain displaces: every non-chosen strain's keyed
 // paths, and -- under the file_level policy -- every remaining path the chosen
-// strain's defining layer outranks. It BORROWS the building keyspace and the
-// provenance, which it is the only strain unit to MUTATE, plus the schema it
-// canonicalizes paths through and the keyed-merge state it asks which
-// collections were already finalised across layers.
+// strain's defining layer outranks. It BORROWS the building keyspace it removes
+// from and the provenance it forgets from, plus the schema it canonicalizes
+// paths through and the keyed-merge state it asks which collections were
+// already finalized across layers.
 class strain_pruning
 {
     // What the file_level pre-pass measures each path against.
@@ -62,6 +62,11 @@ public:
     }
 
 private:
+    keyspace                &m_building;
+    provenance              &m_provenance;
+    const schema_registry   &m_schema;
+    const keyed_merge_state &m_keyed;
+
     void prune_unchosen(const strain_buckets &strains, const std::string &chosen)
     {
         for(const auto &[key_value, paths] : strains)
@@ -94,7 +99,7 @@ private:
         const std::size_t path_rank = orig != nullptr ? orig->rank : 0;
         if(path_rank == 0 || path_rank <= bounds.defining_layer)
             return true;
-        // Keyed-merge collections were finalised across layers already; never
+        // Keyed-merge collections were finalized across layers already; never
         // rank-prune them here either.
         if(m_keyed.under_keyed_merge(m_schema.canonical_text(path)))
             return true;
@@ -110,11 +115,6 @@ private:
         m_building.remove(path);
         m_provenance.forget(path.str());
     }
-
-    keyspace                &m_building;
-    provenance              &m_provenance;
-    const schema_registry   &m_schema;
-    const keyed_merge_state &m_keyed;
 };
 
 }
