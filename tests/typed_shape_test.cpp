@@ -53,6 +53,25 @@ void declare_server_typed(nucleus::config_space_builder &engine)
         nucleus::typed_element<int32_t>("port", anchor::keyspace("cluster/server"))));
 }
 
+nucleus::config_space repeated_typed_cfg_space()
+{
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
+    auto el = nucleus::typed_element<int32_t>("nums", anchor::keyspace("cfg"));
+    el.repeated = true;
+    REQUIRE(engine.register_element(el));
+    return engine.build();
+}
+
+nucleus::config_space repeated_typed_element_cfg_space()
+{
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
+    REQUIRE(engine.register_element(
+        nucleus::repeated_typed_element<int32_t>("nums", anchor::keyspace("cfg"))));
+    return engine.build();
+}
+
 // Document-path chain loader against the explicit stack API.
 nucleus::load_result load_chain(const nucleus::config_space &space,
                                 std::vector<std::string> paths,
@@ -195,84 +214,68 @@ TEST_CASE("typed x pruned strain: selected strain resolves; bad value in pruned 
 // ---------------------------------------------------------------------------
 // Typed x repeated across layers: winning layer collection replaces base
 // ---------------------------------------------------------------------------
-TEST_CASE("typed x repeated across layers: winning layer collection replaces base",
+TEST_CASE("typed x repeated across layers: the winning collection converts fully",
           "[typed][repeated][layers]")
 {
-    SECTION("winning collection converts fully")
-    {
-        nucleus::config_space_builder engine;
-        REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
-        auto el = nucleus::typed_element<int32_t>("nums", anchor::keyspace("cfg"));
-        el.repeated = true;
-        REQUIRE(engine.register_element(el));
-        nucleus::config_space space = engine.build();
+    nucleus::config_space space = repeated_typed_cfg_space();
 
-        auto base_src = xml_of(
-            "<cfg><nums>1</nums><nums>2</nums><nums>3</nums></cfg>");
-        auto derived_src = xml_of(
-            "<cfg><nums>10</nums><nums>20</nums></cfg>");
+    auto base_src = xml_of(
+        "<cfg><nums>1</nums><nums>2</nums><nums>3</nums></cfg>");
+    auto derived_src = xml_of(
+        "<cfg><nums>10</nums><nums>20</nums></cfg>");
 
-        // base_src at lower precedence (stack[0]), derived_src at higher (stack[1]).
-        auto loaded = nucleus::load_config(space,
-            nucleus::source_stack{std::move(base_src), std::move(derived_src)},
-            {});
-        REQUIRE(loaded);
+    // base_src at lower precedence (stack[0]), derived_src at higher (stack[1]).
+    auto loaded = nucleus::load_config(space,
+        nucleus::source_stack{std::move(base_src), std::move(derived_src)},
+        {});
+    REQUIRE(loaded);
 
-        auto r = loaded.value().get_all_as<int32_t>("cfg/nums");
-        REQUIRE(r);
-        REQUIRE(r.value() == std::vector<int32_t>{10, 20});
+    auto r = loaded.value().get_all_as<int32_t>("cfg/nums");
+    REQUIRE(r);
+    REQUIRE(r.value() == std::vector<int32_t>{10, 20});
 
-        auto s = loaded.value().get_all("cfg/nums");
-        REQUIRE(s == std::vector<std::string>{"10", "20"});
-    }
+    auto s = loaded.value().get_all("cfg/nums");
+    REQUIRE(s == std::vector<std::string>{"10", "20"});
+}
 
-    SECTION("bad element in winning collection fails with element index")
-    {
-        nucleus::config_space_builder engine;
-        REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
-        auto el = nucleus::typed_element<int32_t>("nums", anchor::keyspace("cfg"));
-        el.repeated = true;
-        REQUIRE(engine.register_element(el));
-        nucleus::config_space space = engine.build();
+TEST_CASE("typed x repeated across layers: a bad element in the winning collection carries its index",
+          "[typed][repeated][layers]")
+{
+    nucleus::config_space space = repeated_typed_cfg_space();
 
-        auto base_src = xml_of(
-            "<cfg><nums>1</nums><nums>2</nums><nums>3</nums></cfg>");
-        auto derived_src = xml_of(
-            "<cfg><nums>10</nums><nums>notanumber</nums></cfg>");
+    auto base_src = xml_of(
+        "<cfg><nums>1</nums><nums>2</nums><nums>3</nums></cfg>");
+    auto derived_src = xml_of(
+        "<cfg><nums>10</nums><nums>notanumber</nums></cfg>");
 
-        auto loaded = nucleus::load_config(space,
-            nucleus::source_stack{std::move(base_src), std::move(derived_src)},
-            {});
-        REQUIRE(!loaded);
-        INFO("error: " << loaded.error());
-        REQUIRE(loaded.error().message.find("cfg/nums") != std::string::npos);
-        REQUIRE(loaded.error().message.find("[1]") != std::string::npos);
-        REQUIRE(loaded.error().message.find("stack[1]") != std::string::npos);
-    }
+    auto loaded = nucleus::load_config(space,
+        nucleus::source_stack{std::move(base_src), std::move(derived_src)},
+        {});
+    REQUIRE(!loaded);
+    INFO("error: " << loaded.error());
+    REQUIRE(loaded.error().message.find("cfg/nums") != std::string::npos);
+    REQUIRE(loaded.error().message.find("[1]") != std::string::npos);
+    REQUIRE(loaded.error().message.find("stack[1]") != std::string::npos);
+}
 
-    SECTION("bad element only in losing collection does not fail")
-    {
-        nucleus::config_space_builder engine;
-        REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
-        auto el = nucleus::typed_element<int32_t>("nums", anchor::keyspace("cfg"));
-        el.repeated = true;
-        REQUIRE(engine.register_element(el));
-        nucleus::config_space space = engine.build();
+TEST_CASE("typed x repeated across layers: a bad element only in the losing collection does not fail",
+          "[typed][repeated][layers]")
+{
+    nucleus::config_space space = repeated_typed_cfg_space();
 
-        auto base_src = xml_of(
-            "<cfg><nums>1</nums><nums>notanumber</nums></cfg>");
-        auto derived_src = xml_of(
-            "<cfg><nums>10</nums><nums>20</nums></cfg>");
+    auto base_src = xml_of(
+        "<cfg><nums>1</nums><nums>notanumber</nums></cfg>");
+    auto derived_src = xml_of(
+        "<cfg><nums>10</nums><nums>20</nums></cfg>");
 
-        auto loaded = nucleus::load_config(space,
-            nucleus::source_stack{std::move(base_src), std::move(derived_src)},
-            {});
-        REQUIRE(loaded);
+    auto loaded = nucleus::load_config(space,
+        nucleus::source_stack{std::move(base_src), std::move(derived_src)},
+        {});
+    REQUIRE(loaded);
 
-        auto r = loaded.value().get_all_as<int32_t>("cfg/nums");
-        REQUIRE(r);
-        REQUIRE(r.value() == std::vector<int32_t>{10, 20});
-    }
+    auto r = loaded.value().get_all_as<int32_t>("cfg/nums");
+    REQUIRE(r);
+    REQUIRE(r.value() == std::vector<int32_t>{10, 20});
 }
 
 // ---------------------------------------------------------------------------
@@ -464,11 +467,7 @@ TEST_CASE("repeated_typed_element<T> appends within a layer and replaces across 
 {
     SECTION("append accumulates the occurrences WITHIN a single layer")
     {
-        nucleus::config_space_builder engine;
-        REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
-        REQUIRE(engine.register_element(
-            nucleus::repeated_typed_element<int32_t>("nums", anchor::keyspace("cfg"))));
-        nucleus::config_space space = engine.build();
+        nucleus::config_space space = repeated_typed_element_cfg_space();
 
         // One layer carrying several occurrences: the first replaces any lower
         // collection, the rest append -- so all occurrences accumulate in order.
@@ -483,11 +482,7 @@ TEST_CASE("repeated_typed_element<T> appends within a layer and replaces across 
 
     SECTION("equal-rank layers fold in stack insertion order; the later one REPLACES")
     {
-        nucleus::config_space_builder engine;
-        REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
-        REQUIRE(engine.register_element(
-            nucleus::repeated_typed_element<int32_t>("nums", anchor::keyspace("cfg"))));
-        nucleus::config_space space = engine.build();
+        nucleus::config_space space = repeated_typed_element_cfg_space();
 
         // Two SEPARATE sources at adjacent stack positions: stable_sort preserves
         // insertion order, so "second" folds after "first". Replace-across-layers is
@@ -506,11 +501,7 @@ TEST_CASE("repeated_typed_element<T> appends within a layer and replaces across 
 
     SECTION("a higher-rank layer replaces the lower layer's collection")
     {
-        nucleus::config_space_builder engine;
-        REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
-        REQUIRE(engine.register_element(
-            nucleus::repeated_typed_element<int32_t>("nums", anchor::keyspace("cfg"))));
-        nucleus::config_space space = engine.build();
+        nucleus::config_space space = repeated_typed_element_cfg_space();
 
         // base at lower precedence (stack[0]), derived at higher (stack[1]).
         auto loaded = nucleus::load_config(space,

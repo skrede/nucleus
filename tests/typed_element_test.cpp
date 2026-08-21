@@ -111,48 +111,33 @@ TEST_CASE("built-in int32_t converter", "[typed][builtin][integer]")
         REQUIRE(r);
         REQUIRE(r.value() == -1);
     }
+}
 
-    SECTION("empty input")
-    {
-        auto conv = nucleus::make_scalar_converter<int32_t>();
-        auto r = conv("");
-        REQUIRE(!r);
-        REQUIRE(r.error().find("empty") != std::string::npos);
-    }
+TEST_CASE("built-in int32_t converter rejects malformed input", "[typed][builtin][integer]")
+{
+    auto conv = nucleus::make_scalar_converter<int32_t>();
 
-    SECTION("trailing garbage")
-    {
-        auto conv = nucleus::make_scalar_converter<int32_t>();
-        auto r = conv("42abc");
-        REQUIRE(!r);
-        REQUIRE(r.error().find("trailing") != std::string::npos);
-    }
+    auto empty = conv("");
+    REQUIRE(!empty);
+    REQUIRE(empty.error().find("empty") != std::string::npos);
 
-    SECTION("overflow")
-    {
-        auto conv = nucleus::make_scalar_converter<int32_t>();
-        auto r = conv("99999999999");
-        REQUIRE(!r);
-        REQUIRE(r.error().find("out of range") != std::string::npos);
-    }
+    auto trailing = conv("42abc");
+    REQUIRE(!trailing);
+    REQUIRE(trailing.error().find("trailing") != std::string::npos);
 
-    SECTION("leading whitespace rejected")
-    {
-        // std::from_chars does not skip whitespace -- leading space is a failure.
-        auto conv = nucleus::make_scalar_converter<int32_t>();
-        auto r = conv(" 42");
-        REQUIRE(!r);
-    }
+    auto overflowing = conv("99999999999");
+    REQUIRE(!overflowing);
+    REQUIRE(overflowing.error().find("out of range") != std::string::npos);
 
-    SECTION("alphabetic input: invalid characters")
-    {
-        // Pure non-numeric input consumes zero chars; the converter distinguishes
-        // this from a sign-into-wrong-type case and returns "invalid characters".
-        auto conv = nucleus::make_scalar_converter<int32_t>();
-        auto r = conv("abc");
-        REQUIRE(!r);
-        REQUIRE(r.error().find("invalid characters") != std::string::npos);
-    }
+    // std::from_chars does not skip whitespace -- leading space is a failure.
+    auto spaced = conv(" 42");
+    REQUIRE(!spaced);
+
+    // Pure non-numeric input consumes zero chars; the converter distinguishes
+    // this from a sign-into-wrong-type case and returns "invalid characters".
+    auto alphabetic = conv("abc");
+    REQUIRE(!alphabetic);
+    REQUIRE(alphabetic.error().find("invalid characters") != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------
@@ -603,31 +588,32 @@ TEST_CASE("get_as error distinctions", "[typed][accessor][errors]")
         INFO("error: " << r.error());
         REQUIRE(r.error().message.find("type mismatch") != std::string::npos);
     }
+}
 
-    SECTION("get_as on a repeated typed path returns index_required for plain path")
-    {
-        nucleus::config_space_builder engine;
-        REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
-        auto el = nucleus::typed_element<int32_t>("nums", anchor::keyspace("cfg"));
-        el.repeated = true;
-        REQUIRE(engine.register_element(el));
+TEST_CASE("get_as on a repeated typed path returns index_required for a plain path",
+          "[typed][accessor][errors]")
+{
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
+    auto el = nucleus::typed_element<int32_t>("nums", anchor::keyspace("cfg"));
+    el.repeated = true;
+    REQUIRE(engine.register_element(el));
 
-        auto src = xml_of("<cfg><nums>1</nums><nums>2</nums></cfg>");
-        auto loaded = resolve_one(engine, std::move(src));
-        REQUIRE(loaded);
+    auto src = xml_of("<cfg><nums>1</nums><nums>2</nums></cfg>");
+    auto loaded = resolve_one(engine, std::move(src));
+    REQUIRE(loaded);
 
-        // Unindexed path crossing a repeated container returns index_required,
-        // not absent_key. Use get_all_as() to gather all instances, or get_as() with
-        // an explicit index (e.g. "cfg/nums[0]") for a single instance.
-        auto r_plain = loaded.value().get_as<int32_t>("cfg/nums");
-        REQUIRE(!r_plain);
-        REQUIRE(r_plain.error().code == nucleus::errc::index_required);
+    // Unindexed path crossing a repeated container returns index_required,
+    // not absent_key. Use get_all_as() to gather all instances, or get_as() with
+    // an explicit index (e.g. "cfg/nums[0]") for a single instance.
+    auto r_plain = loaded.value().get_as<int32_t>("cfg/nums");
+    REQUIRE(!r_plain);
+    REQUIRE(r_plain.error().code == nucleus::errc::index_required);
 
-        // Indexed paths carry the typed value.
-        auto r0 = loaded.value().get_as<int32_t>("cfg/nums[0]");
-        REQUIRE(r0);
-        REQUIRE(r0.value() == 1);
-    }
+    // Indexed paths carry the typed value.
+    auto r0 = loaded.value().get_as<int32_t>("cfg/nums[0]");
+    REQUIRE(r0);
+    REQUIRE(r0.value() == 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -788,35 +774,36 @@ TEST_CASE("typed + identity: resolve interaction", "[typed][identity][resolve]")
         REQUIRE(id_str.has_value());
         REQUIRE(*id_str == "42");
     }
+}
 
-    SECTION("typed identity key absent from keyspace text does not break resolve")
-    {
-        // When the document omits the key's leaf element entirely (the key value
-        // appears only as a path segment after slice), the converter finds no leaf
-        // at container/id and silently skips it. Resolve still succeeds.
-        nucleus::config_space_builder engine;
+TEST_CASE("typed identity key absent from keyspace text does not break resolve",
+          "[typed][identity][resolve]")
+{
+    // When the document omits the key's leaf element entirely (the key value
+    // appears only as a path segment after slice), the converter finds no leaf
+    // at container/id and silently skips it. Resolve still succeeds.
+    nucleus::config_space_builder engine;
 
-        REQUIRE(engine.register_element(nucleus::element("container", anchor::root())));
-        auto id_el = nucleus::typed_element<int32_t>("id",
-                                                      anchor::keyspace("container"));
-        id_el.identity = true;
-        REQUIRE(engine.register_element(id_el));
-        REQUIRE(engine.register_element(
-            nucleus::typed_element<int32_t>("score", anchor::keyspace("container"))));
+    REQUIRE(engine.register_element(nucleus::element("container", anchor::root())));
+    auto id_el = nucleus::typed_element<int32_t>("id",
+                                                  anchor::keyspace("container"));
+    id_el.identity = true;
+    REQUIRE(engine.register_element(id_el));
+    REQUIRE(engine.register_element(
+        nucleus::typed_element<int32_t>("score", anchor::keyspace("container"))));
 
-        // Document: one keyed instance.  The xml_source represents the key value
-        // as the id child element, so the fold produces container/42/id=42 and
-        // container/42/score=100. After slice, container/id=42 and container/score=100
-        // are present; both typed paths convert. The test above covers that path.
-        // This section simply confirms attach+resolve with the typed identity flag
-        // does not introduce any invariant violation.
-        auto src = xml_of(
-            "<container>"
-            "  <id>7</id>"
-            "  <score>5</score>"
-            "</container>");
-        auto loaded = resolve_one(engine, std::move(src));
-        REQUIRE(loaded);
-        REQUIRE(!loaded.value().empty());
-    }
+    // Document: one keyed instance.  The xml_source represents the key value
+    // as the id child element, so the fold produces container/42/id=42 and
+    // container/42/score=100. After slice, container/id=42 and container/score=100
+    // are present; both typed paths convert. The test above covers that path.
+    // This one simply confirms attach+resolve with the typed identity flag
+    // does not introduce any invariant violation.
+    auto src = xml_of(
+        "<container>"
+        "  <id>7</id>"
+        "  <score>5</score>"
+        "</container>");
+    auto loaded = resolve_one(engine, std::move(src));
+    REQUIRE(loaded);
+    REQUIRE(!loaded.value().empty());
 }

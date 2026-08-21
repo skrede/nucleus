@@ -78,6 +78,56 @@ nucleus::load_result load_chain(const nucleus::config_space &space,
     return nucleus::load_config(space, nucleus::source_stack{}, opts);
 }
 
+// Wraps an xml_source but reports a caller-supplied capability descriptor
+// instead of xml_source's own, so an admissibility policy can be made to
+// reject exactly the documents a test targets.
+struct capped_xml_source
+{
+    nucleus::xml_source src;
+    nucleus::capability_descriptor caps;
+
+    nucleus::capability_descriptor capabilities() const { return caps; }
+    void apply_projection(const nucleus::schema_projection &p) { src.apply_projection(p); }
+    nucleus::inherit_declaration inheritance() const { return src.inheritance(); }
+    nucleus::config_source_result pull() { return src.pull(); }
+};
+
+const char *const chain_a_doc = R"(<cluster><server name="web"><port>80</port></server></cluster>)";
+const char *const chain_b_doc =
+    R"(<cluster inherit="a.xml"><server name="web" extend="wide"><protocol>tcp</protocol></server></cluster>)";
+const char *const chain_c_doc = R"(<cluster><server name="orphan"><port>1</port></server></cluster>)";
+const char *const chain_d_doc =
+    R"(<cluster inherit="c.xml"><server name="orphan" extend="wide"><protocol>udp</protocol></server></cluster>)";
+
+// Wraps an xml_source and increments a shared counter on every pull(),
+// forwarding capabilities()/apply_projection()/inheritance()/pull() to the
+// wrapped source unchanged -- satisfies config_source plus the optional
+// projects_source/inheriting_source refinements by duck typing, exactly as
+// xml_source itself does.
+struct counting_xml_source
+{
+    nucleus::xml_source  src;
+    std::shared_ptr<int> pull_count;
+
+    static nucleus::capability_descriptor capabilities()
+    {
+        return nucleus::xml_source::capabilities();
+    }
+
+    void apply_projection(const nucleus::schema_projection &projection)
+    {
+        src.apply_projection(projection);
+    }
+
+    nucleus::inherit_declaration inheritance() const { return src.inheritance(); }
+
+    nucleus::config_source_result pull()
+    {
+        ++*pull_count;
+        return src.pull();
+    }
+};
+
 }
 
 // ---------------------------------------------------------------------------
@@ -437,27 +487,6 @@ TEST_CASE("admissibility reject-all fails naming the parent in a two-file chain"
 TEST_CASE("directly-requested source reached as an inherited parent is exempt "
           "from admissibility regardless of request order", "[chain]")
 {
-    // Wraps an xml_source but reports a caller-supplied capability descriptor
-    // instead of xml_source's own, so the admissibility policy below can be
-    // made to reject exactly the documents the test targets.
-    struct capped_xml_source
-    {
-        nucleus::xml_source src;
-        nucleus::capability_descriptor caps;
-
-        nucleus::capability_descriptor capabilities() const { return caps; }
-        void apply_projection(const nucleus::schema_projection &p) { src.apply_projection(p); }
-        nucleus::inherit_declaration inheritance() const { return src.inheritance(); }
-        nucleus::config_source_result pull() { return src.pull(); }
-    };
-
-    const char *a_doc = R"(<cluster><server name="web"><port>80</port></server></cluster>)";
-    const char *b_doc =
-        R"(<cluster inherit="a.xml"><server name="web" extend="wide"><protocol>tcp</protocol></server></cluster>)";
-    const char *c_doc = R"(<cluster><server name="orphan"><port>1</port></server></cluster>)";
-    const char *d_doc =
-        R"(<cluster inherit="c.xml"><server name="orphan" extend="wide"><protocol>udp</protocol></server></cluster>)";
-
     nucleus::config_space_builder engine;
     declare_cluster(engine);
     nucleus::config_space space = engine.build();
@@ -476,16 +505,16 @@ TEST_CASE("directly-requested source reached as an inherited parent is exempt "
         const std::string name = filename_of(path);
         if(name == "a.xml")
             return nucleus::source_handle(capped_xml_source{
-                nucleus::xml_source::from(nucleus::xml_source_options::of_string(a_doc)), bare});
+                nucleus::xml_source::from(nucleus::xml_source_options::of_string(chain_a_doc)), bare});
         if(name == "b.xml")
             return nucleus::source_handle(capped_xml_source{
-                nucleus::xml_source::from(nucleus::xml_source_options::of_string(b_doc)), nested});
+                nucleus::xml_source::from(nucleus::xml_source_options::of_string(chain_b_doc)), nested});
         if(name == "c.xml")
             return nucleus::source_handle(capped_xml_source{
-                nucleus::xml_source::from(nucleus::xml_source_options::of_string(c_doc)), bare});
+                nucleus::xml_source::from(nucleus::xml_source_options::of_string(chain_c_doc)), bare});
         if(name == "d.xml")
             return nucleus::source_handle(capped_xml_source{
-                nucleus::xml_source::from(nucleus::xml_source_options::of_string(d_doc)), nested});
+                nucleus::xml_source::from(nucleus::xml_source_options::of_string(chain_d_doc)), nested});
         return nucleus::source_handle(nucleus::env_source{});
     };
 
@@ -1022,35 +1051,6 @@ TEST_CASE("duplicate-canonical path reached two ways resolves deterministically 
 // ---------------------------------------------------------------------------
 TEST_CASE("each chain document is pulled exactly once per load", "[chain]")
 {
-    // Wraps an xml_source and increments a shared counter on every pull(),
-    // forwarding capabilities()/apply_projection()/inheritance()/pull() to the
-    // wrapped source unchanged -- satisfies config_source plus the optional
-    // projects_source/inheriting_source refinements by duck typing, exactly as
-    // xml_source itself does.
-    struct counting_xml_source
-    {
-        nucleus::xml_source  src;
-        std::shared_ptr<int> pull_count;
-
-        static nucleus::capability_descriptor capabilities()
-        {
-            return nucleus::xml_source::capabilities();
-        }
-
-        void apply_projection(const nucleus::schema_projection &projection)
-        {
-            src.apply_projection(projection);
-        }
-
-        nucleus::inherit_declaration inheritance() const { return src.inheritance(); }
-
-        nucleus::config_source_result pull()
-        {
-            ++*pull_count;
-            return src.pull();
-        }
-    };
-
     const char *base_doc =
         R"(<cluster><server name="web"><port>80</port></server></cluster>)";
     const char *derived_doc =

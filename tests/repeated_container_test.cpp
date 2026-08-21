@@ -509,19 +509,19 @@ TEST_CASE("Repeated element with no identity or unique attaches and loads",
         REQUIRE(loaded);
         REQUIRE(loaded.value().get("cluster/node[0]/port") == "80");
     }
+}
 
-    SECTION("repeated + unique combination is rejected at attach")
-    {
-        // unique requires a single comparable value; that is incompatible with
-        // repeated (a collection). The registry must reject this at attach time.
-        nucleus::schema_registry reg;
-        REQUIRE(reg.attach(nucleus::element("cluster", anchor::root())));
-        nucleus::schema_element el = nucleus::repeated_element("tag", anchor::keyspace("cluster"));
-        el.unique = true;
-        auto result = reg.attach(std::move(el));
-        REQUIRE_FALSE(result);
-        REQUIRE(result.error().find("unique") != std::string::npos);
-    }
+TEST_CASE("Repeated combined with unique is rejected at attach", "[repeated_container]")
+{
+    // unique requires a single comparable value; that is incompatible with
+    // repeated (a collection). The registry must reject this at attach time.
+    nucleus::schema_registry reg;
+    REQUIRE(reg.attach(nucleus::element("cluster", anchor::root())));
+    nucleus::schema_element el = nucleus::repeated_element("tag", anchor::keyspace("cluster"));
+    el.unique = true;
+    auto result = reg.attach(std::move(el));
+    REQUIRE_FALSE(result);
+    REQUIRE(result.error().find("unique") != std::string::npos);
 }
 
 // ---------------------------------------------------------------------------

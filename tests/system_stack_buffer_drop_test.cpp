@@ -52,6 +52,43 @@ constexpr const char *kDerived =
     "<port>9000</port>"
     "</server>";
 
+config_space chain_space()
+{
+    config_space_builder builder;
+    REQUIRE(builder.register_element(element("server", anchor::root())));
+    REQUIRE(builder.register_element(element("host", anchor::keyspace("server"))));
+    REQUIRE(builder.register_element(element("mode", anchor::keyspace("server"))));
+    REQUIRE(builder.register_element(element("port", anchor::keyspace("server"))));
+    return builder.build();
+}
+
+source_handle chain_document(const std::string &path)
+{
+    const std::string name = filename_of(path);
+    if(name == "base.xml")    return xml_of(kBase);
+    if(name == "derived.xml") return xml_of(kDerived);
+    return source_handle(env_source{});
+}
+
+// Returns with the space, the source_stack, the env overlay and the pugixml arena the XML
+// source viewed into all destroyed. Anything the config still borrowed from them dangles
+// from here on, which is what the reads back in the caller prove it does not.
+load_result load_over_dropped_sources()
+{
+    config_space space = chain_space();
+
+    // The document chain forms the base; env is a stack source that ranks ABOVE the
+    // whole chain and overrides it where the two contest a key.
+    env_source overlay;
+    overlay.set("server/port", "8888");
+
+    load_options opts;
+    opts.document_paths = {"derived.xml"};
+    opts.make_document  = chain_document;
+
+    return load_config(space, source_stack{std::move(overlay)}, opts);
+}
+
 }
 
 TEST_CASE("config outlives dropped source_stack, space, and XML arena on new load path",
@@ -59,42 +96,11 @@ TEST_CASE("config outlives dropped source_stack, space, and XML arena on new loa
 {
     std::optional<config> result;
 
-    {
-        // --- INNER SCOPE: build, load, then DROP everything ---
+    auto loaded = load_over_dropped_sources();
+    REQUIRE(loaded);
+    result = std::move(loaded).value();
 
-        config_space_builder builder;
-        REQUIRE(builder.register_element(element("server", anchor::root())));
-        REQUIRE(builder.register_element(element("host", anchor::keyspace("server"))));
-        REQUIRE(builder.register_element(element("mode", anchor::keyspace("server"))));
-        REQUIRE(builder.register_element(element("port", anchor::keyspace("server"))));
-        config_space space = builder.build();
-
-        // XML document source (views into the pugixml arena) + env overlay.
-        // The document chain forms the base; env is a stack source that ranks
-        // ABOVE the whole chain and overrides it where they contest a key.
-        env_source overlay;
-        overlay.set("server/port", "8888");
-
-        auto make_doc = [](const std::string &path) -> source_handle {
-            const std::string name = filename_of(path);
-            if(name == "base.xml")    return xml_of(kBase);
-            if(name == "derived.xml") return xml_of(kDerived);
-            return source_handle(env_source{});
-        };
-
-        load_options opts;
-        opts.document_paths = {"derived.xml"};
-        opts.make_document  = make_doc;
-
-        auto loaded = load_config(space, source_stack{std::move(overlay)}, opts);
-        REQUIRE(loaded);
-
-        result = std::move(loaded).value();
-
-        // space, source_stack, overlay, and the pugixml arena are all destroyed here.
-    }
-
-    // --- OUTER SCOPE: space + stack + arena are gone ---
+    // The space, the stack and the arena are gone by the time the loader returned.
 
     REQUIRE(result.has_value());
 

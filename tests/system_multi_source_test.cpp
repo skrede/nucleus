@@ -74,39 +74,37 @@ constexpr const char *kDerivedDoc =
     "<mode>primary</mode>"
     "</server>";
 
+// The three-source composition: env at stack[0] setting all three keys, argv at stack[1]
+// setting port only, and the derived-inherits-base document chain at the base ranks below
+// both. Every stack source therefore outranks the document.
+load_result load_composed(const config_space &space)
+{
+    env_source env;
+    env.set("server/host", "env-host")
+       .set("server/mode", "secondary")
+       .set("server/port", "7000");
+
+    argv_source argv(std::vector<std::string>{"--server-port=8080"});
+    argv.recognize_with(recognizer_of(space));
+
+    load_options opts;
+    opts.document_paths = {"derived.xml"};
+    opts.make_document  = [](const std::string &path) -> source_handle {
+        const std::string name = filename_of(path);
+        if(name == "base.xml")    return xml_of(kBaseDoc);
+        if(name == "derived.xml") return xml_of(kDerivedDoc);
+        return source_handle(env_source{});
+    };
+    return load_config(space, source_stack{std::move(env), std::move(argv)}, opts);
+}
+
 }
 
 TEST_CASE("multi-source system load: values, provenance, and cross-source precedence",
           "[system][multi_source]")
 {
     const config_space space = make_space();
-
-    // env sets all three keys (lowest precedence in the source_stack).
-    env_source env;
-    env.set("server/host", "env-host")
-       .set("server/mode", "secondary")
-       .set("server/port", "7000");
-
-    // argv sets port only (higher than env in the source_stack: index 1 > index 0).
-    argv_source argv(std::vector<std::string>{"--server-port=8080"});
-    argv.recognize_with(recognizer_of(space));
-
-    // Document chain: derived inherits from base; it sets host and mode. The chain
-    // forms the base, below both stack sources.
-    auto make_doc = [](const std::string &path) -> source_handle {
-        const std::string name = filename_of(path);
-        if(name == "base.xml")    return xml_of(kBaseDoc);
-        if(name == "derived.xml") return xml_of(kDerivedDoc);
-        return source_handle(env_source{});
-    };
-
-    load_options opts;
-    opts.document_paths = {"derived.xml"};
-    opts.make_document  = make_doc;
-
-    auto loaded = load_config(space,
-                       source_stack{std::move(env), std::move(argv)},
-                       opts);
+    auto loaded = load_composed(space);
     REQUIRE(loaded);
     const config &config = loaded.value();
 

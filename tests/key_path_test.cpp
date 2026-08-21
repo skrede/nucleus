@@ -134,23 +134,20 @@ TEST_CASE("indexed segment helpers", "[key_path][indexed]")
         REQUIRE_FALSE(empty_idx);
         REQUIRE(empty_idx.error().find("malformed indexed segment") != std::string::npos);
     }
+}
 
-    SECTION("is_indexed_segment ends the accepted domain at the ordinal bound")
-    {
-        REQUIRE(key_path::is_indexed_segment("node[4294967295]"));
-        REQUIRE_FALSE(key_path::is_indexed_segment("node[4294967296]"));
-        REQUIRE_FALSE(key_path::is_indexed_segment("node[9999999999]"));
-        REQUIRE_FALSE(key_path::is_indexed_segment("node[99999999999]"));
-        REQUIRE_FALSE(key_path::is_indexed_segment("node[999999999999999999]"));
-    }
+TEST_CASE("indexed segments end at the ordinal bound", "[key_path][indexed]")
+{
+    REQUIRE(key_path::is_indexed_segment("node[4294967295]"));
+    REQUIRE_FALSE(key_path::is_indexed_segment("node[4294967296]"));
+    REQUIRE_FALSE(key_path::is_indexed_segment("node[9999999999]"));
+    REQUIRE_FALSE(key_path::is_indexed_segment("node[99999999999]"));
+    REQUIRE_FALSE(key_path::is_indexed_segment("node[999999999999999999]"));
 
-    SECTION("parse treats an above-bound ordinal as a malformed indexed segment")
-    {
-        // is_indexed_segment rejects it, so parse() surfaces the malformed-segment error.
-        auto result = key_path::parse("cluster/node[4294967296]/port");
-        REQUIRE_FALSE(result);
-        REQUIRE(result.error().find("malformed indexed segment") != std::string::npos);
-    }
+    // is_indexed_segment rejects it, so parse() surfaces the malformed-segment error.
+    auto result = key_path::parse("cluster/node[4294967296]/port");
+    REQUIRE_FALSE(result);
+    REQUIRE(result.error().find("malformed indexed segment") != std::string::npos);
 }
 
 TEST_CASE("is_indexed_segment rejects leading-zero ordinals", "[key_path][indexed][IN01]")

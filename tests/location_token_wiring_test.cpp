@@ -35,6 +35,19 @@ void write_file(const fs::path &path, const std::string &content)
     out << content;
 }
 
+// Removes the two temp directories a test wrote into when it leaves scope.
+struct cleanup_guard
+{
+    const fs::path &da;
+    const fs::path &db;
+    ~cleanup_guard()
+    {
+        std::error_code ec;
+        fs::remove_all(da, ec);
+        fs::remove_all(db, ec);
+    }
+};
+
 }
 
 TEST_CASE("Two files in different directories resolve ${dir.path} to their own directory",
@@ -63,18 +76,7 @@ TEST_CASE("Two files in different directories resolve ${dir.path} to their own d
     write_file(file_a, xml_a);
     write_file(file_b, xml_b);
 
-    // Cleanup on scope exit.
-    struct cleanup_guard
-    {
-        const fs::path &da;
-        const fs::path &db;
-        ~cleanup_guard()
-        {
-            std::error_code ec;
-            fs::remove_all(da, ec);
-            fs::remove_all(db, ec);
-        }
-    } guard{dir_a, dir_b};
+    const cleanup_guard guard{dir_a, dir_b};
 
     auto space = config_space_builder{}.build();
 

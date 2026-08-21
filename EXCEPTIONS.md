@@ -66,6 +66,12 @@ a unit over one passes only when a table below records a figure it does not exce
 outright when no row names it. The gate uses the same tool and the same thresholds as the recipes
 above, so a row's figure and a gate measurement of the same unit are the same number.
 
+The gate reads rows by shape, not by section, and it skips everything between fence markers. The
+recipes above therefore stay documentation however closely they come to resembling a table, and an
+example row written to illustrate the format grants nothing to the unit it names. A row must sit
+outside a fence to count, and no unit may appear twice under one metric: a duplicate is a fatal
+error rather than a silent first-match win.
+
 Adding a row is therefore the only way past a ceiling, which is to say it is also a bypass. It is
 accepted as one because it cannot be done quietly: the row is a diff a reviewer reads, arguing for
 the exception in the same change that takes it. Growing past a figure already recorded needs the
@@ -81,8 +87,8 @@ current working branch.
 | Before the resolution-context and schema-registry decomposition | 46 units | 62 functions in 25 files |
 | Now | 44 units | 47 functions in 23 files |
 
-Two units left the register: `resolution_context.h` fell from 1890 lines to 197, and
-`schema_registry.h` from 534 to 178. The twenty-eight units split out of them are all inside both
+Two units left the register: `resolution_context.h` fell from 1890 lines to 196, and
+`schema_registry.h` from 534 to 178. The twenty-nine units split out of them are all inside both
 ceilings, so none joined. The fifteen over-ceiling functions those two files held — ten and five —
 are gone with them.
 
@@ -114,7 +120,23 @@ to shrink rather than grow.
 What the policy costs is a ratchet, and the ratchet is the point. Because no row can be added, the
 gate refuses any change whose file listing contains an example unit with an over-ceiling function,
 and the only way through is to bring that unit into compliance first. Eighteen example files are in
-that state today. The test tree is clear: every function under `tests/` is within the ceiling.
+that state today.
+
+The test tree carries one exemption, and only the test tree. A Catch2 test-case body — the block a
+`TEST_CASE`, `SCENARIO`, `TEMPLATE_TEST_CASE` or `TEST_CASE_METHOD` macro introduces — is held to a
+ceiling of its own instead of the 25-line function ceiling, which is a guideline for it rather than
+a gate. A body over 60 lines is refused outright and nothing may excuse it: there is no
+test-function table here and none may be added. Ordinary functions under `tests/` keep the 25-line
+ceiling, again with no row available. The 200-line file ceiling is unchanged everywhere.
+
+The exemption reaches neither of the other trees. In `lib/` the 25-line ceiling stays hard and a
+register row remains the only escape; in `examples/` the ceiling stays hard and nothing may be
+registered at all.
+
+It exists because ctags emits no function tag for a macro-introduced body, so until the gate was
+taught to walk them by brace depth it had measured none of the lines holding nearly all the test
+logic. Of the 840 bodies under `tests/` the median is 16 lines and the longest is 60, so 60 refuses
+what no readable scenario needs while leaving setup-heavy integration cases room.
 
 None of this moves the figures in "Where the count stands". Those count registered units, and this
 policy adds no row to any table, so the before-and-after numbers recorded there stand exactly as
@@ -126,7 +148,7 @@ None.
 
 ## Carried — library files over the 200-line ceiling
 
-13 of 153 units.
+13 of 154 units.
 
 | File | Lines |
 |---|---|
@@ -146,16 +168,16 @@ None.
 
 ## Carried — test files over the 200-line ceiling
 
-29 of 144 units. Test units are held to the same ceiling.
+29 of 145 units. Test units are held to the same ceiling.
 
 | File | Lines |
 |---|---|
 | `tests/inherit_chain_test.cpp` | 1118 |
-| `tests/typed_element_test.cpp` | 822 |
+| `tests/typed_element_test.cpp` | 809 |
 | `tests/repeated_container_test.cpp` | 815 |
 | `tests/config_node_test.cpp` | 777 |
 | `tests/argv_source_test.cpp` | 615 |
-| `tests/typed_shape_test.cpp` | 527 |
+| `tests/typed_shape_test.cpp` | 518 |
 | `tests/repeated_element_test.cpp` | 470 |
 | `tests/integration_shape_test.cpp` | 428 |
 | `tests/strain_scope_policy_test.cpp` | 401 |
@@ -174,7 +196,7 @@ None.
 | `tests/pkey_tokenizer_test.cpp` | 226 |
 | `tests/completion_test.cpp` | 223 |
 | `tests/source_stack_test.cpp` | 218 |
-| `tests/system_multi_source_test.cpp` | 216 |
+| `tests/system_multi_source_test.cpp` | 214 |
 | `tests/collection_shapes/identity_pool_scope_test.cpp` | 208 |
 | `tests/source_handle_test.cpp` | 204 |
 | `tests/instance_addressing_test.cpp` | 202 |
@@ -182,7 +204,7 @@ None.
 
 ## Carried — CMake units over the 200-line ceiling
 
-2 of 22 units.
+2 of 24 units.
 
 | File | Lines |
 |---|---|
@@ -232,9 +254,20 @@ sets the decomposition problem.
 
 Not a size ceiling, but debt of the same kind and worth counting in the same place. The project
 instructions say a member is initialized in its constructor's initializer list, never in its
-declaration. Three members still carry an in-declaration initializer. All three were relocated
-verbatim during the resolution-context decomposition rather than fixed, so that the movement
-stayed reviewable as movement.
+declaration.
+
+The table below is **not** a tree-wide count, and reading it as one would be a mistake. It records
+exactly the members the resolution-context decomposition relocated verbatim rather than fixed, so
+that the movement stayed reviewable as movement. Three qualify on that basis.
+
+Others exist outside that scope and are not listed, counted, or waived here — `anchor::m_invalid`
+in `lib/core/include/nucleus/schema/anchor.h`, `cli_flag::m_text` in
+`lib/core/include/nucleus/schema/cli_flag.h`, `argv_source::m_policy` and `argv_source::m_log` in
+`lib/argv/include/nucleus/argv/argv_source.h`, and `chain_walker::m_depth` in
+`lib/core/src/nucleus/resolve/chain_walker.h`, among others. Every one sits in a class that does
+have a constructor, so none is constrained the way `layered_handle` below is. A tree-wide recount
+needs a parser rather than a grep and has not been attempted; until one is done, no total for the
+tree should be quoted from this page.
 
 | Member | Unit |
 |---|---|
