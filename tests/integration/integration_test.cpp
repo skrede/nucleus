@@ -18,19 +18,41 @@
 #include <cstdint>
 #include <iostream>
 
-int main()
+namespace {
+
+bool declare_space(nucleus::config_space_builder &engine)
 {
-    nucleus::config_space_builder engine;
-    const bool registered =
-        engine.register_element(nucleus::element("server", nucleus::anchor::root()))
+    return engine.register_element(nucleus::element("server", nucleus::anchor::root()))
         && engine.register_element(
             nucleus::typed_element<std::int32_t>("port", nucleus::anchor::keyspace("server")))
         && engine.register_element(
             nucleus::element("name", nucleus::anchor::keyspace("server")));
-    if(!registered)
+}
+
+bool read_back(const nucleus::config &config)
+{
+    if(config.get("server/name") != "edge")
+    {
+        std::cerr << "text accessor mismatch\n";
+        return false;
+    }
+
+    auto port = config.get_as<std::int32_t>("server/port");
+    if(!port || port.value() != 8080)
+    {
+        std::cerr << "typed accessor mismatch\n";
+        return false;
+    }
+    return true;
+}
+
+bool consume_runtime_stack()
+{
+    nucleus::config_space_builder engine;
+    if(!declare_space(engine))
     {
         std::cerr << "schema registration rejected\n";
-        return 1;
+        return false;
     }
     nucleus::config_space space = engine.build();
 
@@ -43,26 +65,16 @@ int main()
     if(!loaded)
     {
         std::cerr << "resolve failed: " << loaded.error() << '\n';
-        return 1;
+        return false;
     }
-
-    const nucleus::config &config = loaded.value();
-    if(config.get("server/name") != "edge")
-    {
-        std::cerr << "text accessor mismatch\n";
-        return 1;
-    }
-
-    auto port = config.get_as<std::int32_t>("server/port");
-    if(!port || port.value() != 8080)
-    {
-        std::cerr << "typed accessor mismatch\n";
-        return 1;
-    }
+    return read_back(loaded.value());
+}
 
 #ifdef NUCLEUS_INTEGRATION_WITH_XML
-    // The xml module rides the same install: parse a document through the
-    // exported nucleus::xml target and read a value back.
+// The xml module rides the same install: parse a document through the
+// exported nucleus::xml target and read a value back.
+bool consume_installed_xml()
+{
     auto doc = nucleus::xml_source::from(
         nucleus::xml_source_options::of_string("<server><zone>edge-1</zone></server>"));
     nucleus::config_space_builder xml_engine;
@@ -71,7 +83,7 @@ int main()
              nucleus::element("zone", nucleus::anchor::keyspace("server")))))
     {
         std::cerr << "xml schema registration rejected\n";
-        return 1;
+        return false;
     }
     nucleus::config_space xml_space = xml_engine.build();
     auto xml_loaded = nucleus::load_config(xml_space,
@@ -80,9 +92,23 @@ int main()
     if(!xml_loaded || xml_loaded.value().get("server/zone") != "edge-1")
     {
         std::cerr << "installed xml module failed to resolve\n";
-        return 1;
+        return false;
     }
     std::cout << "installed nucleus::xml consumed: server/zone=edge-1\n";
+    return true;
+}
+#endif
+
+}
+
+int main()
+{
+    if(!consume_runtime_stack())
+        return 1;
+
+#ifdef NUCLEUS_INTEGRATION_WITH_XML
+    if(!consume_installed_xml())
+        return 1;
 #endif
 
     std::cout << "installed nucleus consumed: server/name=edge, server/port=8080 (typed)\n";

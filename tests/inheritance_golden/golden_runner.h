@@ -100,35 +100,36 @@ inline std::string serialize(const nucleus::config &config)
     return out;
 }
 
+inline std::vector<std::string> split_lines(const std::string &text)
+{
+    std::vector<std::string> lines;
+    std::string current;
+    // Tolerate CRLF: strip a trailing '\r' so a golden file checked out with
+    // Windows line endings still compares equal to the LF-serialized actual.
+    const auto flush = [&] {
+        if(!current.empty() && current.back() == '\r')
+            current.pop_back();
+        lines.push_back(current);
+        current.clear();
+    };
+    for(const char c : text)
+    {
+        if(c == '\n')
+            flush();
+        else
+            current.push_back(c);
+    }
+    if(!current.empty())
+        flush();
+    return lines;
+}
+
 // Compares the golden against the actual serialization line by line. Returns the
 // first differing line (1-based, with both sides) or nullopt when identical.
 inline std::optional<std::string> diff(const std::string &expected, const std::string &actual)
 {
-    auto split = [](const std::string &text) {
-        std::vector<std::string> lines;
-        std::string current;
-        // Tolerate CRLF: strip a trailing '\r' so a golden file checked out with
-        // Windows line endings still compares equal to the LF-serialized actual.
-        const auto flush = [&] {
-            if(!current.empty() && current.back() == '\r')
-                current.pop_back();
-            lines.push_back(current);
-            current.clear();
-        };
-        for(const char c : text)
-        {
-            if(c == '\n')
-                flush();
-            else
-                current.push_back(c);
-        }
-        if(!current.empty())
-            flush();
-        return lines;
-    };
-
-    const std::vector<std::string> exp = split(expected);
-    const std::vector<std::string> act = split(actual);
+    const std::vector<std::string> exp = split_lines(expected);
+    const std::vector<std::string> act = split_lines(actual);
     const std::size_t n = std::max(exp.size(), act.size());
     for(std::size_t i = 0; i < n; ++i)
     {

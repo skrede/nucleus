@@ -97,6 +97,29 @@ file function counts included; the only discrepancy was the order of two test fi
 lines, which the earlier recipe left to an unstable sort and the tie-break above now fixes. So the
 missing CMake units were the sole correction the baseline needed.
 
+## What the two trees outside `lib/` may register
+
+The function table below covers library units only, and the example tree has no table of any kind.
+Both omissions are deliberate rather than oversights.
+
+No function outside `lib/` may be registered. A function over the 25-line ceiling in `tests/` or in
+`examples/` has exactly one remedy, which is to be decomposed; there is no row for it to take. The
+example tree goes further and may register nothing at all, line counts included — the absence of an
+example table is the policy, not a gap in the measurements.
+
+The test-file table is the single entry either tree has, and it records line counts only. Those
+twenty-nine units are carried debt awaiting a reorganization of the tree, and that table is expected
+to shrink rather than grow.
+
+What the policy costs is a ratchet, and the ratchet is the point. Because no row can be added, the
+gate refuses any change whose file listing contains an example unit with an over-ceiling function,
+and the only way through is to bring that unit into compliance first. Eighteen example files are in
+that state today. The test tree is clear: every function under `tests/` is within the ceiling.
+
+None of this moves the figures in "Where the count stands". Those count registered units, and this
+policy adds no row to any table, so the before-and-after numbers recorded there stand exactly as
+they were measured.
+
 ## Sanctioned
 
 None.

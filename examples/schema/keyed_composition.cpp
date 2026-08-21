@@ -51,37 +51,56 @@ static void show(const char *title, merge_mode mode, bool with_identity,
     std::cout << "\n\n";
 }
 
+static runtime_source base_outputs()
+{
+    runtime_source s;
+    s.set("endpoints/output[0]/name", "a").set("endpoints/output[0]/addr", "base-a")
+     .set("endpoints/output[1]/name", "b").set("endpoints/output[1]/addr", "base-b");
+    return s;
+}
+
+static runtime_source override_output(const char *name, const char *addr)
+{
+    runtime_source s;
+    s.set("endpoints/output[0]/name", name).set("endpoints/output[0]/addr", addr);
+    return s;
+}
+
+// The override supplies output[0] alone, so {a} is replaced and {b} stays.
+static void show_wholesale_replace()
+{
+    show("wholesale_replace (default): base {a,b} + override {c}",
+         merge_mode::wholesale_replace, false, base_outputs(),
+         override_output("c", "over-c"));
+}
+
+// Layers union -> {a,b,c}.
+static void show_unite()
+{
+    show("unite: base {a,b} + override {c}",
+         merge_mode::unite, true, base_outputs(), override_output("c", "over-c"));
+}
+
+// A duplicate identifier across layers is loud (strict-additive).
+static void show_unite_duplicate()
+{
+    show("unite: base {a,b} + override redefines {a} (loud)",
+         merge_mode::unite, true, base_outputs(), override_output("a", "over-a"));
+}
+
+// Matching 'b' is replaced by the override's whole element -> {a,b,...}.
+static void show_replace_by_key()
+{
+    show("replace_by_key: base {a,b} + override redefines {b}",
+         merge_mode::replace_by_key, true, base_outputs(),
+         override_output("b", "over-b"));
+}
+
 int main()
 {
-    auto base = [] { runtime_source s;
-        s.set("endpoints/output[0]/name", "a").set("endpoints/output[0]/addr", "base-a")
-         .set("endpoints/output[1]/name", "b").set("endpoints/output[1]/addr", "base-b");
-        return s; };
-    auto over_add = [] { runtime_source s;
-        s.set("endpoints/output[0]/name", "c").set("endpoints/output[0]/addr", "over-c");
-        return s; };
-    auto over_redef_b = [] { runtime_source s;
-        s.set("endpoints/output[0]/name", "b").set("endpoints/output[0]/addr", "over-b");
-        return s; };
-    auto over_dup_a = [] { runtime_source s;
-        s.set("endpoints/output[0]/name", "a").set("endpoints/output[0]/addr", "over-a");
-        return s; };
-
-    // Default: the override supplies output[0] alone, so {a} is replaced and {b} stays.
-    show("wholesale_replace (default): base {a,b} + override {c}",
-         merge_mode::wholesale_replace, false, base(), over_add());
-
-    // Unite: layers union -> {a,b,c}.
-    show("unite: base {a,b} + override {c}",
-         merge_mode::unite, true, base(), over_add());
-
-    // Unite: a duplicate identifier across layers is loud (strict-additive).
-    show("unite: base {a,b} + override redefines {a} (loud)",
-         merge_mode::unite, true, base(), over_dup_a());
-
-    // Replace-by-key: matching 'b' replaced by the override's whole element -> {a,b,...}.
-    show("replace_by_key: base {a,b} + override redefines {b}",
-         merge_mode::replace_by_key, true, base(), over_redef_b());
-
+    show_wholesale_replace();
+    show_unite();
+    show_unite_duplicate();
+    show_replace_by_key();
     return 0;
 }

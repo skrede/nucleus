@@ -43,6 +43,16 @@ std::string read_file(const std::filesystem::path &path)
     return buffer.str();
 }
 
+void apply_field(fixture_case &parsed, const std::string &key, const std::string &value)
+{
+    if(key == "input")
+        parsed.inputs.push_back(value);
+    else if(key == "selection")
+        parsed.selection = value;
+    else if(key == "expect_divergence")
+        parsed.expect_divergence = (value == "true");
+}
+
 // Parses a case.txt: `input=<file>` lines (order preserved -> the precedence
 // stack), an optional `selection=<value>` line, and an optional
 // `expect_divergence=true` line. Blank lines and `#` comments are ignored.
@@ -61,14 +71,7 @@ fixture_case parse_case(const std::string &text)
         const auto eq = line.find('=');
         if(eq == std::string::npos)
             continue;
-        const std::string key = line.substr(0, eq);
-        const std::string value = line.substr(eq + 1);
-        if(key == "input")
-            parsed.inputs.push_back(value);
-        else if(key == "selection")
-            parsed.selection = value;
-        else if(key == "expect_divergence")
-            parsed.expect_divergence = (value == "true");
+        apply_field(parsed, line.substr(0, eq), line.substr(eq + 1));
     }
     return parsed;
 }
