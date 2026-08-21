@@ -59,6 +59,13 @@ public:
     {
     }
 
+    // `m_relay` is constructed from `m_compaction`, so a copy or a move would leave the relay driving the source's compaction.
+    strain_slicing(const strain_slicing &) = delete;
+    strain_slicing &operator=(const strain_slicing &) = delete;
+    strain_slicing(strain_slicing &&) = delete;
+    strain_slicing &operator=(strain_slicing &&) = delete;
+    ~strain_slicing() = default;
+
     // Runs between fold and validate.
     //
     // With a selection: the matching named strain survives, non-matching named

@@ -9,6 +9,7 @@
 #include "nucleus/resolve/resolve_types.h"
 #include "nucleus/resolve/repeated_sweep.h"
 #include "nucleus/resolve/strain_slicing.h"
+#include "nucleus/resolve/keyspace_values.h"
 #include "nucleus/resolve/typed_conversion.h"
 #include "nucleus/resolve/keyed_merge_state.h"
 #include "nucleus/resolve/reference_resolution.h"
@@ -76,6 +77,13 @@ public:
     {
     }
 
+    // Every sub-unit below is constructed from this object's own members and one of them captures `this`, so a copy or a move would leave the whole set driving the source.
+    resolution_context(const resolution_context &) = delete;
+    resolution_context &operator=(const resolution_context &) = delete;
+    resolution_context(resolution_context &&) = delete;
+    resolution_context &operator=(resolution_context &&) = delete;
+    ~resolution_context() = default;
+
     // Borrowed by CONST reference and read-only, so concurrent loads on one shared
     // const config_space share nothing mutable and need no synchronization.
     const schema_registry &schema() const noexcept { return m_schema; }
@@ -129,7 +137,7 @@ public:
     // Copies every building value OUT, paired with its provenance, into an immutable config.
     config freeze(std::vector<degradation> degraded = {}) const
     {
-        return {owned_values(), m_typed, m_provenance, std::move(degraded)};
+        return {owned_values(m_building), m_typed, m_provenance, std::move(degraded)};
     }
 
     // 0 maps to the engine default, so a budget is never capped at zero.
@@ -148,16 +156,7 @@ public:
 
 private:
     // config's snapshot constructor is private with this class as its only friend.
-    config group_snapshot() const { return {owned_values(), m_provenance}; }
-
-    std::map<std::string, std::string> owned_values() const
-    {
-        std::map<std::string, std::string> owned;
-        for(const key_path &path : m_building.paths())
-            if(const value *v = m_building.find(path))
-                owned.emplace(path.str(), std::string(v->text()));
-        return owned;
-    }
+    config group_snapshot() const { return {owned_values(m_building), m_provenance}; }
 
     const schema_registry           &m_schema;
     const tokenizer_registry        &m_tokenizer;

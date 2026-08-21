@@ -17,10 +17,14 @@
 namespace nucleus {
 
 // The concrete instance path `path` names under `container`: the container
-// extended by the one segment directly beneath it. Empty when `path` does not
-// descend from `container`, which no real instance path ever is.
+// extended by the one segment directly beneath it. Empty unless `path` is
+// strictly longer than `container` and descends from it -- the length bound is
+// enforced here, and it is what keeps the prefix comparison and the trailing
+// index within the shorter segment vector.
 inline std::string instance_under(const key_path &container, const key_path &path)
 {
+    if(path.size() <= container.size())
+        return {};
     const std::vector<std::string> &outer = container.segments();
     const std::vector<std::string> &inner = path.segments();
     if(!std::equal(outer.begin(), outer.end(), inner.begin()))

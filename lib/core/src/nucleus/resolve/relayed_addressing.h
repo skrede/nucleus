@@ -42,6 +42,7 @@ public:
         , m_sweep(sweep)
         , m_provenance(prov)
         , m_schema(schema)
+        , m_relay_open(false)
     {
     }
 
@@ -51,6 +52,7 @@ public:
     {
         m_repeated_declared   = repeated_declared_paths(m_schema);
         m_repeated_containers = m_schema.repeated_container_paths();
+        m_relay_open          = true;
         return m_repeated_containers;
     }
 
@@ -75,6 +77,8 @@ public:
     scope_displaced(const unified_target &unified, bool keyed_merge,
                     std::size_t entry_rank) const
     {
+        if(!m_relay_open)
+            return unexpected(error{errc::malformed_source, "internal invariant violation: scope_displaced() consulted the relay's cached schema lookups before begin_relay() refreshed them"});
         if(keyed_merge)
             return false;
         const std::string canonical = m_schema.canonical_text(unified.path);
@@ -98,6 +102,9 @@ private:
     const schema_registry &m_schema;
     std::set<std::string>  m_repeated_declared;
     std::set<std::string>  m_repeated_containers;
+    // An empty m_repeated_declared is legitimately reachable after begin_relay() -- a schema
+    // declaring no repeated container -- so the cached sets cannot report their own unset state.
+    bool                   m_relay_open;
 
     bool instance_displaced(const key_path &unified, const std::string &unit,
                             const std::string &scope, bool scope_is_leaf,

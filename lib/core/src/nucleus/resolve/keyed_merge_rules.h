@@ -31,10 +31,17 @@ public:
     // merge-key value, and the diverted leaves that belong to it.
     struct merged_instance
     {
-        std::size_t rank = 0;
-        std::size_t ordinal = 0;
+        merged_instance()
+            : rank(0)
+            , ordinal(0)
+            , has_key(false)
+        {
+        }
+
+        std::size_t rank;
+        std::size_t ordinal;
         std::string key;
-        bool        has_key = false;
+        bool        has_key;
         origin      prov;
         std::vector<keyed_merge_state::keyed_instance_entry *> leaves;
     };
