@@ -14,6 +14,14 @@ endif()
 if(NOT DEFINED WORK_DIR)
     set(WORK_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 endif()
+# INCLUDE_DIRS arrives bar-separated because a CMake list would have split into
+# separate script arguments on the way here.
+string(REPLACE "|" ";" INCLUDE_DIR_LIST "${INCLUDE_DIRS}")
+list(FILTER INCLUDE_DIR_LIST EXCLUDE REGEX "^$")
+set(INCLUDE_FLAGS "")
+foreach(directory IN LISTS INCLUDE_DIR_LIST)
+    list(APPEND INCLUDE_FLAGS "-I${directory}")
+endforeach()
 # The portable core of the first-party warning set: the probe is compiled as a
 # first-party target is, so a narrowing at a std::size_t sink fails this gate
 # instead of passing through it unseen. Only flags both GNU and Clang accept.
@@ -104,12 +112,16 @@ endfunction()
 # One throwaway Win32-generator project, which is how MSVC selects a 32-bit target.
 function(build_win32_probe out)
     set(tree "${WORK_DIR}/ordinal-width-win32")
+    set(quoted "")
+    foreach(directory IN LISTS INCLUDE_DIR_LIST)
+        string(APPEND quoted " \"${directory}\"")
+    endforeach()
     file(WRITE "${tree}/CMakeLists.txt"
          "cmake_minimum_required(VERSION 3.24)\n"
          "project(ordinal_width_win32 CXX)\n"
          "add_executable(ordinal_width_probe_win32 \"${PROBE_SOURCE}\")\n"
          "target_compile_features(ordinal_width_probe_win32 PRIVATE cxx_std_20)\n"
-         "target_include_directories(ordinal_width_probe_win32 PRIVATE \"${INCLUDE_DIRS}\")\n")
+         "target_include_directories(ordinal_width_probe_win32 PRIVATE${quoted})\n")
     set(${out} "${tree}" PARENT_SCOPE)
 endfunction()
 
@@ -149,7 +161,7 @@ endif()
 require_m32_toolchain()
 
 set(binary "${WORK_DIR}/ordinal_width_probe_m32")
-set(command "${CXX_COMPILER}" -m32 -std=c++20 ${PROBE_WARNINGS} "-I${INCLUDE_DIRS}"
+set(command "${CXX_COMPILER}" -m32 -std=c++20 ${PROBE_WARNINGS} ${INCLUDE_FLAGS}
             "${PROBE_SOURCE}" -o "${binary}")
 string(JOIN " " attempted ${command})
 execute_process(COMMAND ${command}

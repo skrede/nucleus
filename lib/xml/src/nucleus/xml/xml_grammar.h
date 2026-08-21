@@ -92,14 +92,22 @@ inline std::optional<std::uint32_t> decode_utf8_tail(std::string_view  text,
     return value;
 }
 
+// MSVC spells std::array's iterator as a class type where libstdc++ and libc++ make
+// it a raw pointer, so a std::find_if result over the table has no portable spelling.
+inline const utf8_shape *utf8_shape_for(std::uint8_t lead) noexcept
+{
+    for(const utf8_shape &shape : utf8_shapes)
+        if(lead >= shape.lead_low && lead <= shape.lead_high)
+            return &shape;
+    return nullptr;
+}
+
 inline std::optional<utf8_code_point> decode_utf8(std::string_view text,
                                                   std::size_t      offset) noexcept
 {
-    const auto        lead  = static_cast<std::uint8_t>(text[offset]);
-    const auto *const shape = std::find_if(utf8_shapes.begin(), utf8_shapes.end(),
-                                           [lead](const utf8_shape &candidate)
-                                           { return lead >= candidate.lead_low && lead <= candidate.lead_high; });
-    if(shape == utf8_shapes.end() || text.size() - offset <= shape->tail_count)
+    const auto              lead  = static_cast<std::uint8_t>(text[offset]);
+    const utf8_shape *const shape = utf8_shape_for(lead);
+    if(shape == nullptr || text.size() - offset <= shape->tail_count)
         return std::nullopt;
     const std::uint32_t leading = shape->tail_count == 0
             ? static_cast<std::uint32_t>(lead)

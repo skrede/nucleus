@@ -15,19 +15,27 @@ target_sources(flat_emit_test
 
 # The ordinal bound has to hold where std::size_t is 32 bits, so this probe compiles
 # against the production headers alone and is run at that actual width rather than
-# simulated at 64. It links no library: the bound, the sort key and the anchor match
-# are header-only, so a single translation unit can be built for the narrower target.
+# simulated at 64. Those headers reach the diagnostic formatting seam, so the probe
+# carries a real link dependency on a standard library without std::format.
 add_executable(ordinal_width_probe ${CMAKE_CURRENT_SOURCE_DIR}/ordinal_width_probe.cpp)
 nucleus_warnings(ordinal_width_probe)
 target_compile_features(ordinal_width_probe PRIVATE cxx_std_20)
-target_include_directories(ordinal_width_probe PRIVATE
-    ${CMAKE_SOURCE_DIR}/lib/core/include)
+target_link_libraries(ordinal_width_probe PRIVATE nucleus::core)
+
+# The sub-compiles below are standalone compiler invocations that inherit nothing from
+# the probe target, so its include set is spelled out here. Bar-separated, because a
+# CMake list would split into separate script arguments on the way into the driver.
+set(ordinal_width_includes ${CMAKE_SOURCE_DIR}/lib/core/include)
+if(NOT NUCLEUS_HAVE_STD_FORMAT)
+    string(APPEND ordinal_width_includes
+        "|$<JOIN:$<TARGET_PROPERTY:fmt::fmt,INTERFACE_INCLUDE_DIRECTORIES>,|>")
+endif()
 
 set(ordinal_width_driver ${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_ordinal_width.cmake)
 set(ordinal_width_args
     -DPROBE_EXE=$<TARGET_FILE:ordinal_width_probe>
     -DPROBE_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/ordinal_width_probe.cpp
-    -DINCLUDE_DIRS=${CMAKE_SOURCE_DIR}/lib/core/include
+    -DINCLUDE_DIRS=${ordinal_width_includes}
     -DCXX_COMPILER=${CMAKE_CXX_COMPILER}
     -DCXX_COMPILER_ID=${CMAKE_CXX_COMPILER_ID}
     -DNATIVE_POINTER_SIZE=${CMAKE_SIZEOF_VOID_P}

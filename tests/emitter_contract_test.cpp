@@ -22,13 +22,13 @@ namespace {
 
 struct owned_emitter
 {
-    nucleus::expected<std::string, nucleus::error>
+    [[maybe_unused]] nucleus::expected<std::string, nucleus::error>
     render_template(const nucleus::config_space &) const
     {
         return std::string{};
     }
 
-    nucleus::expected<std::string, nucleus::error>
+    [[maybe_unused]] nucleus::expected<std::string, nucleus::error>
     render_document(const nucleus::config &, const nucleus::config_space &) const
     {
         return std::string{};
@@ -37,13 +37,13 @@ struct owned_emitter
 
 struct stream_only_emitter
 {
-    nucleus::expected<void, nucleus::error>
+    [[maybe_unused]] nucleus::expected<void, nucleus::error>
     emit_template(const nucleus::config_space &, std::ostream &) const
     {
         return {};
     }
 
-    nucleus::expected<void, nucleus::error>
+    [[maybe_unused]] nucleus::expected<void, nucleus::error>
     emit_document(const nucleus::config &, std::ostream &) const
     {
         return {};
