@@ -14,19 +14,19 @@
 #include <vector>
 #include <iostream>
 
-int main()
+static nucleus::source_stack make_sources()
 {
     nucleus::env_source env;
     env.set("service/region", "eu-west").set("service/tier", "silver");
-
     nucleus::argv_source argv(std::vector<std::string>{"--service-tier=gold"});
+    // Environment is lower precedence than command-line arguments.
+    return nucleus::source_stack{std::move(env), std::move(argv)};
+}
 
-    nucleus::config_space space = nucleus::config_space_builder{}.build();
-
-    // env at lower precedence (stack[0]), argv at higher precedence (stack[1]).
-    auto loaded = nucleus::load_config(space,
-        nucleus::source_stack{std::move(env), std::move(argv)},
-        {});
+int main()
+{
+    nucleus::config_space space  = nucleus::config_space_builder{}.build();
+    auto                  loaded = nucleus::load_config(space, make_sources(), {});
     if(!loaded)
     {
         std::cerr << "resolve failed: " << loaded.error() << '\n';

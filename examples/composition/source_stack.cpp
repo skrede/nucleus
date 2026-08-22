@@ -15,50 +15,48 @@
 #include <vector>
 #include <iostream>
 
-int main()
+static bool define_space(nucleus::config_space_builder &builder)
 {
-    // Schema: a server container with host, port, and mode.
-    nucleus::config_space_builder builder;
-    if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
-        return 1;
-    if(!builder.register_element(nucleus::element("host", nucleus::anchor::keyspace("server"))))
-        return 1;
-    if(!builder.register_element(nucleus::element("port", nucleus::anchor::keyspace("server"))))
-        return 1;
-    if(!builder.register_element(
-        nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
-                              std::vector<std::string>{"primary", "secondary"})))
-        return 1;
-    const nucleus::config_space space = builder.build();
+    return builder.register_element(
+                   nucleus::element("server", nucleus::anchor::root())) &&
+            builder.register_element(
+                    nucleus::element("host", nucleus::anchor::keyspace("server"))) &&
+            builder.register_element(
+                    nucleus::element("port", nucleus::anchor::keyspace("server"))) &&
+            builder.register_element(
+                    nucleus::enum_element(
+                            "mode", nucleus::anchor::keyspace("server"),
+                            std::vector<std::string>{"primary", "secondary"}));
+}
 
-    // Layer 0 (lowest precedence): programmatic defaults.
+static nucleus::runtime_source make_defaults()
+{
     nucleus::runtime_source defaults;
     defaults.set("server/host", "localhost")
             .set("server/port", "8080")
             .set("server/mode", "primary");
+    return defaults;
+}
 
-    // Layer 1: env-style overrides (e.g. from a deploy environment).
+static nucleus::env_source make_environment()
+{
     nucleus::env_source env;
     env.set("server/host", "staging-host")
-       .set("server/mode", "secondary");
+            .set("server/mode", "secondary");
+    return env;
+}
 
-    // Layer 2 (highest precedence): command-line flags, schema-coupled via recognizer_of.
+static nucleus::argv_source make_arguments(const nucleus::config_space &space)
+{
     nucleus::argv_source argv(std::vector<std::string>{"--server-port=9090"});
     argv.recognize_with(nucleus::recognizer_of(space));
+    return argv;
+}
 
-    // Explicit variadic composition: stack order is precedence order, last listed wins.
-    auto loaded = nucleus::load_config(space,
-        nucleus::source_stack{std::move(defaults), std::move(env), std::move(argv)},
-        {});
-    if(!loaded)
-    {
-        std::cerr << "load failed: " << loaded.error() << '\n';
-        return 1;
-    }
-
-    const nucleus::config &config = loaded.value();
-
-    // Print each resolved value and the source layer that supplied it.
+// Provenance confirms environment overrides for host and mode and an argv
+// override for port, while defaults supply no surviving value.
+static void print_resolved(const nucleus::config &config)
+{
     std::cout << "resolved config (last-listed source wins):\n";
     for(const std::string &key : config.keys())
     {
@@ -66,8 +64,27 @@ int main()
         std::cout << "  " << key << " = " << config.get(key).value()
                   << "  (layer rank " << (from ? from->rank : 0) << ")\n";
     }
+}
 
-    // Provenance confirms: env overrode the runtime default for host and mode;
-    // argv overrode env and defaults for port; defaults alone supplied nothing higher.
+int main()
+{
+    nucleus::config_space_builder builder;
+    if(!define_space(builder))
+        return 1;
+    const nucleus::config_space space       = builder.build();
+    nucleus::runtime_source     defaults    = make_defaults();
+    nucleus::env_source         environment = make_environment();
+    nucleus::argv_source        arguments   = make_arguments(space);
+    auto                        loaded      = nucleus::load_config(
+            space,
+            nucleus::source_stack{
+                    std::move(defaults), std::move(environment), std::move(arguments)},
+            {});
+    if(!loaded)
+    {
+        std::cerr << "load failed: " << loaded.error() << '\n';
+        return 1;
+    }
+    print_resolved(loaded.value());
     return 0;
 }

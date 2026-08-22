@@ -13,54 +13,43 @@
 #include <vector>
 #include <iostream>
 
-int main()
+static bool define_space(nucleus::config_space_builder &builder)
 {
-    // One sealed space: the shared authority on layout for every profile.
-    nucleus::config_space_builder builder;
-    if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
-        return 1;
-    if(!builder.register_element(nucleus::element("host", nucleus::anchor::keyspace("server"))))
-        return 1;
-    if(!builder.register_element(nucleus::element("port", nucleus::anchor::keyspace("server"))))
-        return 1;
-    if(!builder.register_element(
-        nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
-                              std::vector<std::string>{"primary", "secondary"})))
-        return 1;
-    const nucleus::config_space space = builder.build();
+    return builder.register_element(
+                   nucleus::element("server", nucleus::anchor::root())) &&
+            builder.register_element(
+                    nucleus::element("host", nucleus::anchor::keyspace("server"))) &&
+            builder.register_element(
+                    nucleus::element("port", nucleus::anchor::keyspace("server"))) &&
+            builder.register_element(
+                    nucleus::enum_element(
+                            "mode", nucleus::anchor::keyspace("server"),
+                            std::vector<std::string>{"primary", "secondary"}));
+}
 
-    // Primary profile stack: its own source, its own values.
+static nucleus::runtime_source make_primary_source()
+{
     nucleus::runtime_source primary_src;
     primary_src.set("server/host", "primary-host")
-               .set("server/port", "8000")
-               .set("server/mode", "primary");
+            .set("server/port", "8000")
+            .set("server/mode", "primary");
+    return primary_src;
+}
 
-    // Secondary profile stack: different source, different values, same space.
+static nucleus::runtime_source make_secondary_source()
+{
     nucleus::runtime_source secondary_src;
     secondary_src.set("server/host", "secondary-host")
-                 .set("server/port", "9000")
-                 .set("server/mode", "secondary");
+            .set("server/port", "9000")
+            .set("server/mode", "secondary");
+    return secondary_src;
+}
 
-    // Two loads from the same space -- stacks are swapped, not the space.
-    auto loaded_primary   = nucleus::load_config(space, nucleus::source_stack{std::move(primary_src)},   {});
-    auto loaded_secondary = nucleus::load_config(space, nucleus::source_stack{std::move(secondary_src)}, {});
-
-    if(!loaded_primary)
-    {
-        std::cerr << "primary load failed: " << loaded_primary.error() << '\n';
-        return 1;
-    }
-    if(!loaded_secondary)
-    {
-        std::cerr << "secondary load failed: " << loaded_secondary.error() << '\n';
-        return 1;
-    }
-
-    // Both configurations are disconnected and simultaneously readable.
-    // The stacks that produced them are already gone.
-    const nucleus::config primary   = std::move(loaded_primary).value();
-    const nucleus::config secondary = std::move(loaded_secondary).value();
-
+// Both configurations are disconnected and simultaneously readable after the
+// source stacks that produced them are gone.
+static void print_profiles(const nucleus::config &primary,
+                           const nucleus::config &secondary)
+{
     std::cout << "primary profile:\n";
     for(const std::string &key : primary.keys())
         std::cout << "  " << key << " = " << primary.get(key).value() << '\n';
@@ -73,6 +62,30 @@ int main()
     std::cout << "\nkey sets match:  " << (primary.keys() == secondary.keys() ? "yes" : "no") << '\n';
     std::cout << "values differ:   "
               << (primary.get("server/host") != secondary.get("server/host") ? "yes" : "no") << '\n';
+}
 
+int main()
+{
+    nucleus::config_space_builder builder;
+    if(!define_space(builder))
+        return 1;
+    const nucleus::config_space space          = builder.build();
+    auto                        loaded_primary = nucleus::load_config(
+            space, nucleus::source_stack{make_primary_source()}, {});
+    auto loaded_secondary = nucleus::load_config(
+            space, nucleus::source_stack{make_secondary_source()}, {});
+    if(!loaded_primary)
+    {
+        std::cerr << "primary load failed: " << loaded_primary.error() << '\n';
+        return 1;
+    }
+    if(!loaded_secondary)
+    {
+        std::cerr << "secondary load failed: " << loaded_secondary.error() << '\n';
+        return 1;
+    }
+    const nucleus::config primary   = std::move(loaded_primary).value();
+    const nucleus::config secondary = std::move(loaded_secondary).value();
+    print_profiles(primary, secondary);
     return 0;
 }

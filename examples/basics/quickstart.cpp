@@ -14,14 +14,13 @@
 #include <vector>
 #include <iostream>
 
-// Part 1: single scalar via argv.
 static int demo_argv()
 {
     nucleus::config_space_builder builder;
     if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
         return 1;
     if(!builder.register_element(
-        nucleus::element("port", nucleus::anchor::keyspace("server"))))
+               nucleus::element("port", nucleus::anchor::keyspace("server"))))
         return 1;
     nucleus::config_space space = builder.build();
 
@@ -40,26 +39,34 @@ static int demo_argv()
     return 0;
 }
 
-// Part 2: repeated container with config_node cursor navigation.
-// Uses runtime_source to populate indexed scalar paths directly.
-static int demo_repeated()
+static bool define_repeated_space(nucleus::config_space_builder &builder)
 {
-    nucleus::config_space_builder builder;
-    if(!builder.register_element(nucleus::element("cluster", nucleus::anchor::root())))
-        return 1;
-    if(!builder.register_element(
-        nucleus::repeated_element("node", nucleus::anchor::keyspace("cluster"))))
-        return 1;
-    if(!builder.register_element(
-        nucleus::element("port", nucleus::anchor::keyspace("cluster/node"))))
-        return 1;
-    nucleus::config_space space = builder.build();
+    return builder.register_element(
+                   nucleus::element("cluster", nucleus::anchor::root())) &&
+            builder.register_element(
+                    nucleus::repeated_element(
+                            "node", nucleus::anchor::keyspace("cluster"))) &&
+            builder.register_element(
+                    nucleus::element(
+                            "port", nucleus::anchor::keyspace("cluster/node")));
+}
 
+static nucleus::runtime_source make_repeated_source()
+{
     nucleus::runtime_source src;
     src.set("cluster/node[0]/port", "80");
     src.set("cluster/node[1]/port", "443");
+    return src;
+}
 
-    auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(src)}, {});
+static int demo_repeated()
+{
+    nucleus::config_space_builder builder;
+    if(!define_repeated_space(builder))
+        return 1;
+    nucleus::config_space space  = builder.build();
+    auto                  loaded = nucleus::load_config(
+            space, nucleus::source_stack{make_repeated_source()}, {});
     if(!loaded)
     {
         std::cerr << "load failed: " << loaded.error() << '\n';

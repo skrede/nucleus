@@ -52,90 +52,126 @@ private:
 // the prefix as a top-level keyspace; the rest anchor beneath it. Reused verbatim
 // for both the shared application space and the plugin's own standalone space.
 nucleus::registration_result register_net(nucleus::config_space_builder &builder,
-                                          const nucleus::owner_token &owner)
+                                          const nucleus::owner_token    &owner)
 {
     if(auto r = builder.register_element(
-           nucleus::element("net", nucleus::anchor::root()), owner); !r)
+               nucleus::element("net", nucleus::anchor::root()), owner);
+       !r)
         return r;
     if(auto r = builder.register_element(
-           nucleus::element("listen", nucleus::anchor::keyspace("net")), owner); !r)
+               nucleus::element("listen", nucleus::anchor::keyspace("net")), owner);
+       !r)
         return r;
     return builder.register_element(
-        nucleus::enum_element("proto", nucleus::anchor::keyspace("net"),
-                              std::vector<std::string>{"tcp", "udp"}), owner);
+            nucleus::enum_element("proto", nucleus::anchor::keyspace("net"),
+                                  std::vector<std::string>{"tcp", "udp"}),
+            owner);
 }
 
 nucleus::registration_result register_cache(nucleus::config_space_builder &builder,
-                                            const nucleus::owner_token &owner)
+                                            const nucleus::owner_token    &owner)
 {
     if(auto r = builder.register_element(
-           nucleus::element("cache", nucleus::anchor::root()), owner); !r)
+               nucleus::element("cache", nucleus::anchor::root()), owner);
+       !r)
         return r;
     if(auto r = builder.register_element(
-           nucleus::element("size_mb", nucleus::anchor::keyspace("cache")), owner); !r)
+               nucleus::element("size_mb", nucleus::anchor::keyspace("cache")), owner);
+       !r)
         return r;
     return builder.register_element(
-        nucleus::enum_element("policy", nucleus::anchor::keyspace("cache"),
-                              std::vector<std::string>{"lru", "lfu"}), owner);
+            nucleus::enum_element("policy", nucleus::anchor::keyspace("cache"),
+                                  std::vector<std::string>{"lru", "lfu"}),
+            owner);
+}
+
+std::shared_ptr<admitted_plugins_policy> make_policy(
+        const nucleus::owner_token &net_owner,
+        const nucleus::owner_token &cache_owner)
+{
+    auto policy = std::make_shared<admitted_plugins_policy>();
+    policy->admit(net_owner);
+    policy->admit(cache_owner);
+    return policy;
+}
+
+bool register_plugins(nucleus::config_space_builder &builder,
+                      const nucleus::owner_token    &net_owner,
+                      const nucleus::owner_token    &cache_owner)
+{
+    if(!register_net(builder, net_owner))
+    {
+        std::cerr << "net plugin rejected\n";
+        return false;
+    }
+    if(!register_cache(builder, cache_owner))
+    {
+        std::cerr << "cache plugin rejected\n";
+        return false;
+    }
+    return true;
+}
+
+nucleus::runtime_source make_application_source()
+{
+    nucleus::runtime_source src;
+    src.set("net/listen", "0.0.0.0:8080")
+            .set("net/proto", "tcp")
+            .set("cache/size_mb", "256")
+            .set("cache/policy", "lru");
+    return src;
+}
+
+void print_application(const nucleus::config_space &app,
+                       const nucleus::config       &config)
+{
+    std::cout << "application-wide config (space \"" << app.space_name() << "\"):\n";
+    for(const std::string &key : config.keys())
+        std::cout << "  " << key << " = " << config.get(key).value() << '\n';
+}
+
+// A plugin can also seal its own product without sharing a registry.
+int show_private_space(const nucleus::owner_token &net_owner)
+{
+    nucleus::config_space_builder private_builder;
+    private_builder.name("net");
+    if(!register_net(private_builder, net_owner))
+    {
+        std::cerr << "private net build failed\n";
+        return 1;
+    }
+    const nucleus::config_space net_private = private_builder.build();
+    std::cout << "\nnet's private space is independent of the app space: "
+              << "schema elements = " << net_private.schema_elements().size() << '\n';
+    return 0;
 }
 
 } // namespace
 
+// An unadmitted plugin is refused before it can claim a key, while admitted
+// plugins retain owner-attributed collision reporting.
 int main()
 {
-    const nucleus::owner_token net_owner(std::string("net"));
-    const nucleus::owner_token cache_owner(std::string("cache"));
-
-    // The grand, application-wide space: one builder, admitting two plugins.
+    const nucleus::owner_token    net_owner(std::string("net")), cache_owner(std::string("cache"));
     nucleus::config_space_builder builder;
     builder.name("app");
-
-    auto policy = std::make_shared<admitted_plugins_policy>();
-    policy->admit(net_owner);
-    policy->admit(cache_owner);
-    builder.set_registration_policy(std::move(policy));
-
-    if(!register_net(builder, net_owner))   { std::cerr << "net plugin rejected\n";   return 1; }
-    if(!register_cache(builder, cache_owner)){ std::cerr << "cache plugin rejected\n"; return 1; }
-
-    // An unadmitted plugin is refused at the seam, before it can claim any key.
+    builder.set_registration_policy(make_policy(net_owner, cache_owner));
+    if(!register_plugins(builder, net_owner, cache_owner))
+        return 1;
     const nucleus::owner_token rogue_owner(std::string("rogue"));
-    auto rogue = builder.register_element(
-        nucleus::element("rogue", nucleus::anchor::root()), rogue_owner);
+    auto                       rogue = builder.register_element(
+            nucleus::element("rogue", nucleus::anchor::root()), rogue_owner);
     std::cout << "rogue plugin admitted: " << (rogue ? "yes" : "no")
               << "  (" << (rogue ? "" : rogue.error().message) << ")\n";
-
-    // Cross-plugin key collisions are reported with owner attribution; none here.
     std::cout << "cross-plugin conflicts: " << builder.conflicts().size() << "\n\n";
-
-    const nucleus::config_space app = builder.build();
-
-    nucleus::runtime_source src;
-    src.set("net/listen", "0.0.0.0:8080")
-       .set("net/proto", "tcp")
-       .set("cache/size_mb", "256")
-       .set("cache/policy", "lru");
-
-    auto loaded = nucleus::load_config(app, nucleus::source_stack{std::move(src)}, {});
+    const nucleus::config_space app    = builder.build();
+    auto                        loaded = nucleus::load_config(
+            app, nucleus::source_stack{make_application_source()}, {});
     if(!loaded)
     {
         std::cerr << "app load failed: " << loaded.error() << '\n';
         return 1;
     }
-
-    std::cout << "application-wide config (space \"" << app.space_name() << "\"):\n";
-    for(const std::string &key : loaded.value().keys())
-        std::cout << "  " << key << " = " << loaded.value().get(key).value() << '\n';
-
-    // The other case: a plugin seals its OWN space, which only it builds and reads.
-    // Same registration function, a separate sealed product -- no shared registry.
-    nucleus::config_space_builder private_builder;
-    private_builder.name("net");
-    if(!register_net(private_builder, net_owner)) { std::cerr << "private net build failed\n"; return 1; }
-    const nucleus::config_space net_private = private_builder.build();
-
-    std::cout << "\nnet's private space is independent of the app space: "
-              << "schema elements = " << net_private.schema_elements().size() << '\n';
-
-    return 0;
+    print_application(app, loaded.value());
+    return show_private_space(net_owner);
 }

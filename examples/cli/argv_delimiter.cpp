@@ -19,60 +19,86 @@
 #include <vector>
 #include <iostream>
 
+static bool define_space(nucleus::config_space_builder &builder)
+{
+    return builder.register_element(
+                   nucleus::element("server", nucleus::anchor::root())) &&
+            builder.register_element(
+                    nucleus::element("host", nucleus::anchor::keyspace("server"))) &&
+            builder.register_element(
+                    nucleus::element("port", nucleus::anchor::keyspace("server")));
+}
+
+// The source parses `--server__host=...` instead of `--server-host=...`.
+static nucleus::argv_source make_arguments(
+        const nucleus::config_space  &space,
+        const nucleus::cli_delimiter &delimiter)
+{
+    nucleus::argv_source args(std::vector<std::string>{
+            "--server__host=edge-node",
+            "--server__port=8443",
+    });
+    args.delimit_with(delimiter)
+            .recognize_with(nucleus::recognizer_of(space));
+    return args;
+}
+
+static void print_resolved(const nucleus::config &config)
+{
+    std::cout << "resolved from `__`-delimited flags:\n";
+    for(const std::string &key : config.keys())
+        std::cout << "  " << key << " = " << config.get(key).value() << '\n';
+}
+
+// Every emitted template line uses the same grammar the source accepts.
+static bool print_template(
+        const nucleus::config_space  &space,
+        const nucleus::cli_delimiter &delimiter)
+{
+    std::cout << "\nflag template under the same delimiter:\n";
+    if(auto emitted = nucleus::argv::emit_template(space, std::cout, delimiter); !emitted)
+    {
+        std::cerr << "emit failed: " << emitted.error() << '\n';
+        return false;
+    }
+    return true;
+}
+
+// Completion shares the delimiter, so completed flags match parsed flags.
+static void print_completion(
+        const nucleus::config_space  &space,
+        const nucleus::cli_delimiter &delimiter)
+{
+    const std::string script =
+            space.generate_completion(nucleus::shell::bash, "mytool", delimiter);
+    std::cout << "\ncompletion offers `--server__host`: "
+              << (script.find("--server__host") != std::string::npos) << '\n';
+}
+
+// parse() validates the text: empty, `=`-containing, and `/`-containing
+// delimiters (other than `/` itself) are rejected.
 int main()
 {
-    // Declared elements so the schema projects both flags and template lines.
     nucleus::config_space_builder builder;
-    if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
-        return 1;
-    if(!builder.register_element(nucleus::element("host", nucleus::anchor::keyspace("server"))))
-        return 1;
-    if(!builder.register_element(nucleus::element("port", nucleus::anchor::keyspace("server"))))
+    if(!define_space(builder))
         return 1;
     const nucleus::config_space space = builder.build();
-
-    // parse() validates the text: empty, `=`-containing, and `/`-containing
-    // delimiters (other than `/` itself) are rejected.
-    auto delim = nucleus::cli_delimiter::parse("__");
+    auto                        delim = nucleus::cli_delimiter::parse("__");
     if(!delim)
     {
         std::cerr << "bad delimiter: " << delim.error() << '\n';
         return 1;
     }
-
-    // The source parses `--server__host=...` instead of `--server-host=...`.
-    nucleus::argv_source args(std::vector<std::string>{
-        "--server__host=edge-node",
-        "--server__port=8443",
-    });
-    args.delimit_with(delim.value())
-        .recognize_with(nucleus::recognizer_of(space));
-
-    auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(args)}, {});
+    nucleus::argv_source args   = make_arguments(space, delim.value());
+    auto                 loaded = nucleus::load_config(space, nucleus::source_stack{std::move(args)}, {});
     if(!loaded)
     {
         std::cerr << "load failed: " << loaded.error() << '\n';
         return 1;
     }
-
-    std::cout << "resolved from `__`-delimited flags:\n";
-    for(const std::string &key : loaded.value().keys())
-        std::cout << "  " << key << " = " << loaded.value().get(key).value() << '\n';
-
-    // The emitter renders the SAME grammar back: every template line is a flag
-    // the source above would accept verbatim.
-    std::cout << "\nflag template under the same delimiter:\n";
-    if(auto emitted = nucleus::argv::emit_template(space, std::cout, delim.value()); !emitted)
-    {
-        std::cerr << "emit failed: " << emitted.error() << '\n';
+    print_resolved(loaded.value());
+    if(!print_template(space, delim.value()))
         return 1;
-    }
-
-    // Completion follows the same delimiter, so the completed flags are
-    // identical to the parsed ones.
-    const std::string script =
-        space.generate_completion(nucleus::shell::bash, "mytool", delim.value());
-    std::cout << "\ncompletion offers `--server__host`: "
-              << (script.find("--server__host") != std::string::npos) << '\n';
+    print_completion(space, delim.value());
     return 0;
 }

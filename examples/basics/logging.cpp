@@ -15,26 +15,31 @@
 #include <iostream>
 #include <string_view>
 
+static nucleus::argv_source make_arguments(nucleus::log_sink &sink)
+{
+    nucleus::argv_source args(
+            std::vector<std::string>{"--service-name=edge", "--service-mode=fast"});
+    args.recognize_with([](const nucleus::key_path &path)
+                        { return path.str() == "service/name"; })
+            .policy(nucleus::unknown_key_policy::lenient)
+            .log_to(sink);
+    return args;
+}
+
 int main()
 {
     int warnings = 0;
 
     // A callable bridged into the seam with log_sink_f -- no subclass needed.
     auto sink = nucleus::log_sink_f(
-        [&warnings](nucleus::log_level level, std::string_view message) {
-            ++warnings;
-            std::cout << "[app/" << nucleus::to_string(level) << "] " << message << '\n';
-        });
+            [&warnings](nucleus::log_level level, std::string_view message)
+            {
+                ++warnings;
+                std::cout << "[app/" << nucleus::to_string(level) << "] " << message << '\n';
+            });
 
-    nucleus::argv_source args(
-        std::vector<std::string>{"--service-name=edge", "--service-mode=fast"});
-    args.recognize_with([](const nucleus::key_path &path) {
-            return path.str() == "service/name";
-        })
-        .policy(nucleus::unknown_key_policy::lenient)
-        .log_to(sink);
-
-    auto pulled = args.pull();
+    nucleus::argv_source args   = make_arguments(sink);
+    auto                 pulled = args.pull();
     if(!pulled)
     {
         std::cerr << "pull failed: " << pulled.error() << '\n';
