@@ -14,8 +14,9 @@
 
 #include "nucleus/runtime/runtime_source.h"
 
-#include <iostream>
 #include <string>
+#include <utility>
+#include <iostream>
 
 using namespace nucleus;
 
@@ -23,18 +24,29 @@ using namespace nucleus;
 // Elements registered under a named owner so owned_by() can be shown.
 static owner_token network_owner(std::string("network.module"));
 
-static config_space make_server_space()
+static registration_result define_server_space(config_space_builder &builder)
+{
+    if(auto result = builder.register_element(element("cluster", anchor::root()), network_owner); !result)
+        return result;
+    if(auto result = builder.register_element(element("server", anchor::keyspace("cluster")), network_owner); !result)
+        return result;
+    if(auto result = builder.register_element(
+               primary_key_element("name", anchor::keyspace("cluster/server")), network_owner);
+       !result)
+        return result;
+    if(auto result = builder.register_element(
+               element("port", anchor::keyspace("cluster/server")), network_owner);
+       !result)
+        return result;
+    return builder.register_element(element("host", anchor::keyspace("cluster/server")));
+}
+
+static expected<config_space, error> make_server_space()
 {
     config_space_builder builder;
-    builder.register_element(element("cluster", anchor::root()), network_owner);
-    builder.register_element(element("server", anchor::keyspace("cluster")), network_owner);
-    builder.register_element(
-            primary_key_element("name", anchor::keyspace("cluster/server")), network_owner);
-    builder.register_element(
-            element("port", anchor::keyspace("cluster/server")), network_owner);
-    builder.register_element(
-            element("host", anchor::keyspace("cluster/server")));
-    return std::move(builder).build();
+    if(auto result = define_server_space(builder); !result)
+        return unexpected(std::move(result).error());
+    return builder.build();
 }
 
 // Helper: print a header and a list of matched node paths.
@@ -116,11 +128,10 @@ static void show_strain_nodes(const config &cfg, const schema_query_context &ctx
     print_nodes("in_strain() from server[0]", nodes);
 }
 
-int main()
+static int run_queries(const config_space &space)
 {
-    const config_space space  = make_server_space();
-    runtime_source     source = make_server_source();
-    const auto         loaded = load_config(space, source_stack{std::move(source)}, {});
+    runtime_source source = make_server_source();
+    const auto     loaded = load_config(space, source_stack{std::move(source)}, {});
     if(!loaded)
     {
         std::cerr << "load failed: " << loaded.error() << '\n';
@@ -136,4 +147,15 @@ int main()
     show_owned_nodes(cfg, ctx, network_owner);
     show_strain_nodes(cfg, ctx);
     return 0;
+}
+
+int main()
+{
+    auto space = make_server_space();
+    if(!space)
+    {
+        std::cerr << "space setup failed: " << space.error() << '\n';
+        return 1;
+    }
+    return run_queries(*space);
 }

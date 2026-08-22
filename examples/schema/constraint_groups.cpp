@@ -15,25 +15,35 @@
 
 #include "nucleus/runtime/runtime_source.h"
 
-#include <iostream>
 #include <string>
+#include <utility>
+#include <iostream>
 
 using namespace nucleus;
 
-static void register_cache_constraints(config_space_builder &builder)
+static registration_result register_cache_elements(config_space_builder &builder)
 {
-    builder.register_element(element("cache", anchor::keyspace("server")));
-    builder.register_element(element("eager", anchor::keyspace("server/cache")));
-    builder.register_element(element("lru", anchor::keyspace("server/cache")));
-    builder.register_element(element("ttl", anchor::keyspace("server/cache")));
-    builder.register_constraint_group(
-            exclusion_group("cache_policy", anchor::keyspace("server/cache"))
-                    .member("eager", when_value("true"))
-                    .member("lru")
-                    .member("ttl")
-                    .at_most(1));
+    if(auto result = builder.register_element(element("cache", anchor::keyspace("server"))); !result)
+        return result;
+    if(auto result = builder.register_element(element("eager", anchor::keyspace("server/cache"))); !result)
+        return result;
+    if(auto result = builder.register_element(element("lru", anchor::keyspace("server/cache"))); !result)
+        return result;
+    return builder.register_element(element("ttl", anchor::keyspace("server/cache")));
+}
+
+static registration_result register_cache_groups(config_space_builder &builder)
+{
+    if(auto result = builder.register_constraint_group(
+               exclusion_group("cache_policy", anchor::keyspace("server/cache"))
+                       .member("eager", when_value("true"))
+                       .member("lru")
+                       .member("ttl")
+                       .at_most(1));
+       !result)
+        return result;
     // Host-validator valve: a host rule cardinality cannot express.
-    builder.register_constraint_group(validate_group(
+    return builder.register_constraint_group(validate_group(
             "ttl_positive", anchor::keyspace("server/cache"),
             [](const config_node &cache) -> expected<void, std::string>
             {
@@ -44,41 +54,61 @@ static void register_cache_constraints(config_space_builder &builder)
             }));
 }
 
-static void register_auth_constraints(config_space_builder &builder)
+static registration_result register_cache_constraints(config_space_builder &builder)
 {
-    builder.register_element(element("auth", anchor::keyspace("server")));
-    builder.register_element(element("cert", anchor::keyspace("server/auth")));
-    builder.register_element(element("key", anchor::keyspace("server/auth")));
-    builder.register_element(element("token", anchor::keyspace("server/auth")));
-    builder.register_constraint_group(
+    if(auto result = register_cache_elements(builder); !result)
+        return result;
+    return register_cache_groups(builder);
+}
+
+static registration_result register_auth_constraints(config_space_builder &builder)
+{
+    if(auto result = builder.register_element(element("auth", anchor::keyspace("server"))); !result)
+        return result;
+    if(auto result = builder.register_element(element("cert", anchor::keyspace("server/auth"))); !result)
+        return result;
+    if(auto result = builder.register_element(element("key", anchor::keyspace("server/auth"))); !result)
+        return result;
+    if(auto result = builder.register_element(element("token", anchor::keyspace("server/auth"))); !result)
+        return result;
+    return builder.register_constraint_group(
             choice("auth_mode", anchor::keyspace("server/auth"))
                     .option(all_of({"cert", "key"}))
                     .option(all_of({"token"}))
                     .exactly(1));
 }
 
-static void register_pool_identity(config_space_builder &builder)
+static registration_result register_pool_identity(config_space_builder &builder)
 {
-    builder.register_element(element("pool", anchor::keyspace("server")));
-    builder.register_element(repeated_element("worker", anchor::keyspace("server/pool")));
-    builder.register_element(element("name", anchor::keyspace("server/pool/worker")));
-    builder.register_element(repeated_element("gateway", anchor::keyspace("server/pool")));
-    builder.register_element(element("name", anchor::keyspace("server/pool/gateway")));
+    if(auto result = builder.register_element(element("pool", anchor::keyspace("server"))); !result)
+        return result;
+    if(auto result = builder.register_element(repeated_element("worker", anchor::keyspace("server/pool"))); !result)
+        return result;
+    if(auto result = builder.register_element(element("name", anchor::keyspace("server/pool/worker"))); !result)
+        return result;
+    if(auto result = builder.register_element(repeated_element("gateway", anchor::keyspace("server/pool"))); !result)
+        return result;
+    if(auto result = builder.register_element(element("name", anchor::keyspace("server/pool/gateway"))); !result)
+        return result;
     // One namespace: the `name` of every worker/gateway is unique across the pool.
-    builder.register_identity_group(
+    return builder.register_identity_group(
             identity_group("component_names", anchor::keyspace("server/pool"))
                     .members({"worker", "gateway"})
                     .field("name"));
 }
 
-static config_space make_space()
+static expected<config_space, error> make_space()
 {
     config_space_builder builder;
-    builder.register_element(element("server", anchor::root()));
-    register_cache_constraints(builder);
-    register_auth_constraints(builder);
-    register_pool_identity(builder);
-    return std::move(builder).build();
+    if(auto result = builder.register_element(element("server", anchor::root())); !result)
+        return unexpected(std::move(result).error());
+    if(auto result = register_cache_constraints(builder); !result)
+        return unexpected(std::move(result).error());
+    if(auto result = register_auth_constraints(builder); !result)
+        return unexpected(std::move(result).error());
+    if(auto result = register_pool_identity(builder); !result)
+        return unexpected(std::move(result).error());
+    return builder.build();
 }
 
 static void show(const config_space &space, const char *title, runtime_source src)
@@ -131,11 +161,16 @@ static runtime_source make_duplicate_identity_source()
 
 int main()
 {
-    const config_space space = make_space();
-    show(space, "valid: one cache policy, one auth mode, unique names", make_valid_source());
-    show(space, "violation: two cache policies active", make_two_policy_source());
-    show(space, "violation: partial auth bundle (key missing)", make_partial_auth_source());
-    show(space, "violation: host-validator valve rejects ttl=0", make_bad_ttl_source());
-    show(space, "violation: duplicate name across worker and gateway", make_duplicate_identity_source());
+    auto space = make_space();
+    if(!space)
+    {
+        std::cerr << "space setup failed: " << space.error() << '\n';
+        return 1;
+    }
+    show(*space, "valid: one cache policy, one auth mode, unique names", make_valid_source());
+    show(*space, "violation: two cache policies active", make_two_policy_source());
+    show(*space, "violation: partial auth bundle (key missing)", make_partial_auth_source());
+    show(*space, "violation: host-validator valve rejects ttl=0", make_bad_ttl_source());
+    show(*space, "violation: duplicate name across worker and gateway", make_duplicate_identity_source());
     return 0;
 }

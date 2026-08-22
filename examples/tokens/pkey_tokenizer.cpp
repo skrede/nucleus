@@ -11,23 +11,41 @@
 
 #include "nucleus/runtime/runtime_source.h"
 
-#include <iostream>
 #include <string>
+#include <utility>
+#include <iostream>
 
 // Schema setup: cluster/server is a keyed container whose primary key is
 // "name". The "endpoint" leaf holds a value we compose using the pkey token.
-static nucleus::config_space make_server_space()
+static nucleus::registration_result define_server_space(
+        nucleus::config_space_builder &builder)
 {
-    nucleus::config_space_builder engine;
-    engine.register_element(nucleus::element("cluster", nucleus::anchor::root()));
-    engine.register_element(nucleus::element("server", nucleus::anchor::keyspace("cluster")));
-    engine.register_element(
-            nucleus::primary_key_element("name", nucleus::anchor::keyspace("cluster/server")));
-    engine.register_element(
-            nucleus::element("endpoint", nucleus::anchor::keyspace("cluster/server")));
-    engine.register_element(
+    if(auto result = builder.register_element(
+               nucleus::element("cluster", nucleus::anchor::root()));
+       !result)
+        return result;
+    if(auto result = builder.register_element(
+               nucleus::element("server", nucleus::anchor::keyspace("cluster")));
+       !result)
+        return result;
+    if(auto result = builder.register_element(
+               nucleus::primary_key_element("name", nucleus::anchor::keyspace("cluster/server")));
+       !result)
+        return result;
+    if(auto result = builder.register_element(
+               nucleus::element("endpoint", nucleus::anchor::keyspace("cluster/server")));
+       !result)
+        return result;
+    return builder.register_element(
             nucleus::element("description", nucleus::anchor::keyspace("cluster/server")));
-    return engine.build();
+}
+
+static nucleus::expected<nucleus::config_space, nucleus::error> make_server_space()
+{
+    nucleus::config_space_builder builder;
+    if(auto result = define_server_space(builder); !result)
+        return nucleus::unexpected(std::move(result).error());
+    return builder.build();
 }
 
 static nucleus::runtime_source make_builtin_source()
@@ -65,12 +83,17 @@ static int show_selected_server(const nucleus::config_space   &space,
 // The tokenizer is auto-registered by build() — no host install needed.
 static int demonstrate_builtin_tokenizer()
 {
-    const nucleus::config_space   space  = make_server_space();
+    auto space = make_server_space();
+    if(!space)
+    {
+        std::cerr << "space setup failed (built-in tokenizer): " << space.error() << '\n';
+        return 1;
+    }
     const nucleus::runtime_source source = make_builtin_source();
-    if(const int status = show_selected_server(space, source, "primary", "primary:   "))
+    if(const int status = show_selected_server(*space, source, "primary", "primary:   "))
         return status;
     // Prints: primary:   primary at 10.0.0.1:9000
-    const int status = show_selected_server(space, source, "secondary", "secondary: ");
+    const int status = show_selected_server(*space, source, "secondary", "secondary: ");
     // Prints: secondary: secondary at 10.0.0.2:9000
     return status;
 }
@@ -110,31 +133,52 @@ static nucleus::runtime_source make_host_source()
     return source;
 }
 
-static void define_host_space(nucleus::config_space_builder &engine)
+static nucleus::registration_result define_host_space(
+        nucleus::config_space_builder &builder)
 {
-    engine.register_element(nucleus::element("cluster", nucleus::anchor::root()));
-    engine.register_element(nucleus::element("server", nucleus::anchor::keyspace("cluster")));
-    engine.register_element(nucleus::primary_key_element("name", nucleus::anchor::keyspace("cluster/server")));
-    engine.register_element(nucleus::element("endpoint", nucleus::anchor::keyspace("cluster/server")));
-    engine.register_element(nucleus::element("label", nucleus::anchor::keyspace("cluster/server")));
+    if(auto result = builder.register_element(
+               nucleus::element("cluster", nucleus::anchor::root()));
+       !result)
+        return result;
+    if(auto result = builder.register_element(
+               nucleus::element("server", nucleus::anchor::keyspace("cluster")));
+       !result)
+        return result;
+    if(auto result = builder.register_element(
+               nucleus::primary_key_element("name", nucleus::anchor::keyspace("cluster/server")));
+       !result)
+        return result;
+    if(auto result = builder.register_element(
+               nucleus::element("endpoint", nucleus::anchor::keyspace("cluster/server")));
+       !result)
+        return result;
+    return builder.register_element(
+            nucleus::element("label", nucleus::anchor::keyspace("cluster/server")));
+}
+
+static nucleus::expected<nucleus::config_space, nucleus::error> make_host_space()
+{
+    nucleus::config_space_builder builder;
+    if(auto result = define_host_space(builder); !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.install_tree_tokenizer(make_host_tokenizer()); !result)
+        return nucleus::unexpected(std::move(result).error());
+    return builder.build();
 }
 
 static int demonstrate_host_tokenizer()
 {
-    nucleus::config_space_builder engine;
-    define_host_space(engine);
-    const auto install = engine.install_tree_tokenizer(make_host_tokenizer());
-    if(!install)
+    auto space = make_host_space();
+    if(!space)
     {
-        std::cerr << "install_tree_tokenizer failed: " << install.error() << '\n';
+        std::cerr << "space setup failed (host tokenizer): " << space.error() << '\n';
         return 1;
     }
-    const nucleus::config_space space = engine.build();
-    nucleus::load_options       options;
+    nucleus::load_options options;
     options.selection              = "alpha";
     nucleus::runtime_source source = make_host_source();
     const auto              loaded = nucleus::load_config(
-            space, nucleus::source_stack{std::move(source)}, options);
+            *space, nucleus::source_stack{std::move(source)}, options);
     if(!loaded)
     {
         std::cerr << "load failed (host tokenizer): " << loaded.error() << '\n';
