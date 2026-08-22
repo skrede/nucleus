@@ -39,6 +39,8 @@ static nucleus::source_handle make_document(const std::string &)
                     nucleus::xml_source_options::of_string(document)));
 }
 
+// argv outranks the document band, so it overrides `mode`; the document's
+// `host` survives.
 int main()
 {
     nucleus::config_space_builder builder;

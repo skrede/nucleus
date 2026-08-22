@@ -119,8 +119,8 @@ to shrink rather than grow.
 
 What the policy costs is a ratchet, and the ratchet is the point. Because no row can be added, the
 gate refuses any change whose file listing contains an example unit with an over-ceiling function,
-and the only way through is to bring that unit into compliance first. Eighteen example files are in
-that state today.
+and the only way through is to bring that unit into compliance first.
+Every example file is inside both ceilings today.
 
 The test tree carries one exemption, and only the test tree. A Catch2 test-case body — the block a
 `TEST_CASE`, `SCENARIO`, `TEMPLATE_TEST_CASE` or `TEST_CASE_METHOD` macro introduces — is held to a
