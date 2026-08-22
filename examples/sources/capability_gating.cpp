@@ -13,6 +13,7 @@
 
 #include "nucleus/env/env_source.h"
 
+#include <string>
 #include <iostream>
 
 static bool define_space(nucleus::config_space_builder &builder)
@@ -24,6 +25,14 @@ static bool define_space(nucleus::config_space_builder &builder)
                     nucleus::typed_element<int>("port", nucleus::anchor::keyspace("server")));
 }
 
+static bool is_missing_nesting(const nucleus::error &error)
+{
+    return error.code == nucleus::errc::unmet_capability &&
+            error.message.find(
+                    "no source can satisfy capability 'nesting' required by 'schema'") !=
+            std::string::npos;
+}
+
 int main()
 {
     nucleus::config_space_builder builder;
@@ -31,18 +40,21 @@ int main()
         return 1;
     nucleus::config_space space = builder.build();
 
-    // A flat env source -- no nesting, no typed scalars.
     nucleus::env_source values;
     values.set("server/name", "primary");
 
-    // No gate/check call anywhere: load auto-gates on its own.
     auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(values)}, {});
-    if(!loaded)
+    if(loaded)
     {
-        std::cout << "load auto-gated and refused: " << loaded.error() << '\n';
-        return 0;
+        std::cerr << "unexpected success: flat source accepted\n";
+        return 1;
+    }
+    if(!is_missing_nesting(loaded.error()))
+    {
+        std::cerr << "unexpected rejection: " << loaded.error() << '\n';
+        return 1;
     }
 
-    std::cerr << "expected the flat source to be refused by the auto-gate\n";
-    return 1;
+    std::cout << "load auto-gated and refused: " << loaded.error() << '\n';
+    return 0;
 }

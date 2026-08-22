@@ -10,8 +10,9 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/env/env_source.h"
+#include "nucleus/runtime/runtime_source.h"
 
+#include <string>
 #include <iostream>
 
 static bool define_space(nucleus::config_space_builder &builder)
@@ -24,6 +25,13 @@ static bool define_space(nucleus::config_space_builder &builder)
                                           {"http", "https"}));
 }
 
+static bool is_missing_host(const nucleus::error &error)
+{
+    return error.code == nucleus::errc::schema_violation &&
+            error.message.find("required field 'server/host' is missing") !=
+            std::string::npos;
+}
+
 int main()
 {
     nucleus::config_space_builder builder;
@@ -31,17 +39,21 @@ int main()
         return 1;
     nucleus::config_space space = builder.build();
 
-    // A source that supplies `mode` but not the required `host`.
-    nucleus::env_source values;
+    nucleus::runtime_source values;
     values.set("server/mode", "http");
 
     auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(values)}, {});
-    if(!loaded)
+    if(loaded)
     {
-        std::cout << "rejected as expected: " << loaded.error() << '\n';
-        return 0;
+        std::cerr << "unexpected success\n";
+        return 1;
+    }
+    if(!is_missing_host(loaded.error()))
+    {
+        std::cerr << "unexpected rejection: " << loaded.error() << '\n';
+        return 1;
     }
 
-    std::cerr << "unexpected success\n";
-    return 1;
+    std::cout << "rejected as expected: " << loaded.error() << '\n';
+    return 0;
 }

@@ -6,6 +6,7 @@
 
 #include "nucleus/argv/argv_source.h"
 
+#include <string>
 #include <vector>
 #include <iostream>
 
@@ -33,8 +34,16 @@ static void print_resolved(const nucleus::config &config)
         std::cout << "  " << key << " = " << config.get(key).value() << '\n';
 }
 
+static bool is_unknown_timeout(const nucleus::error &error)
+{
+    return error.code == nucleus::errc::schema_violation &&
+            error.message.find(
+                    "unknown CLI flag '--server-timeout=30' maps to undeclared key 'server/timeout'") !=
+            std::string::npos;
+}
+
 // Strict mode rejects an unknown path at pull() before the fold starts.
-static void demonstrate_unknown_rejection(
+static int demonstrate_unknown_rejection(
         const nucleus::config_space   &space,
         const nucleus::key_recognizer &recognizer)
 {
@@ -42,8 +51,18 @@ static void demonstrate_unknown_rejection(
     unknown_argv.recognize_with(recognizer)
             .policy(nucleus::unknown_key_policy::strict);
     auto rejected = nucleus::load_config(space, nucleus::source_stack{std::move(unknown_argv)}, {});
-    if(!rejected)
-        std::cout << "\nunrecognized flag rejected: " << rejected.error() << '\n';
+    if(rejected)
+    {
+        std::cerr << "unexpected success: unrecognized flag accepted\n";
+        return 1;
+    }
+    if(!is_unknown_timeout(rejected.error()))
+    {
+        std::cerr << "unexpected rejection: " << rejected.error() << '\n';
+        return 1;
+    }
+    std::cout << "\nunrecognized flag rejected: " << rejected.error() << '\n';
+    return 0;
 }
 
 int main()
@@ -62,6 +81,5 @@ int main()
         return 1;
     }
     print_resolved(loaded.value());
-    demonstrate_unknown_rejection(space, recognizer);
-    return 0;
+    return demonstrate_unknown_rejection(space, recognizer);
 }

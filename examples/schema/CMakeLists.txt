@@ -1,6 +1,6 @@
 # Schema and validation: element kinds, typed conversion, strain selection, and
 # constraint/identity composition.
-nucleus_add_example(schema nucleus::env)
+nucleus_add_example(schema nucleus::runtime)
 nucleus_add_example(constraint_groups nucleus::runtime)
 nucleus_add_example(keyed_composition nucleus::runtime)
 
