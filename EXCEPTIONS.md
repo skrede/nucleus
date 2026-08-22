@@ -173,8 +173,8 @@ None.
 | File | Lines |
 |---|---|
 | `tests/inherit_chain_test.cpp` | 1118 |
-| `tests/typed_element_test.cpp` | 809 |
 | `tests/repeated_container_test.cpp` | 815 |
+| `tests/typed_element_test.cpp` | 809 |
 | `tests/config_node_test.cpp` | 777 |
 | `tests/argv_source_test.cpp` | 615 |
 | `tests/typed_shape_test.cpp` | 518 |

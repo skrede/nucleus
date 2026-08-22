@@ -17,7 +17,12 @@
 
 namespace {
 
-struct vec3 { float x = 0.f; float y = 0.f; float z = 0.f; };
+struct vec3
+{
+    float x = 0.f;
+    float y = 0.f;
+    float z = 0.f;
+};
 
 // Parses "x,y,z" -- three comma-separated floats. Each component is parsed by
 // reusing the built-in float converter rather than re-implementing low-level
@@ -28,14 +33,16 @@ std::function<nucleus::expected<std::any, std::string>(std::string_view)>
 make_vec3_converter()
 {
     return [parse_float = nucleus::make_scalar_converter<float>()](
-               std::string_view sv) -> nucleus::expected<std::any, std::string> {
-        float components[3] = {};
-        std::size_t count = 0;
-        std::string_view rest = sv;
-        while(count < 3 && !rest.empty()) {
-            auto sep = rest.find(',');
-            std::string_view token = rest.substr(0, sep);
-            auto component = parse_float(token);
+                   std::string_view sv) -> nucleus::expected<std::any, std::string>
+    {
+        float            components[3] = {};
+        std::size_t      count         = 0;
+        std::string_view rest          = sv;
+        while(count < 3 && !rest.empty())
+        {
+            auto             sep       = rest.find(',');
+            std::string_view token     = rest.substr(0, sep);
+            auto             component = parse_float(token);
             if(!component)
                 return nucleus::unexpected(std::string("bad component"));
             components[count] = std::any_cast<float>(component.value());
@@ -44,7 +51,7 @@ make_vec3_converter()
         }
         if(count != 3 || !rest.empty())
             return nucleus::unexpected(
-                std::string("expected x,y,z -- three comma-separated floats"));
+                    std::string("expected x,y,z -- three comma-separated floats"));
         return std::any(vec3{components[0], components[1], components[2]});
     };
 }
