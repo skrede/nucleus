@@ -49,60 +49,68 @@ make_vec3_converter()
     };
 }
 
+bool define_space(nucleus::config_space_builder &builder)
+{
+    return builder.register_element(nucleus::element("body", nucleus::anchor::root())) &&
+            builder.register_element(
+                    nucleus::typed_element<vec3>("pos", nucleus::anchor::keyspace("body"), make_vec3_converter())) &&
+            builder.register_element(
+                    nucleus::typed_element<int32_t>("mass", nucleus::anchor::keyspace("body")));
 }
 
-int main()
+// In-memory document -- no file on disk required.
+nucleus::source_handle make_document(const std::string &)
 {
-    nucleus::config_space_builder builder;
-    if(!builder.register_element(nucleus::element("body", nucleus::anchor::root())))
-        return 1;
-    if(!builder.register_element(
-        nucleus::typed_element<vec3>("pos", nucleus::anchor::keyspace("body"), make_vec3_converter())))
-        return 1;
-    if(!builder.register_element(
-        nucleus::typed_element<int32_t>("mass", nucleus::anchor::keyspace("body"))))
-        return 1;
-    nucleus::config_space space = builder.build();
-
-    // In-memory document -- no file on disk required.
     const char *document = R"(<body><pos>1.0,2.5,3.0</pos><mass>42</mass></body>)";
-    auto make = [document](const std::string &) -> nucleus::source_handle {
-        return nucleus::source_handle(
+    return nucleus::source_handle(
             nucleus::xml_source::from(
-                nucleus::xml_source_options::of_string(document)));
-    };
+                    nucleus::xml_source_options::of_string(document)));
+}
 
-    auto loaded = nucleus::load_config(space, nucleus::source_stack{},
-        nucleus::load_options{.document_paths = {"config.xml"}, .make_document = make});
-    if(!loaded) {
-        std::cerr << "load failed: " << loaded.error() << '\n';
-        return 1;
-    }
-
-    const nucleus::config &config = loaded.value();
-
+// get() and get_as() agree: the text value is still accessible alongside the typed value.
+int print_typed_values(const nucleus::config &config)
+{
     auto pos = config.get_as<vec3>("body/pos");
-    if(!pos) {
+    if(!pos)
+    {
         std::cerr << "get_as<vec3> failed: " << pos.error() << '\n';
         return 1;
     }
     std::cout << "pos: " << pos.value().x << ", " << pos.value().y << ", " << pos.value().z << '\n';
 
     auto mass = config.get_as<int32_t>("body/mass");
-    if(!mass) {
+    if(!mass)
+    {
         std::cerr << "get_as<int32_t> failed: " << mass.error() << '\n';
         return 1;
     }
     std::cout << "mass: " << mass.value() << '\n';
 
-    // get() and get_as() agree: the text value is still accessible alongside the typed value.
     std::cout << "pos (text): " << config.get("body/pos").value() << '\n';
 
-    // A bad value in the document would fail the resolve, e.g.:
-    //   error: conversion failed for 'body/pos': expected x,y,z -- three comma-separated floats (layer: config.xml)
-    // get_as with the wrong type produces a type-mismatch error at access:
-    //   auto r = config.get_as<int32_t>("body/pos");
-    //   // r.error(): "type mismatch for path 'body/pos': stored type does not match requested type"
-
     return 0;
+}
+
+// A bad value in the document would fail the resolve, e.g.:
+//   error: conversion failed for 'body/pos': expected x,y,z -- three comma-separated floats (layer: config.xml)
+// get_as with the wrong type produces a type-mismatch error at access:
+//   auto r = config.get_as<int32_t>("body/pos");
+//   // r.error(): "type mismatch for path 'body/pos': stored type does not match requested type"
+
+}
+
+int main()
+{
+    nucleus::config_space_builder builder;
+    if(!define_space(builder))
+        return 1;
+    nucleus::config_space space  = builder.build();
+    auto                  loaded = nucleus::load_config(space, nucleus::source_stack{},
+                                                        nucleus::load_options{.document_paths = {"config.xml"}, .make_document = make_document});
+    if(!loaded)
+    {
+        std::cerr << "load failed: " << loaded.error() << '\n';
+        return 1;
+    }
+    return print_typed_values(loaded.value());
 }

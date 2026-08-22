@@ -18,38 +18,40 @@
 #include <string>
 #include <iostream>
 
+static bool define_space(nucleus::config_space_builder &builder)
+{
+    return builder.register_element(nucleus::element("server", nucleus::anchor::root())) &&
+            builder.register_element(
+                    nucleus::required_element("host", nucleus::anchor::keyspace("server"))) &&
+            builder.register_element(
+                    nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
+                                          {"http", "https"}));
+}
+
+// Parse from an in-memory string so the example needs no file on disk. The
+// document factory builds the xml_source from an xml_source_options value --
+// the only seam through which the xml module reaches the core.
+static nucleus::source_handle make_document(const std::string &)
+{
+    const char *document = R"(<server host="127.0.0.1" mode="http"/>)";
+    return nucleus::source_handle(
+            nucleus::xml_source::from(
+                    nucleus::xml_source_options::of_string(document)));
+}
+
 int main()
 {
     nucleus::config_space_builder builder;
-    if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
-        return 1;
-    if(!builder.register_element(
-        nucleus::required_element("host", nucleus::anchor::keyspace("server"))))
-        return 1;
-    if(!builder.register_element(
-        nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
-                              {"http", "https"})))
+    if(!define_space(builder))
         return 1;
     nucleus::config_space space = builder.build();
 
-    // Parse from an in-memory string so the example needs no file on disk. The
-    // document factory builds the xml_source from an xml_source_options value --
-    // the only seam through which the xml module reaches the core.
-    const char *document = R"(<server host="127.0.0.1" mode="http"/>)";
-    auto make = [document](const std::string &) -> nucleus::source_handle {
-        return nucleus::source_handle(
-            nucleus::xml_source::from(
-                nucleus::xml_source_options::of_string(document)));
-    };
-
-    // argv outranks the document band, so it overrides `mode`; the document's
-    // `host` survives.
     nucleus::argv_source argv(std::vector<std::string>{"--server-mode=https"});
     argv.recognize_with(nucleus::recognizer_of(space));
 
     auto loaded = nucleus::load_config(space,
-        nucleus::source_stack{std::move(argv)},
-        nucleus::load_options{.document_paths = {"config.xml"}, .make_document = make});
+                                       nucleus::source_stack{std::move(argv)},
+                                       nucleus::load_options{.document_paths = {"config.xml"}, .make_document = make_document});
     if(!loaded)
     {
         std::cerr << "load failed: " << loaded.error() << '\n';

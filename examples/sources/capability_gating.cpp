@@ -15,16 +15,19 @@
 
 #include <iostream>
 
+static bool define_space(nucleus::config_space_builder &builder)
+{
+    return builder.register_element(nucleus::element("server", nucleus::anchor::root())) &&
+            builder.register_element(
+                    nucleus::primary_key_element("name", nucleus::anchor::keyspace("server"))) &&
+            builder.register_element(
+                    nucleus::typed_element<int>("port", nucleus::anchor::keyspace("server")));
+}
+
 int main()
 {
     nucleus::config_space_builder builder;
-    if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
-        return 1;
-    if(!builder.register_element(
-        nucleus::primary_key_element("name", nucleus::anchor::keyspace("server"))))
-        return 1;
-    if(!builder.register_element(
-        nucleus::typed_element<int>("port", nucleus::anchor::keyspace("server"))))
+    if(!define_space(builder))
         return 1;
     nucleus::config_space space = builder.build();
 

@@ -14,17 +14,20 @@
 
 #include <iostream>
 
+static bool define_space(nucleus::config_space_builder &builder)
+{
+    return builder.register_element(nucleus::element("server", nucleus::anchor::root())) &&
+            builder.register_element(
+                    nucleus::required_element("host", nucleus::anchor::keyspace("server"))) &&
+            builder.register_element(
+                    nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
+                                          {"http", "https"}));
+}
+
 int main()
 {
     nucleus::config_space_builder builder;
-    if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
-        return 1;
-    if(!builder.register_element(
-        nucleus::required_element("host", nucleus::anchor::keyspace("server"))))
-        return 1;
-    if(!builder.register_element(
-        nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
-                              {"http", "https"})))
+    if(!define_space(builder))
         return 1;
     nucleus::config_space space = builder.build();
 
