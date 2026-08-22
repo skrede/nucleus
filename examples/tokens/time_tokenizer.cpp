@@ -45,23 +45,23 @@ nucleus::token_result render(std::chrono::system_clock::time_point instant,
                              bool utc, const std::string &format)
 {
     std::time_t epoch = std::chrono::system_clock::to_time_t(instant);
-    std::tm parts = utc ? *std::gmtime(&epoch) : *std::localtime(&epoch);
+    std::tm     parts = utc ? *std::gmtime(&epoch) : *std::localtime(&epoch);
 
     std::array<char, 128> buffer{};
 #if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wformat-nonliteral"
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wformat-nonliteral"
 #endif
     // format is a host-supplied named tokenizer argument (${time.utc(format=...)}),
     // genuinely not a compile-time literal by design.
     std::size_t written = std::strftime(buffer.data(), buffer.size(), format.c_str(), &parts);
 #if defined(__GNUC__)
-#pragma GCC diagnostic pop
+    #pragma GCC diagnostic pop
 #endif
     if(written == 0)
         return nucleus::unexpected(nucleus::resolve_error(
-            nucleus::resolve_errc::parse_error,
-            "time format produced no output or exceeded the render buffer: " + format));
+                nucleus::resolve_errc::parse_error,
+                "time format produced no output or exceeded the render buffer: " + format));
     return std::string(buffer.data(), written);
 }
 
@@ -71,8 +71,10 @@ nucleus::tokenizer make_time_tokenizer(std::chrono::system_clock::time_point ins
 {
     nucleus::tokenizer_builder builder("time");
 
-    auto clock_fn = [instant](bool utc) {
-        return [instant, utc](const nucleus::named_args &args) -> nucleus::token_result {
+    auto clock_fn = [instant](bool utc)
+    {
+        return [instant, utc](const nucleus::named_args &args) -> nucleus::token_result
+        {
             return render(instant, utc, args.string("format"));
         };
     };
@@ -80,12 +82,31 @@ nucleus::tokenizer make_time_tokenizer(std::chrono::system_clock::time_point ins
     using nucleus::arg_spec;
     using nucleus::arg_type;
     builder.add_function("utc",
-        {arg_spec::scalar("format", arg_type::string).with_default("%Y-%m-%dT%H:%M:%SZ")},
-        clock_fn(true));
+                         {arg_spec::scalar("format", arg_type::string).with_default("%Y-%m-%dT%H:%M:%SZ")},
+                         clock_fn(true));
     builder.add_function("local",
-        {arg_spec::scalar("format", arg_type::string).with_default("%Y-%m-%dT%H:%M:%S")},
-        clock_fn(false));
+                         {arg_spec::scalar("format", arg_type::string).with_default("%Y-%m-%dT%H:%M:%S")},
+                         clock_fn(false));
     return std::move(builder).build();
+}
+
+nucleus::env_source make_fixed_values()
+{
+    nucleus::env_source values;
+    values.set("build/stamp", "${time.utc()}")
+            .set("build/date", "${time.utc(format='%Y-%m-%d')}")
+            .set("build/local", "${time.local(format='%H:%M:%S')}")
+            .set("build/weekday", "${string.upper(value=${time.utc(format='%A')})}")
+            // A list argument: a literal joined with a nested ${...} element.
+            .set("build/label", "${string.concat(values=['build', ${time.utc(format='%Y')}], separator='-')}");
+    return values;
+}
+
+// build/local reflects the host time zone; the utc-derived keys are stable.
+void print_values(const nucleus::config &config)
+{
+    for(const std::string &key : config.keys())
+        std::cout << key << " = " << config.get(key).value() << '\n';
 }
 
 }
@@ -95,16 +116,8 @@ int main()
     // Inject the clock. Swap this single line for
     // std::chrono::system_clock::now() in production; the fixed instant here
     // makes the utc output below deterministic and the tokenizer testable.
-    const auto instant = std::chrono::system_clock::from_time_t(1700000000);
-
-    nucleus::env_source values;
-    values.set("build/stamp", "${time.utc()}")
-          .set("build/date", "${time.utc(format='%Y-%m-%d')}")
-          .set("build/local", "${time.local(format='%H:%M:%S')}")
-          .set("build/weekday", "${string.upper(value=${time.utc(format='%A')})}")
-          // A list argument: a literal joined with a nested ${...} element.
-          .set("build/label", "${string.concat(values=['build', ${time.utc(format='%Y')}], separator='-')}");
-
+    const auto                    instant = std::chrono::system_clock::from_time_t(1700000000);
+    nucleus::env_source           values  = make_fixed_values();
     nucleus::config_space_builder builder;
     if(auto installed = builder.install_tokenizer(make_time_tokenizer(instant)); !installed)
     {
@@ -119,10 +132,6 @@ int main()
         std::cerr << "resolve failed: " << loaded.error() << '\n';
         return 1;
     }
-
-    // build/local reflects the host time zone; the utc-derived keys are stable.
-    const nucleus::config &config = loaded.value();
-    for(const std::string &key : config.keys())
-        std::cout << key << " = " << config.get(key).value() << '\n';
+    print_values(loaded.value());
     return 0;
 }
