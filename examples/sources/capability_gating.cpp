@@ -1,7 +1,7 @@
 // capability_gating: load auto-gates with NO host gate call.
 //
 // The schema is nested (a `server` container primary-keyed by `name`) and typed
-// (an int `port`), so it requires the `nesting` capability. A flat env source
+// (a `std::uint16_t` `port`), so it requires the `nesting` capability. A flat env source
 // cannot represent nesting, so the load fails loudly BEFORE folding -- the gate is
 // part of every load, not a separate step the host must remember to call.
 
@@ -14,6 +14,7 @@
 #include "nucleus/env/env_source.h"
 
 #include <string>
+#include <cstdint>
 #include <utility>
 #include <iostream>
 
@@ -23,7 +24,8 @@ static bool define_space(nucleus::config_space_builder &builder)
             builder.register_element(
                     nucleus::primary_key_element("name", nucleus::anchor::keyspace("server"))) &&
             builder.register_element(
-                    nucleus::typed_element<int>("port", nucleus::anchor::keyspace("server")));
+                    nucleus::typed_element<std::uint16_t>(
+                            "port", nucleus::anchor::keyspace("server")));
 }
 
 static bool is_missing_nesting(const nucleus::error &error)

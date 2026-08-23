@@ -15,6 +15,7 @@
 #include <ostream>
 #include <utility>
 #include <iostream>
+#include <string_view>
 
 using namespace nucleus;
 
@@ -35,7 +36,8 @@ static registration_result define_server_space(Builder &builder)
                element("port", anchor::keyspace("cluster/server")), network_owner);
        !result)
         return result;
-    return builder.register_element(element("host", anchor::keyspace("cluster/server")));
+    return builder.register_element(
+            element("host", anchor::keyspace("cluster/server")), network_owner);
 }
 
 template<typename Builder>
@@ -84,27 +86,39 @@ static void show_primary_key_nodes(std::ostream &output, const config &cfg,
     print_nodes(output, "role(primary_key) — all pkey leaves", nodes);
 }
 
-static void show_ambiguous_one(std::ostream &output, const config &cfg,
-                               const schema_query_context &ctx)
+static int show_ambiguous_one(std::ostream &output, std::ostream &errors,
+                              expected<config_node, error> ambiguous)
 {
     output << "\n--- one() on many matches (two servers -> ambiguous_result) ---\n";
-    const auto ambiguous = query(cfg.root(), ctx).role(node_role::primary_key).one();
-    if(!ambiguous)
-        output << "  error: " << ambiguous.error().message << '\n';
-    else
-        output << "  node: " << ambiguous->path() << '\n';
+    constexpr std::string_view message =
+            "query matched 2 nodes; one() requires exactly one match";
+    if(ambiguous || ambiguous.error().code != errc::ambiguous_result ||
+       ambiguous.error().message != message)
+    {
+        errors << "unexpected ambiguous query result\n";
+        return 1;
+    }
+    output << "  error: " << ambiguous.error().message << '\n';
+    return 0;
 }
 
-static void show_single_one(std::ostream &output, const config &cfg,
-                            const schema_query_context &ctx)
+static int show_single_one(std::ostream &output, std::ostream &errors,
+                           expected<config_node, error> single)
 {
-    const auto anchor0 = cfg.root()["cluster"]["server"][std::size_t{0}];
-    const auto single  = query(anchor0, ctx).role(node_role::primary_key).one();
     output << "\n--- one() on server[0] (single pkey) ---\n";
-    if(single)
-        output << "  name: " << single->value().value_or("(absent)") << '\n';
-    else
-        output << "  error: " << single.error().message << '\n';
+    if(!single)
+    {
+        errors << "unexpected single query error: " << single.error() << '\n';
+        return 1;
+    }
+    const auto value = single->value();
+    if(!value || *value != "primary")
+    {
+        errors << "unexpected single query value\n";
+        return 1;
+    }
+    output << "  name: " << *value << '\n';
+    return 0;
 }
 
 static void show_leaves(std::ostream &output, const config &cfg,
@@ -131,6 +145,22 @@ static void show_strain_nodes(std::ostream &output, const config &cfg,
     print_nodes(output, "in_strain() from server[0]", nodes);
 }
 
+static int run_queries(const config &cfg, const schema_query_context &ctx,
+                       expected<config_node, error> ambiguous,
+                       expected<config_node, error> single,
+                       std::ostream &output, std::ostream &errors)
+{
+    show_primary_key_nodes(output, cfg, ctx);
+    if(const int status = show_ambiguous_one(output, errors, std::move(ambiguous)); status != 0)
+        return status;
+    if(const int status = show_single_one(output, errors, std::move(single)); status != 0)
+        return status;
+    show_leaves(output, cfg, ctx);
+    show_owned_nodes(output, cfg, ctx, network_owner);
+    show_strain_nodes(output, cfg, ctx);
+    return 0;
+}
+
 static int run_queries(const config_space &space, std::ostream &output, std::ostream &errors)
 {
     runtime_source source = make_server_source();
@@ -140,15 +170,12 @@ static int run_queries(const config_space &space, std::ostream &output, std::ost
         errors << "load failed: " << loaded.error() << '\n';
         return 1;
     }
-    const config              &cfg = *loaded;
-    const schema_query_context ctx = space.query_context();
-    show_primary_key_nodes(output, cfg, ctx);
-    show_ambiguous_one(output, cfg, ctx);
-    show_single_one(output, cfg, ctx);
-    show_leaves(output, cfg, ctx);
-    show_owned_nodes(output, cfg, ctx, network_owner);
-    show_strain_nodes(output, cfg, ctx);
-    return 0;
+    const config              &cfg       = *loaded;
+    const schema_query_context ctx       = space.query_context();
+    const auto                 ambiguous = query(cfg.root(), ctx).role(node_role::primary_key).one();
+    const auto                 anchor0   = cfg.root()["cluster"]["server"][std::size_t{0}];
+    const auto                 single    = query(anchor0, ctx).role(node_role::primary_key).one();
+    return run_queries(cfg, ctx, ambiguous, single, output, errors);
 }
 
 static int run_query_example(expected<config_space, error> space, std::ostream &output,
