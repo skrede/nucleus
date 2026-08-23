@@ -8,6 +8,7 @@
 
 #include <string>
 #include <vector>
+#include <utility>
 #include <iostream>
 
 static bool define_space(nucleus::config_space_builder &builder)
@@ -42,6 +43,24 @@ static bool is_unknown_timeout(const nucleus::error &error)
             std::string::npos;
 }
 
+static int report_unknown_rejection(nucleus::load_result rejected,
+                                    std::ostream        &output,
+                                    std::ostream        &errors)
+{
+    if(rejected)
+    {
+        errors << "unexpected success: unrecognized flag accepted\n";
+        return 1;
+    }
+    if(!is_unknown_timeout(rejected.error()))
+    {
+        errors << "unexpected rejection: " << rejected.error() << '\n';
+        return 1;
+    }
+    output << "\nunrecognized flag rejected: " << rejected.error() << '\n';
+    return 0;
+}
+
 // Strict mode rejects an unknown path at pull() before the fold starts.
 static int demonstrate_unknown_rejection(
         const nucleus::config_space   &space,
@@ -51,18 +70,7 @@ static int demonstrate_unknown_rejection(
     unknown_argv.recognize_with(recognizer)
             .policy(nucleus::unknown_key_policy::strict);
     auto rejected = nucleus::load_config(space, nucleus::source_stack{std::move(unknown_argv)}, {});
-    if(rejected)
-    {
-        std::cerr << "unexpected success: unrecognized flag accepted\n";
-        return 1;
-    }
-    if(!is_unknown_timeout(rejected.error()))
-    {
-        std::cerr << "unexpected rejection: " << rejected.error() << '\n';
-        return 1;
-    }
-    std::cout << "\nunrecognized flag rejected: " << rejected.error() << '\n';
-    return 0;
+    return report_unknown_rejection(std::move(rejected), std::cout, std::cerr);
 }
 
 int main()

@@ -14,6 +14,7 @@
 #include "nucleus/env/env_source.h"
 
 #include <string>
+#include <utility>
 #include <iostream>
 
 static bool define_space(nucleus::config_space_builder &builder)
@@ -33,6 +34,24 @@ static bool is_missing_nesting(const nucleus::error &error)
             std::string::npos;
 }
 
+static int report_capability_rejection(nucleus::load_result loaded,
+                                       std::ostream        &output,
+                                       std::ostream        &errors)
+{
+    if(loaded)
+    {
+        errors << "unexpected success: flat source accepted\n";
+        return 1;
+    }
+    if(!is_missing_nesting(loaded.error()))
+    {
+        errors << "unexpected rejection: " << loaded.error() << '\n';
+        return 1;
+    }
+    output << "load auto-gated and refused: " << loaded.error() << '\n';
+    return 0;
+}
+
 int main()
 {
     nucleus::config_space_builder builder;
@@ -44,17 +63,5 @@ int main()
     values.set("server/name", "primary");
 
     auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(values)}, {});
-    if(loaded)
-    {
-        std::cerr << "unexpected success: flat source accepted\n";
-        return 1;
-    }
-    if(!is_missing_nesting(loaded.error()))
-    {
-        std::cerr << "unexpected rejection: " << loaded.error() << '\n';
-        return 1;
-    }
-
-    std::cout << "load auto-gated and refused: " << loaded.error() << '\n';
-    return 0;
+    return report_capability_rejection(std::move(loaded), std::cout, std::cerr);
 }
