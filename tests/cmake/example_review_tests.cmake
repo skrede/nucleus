@@ -1,4 +1,6 @@
 target_sources(facade_schema_test PRIVATE example_schema_contract_test.cpp)
+target_sources(pkey_tokenizer_test PRIVATE example_pkey_tokenizer_contract_test.cpp)
+target_sources(selector_combinator_test PRIVATE example_query_contract_test.cpp)
 target_sources(recognizer_of_test PRIVATE example_argv_recognizer_contract_test.cpp)
 target_sources(auto_gating_test PRIVATE example_capability_gating_contract_test.cpp)
 target_link_libraries(auto_gating_test PRIVATE nucleus::runtime)
