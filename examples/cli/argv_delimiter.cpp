@@ -65,14 +65,19 @@ static bool print_template(
 }
 
 // Completion shares the delimiter, so completed flags match parsed flags.
-static void print_completion(
+static bool print_completion(
         const nucleus::config_space  &space,
         const nucleus::cli_delimiter &delimiter)
 {
-    const std::string script =
-            space.generate_completion(nucleus::shell::bash, "mytool", delimiter);
+    const auto script = space.generate_completion(nucleus::shell::bash, "mytool", delimiter);
+    if(!script)
+    {
+        std::cerr << "completion failed: " << script.error() << '\n';
+        return false;
+    }
     std::cout << "\ncompletion offers `--server__host`: "
-              << (script.find("--server__host") != std::string::npos) << '\n';
+              << (script.value().find("--server__host") != std::string::npos) << '\n';
+    return true;
 }
 
 // parse() validates the text: empty, `=`-containing, and `/`-containing
@@ -99,6 +104,5 @@ int main()
     print_resolved(loaded.value());
     if(!print_template(space, delim.value()))
         return 1;
-    print_completion(space, delim.value());
-    return 0;
+    return print_completion(space, delim.value()) ? 0 : 1;
 }

@@ -458,7 +458,7 @@ std::size_t tokenizer_count() const noexcept;   // includes the auto-installed c
 std::size_t converter_count() const noexcept;
 std::vector<conflict_report> conflicts() const;
 std::string_view space_name() const noexcept;   // the name set via config_space_builder::name(); empty if unnamed
-std::string generate_completion(shell which, std::string_view prog,
+expected<std::string, error> generate_completion(shell which, std::string_view prog,
                                 const cli_delimiter &delimiter = {},
                                 const key_path &anchor = {},
                                 std::string_view space_name = {}) const;
@@ -1090,7 +1090,8 @@ same flag mapping the CLI surface uses, so completion cannot drift from the CLI.
 
 ```cpp
 enum class shell { bash, zsh };
-std::string config_space::generate_completion(shell which, std::string_view prog,
+expected<std::string, error> config_space::generate_completion(
+                                                     shell which, std::string_view prog,
                                                      const cli_delimiter &delimiter = {},
                                                      const key_path &anchor = {},
                                                      std::string_view space_name = {}) const;
@@ -1103,6 +1104,11 @@ non-empty, every completion entry is prefixed with the space name, matching a
 `multispace_argv_source` that routes tokens by their first segment.
 An `enum_element`'s value set becomes that flag's completion candidates. A pure
 read of the sealed schema. nucleus is a library, not a CLI — it returns the
-script as a string and the host decides how to surface it. See
+script and the host decides how to surface it.
+
+`prog` reaches shell command position unquoted in the generated script, so it must
+be a bare command token: letters, digits, `.`, `_` and `-`, and nothing else. A name
+carrying a path separator, whitespace, a newline or any shell metacharacter is
+refused with `errc::malformed_source` and no script text is produced. See
 [`examples/cli/completion.cpp`](../examples/cli/completion.cpp) and
 [`examples/cli/argv_delimiter.cpp`](../examples/cli/argv_delimiter.cpp).

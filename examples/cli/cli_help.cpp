@@ -14,6 +14,18 @@
 
 #include <iostream>
 
+static bool print_zsh_completion(const nucleus::config_space &space)
+{
+    const auto script = space.generate_completion(nucleus::shell::zsh, "mytool");
+    if(!script)
+    {
+        std::cerr << "completion failed: " << script.error() << '\n';
+        return false;
+    }
+    std::cout << script.value();
+    return true;
+}
+
 int main()
 {
     nucleus::config_space_builder builder;
@@ -35,6 +47,5 @@ int main()
     std::cout << "# ---- --help ----\n";
     std::cout << space.generate_help("mytool");
     std::cout << "\n# ---- zsh completion (descriptions rendered inline) ----\n";
-    std::cout << space.generate_completion(nucleus::shell::zsh, "mytool");
-    return 0;
+    return print_zsh_completion(space) ? 0 : 1;
 }

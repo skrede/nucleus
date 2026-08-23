@@ -1,6 +1,7 @@
 #include "nucleus/completion/completion_generator.h"
 #include "nucleus/completion/bash_emitter.h"
 #include "nucleus/completion/zsh_emitter.h"
+#include "nucleus/completion/program_token.h"
 #include "nucleus/completion/completion_model.h"
 
 #include "nucleus/schema/schema.h"
@@ -66,7 +67,6 @@ std::string wildcard_flag(const key_path &effective,
         if(i != 0)
             flag += delimiter.str();
         flag += segs[i];
-        // After the last segment of the repeated container, insert the wildcard.
         if(i + 1 == container_depth)
         {
             flag += delimiter.str();
@@ -118,8 +118,6 @@ completion_model project(const schema_registry &schema,
         const auto option_description = opt.description;
         model.options.push_back(std::move(opt));
 
-        // Emit an additional wildcard entry when the path crosses a repeated
-        // container. Walk the full (pre-anchor) path to find the crossing container.
         std::string prefix;
         for(std::size_t depth = 1; depth < path.size(); ++depth)
         {
@@ -129,8 +127,6 @@ completion_model project(const schema_registry &schema,
             prefix += seg;
             if(repeated_containers.contains(prefix) && depth < path.size())
             {
-                // Compute the container depth in the effective path (accounting for
-                // anchor stripping and space_name prepend).
                 const std::size_t anchor_offset = anchor.empty() ? 0 : anchor.size();
                 const std::size_t space_offset  = space_name.empty() ? 0 : 1;
                 const std::size_t effective_depth =
@@ -177,10 +173,12 @@ std::string help_line(const std::string &flag, const schema_element &el)
 
 }
 
-std::string generate_completion(shell which, const schema_registry &schema,
+expected<std::string, error> generate_completion(shell which, const schema_registry &schema,
                                 std::string_view prog, const cli_delimiter &delimiter,
                                 const key_path &anchor, std::string_view space_name)
 {
+    if(auto valid = check_program_token(prog); !valid)
+        return unexpected(std::move(valid).error());
     const completion_model model = project(schema, prog, delimiter, anchor, space_name);
     // No default label: an added shell must gain a case here rather than fall
     // through silently to the bash emitter.

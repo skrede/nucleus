@@ -11,7 +11,21 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
+#include <string>
 #include <iostream>
+
+using completion_result = nucleus::expected<std::string, nucleus::error>;
+
+static bool print_script(const char *heading, const completion_result &script)
+{
+    if(!script)
+    {
+        std::cerr << "completion failed: " << script.error() << '\n';
+        return false;
+    }
+    std::cout << heading << script.value();
+    return true;
+}
 
 int main()
 {
@@ -24,9 +38,9 @@ int main()
         return 1;
     nucleus::config_space space = builder.build();
 
-    std::cout << "# ---- bash ----\n";
-    std::cout << space.generate_completion(nucleus::shell::bash, "mytool");
-    std::cout << "\n# ---- zsh ----\n";
-    std::cout << space.generate_completion(nucleus::shell::zsh, "mytool");
-    return 0;
+    const auto bash = space.generate_completion(nucleus::shell::bash, "mytool");
+    const auto zsh  = space.generate_completion(nucleus::shell::zsh, "mytool");
+    if(!print_script("# ---- bash ----\n", bash))
+        return 1;
+    return print_script("\n# ---- zsh ----\n", zsh) ? 0 : 1;
 }

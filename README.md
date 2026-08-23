@@ -303,7 +303,10 @@ if(!builder.register_element(nucleus::enum_element(
     return 1;
 nucleus::config_space space = builder.build();
 
-std::cout << space.generate_completion(nucleus::shell::bash, "mytool");
+auto script = space.generate_completion(nucleus::shell::bash, "mytool");
+if(!script)
+    return 1;   // the program name is not a bare command token
+std::cout << script.value();
 ```
 
 ```bash

@@ -87,7 +87,7 @@ TEST_CASE("the generated bash script actually completes under real bash",
     if(!bash_available())
         SKIP("bash not found on PATH -- the real-bash smoke test needs it");
 
-    const std::string completion = generate_completion(shell::bash, fixture(), "myapp");
+    const std::string completion = generate_completion(shell::bash, fixture(), "myapp").value();
 
     // Drive the sourced function the way bash itself would: set COMP_WORDS /
     // COMP_CWORD and invoke the completer, then print COMPREPLY.

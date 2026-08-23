@@ -3,6 +3,9 @@
 
 #include "nucleus/completion/completion.h"
 
+#include "nucleus/error.h"
+#include "nucleus/expected.h"
+
 #include "nucleus/schema/cli_flag.h"
 
 #include <string>
@@ -15,11 +18,13 @@ class schema_registry;
 // Generates a complete, self-contained completion script for `which`, projected
 // from `schema` and bound to the program name `prog`. Flags are rendered under
 // `delimiter` and relative to `anchor`, which must match the argv_source grammar
-// or completion drifts from the real CLI. The result is a plain string with no
-// shell process involved -- core stays free of any shell binary dependency.
+// or completion drifts from the real CLI. No shell process is involved -- core
+// stays free of any shell binary dependency. A `prog` outside the bare-command-
+// token grammar is refused before any script text exists, since the emitters
+// write it at shell command position unquoted.
 // Internal: it names the schema_registry, so the public surface is the
 // config_space::generate_completion member that forwards here.
-std::string generate_completion(shell which,
+expected<std::string, error> generate_completion(shell which,
                                               const schema_registry &schema,
                                               std::string_view prog,
                                               const cli_delimiter &delimiter = {},

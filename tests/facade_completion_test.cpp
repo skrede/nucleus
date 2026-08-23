@@ -35,7 +35,7 @@ TEST_CASE("the facade generates a bash completion script from the registered sch
         nucleus::element("port", nucleus::anchor::keyspace(path_of("plexus")))));
     nucleus::config_space space = engine.build();
 
-    const std::string bash = space.generate_completion(nucleus::shell::bash, "mytool");
+    const std::string bash = space.generate_completion(nucleus::shell::bash, "mytool").value();
 
     REQUIRE(bash.find("complete -F _mytool_complete mytool") != std::string::npos);
     REQUIRE(bash.find("--logging") != std::string::npos);
@@ -56,7 +56,7 @@ TEST_CASE("the facade generates a zsh completion script from the registered sche
         {"debug", "info", "warn", "error"})));
     nucleus::config_space space = engine.build();
 
-    const std::string zsh = space.generate_completion(nucleus::shell::zsh, "mytool");
+    const std::string zsh = space.generate_completion(nucleus::shell::zsh, "mytool").value();
 
     REQUIRE(zsh.find("#compdef mytool") != std::string::npos);
     REQUIRE(zsh.find("_arguments -s") != std::string::npos);
@@ -108,9 +108,62 @@ TEST_CASE("the facade --help lists a bare path-tagged flag alongside typed eleme
     nucleus::config_space space = engine.build();
 
     const std::string help = space.generate_help("mytool");
-    const std::string completion = space.generate_completion(nucleus::shell::bash, "mytool");
+    const std::string completion = space.generate_completion(nucleus::shell::bash, "mytool").value();
 
     REQUIRE(help.find("--logging") != std::string::npos);
     REQUIRE(help.find("--logging-verbose") != std::string::npos);
     REQUIRE(completion.find("--logging-verbose") != std::string::npos);
+}
+
+TEST_CASE("a program name carrying a newline is refused instead of emitted as script text",
+          "[facade][completion]")
+{
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
+    nucleus::config_space space = engine.build();
+
+    const auto refused = space.generate_completion(nucleus::shell::bash, "my\ntool");
+
+    REQUIRE_FALSE(refused);
+    REQUIRE(refused.error().code == nucleus::errc::malformed_source);
+    // The token is quoted in its escaped form, so the diagnostic cannot itself
+    // carry the line break it reports.
+    REQUIRE(refused.error().message.find("my\\ntool") != std::string::npos);
+    REQUIRE(refused.error().message.find('\n') == std::string::npos);
+}
+
+TEST_CASE("a program name carrying a shell metacharacter is refused for both shells",
+          "[facade][completion]")
+{
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
+    nucleus::config_space space = engine.build();
+
+    const auto bash = space.generate_completion(nucleus::shell::bash, "x; rm -rf ~");
+    const auto zsh  = space.generate_completion(nucleus::shell::zsh, "x; rm -rf ~");
+
+    REQUIRE_FALSE(bash);
+    REQUIRE(bash.error().code == nucleus::errc::malformed_source);
+    REQUIRE(bash.error().message.find("x; rm -rf ~") != std::string::npos);
+    REQUIRE_FALSE(zsh);
+    REQUIRE(zsh.error().code == nucleus::errc::malformed_source);
+}
+
+TEST_CASE("a plain program name still yields a script for both shells",
+          "[facade][completion]")
+{
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
+    nucleus::config_space space = engine.build();
+
+    const auto bash = space.generate_completion(nucleus::shell::bash, "my-tool.v2");
+    const auto zsh  = space.generate_completion(nucleus::shell::zsh, "my-tool.v2");
+
+    REQUIRE(bash);
+    // The last line is shell command position -- where an unquoted token that was
+    // not a bare word would open a statement of its own.
+    REQUIRE(bash.value().ends_with("complete -F _my_tool_v2_complete my-tool.v2\n"));
+    REQUIRE(bash.value().find("--logging") != std::string::npos);
+    REQUIRE(zsh);
+    REQUIRE(zsh.value().starts_with("#compdef my-tool.v2\n"));
 }

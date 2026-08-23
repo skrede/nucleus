@@ -495,13 +495,13 @@ std::vector<conflict_report> config_space::conflicts() const { return m_impl->co
 
 std::string_view config_space::space_name() const noexcept { return m_impl->name; }
 
-std::string config_space::generate_completion(shell which, std::string_view prog,
+expected<std::string, error> config_space::generate_completion(shell which, std::string_view prog,
                                                      const cli_delimiter &delimiter,
                                                      const key_path &anchor,
                                                      std::string_view space_name) const
 {
     // Project the sealed schema through the free generator. Only the script string
-    // crosses the boundary; the registry stays encapsulated.
+    // or its refusal crosses the boundary; the registry stays encapsulated.
     return nucleus::generate_completion(which, m_impl->schema, prog, delimiter, anchor, space_name);
 }
 

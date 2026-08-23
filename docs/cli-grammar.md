@@ -151,9 +151,11 @@ emits `--alpha-x=` for schema key `x` (with default delimiter `-`), which is
 the exact token that `multispace_argv_source::for_space("alpha")` parses back.
 
 ```cpp
-space.generate_completion(shell::bash, "mytool", delimiter, anchor, "alpha");
+auto script = space.generate_completion(shell::bash, "mytool", delimiter, anchor, "alpha");
 ```
-produces completion entries prefixed with `--alpha-`, matching the same grammar.
+produces completion entries prefixed with `--alpha-`, matching the same grammar. The
+call returns `expected<std::string, error>`: a program name outside the bare-command-token
+grammar (letters, digits, `.`, `_`, `-`) is refused instead of emitted as script text.
 
 Both accept `space_name` as their last (defaulted) parameter so existing call
 sites without a space name are unaffected.
