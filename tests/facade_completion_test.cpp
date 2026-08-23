@@ -7,6 +7,8 @@
 
 #include "nucleus/keyspace/key_path.h"
 
+#include "nucleus/utility/escaped_text.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
@@ -127,9 +129,11 @@ TEST_CASE("a program name carrying a newline is refused instead of emitted as sc
     REQUIRE_FALSE(refused);
     REQUIRE(refused.error().code == nucleus::errc::malformed_source);
     // The token is quoted in its escaped form, so the diagnostic cannot itself
-    // carry the line break it reports.
+    // carry the line break it reports. The escaper is injective, so the quoted form
+    // names the byte the token carried rather than merely resembling it.
     REQUIRE(refused.error().message.find("my\\ntool") != std::string::npos);
     REQUIRE(refused.error().message.find('\n') == std::string::npos);
+    REQUIRE(nucleus::escaped_text("my\\ntool") != nucleus::escaped_text("my\ntool"));
 }
 
 TEST_CASE("a program name carrying a shell metacharacter is refused for both shells",

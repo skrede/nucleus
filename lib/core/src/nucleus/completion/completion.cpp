@@ -127,10 +127,11 @@ completion_model project(const schema_registry &schema,
             prefix += seg;
             if(repeated_containers.contains(prefix) && depth < path.size())
             {
-                const std::size_t anchor_offset = anchor.empty() ? 0 : anchor.size();
-                const std::size_t space_offset  = space_name.empty() ? 0 : 1;
-                const std::size_t effective_depth =
-                    depth - anchor_offset + space_offset;
+                // depth counts full-path segments; the flag counts effective-path
+                // segments, which drop the anchor prefix and gain the space name.
+                const std::size_t anchor_offset   = anchor.empty() ? 0 : anchor.size();
+                const std::size_t space_offset    = space_name.empty() ? 0 : 1;
+                const std::size_t effective_depth = depth - anchor_offset + space_offset;
 
                 completion_option wild;
                 wild.flag = wildcard_flag(effective, effective_depth, delimiter);

@@ -208,7 +208,7 @@ None.
 
 | File | Lines |
 |---|---|
-| `tests/CMakeLists.txt` | 681 |
+| `tests/CMakeLists.txt` | 683 |
 | `lib/CMakeLists.txt` | 236 |
 
 A CMake unit carries the line ceiling only. The gate measures function spans by running ctags

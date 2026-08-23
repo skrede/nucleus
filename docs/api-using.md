@@ -1107,8 +1107,11 @@ read of the sealed schema. nucleus is a library, not a CLI — it returns the
 script and the host decides how to surface it.
 
 `prog` reaches shell command position unquoted in the generated script, so it must
-be a bare command token: letters, digits, `.`, `_` and `-`, and nothing else. A name
-carrying a path separator, whitespace, a newline or any shell metacharacter is
-refused with `errc::malformed_source` and no script text is produced. See
+be a bare command token: it opens with a letter, a digit or `_`, and carries only
+letters, digits, `.`, `_` and `-`. A name carrying a path separator, whitespace, a
+newline or any shell metacharacter is refused with `errc::malformed_source` and no
+script text is produced, as is a name opening with `-` (the shell would read it as
+an option of the command the name was meant to occupy) or with `.` (a path
+reference rather than a command). See
 [`examples/cli/completion.cpp`](../examples/cli/completion.cpp) and
 [`examples/cli/argv_delimiter.cpp`](../examples/cli/argv_delimiter.cpp).
