@@ -1,16 +1,3 @@
-// plugin_spaces: many plugins, one application-wide space.
-//
-// A config_space is a single flat namespace -- there is no "space inside a space".
-// Composition is instead expressed by KEY PATH: each plugin introduces its own
-// top-level prefix and anchors its sub-schema under it via anchor::keyspace(...).
-//
-// Two seams make this a real plugin model rather than a naming convention:
-//   - owner_token  tags every registration with "who registered this".
-//   - registration_policy  lets the host admit only known plugins and reject the rest.
-//
-// The same plugin registration function also seals a private, standalone space the
-// plugin alone owns and reads -- the "only it can read its own file" case.
-
 #include "nucleus/config.h"
 #include "nucleus/identity.h"
 #include "nucleus/config_space.h"
@@ -28,10 +15,6 @@
 #include <iostream>
 
 namespace {
-
-// Admits registrations only from plugins the host has explicitly handed a token.
-// The seam never sees the key path -- it gates on identity, not namespace -- so
-// prefix ownership stays a host convention, while admission is enforced here.
 class admitted_plugins_policy : public nucleus::registration_policy
 {
 public:
@@ -49,11 +32,9 @@ private:
     std::vector<nucleus::owner_token> m_admitted;
 };
 
-// A plugin contributes its schema under its own prefix. The first element introduces
-// the prefix as a top-level keyspace; the rest anchor beneath it. Reused verbatim
-// for both the shared application space and the plugin's own standalone space.
-nucleus::registration_result register_net(nucleus::config_space_builder &builder,
-                                          const nucleus::owner_token    &owner)
+template<typename Builder>
+nucleus::registration_result register_net(Builder                    &builder,
+                                          const nucleus::owner_token &owner)
 {
     if(auto r = builder.register_element(
                nucleus::element("net", nucleus::anchor::root()), owner);
@@ -69,8 +50,9 @@ nucleus::registration_result register_net(nucleus::config_space_builder &builder
             owner);
 }
 
-nucleus::registration_result register_cache(nucleus::config_space_builder &builder,
-                                            const nucleus::owner_token    &owner)
+template<typename Builder>
+nucleus::registration_result register_cache(Builder                    &builder,
+                                            const nucleus::owner_token &owner)
 {
     if(auto r = builder.register_element(
                nucleus::element("cache", nucleus::anchor::root()), owner);
@@ -96,21 +78,24 @@ std::shared_ptr<admitted_plugins_policy> make_policy(
     return policy;
 }
 
+template<typename Builder>
 nucleus::registration_result register_plugins(
-        nucleus::config_space_builder &builder,
-        const nucleus::owner_token    &net_owner,
-        const nucleus::owner_token    &cache_owner)
+        Builder                    &builder,
+        const nucleus::owner_token &net_owner,
+        const nucleus::owner_token &cache_owner)
 {
     if(auto result = register_net(builder, net_owner); !result)
         return result;
     return register_cache(builder, cache_owner);
 }
 
+template<typename Builder>
 nucleus::expected<nucleus::config_space, nucleus::error> make_application_space(
+        Builder                    &builder,
         const nucleus::owner_token &net_owner,
-        const nucleus::owner_token &cache_owner)
+        const nucleus::owner_token &cache_owner,
+        std::ostream               &output)
 {
-    nucleus::config_space_builder builder;
     builder.name("app");
     if(auto result = builder.set_registration_policy(make_policy(net_owner, cache_owner)); !result)
         return nucleus::unexpected(std::move(result).error());
@@ -119,10 +104,18 @@ nucleus::expected<nucleus::config_space, nucleus::error> make_application_space(
     const nucleus::owner_token rogue_owner(std::string("rogue"));
     auto                       rogue = builder.register_element(
             nucleus::element("rogue", nucleus::anchor::root()), rogue_owner);
-    std::cout << "rogue plugin admitted: " << (rogue ? "yes" : "no")
-              << "  (" << (rogue ? "" : rogue.error().message) << ")\n";
-    std::cout << "cross-plugin conflicts: " << builder.conflicts().size() << "\n\n";
+    output << "rogue plugin admitted: " << (rogue ? "yes" : "no")
+           << "  (" << (rogue ? "" : rogue.error().message) << ")\n";
+    output << "cross-plugin conflicts: " << builder.conflicts().size() << "\n\n";
     return builder.build();
+}
+
+nucleus::expected<nucleus::config_space, nucleus::error> make_application_space(
+        const nucleus::owner_token &net_owner,
+        const nucleus::owner_token &cache_owner)
+{
+    nucleus::config_space_builder builder;
+    return make_application_space(builder, net_owner, cache_owner, std::cout);
 }
 
 nucleus::runtime_source make_application_source()
@@ -136,57 +129,72 @@ nucleus::runtime_source make_application_source()
 }
 
 void print_application(const nucleus::config_space &app,
-                       const nucleus::config       &config)
+                       const nucleus::config &config, std::ostream &output)
 {
-    std::cout << "application-wide config (space \"" << app.space_name() << "\"):\n";
+    output << "application-wide config (space \"" << app.space_name() << "\"):\n";
     for(const std::string &key : config.keys())
-        std::cout << "  " << key << " = " << config.get(key).value() << '\n';
+        output << "  " << key << " = " << config.get(key).value() << '\n';
 }
 
+template<typename Builder>
 nucleus::expected<nucleus::config_space, nucleus::error> make_private_space(
+        Builder                    &builder,
         const nucleus::owner_token &net_owner)
 {
-    nucleus::config_space_builder builder;
     builder.name("net");
     if(auto result = register_net(builder, net_owner); !result)
         return nucleus::unexpected(std::move(result).error());
     return builder.build();
 }
 
-// A plugin can also seal its own product without sharing a registry.
-int show_private_space(const nucleus::owner_token &net_owner)
+nucleus::expected<nucleus::config_space, nucleus::error> make_private_space(
+        const nucleus::owner_token &net_owner)
 {
-    auto net_private = make_private_space(net_owner);
-    if(!net_private)
-    {
-        std::cerr << "private space setup failed: " << net_private.error() << '\n';
-        return 1;
-    }
-    std::cout << "\nnet's private space is independent of the app space: "
-              << "schema elements = " << net_private->schema_elements().size() << '\n';
-    return 0;
+    nucleus::config_space_builder builder;
+    return make_private_space(builder, net_owner);
 }
 
-} // namespace
-
-// An unadmitted plugin is refused before it can claim a key, while admitted
-// plugins retain owner-attributed collision reporting.
-int main()
+int run_application(
+        nucleus::expected<nucleus::config_space, nucleus::error> app,
+        std::ostream &output, std::ostream &errors)
 {
-    const nucleus::owner_token net_owner(std::string("net")), cache_owner(std::string("cache"));
-    auto                       app = make_application_space(net_owner, cache_owner);
     if(!app)
     {
-        std::cerr << "application space setup failed: " << app.error() << '\n';
+        errors << "application space setup failed: " << app.error() << '\n';
         return 1;
     }
     auto loaded = nucleus::load_config(
             *app, nucleus::source_stack{make_application_source()}, {});
     if(!loaded)
     {
-        std::cerr << "app load failed: " << loaded.error() << '\n';
+        errors << "app load failed: " << loaded.error() << '\n';
         return 1;
     }
-    print_application(*app, loaded.value());
-    return show_private_space(net_owner);
+    print_application(*app, loaded.value(), output);
+    return 0;
+}
+
+int run_private_space(
+        nucleus::expected<nucleus::config_space, nucleus::error> net_private,
+        std::ostream &output, std::ostream &errors)
+{
+    if(!net_private)
+    {
+        errors << "private space setup failed: " << net_private.error() << '\n';
+        return 1;
+    }
+    output << "\nnet's private space is independent of the app space: "
+           << "schema elements = " << net_private->schema_elements().size() << '\n';
+    return 0;
+}
+}
+
+int main()
+{
+    const nucleus::owner_token net_owner(std::string("net")), cache_owner(std::string("cache"));
+    const int                  app_status = run_application(
+            make_application_space(net_owner, cache_owner), std::cout, std::cerr);
+    if(app_status != 0)
+        return app_status;
+    return run_private_space(make_private_space(net_owner), std::cout, std::cerr);
 }
