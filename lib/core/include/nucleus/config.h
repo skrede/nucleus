@@ -451,16 +451,10 @@ inline std::vector<std::size_t> config_node::distinct_ordinals() const
         const auto close = remainder.find(']');
         if(close == std::string_view::npos || close < 2)
             continue;
-        const std::string_view digits = remainder.substr(1, close - 1);
-        bool all_digits = !digits.empty();
-        for(char const c : digits)
-            if(c < '0' || c > '9') { all_digits = false; break; }
-        if(!all_digits)
+        auto const ordinal = key_path::ordinal_in_domain(remainder.substr(1, close - 1));
+        if(!ordinal)
             continue;
-        std::size_t ordinal = 0;
-        for(char const c : digits)
-            ordinal = (ordinal * 10) + static_cast<std::size_t>(c - '0');
-        ordinal_set.insert(ordinal);
+        ordinal_set.insert(static_cast<std::size_t>(*ordinal));
     }
     return {ordinal_set.begin(), ordinal_set.end()};
 }

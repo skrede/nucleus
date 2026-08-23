@@ -166,10 +166,9 @@ private:
             const auto rb = bps.find(']', lb);
             if(lb == std::string::npos || rb == std::string::npos)
                 continue;
-            std::size_t slot = 0;
-            for(std::size_t k = lb + 1; k < rb; ++k)
-                slot = (slot * 10) + static_cast<std::size_t>(bps[k] - '0');
-            ordinals.insert(slot);
+            const std::string_view digits = std::string_view(bps).substr(lb + 1, rb - lb - 1);
+            if(auto const slot = key_path::ordinal_in_domain(digits))
+                ordinals.insert(static_cast<std::size_t>(*slot));
         }
         return ordinals;
     }

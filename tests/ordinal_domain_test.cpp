@@ -133,3 +133,31 @@ TEST_CASE("every route shares the one bound key_path states", "[ordinal][domain]
     REQUIRE(nucleus::key_path::is_indexed_segment("node[" + at_bound + "]"));
     REQUIRE_FALSE(nucleus::key_path::is_indexed_segment("node[" + above_bound + "]"));
 }
+
+TEST_CASE("both instance enumerations admit the bound ordinal and no other",
+          "[ordinal][domain][enumeration]")
+{
+    const auto enumerated = nucleus::config::from_values(
+            {{"cluster/node[0]/port", "80"}, {indexed_path(at_bound), "90"}});
+    REQUIRE(enumerated);
+    const nucleus::config_node nodes = enumerated.value().root()["cluster"]["node"];
+    REQUIRE(nodes.count() == 2);
+    REQUIRE(nodes.children().size() == 2);
+    REQUIRE(nodes[static_cast<std::size_t>(4294967295)].exists());
+
+    nucleus::runtime_source base;
+    base.set("cluster/node[0]/port", "80");
+    base.set(indexed_path(at_bound), "80");
+    nucleus::argv_source argv(
+            std::vector<std::string>{"--cluster-node-" + at_bound + "-port=90"});
+    const nucleus::config_space space = cluster_space();
+    argv.recognize_with(nucleus::recognizer_of(space));
+    const nucleus::load_result appended = nucleus::load_config(
+            space, nucleus::source_stack{std::move(base), std::move(argv)}, {});
+    REQUIRE(appended);
+    REQUIRE(appended.value().get(indexed_path(at_bound)) == "90");
+
+    // An above-bound bracket ordinal never reaches either enumeration:
+    // key_path::parse refuses the segment through is_indexed_segment.
+    REQUIRE_FALSE(nucleus::config::from_values({{indexed_path(above_bound), "90"}}));
+}

@@ -1,3 +1,4 @@
+#include "nucleus/tokenizer/brace_scan.h"
 #include "nucleus/tokenizer/tree_resolver_scope.h"
 
 #include "nucleus/format.h"
@@ -22,9 +23,6 @@ tree_resolver_scope::tree_resolver_scope(const keyspace &building,
 {
 }
 
-// Scans value_text for ${...} tokens and splices each resolved value in place.
-// Nested ${} depths are tracked so braces inside a token body are not mistaken
-// for the closing brace of the outer token.
 token_result tree_resolver_scope::resolve_value(std::string_view value_text)
 {
     if(value_text.find("${") == std::string_view::npos)
@@ -46,32 +44,13 @@ token_result tree_resolver_scope::resolve_value(std::string_view value_text)
         // Literal text before the token.
         result.append(value_text.substr(pos, open - pos));
 
-        // Find matching closing brace, tracking nested ${} depth.
-        std::size_t depth = 1;
-        std::size_t i = open + 2;
-        while(i < value_text.size() && depth > 0)
-        {
-            if(value_text[i] == '$' && i + 1 < value_text.size()
-               && value_text[i + 1] == '{')
-            {
-                ++depth;
-                i += 2;
-            }
-            else if(value_text[i] == '}')
-            {
-                --depth;
-                ++i;
-            }
-            else
-                ++i;
-        }
-        if(depth != 0)
+        auto const close = scan_braced_span(value_text, open + 2);
+        if(close == std::string_view::npos)
             return unexpected(resolve_error(resolve_errc::parse_error,
                                       "unterminated ${ in value"));
 
-        // The full token body (between ${ and the matching }).
-        const std::string_view token_body = value_text.substr(open + 2, i - open - 3);
-        pos = i;
+        const std::string_view token_body = value_text.substr(open + 2, close - open - 2);
+        pos = close + 1;
 
         // Split on top-level '??' to get fallback arms.
         std::vector<std::string_view> const arms = split_fallback_arms(token_body);

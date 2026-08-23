@@ -119,3 +119,11 @@ TEST_CASE("a scalar argument given a list value is a type error", "[named-args][
     REQUIRE_FALSE(r.has_value());
     CHECK(r.error().code == resolve_errc::type_mismatch);
 }
+
+TEST_CASE("a closing brace inside a quoted function argument does not end the token",
+          "[named-args][quoting]")
+{
+    auto reg = core_registry();
+    CHECK(resolve_tokens("${string.replace(value=abc, from=b, to='}')}", reg).value() == "a}c");
+    CHECK(resolve_tokens("${string.concat(values=['}', 'x'], separator='-')}", reg).value() == "}-x");
+}

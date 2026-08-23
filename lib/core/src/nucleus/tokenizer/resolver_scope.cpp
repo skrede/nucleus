@@ -1,5 +1,6 @@
 #include "nucleus/format.h"
 
+#include "nucleus/tokenizer/brace_scan.h"
 #include "nucleus/tokenizer/scope_keys.h"
 #include "nucleus/tokenizer/token_lexer.h"
 #include "nucleus/tokenizer/resolver_scope.h"
@@ -13,11 +14,6 @@ namespace nucleus {
 
 namespace {
 
-// Brace- and quote-aware scan for the next outer ${...} token in `input` from
-// `pos`. A nested ${...} inside the outer token's argument list bumps the brace
-// depth so the scan returns the OUTER closing brace, and a quoted run shields a
-// stray '{' or '}' from perturbing the depth. Returns nullopt when no further
-// token start remains or an opened token never closes.
 struct token_span
 {
     std::size_t start;
@@ -56,28 +52,18 @@ std::optional<std::string> body_head_has_nested_token(std::string_view token)
     return std::nullopt;
 }
 
+// Nullopt when no further token start remains, or when the token that starts
+// there never closes.
 std::optional<token_span> find_next_token(std::string_view input, std::size_t pos)
 {
     auto start = input.find("${", pos);
     if(start == std::string_view::npos)
         return std::nullopt;
 
-    int brace_depth = 1;
-    char quote_char = '\0';
-    for(std::size_t i = start + 2; i < input.size(); ++i)
-    {
-        char const c = input[i];
-        if(quote_char != '\0')
-        {
-            if(c == quote_char) quote_char = '\0';
-            continue;
-        }
-        if(c == '\'' || c == '"') { quote_char = c; continue; }
-        if(c == '$' && i + 1 < input.size() && input[i + 1] == '{') { ++brace_depth; ++i; continue; }
-        if(c == '}' && --brace_depth == 0)
-            return token_span{start, i};
-    }
-    return std::nullopt;
+    auto const close = scan_braced_span(input, start + 2);
+    if(close == std::string_view::npos)
+        return std::nullopt;
+    return token_span{start, close};
 }
 
 }

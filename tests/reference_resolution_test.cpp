@@ -146,3 +146,15 @@ TEST_CASE("multiple references in one value string all resolve", "[reference][ab
     REQUIRE(loaded.has_value());
     CHECK(loaded.value().get("host/addr") == "myhost:8080");
 }
+
+TEST_CASE("a closing brace inside a quoted fallback arm does not end the tree token",
+          "[reference][quoting]")
+{
+    auto space = config_space_builder{}.build();
+    runtime_source src;
+    src.set("cluster/alias", "${abs:cluster/absent ?? \"}\"}");
+
+    auto loaded = load_config(space, source_stack{std::move(src)}, {});
+    REQUIRE(loaded.has_value());
+    CHECK(loaded.value().get("cluster/alias").value() == "}");
+}
