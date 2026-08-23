@@ -11,10 +11,26 @@
 #include <utility>
 #include <iostream>
 
-static bool define_space(nucleus::config_space_builder &builder)
+template<typename Builder>
+static nucleus::registration_result define_space(Builder &builder)
 {
-    return builder.register_schema("server/host") &&
-            builder.register_schema("server/port");
+    if(auto result = builder.register_schema("server/host"); !result)
+        return result;
+    return builder.register_schema("server/port");
+}
+
+template<typename Builder>
+static nucleus::expected<nucleus::config_space, nucleus::error> make_space(Builder &builder)
+{
+    if(auto result = define_space(builder); !result)
+        return nucleus::unexpected(std::move(result).error());
+    return builder.build();
+}
+
+static nucleus::expected<nucleus::config_space, nucleus::error> make_space()
+{
+    nucleus::config_space_builder builder;
+    return make_space(builder);
 }
 
 static nucleus::argv_source make_known_arguments(
@@ -28,11 +44,11 @@ static nucleus::argv_source make_known_arguments(
     return known_argv;
 }
 
-static void print_resolved(const nucleus::config &config)
+static void print_resolved(const nucleus::config &config, std::ostream &output)
 {
-    std::cout << "recognized flags (resolved into the config):\n";
+    output << "recognized flags (resolved into the config):\n";
     for(const std::string &key : config.keys())
-        std::cout << "  " << key << " = " << config.get(key).value() << '\n';
+        output << "  " << key << " = " << config.get(key).value() << '\n';
 }
 
 static bool is_unknown_timeout(const nucleus::error &error)
@@ -64,30 +80,41 @@ static int report_unknown_rejection(nucleus::load_result rejected,
 // Strict mode rejects an unknown path at pull() before the fold starts.
 static int demonstrate_unknown_rejection(
         const nucleus::config_space   &space,
-        const nucleus::key_recognizer &recognizer)
+        const nucleus::key_recognizer &recognizer,
+        std::ostream                  &output,
+        std::ostream                  &errors)
 {
     nucleus::argv_source unknown_argv(std::vector<std::string>{"--server-timeout=30"});
     unknown_argv.recognize_with(recognizer)
             .policy(nucleus::unknown_key_policy::strict);
     auto rejected = nucleus::load_config(space, nucleus::source_stack{std::move(unknown_argv)}, {});
-    return report_unknown_rejection(std::move(rejected), std::cout, std::cerr);
+    return report_unknown_rejection(std::move(rejected), output, errors);
+}
+
+static int run_recognizer_example(nucleus::expected<nucleus::config_space, nucleus::error> space,
+                                  std::ostream                                            &output,
+                                  std::ostream                                            &errors)
+{
+    if(!space)
+    {
+        errors << "space setup failed: " << space.error() << '\n';
+        return 1;
+    }
+    // The recognizer accepts only schema-declared paths, regardless of syntax.
+    const nucleus::key_recognizer recognizer = nucleus::recognizer_of(*space);
+    nucleus::argv_source          known_argv = make_known_arguments(recognizer);
+    auto                          loaded     = nucleus::load_config(
+            *space, nucleus::source_stack{std::move(known_argv)}, {});
+    if(!loaded)
+    {
+        errors << "load failed: " << loaded.error() << '\n';
+        return 1;
+    }
+    print_resolved(loaded.value(), output);
+    return demonstrate_unknown_rejection(*space, recognizer, output, errors);
 }
 
 int main()
 {
-    nucleus::config_space_builder builder;
-    if(!define_space(builder))
-        return 1;
-    const nucleus::config_space space = builder.build();
-    // The recognizer accepts only schema-declared paths, regardless of syntax.
-    const nucleus::key_recognizer recognizer = nucleus::recognizer_of(space);
-    nucleus::argv_source          known_argv = make_known_arguments(recognizer);
-    auto                          loaded     = nucleus::load_config(space, nucleus::source_stack{std::move(known_argv)}, {});
-    if(!loaded)
-    {
-        std::cerr << "load failed: " << loaded.error() << '\n';
-        return 1;
-    }
-    print_resolved(loaded.value());
-    return demonstrate_unknown_rejection(space, recognizer);
+    return run_recognizer_example(make_space(), std::cout, std::cerr);
 }

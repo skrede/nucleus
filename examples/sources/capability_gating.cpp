@@ -18,14 +18,32 @@
 #include <utility>
 #include <iostream>
 
-static bool define_space(nucleus::config_space_builder &builder)
+template<typename Builder>
+static nucleus::registration_result define_space(Builder &builder)
 {
-    return builder.register_element(nucleus::element("server", nucleus::anchor::root())) &&
-            builder.register_element(
-                    nucleus::primary_key_element("name", nucleus::anchor::keyspace("server"))) &&
-            builder.register_element(
-                    nucleus::typed_element<std::uint16_t>(
-                            "port", nucleus::anchor::keyspace("server")));
+    if(auto result = builder.register_element(nucleus::element("server", nucleus::anchor::root()));
+       !result)
+        return result;
+    if(auto result = builder.register_element(
+               nucleus::primary_key_element("name", nucleus::anchor::keyspace("server")));
+       !result)
+        return result;
+    return builder.register_element(
+            nucleus::typed_element<std::uint16_t>("port", nucleus::anchor::keyspace("server")));
+}
+
+template<typename Builder>
+static nucleus::expected<nucleus::config_space, nucleus::error> make_space(Builder &builder)
+{
+    if(auto result = define_space(builder); !result)
+        return nucleus::unexpected(std::move(result).error());
+    return builder.build();
+}
+
+static nucleus::expected<nucleus::config_space, nucleus::error> make_space()
+{
+    nucleus::config_space_builder builder;
+    return make_space(builder);
 }
 
 static bool is_missing_nesting(const nucleus::error &error)
@@ -54,16 +72,24 @@ static int report_capability_rejection(nucleus::load_result loaded,
     return 0;
 }
 
-int main()
+static int run_gating_example(nucleus::expected<nucleus::config_space, nucleus::error> space,
+                              std::ostream                                            &output,
+                              std::ostream                                            &errors)
 {
-    nucleus::config_space_builder builder;
-    if(!define_space(builder))
+    if(!space)
+    {
+        errors << "space setup failed: " << space.error() << '\n';
         return 1;
-    nucleus::config_space space = builder.build();
+    }
 
     nucleus::env_source values;
     values.set("server/name", "primary");
 
-    auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(values)}, {});
-    return report_capability_rejection(std::move(loaded), std::cout, std::cerr);
+    auto loaded = nucleus::load_config(*space, nucleus::source_stack{std::move(values)}, {});
+    return report_capability_rejection(std::move(loaded), output, errors);
+}
+
+int main()
+{
+    return run_gating_example(make_space(), std::cout, std::cerr);
 }

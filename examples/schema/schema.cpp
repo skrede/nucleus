@@ -1,6 +1,6 @@
-// schema: the four element kinds, and what the schema rejects at resolve.
+// schema: three element kinds, and what the schema rejects at resolve.
 //
-// element / required_element / identity_element / enum_element declare nodes.
+// element / required_element / enum_element declare nodes.
 // anchor::root() introduces a top-level node; anchor::keyspace(path) attaches a
 // child under an already-declared one. Here the resolve fails: `host` is required
 // but no source supplies it.
@@ -16,14 +16,33 @@
 #include <utility>
 #include <iostream>
 
-static bool define_space(nucleus::config_space_builder &builder)
+template<typename Builder>
+static nucleus::registration_result define_space(Builder &builder)
 {
-    return builder.register_element(nucleus::element("server", nucleus::anchor::root())) &&
-            builder.register_element(
-                    nucleus::required_element("host", nucleus::anchor::keyspace("server"))) &&
-            builder.register_element(
-                    nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
-                                          {"http", "https"}));
+    if(auto result = builder.register_element(nucleus::element("server", nucleus::anchor::root()));
+       !result)
+        return result;
+    if(auto result = builder.register_element(
+               nucleus::required_element("host", nucleus::anchor::keyspace("server")));
+       !result)
+        return result;
+    return builder.register_element(
+            nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
+                                  {"http", "https"}));
+}
+
+template<typename Builder>
+static nucleus::expected<nucleus::config_space, nucleus::error> make_space(Builder &builder)
+{
+    if(auto result = define_space(builder); !result)
+        return nucleus::unexpected(std::move(result).error());
+    return builder.build();
+}
+
+static nucleus::expected<nucleus::config_space, nucleus::error> make_space()
+{
+    nucleus::config_space_builder builder;
+    return make_space(builder);
 }
 
 static bool is_missing_host(const nucleus::error &error)
@@ -51,16 +70,24 @@ static int report_load_result(nucleus::load_result loaded,
     return 0;
 }
 
-int main()
+static int run_schema_example(nucleus::expected<nucleus::config_space, nucleus::error> space,
+                              std::ostream                                            &output,
+                              std::ostream                                            &errors)
 {
-    nucleus::config_space_builder builder;
-    if(!define_space(builder))
+    if(!space)
+    {
+        errors << "space setup failed: " << space.error() << '\n';
         return 1;
-    nucleus::config_space space = builder.build();
+    }
 
     nucleus::runtime_source values;
     values.set("server/mode", "http");
 
-    auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(values)}, {});
-    return report_load_result(std::move(loaded), std::cout, std::cerr);
+    auto loaded = nucleus::load_config(*space, nucleus::source_stack{std::move(values)}, {});
+    return report_load_result(std::move(loaded), output, errors);
+}
+
+int main()
+{
+    return run_schema_example(make_space(), std::cout, std::cerr);
 }

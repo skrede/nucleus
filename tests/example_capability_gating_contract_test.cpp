@@ -8,6 +8,7 @@
 
 #include <array>
 #include <string>
+#include <cstddef>
 #include <cstdint>
 #include <sstream>
 #include <utility>
@@ -39,6 +40,46 @@ nucleus::load_result load_capability_port(std::string_view port)
     return nucleus::load_config(builder.build(),
                                 nucleus::source_stack{std::move(values)}, options);
 }
+
+nucleus::error gating_setup_error(std::size_t ordinal)
+{
+    return {nucleus::errc::rejected_registration,
+            "injected gating setup failure " + std::to_string(ordinal)};
+}
+
+class scripted_gating_builder
+{
+public:
+    explicit scripted_gating_builder(std::size_t fail_at)
+            : m_fail_at(fail_at)
+            , m_call_count(0)
+            , m_build_count(0)
+    {
+    }
+
+    nucleus::registration_result register_element(nucleus::schema_element, const nucleus::owner_token & = {})
+    {
+        ++m_call_count;
+        if(m_call_count == m_fail_at)
+            return nucleus::unexpected(gating_setup_error(m_fail_at));
+        return nucleus::registration_ok();
+    }
+
+    nucleus::config_space build()
+    {
+        ++m_build_count;
+        return nucleus::config_space_builder{}.build();
+    }
+
+    std::size_t call_count() const { return m_call_count; }
+
+    std::size_t build_count() const { return m_build_count; }
+
+private:
+    std::size_t m_fail_at;
+    std::size_t m_call_count;
+    std::size_t m_build_count;
+};
 
 }
 
@@ -105,4 +146,42 @@ TEST_CASE("capability port covers the complete uint16 domain", "[auto-gate][exam
     REQUIRE(overflow.error().code == nucleus::errc::failed_conversion);
     REQUIRE(overflow.error().message.find("server/port") != std::string::npos);
     REQUIRE(overflow.error().message.find("value out of range for type") != std::string::npos);
+}
+
+TEST_CASE("gating setup preserves each first registration failure", "[gating][example]")
+{
+    for(std::size_t ordinal = 1; ordinal <= 3; ++ordinal)
+    {
+        DYNAMIC_SECTION("registration " << ordinal)
+        {
+            scripted_gating_builder builder(ordinal);
+            const auto              result = define_space(builder);
+            REQUIRE_FALSE(result.has_value());
+            REQUIRE(result.error() == gating_setup_error(ordinal));
+            REQUIRE(builder.call_count() == ordinal);
+            REQUIRE(builder.build_count() == 0);
+        }
+    }
+}
+
+TEST_CASE("gating product and terminal preserve setup failure", "[gating][example]")
+{
+    scripted_gating_builder builder(3);
+    auto                    product = make_space(builder);
+    REQUIRE_FALSE(product.has_value());
+    REQUIRE(product.error() == gating_setup_error(3));
+    REQUIRE(builder.call_count() == 3);
+    REQUIRE(builder.build_count() == 0);
+    std::ostringstream output;
+    std::ostringstream errors;
+    const int          status = run_gating_example(std::move(product), output, errors);
+    REQUIRE(status == 1);
+    REQUIRE(output.str().empty());
+    REQUIRE(errors.str() ==
+            "space setup failed: rejected_registration: injected gating setup failure 3\n");
+}
+
+TEST_CASE("gating setup retains the real builder path", "[gating][example]")
+{
+    REQUIRE(make_space().has_value());
 }
