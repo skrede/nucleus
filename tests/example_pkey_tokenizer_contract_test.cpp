@@ -101,14 +101,13 @@ TEST_CASE("built-in tokenizer setup preserves each first registration failure",
           "[pkey_tokenizer][example]")
 {
     verify_setup_positions("built-in", [](auto &builder)
-                           { return define_server_space(builder); });
+                           { return define_space(builder, "description"); });
 }
-
 TEST_CASE("host tokenizer setup preserves each first registration failure",
           "[pkey_tokenizer][example]")
 {
     verify_setup_positions("host", [](auto &builder)
-                           { return define_host_space(builder); });
+                           { return define_space(builder, "label"); });
 }
 
 TEST_CASE("tokenizer factories preserve setup and install failures",
@@ -119,14 +118,12 @@ TEST_CASE("tokenizer factories preserve setup and install failures",
     REQUIRE_FALSE(builtin_product.has_value());
     REQUIRE(builtin_product.error() == tokenizer_setup_error("built-in", 4));
     REQUIRE(builtin.build_count() == 0);
-
     scripted_tokenizer_builder host_setup("host", 3, false);
     const auto                 host_product = make_host_space(host_setup);
     REQUIRE_FALSE(host_product.has_value());
     REQUIRE(host_product.error() == tokenizer_setup_error("host", 3));
     REQUIRE(host_setup.install_count() == 0);
     REQUIRE(host_setup.build_count() == 0);
-
     scripted_tokenizer_builder host_install("host", 0, true);
     const auto                 install_product = make_host_space(host_install);
     REQUIRE_FALSE(install_product.has_value());
@@ -147,7 +144,6 @@ TEST_CASE("tokenizer terminals stop before narrative work on setup failure",
     REQUIRE(builtin_status == 1);
     REQUIRE(output.str().empty());
     REQUIRE(errors.str() == "space setup failed (built-in tokenizer): " + nucleus::to_string(builtin_error) + "\n");
-
     output.str("");
     errors.str("");
     const auto host_error  = tokenizer_install_error();
@@ -156,4 +152,49 @@ TEST_CASE("tokenizer terminals stop before narrative work on setup failure",
     REQUIRE(host_status == 1);
     REQUIRE(output.str().empty());
     REQUIRE(errors.str() == "space setup failed (host tokenizer): " + nucleus::to_string(host_error) + "\n");
+}
+
+TEST_CASE("tokenizer narratives require exact selected values",
+          "[pkey_tokenizer][example]")
+{
+    std::ostringstream output;
+    std::ostringstream errors;
+    REQUIRE(run_builtin_tokenizer(make_server_space(), output, errors) == 0);
+    REQUIRE(errors.str().empty());
+    REQUIRE(output.str() ==
+            "primary:   primary at 10.0.0.1:9000\n"
+            "secondary: secondary at 10.0.0.2:9000\n");
+    output.str("");
+    REQUIRE(run_host_tokenizer(make_host_space(), output, errors) == 0);
+    REQUIRE(errors.str().empty());
+    REQUIRE(output.str() == "host tok:  host: alpha at 10.0.1.1:9000\n");
+}
+
+TEST_CASE("host tokenizer matches selected direct-child failures",
+          "[pkey_tokenizer][example]")
+{
+    struct access_case
+    {
+        bool             selected;
+        std::string_view field;
+        std::string_view cue;
+    };
+    const access_case cases[] = {
+            {false, "endpoint", "selected primary-key instance"},
+            {true, "missing", "has no field 'missing'"},
+            {true, "endpoint/secret", "one direct child segment"}};
+    const auto container = nucleus::key_path::parse("cluster/server").value();
+    const auto current   = nucleus::key_path::parse("cluster/server/label").value();
+    const auto tokenizer = make_host_tokenizer();
+    for(const access_case &one : cases)
+    {
+        nucleus::keyspace building;
+        if(one.selected)
+            building.set(container.child("name"), nucleus::value::owned("alpha"));
+        const nucleus::tree_access access{building, current, "server", one.field};
+        const auto                 result = tokenizer.resolve(access);
+        REQUIRE_FALSE(result.has_value());
+        REQUIRE(result.error().code == nucleus::resolve_errc::missing_field);
+        REQUIRE(result.error().message.find(one.cue) != std::string::npos);
+    }
 }

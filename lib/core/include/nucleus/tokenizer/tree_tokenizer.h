@@ -16,10 +16,10 @@ namespace nucleus {
 // valid only for the duration of the resolver call; callers must not store them.
 struct tree_access
 {
-    const keyspace   &building;
-    const key_path   &current_path;
-    std::string_view  category;
-    std::string_view  field_name;
+    const keyspace  &building;
+    const key_path  &current_path;
+    std::string_view category;
+    std::string_view field_name;
 };
 
 // The callable a host or core supplies for tree-access token resolution.
@@ -33,8 +33,8 @@ class tree_tokenizer
 {
 public:
     explicit tree_tokenizer(std::string category, tree_field_resolver resolver)
-        : m_category(std::move(category))
-        , m_resolver(std::move(resolver))
+            : m_category(std::move(category))
+            , m_resolver(std::move(resolver))
     {
     }
 
@@ -42,11 +42,16 @@ public:
 
     token_result resolve(const tree_access &access) const
     {
+        if(access.field_name.find(key_path::separator) != std::string_view::npos)
+            return unexpected(resolve_error(
+                    resolve_errc::missing_field,
+                    "tree field '" + std::string(access.field_name) +
+                            "' requires one direct child segment"));
         return m_resolver(access);
     }
 
 private:
-    std::string        m_category;
+    std::string         m_category;
     tree_field_resolver m_resolver;
 };
 

@@ -10,7 +10,9 @@
 #include "nucleus/xml/xml_source.h"
 
 #include <any>
+#include <array>
 #include <string>
+#include <cstdint>
 #include <iostream>
 #include <functional>
 #include <string_view>
@@ -24,36 +26,53 @@ struct vec3
     float z = 0.f;
 };
 
-// Parses "x,y,z" -- three comma-separated floats. Each component is parsed by
-// reusing the built-in float converter rather than re-implementing low-level
-// float parsing, so the parse stays locale-independent and portable across
-// toolchains (e.g. standard libraries whose <charconv> lacks floating-point
-// from_chars).
-std::function<nucleus::expected<std::any, std::string>(std::string_view)>
-make_vec3_converter()
+using scalar_converter = std::function<
+        nucleus::expected<std::any, std::string>(std::string_view)>;
+
+nucleus::expected<float, std::string>
+parse_component(const scalar_converter &converter, std::string_view token,
+                uint32_t position)
+{
+    auto converted = converter(token);
+    if(!converted)
+        return nucleus::unexpected("component " + std::to_string(position) +
+                                   ": " + converted.error());
+    const float *value = std::any_cast<float>(&converted.value());
+    if(value == nullptr)
+        return nucleus::unexpected("component parser type mismatch");
+    return *value;
+}
+
+nucleus::expected<std::any, std::string>
+convert_vec3(const scalar_converter &parse_float, std::string_view sv)
+{
+    const std::size_t first  = sv.find(',');
+    const std::size_t second = first == std::string_view::npos
+            ? first
+            : sv.find(',', first + 1);
+    if(second == std::string_view::npos ||
+       sv.find(',', second + 1) != std::string_view::npos)
+        return nucleus::unexpected(
+                std::string("expected x,y,z -- three comma-separated floats"));
+    const std::array<std::string_view, 3> tokens{
+            sv.substr(0, first), sv.substr(first + 1, second - first - 1),
+            sv.substr(second + 1)};
+    std::array<float, 3> components{};
+    for(uint32_t index = 0; index < components.size(); ++index)
+    {
+        auto component = parse_component(parse_float, tokens[index], index + 1);
+        if(!component)
+            return nucleus::unexpected(component.error());
+        components[index] = component.value();
+    }
+    return std::any(vec3{components[0], components[1], components[2]});
+}
+
+scalar_converter make_vec3_converter()
 {
     return [parse_float = nucleus::make_scalar_converter<float>()](
                    std::string_view sv) -> nucleus::expected<std::any, std::string>
-    {
-        float            components[3] = {};
-        std::size_t      count         = 0;
-        std::string_view rest          = sv;
-        while(count < 3 && !rest.empty())
-        {
-            auto             sep       = rest.find(',');
-            std::string_view token     = rest.substr(0, sep);
-            auto             component = parse_float(token);
-            if(!component)
-                return nucleus::unexpected(std::string("bad component"));
-            components[count] = std::any_cast<float>(component.value());
-            ++count;
-            rest = (sep == std::string_view::npos) ? std::string_view{} : rest.substr(sep + 1);
-        }
-        if(count != 3 || !rest.empty())
-            return nucleus::unexpected(
-                    std::string("expected x,y,z -- three comma-separated floats"));
-        return std::any(vec3{components[0], components[1], components[2]});
-    };
+    { return convert_vec3(parse_float, sv); };
 }
 
 bool define_space(nucleus::config_space_builder &builder)

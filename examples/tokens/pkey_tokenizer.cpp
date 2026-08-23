@@ -1,4 +1,5 @@
 #include "nucleus/config.h"
+#include "nucleus/format.h"
 #include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
@@ -12,11 +13,12 @@
 #include <ostream>
 #include <utility>
 #include <iostream>
+#include <string_view>
 
 using space_result = nucleus::expected<nucleus::config_space, nucleus::error>;
 
 template<typename Builder>
-static nucleus::registration_result define_server_space(Builder &builder)
+static nucleus::registration_result define_space(Builder &builder, std::string leaf)
 {
     if(auto result = builder.register_element(
                nucleus::element("cluster", nucleus::anchor::root()));
@@ -35,17 +37,16 @@ static nucleus::registration_result define_server_space(Builder &builder)
        !result)
         return result;
     return builder.register_element(
-            nucleus::element("description", nucleus::anchor::keyspace("cluster/server")));
+            nucleus::element(std::move(leaf), nucleus::anchor::keyspace("cluster/server")));
 }
 
 template<typename Builder>
 static space_result make_server_space(Builder &builder)
 {
-    if(auto result = define_server_space(builder); !result)
+    if(auto result = define_space(builder, "description"); !result)
         return nucleus::unexpected(std::move(result).error());
     return builder.build();
 }
-
 static space_result make_server_space()
 {
     nucleus::config_space_builder builder;
@@ -64,11 +65,25 @@ static nucleus::runtime_source make_builtin_source()
     return source;
 }
 
+static int show_expected(const nucleus::config &config, std::string_view path,
+                         std::string_view expected, std::string_view prefix,
+                         std::ostream &output, std::ostream &errors)
+{
+    const auto actual = config.get(path);
+    if(!actual || *actual != expected)
+    {
+        errors << "unexpected value for " << path << '\n';
+        return 1;
+    }
+    output << prefix << *actual << '\n';
+    return 0;
+}
+
 static int show_selected_server(const nucleus::config_space   &space,
                                 const nucleus::runtime_source &source,
-                                const std::string             &selection,
-                                const std::string             &prefix,
-                                std::ostream &output, std::ostream &errors)
+                                std::string_view selection, std::string_view expected,
+                                std::string_view prefix, std::ostream &output,
+                                std::ostream &errors)
 {
     nucleus::load_options options;
     options.selection = selection;
@@ -78,8 +93,8 @@ static int show_selected_server(const nucleus::config_space   &space,
         errors << "load failed (" << selection << "): " << loaded.error() << '\n';
         return 1;
     }
-    output << prefix << loaded->get("cluster/server/description").value_or("(absent)") << '\n';
-    return 0;
+    return show_expected(*loaded, "cluster/server/description", expected,
+                         prefix, output, errors);
 }
 
 static int run_builtin_tokenizer(space_result space, std::ostream &output,
@@ -92,28 +107,34 @@ static int run_builtin_tokenizer(space_result space, std::ostream &output,
     }
     const nucleus::runtime_source source = make_builtin_source();
     if(const int status = show_selected_server(
-               *space, source, "primary", "primary:   ", output, errors))
+               *space, source, "primary", "primary at 10.0.0.1:9000",
+               "primary:   ", output, errors))
         return status;
     return show_selected_server(
-            *space, source, "secondary", "secondary: ", output, errors);
+            *space, source, "secondary", "secondary at 10.0.0.2:9000",
+            "secondary: ", output, errors);
 }
 
 static nucleus::tree_tokenizer make_host_tokenizer()
 {
+    const nucleus::key_path container = nucleus::key_path{}.child("cluster").child("server");
     return nucleus::tree_tokenizer("server",
-                                   [](const nucleus::tree_access &access) -> nucleus::token_result
+                                   [container](const nucleus::tree_access &access) -> nucleus::token_result
                                    {
-                                       const auto field_path = nucleus::key_path::parse(
-                                               "cluster/server/" + std::string(access.field_name));
-                                       if(!field_path)
+                                       if(access.building.find(container.child("name")) == nullptr)
                                            return nucleus::unexpected(
                                                    nucleus::resolve_error(nucleus::resolve_errc::missing_field,
-                                                                          "invalid field path"));
-                                       const nucleus::value *value = access.building.find(field_path.value());
+                                                                          nucleus::format(
+                                                                                  "${{{}}} requires a selected primary-key instance; this configuration has none in scope",
+                                                                                  std::string(access.category) + "." + std::string(access.field_name))));
+                                       const nucleus::value *value = access.building.find(
+                                               container.child(std::string(access.field_name)));
                                        if(value == nullptr)
                                            return nucleus::unexpected(
                                                    nucleus::resolve_error(nucleus::resolve_errc::missing_field,
-                                                                          "field not found"));
+                                                                          nucleus::format(
+                                                                                  "${{{}}} has no field '{}' in the selected instance",
+                                                                                  access.category, access.field_name)));
                                        return std::string(value->text());
                                    });
 }
@@ -123,43 +144,19 @@ static nucleus::runtime_source make_host_source()
     nucleus::runtime_source source;
     source.set("cluster/server/alpha/name", "alpha")
             .set("cluster/server/alpha/endpoint", "10.0.1.1:9000")
-            .set("cluster/server/alpha/label", "host: ${server.name}");
+            .set("cluster/server/alpha/label", "host: ${server.name} at ${server.endpoint}");
     return source;
-}
-
-template<typename Builder>
-static nucleus::registration_result define_host_space(Builder &builder)
-{
-    if(auto result = builder.register_element(
-               nucleus::element("cluster", nucleus::anchor::root()));
-       !result)
-        return result;
-    if(auto result = builder.register_element(
-               nucleus::element("server", nucleus::anchor::keyspace("cluster")));
-       !result)
-        return result;
-    if(auto result = builder.register_element(
-               nucleus::primary_key_element("name", nucleus::anchor::keyspace("cluster/server")));
-       !result)
-        return result;
-    if(auto result = builder.register_element(
-               nucleus::element("endpoint", nucleus::anchor::keyspace("cluster/server")));
-       !result)
-        return result;
-    return builder.register_element(
-            nucleus::element("label", nucleus::anchor::keyspace("cluster/server")));
 }
 
 template<typename Builder>
 static space_result make_host_space(Builder &builder)
 {
-    if(auto result = define_host_space(builder); !result)
+    if(auto result = define_space(builder, "label"); !result)
         return nucleus::unexpected(std::move(result).error());
     if(auto result = builder.install_tree_tokenizer(make_host_tokenizer()); !result)
         return nucleus::unexpected(std::move(result).error());
     return builder.build();
 }
-
 static space_result make_host_space()
 {
     nucleus::config_space_builder builder;
@@ -184,8 +181,9 @@ static int run_host_tokenizer(space_result space, std::ostream &output,
         errors << "load failed (host tokenizer): " << loaded.error() << '\n';
         return 1;
     }
-    output << "host tok:  " << loaded->get("cluster/server/label").value_or("(absent)") << '\n';
-    return 0;
+    return show_expected(*loaded, "cluster/server/label",
+                         "host: alpha at 10.0.1.1:9000", "host tok:  ",
+                         output, errors);
 }
 
 int main()

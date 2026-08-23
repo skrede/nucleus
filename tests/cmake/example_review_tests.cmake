@@ -1,4 +1,7 @@
 target_sources(facade_schema_test PRIVATE example_schema_contract_test.cpp)
+if(TARGET typed_element_test)
+    target_sources(typed_element_test PRIVATE example_typed_contract_test.cpp)
+endif()
 target_sources(pkey_tokenizer_test PRIVATE example_pkey_tokenizer_contract_test.cpp)
 target_sources(selector_combinator_test PRIVATE example_query_contract_test.cpp)
 target_sources(recognizer_of_test PRIVATE example_argv_recognizer_contract_test.cpp)
