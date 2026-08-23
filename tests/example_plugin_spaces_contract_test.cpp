@@ -4,6 +4,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <map>
+#include <array>
 #include <memory>
 #include <string>
 #include <vector>
@@ -13,186 +15,185 @@
 #include <string_view>
 
 namespace {
-
-nucleus::error plugin_setup_error(std::string_view context,
-                                  std::size_t      ordinal)
+nucleus::error setup_error(std::string_view context, std::size_t ordinal) { return {nucleus::errc::rejected_registration, "injected " + std::string(context) + " setup failure " + std::to_string(ordinal)}; }
+nucleus::error policy_error() { return {nucleus::errc::rejected_registration, "injected plugin policy failure"}; }
+nucleus::error build_error(std::string_view context) { return {nucleus::errc::rejected_registration, "injected " + std::string(context) + " build failure"}; }
+nucleus::error rogue_rejection() { return {nucleus::errc::rejected_registration, "registration from an unadmitted plugin"}; }
+struct scripted_builder
 {
-    return {nucleus::errc::rejected_registration,
-            "injected " + std::string(context) + " setup failure " +
-                    std::to_string(ordinal)};
-}
+    std::string m_context;
+    std::size_t m_fail_at;
+    bool        m_fail_policy, m_fail_build;
+    std::size_t m_calls, m_policies, m_builds;
 
-nucleus::error plugin_policy_error()
-{
-    return {nucleus::errc::rejected_registration,
-            "injected plugin policy failure"};
-}
+    scripted_builder &name(std::string) { return *this; }
 
-nucleus::error plugin_build_error(std::string_view context)
-{
-    return {nucleus::errc::rejected_registration,
-            "injected " + std::string(context) + " build failure"};
-}
-
-class scripted_plugin_builder
-{
-public:
-    scripted_plugin_builder(std::string context, std::size_t fail_at,
-                            bool fail_policy, bool fail_build)
-            : m_context(std::move(context))
-            , m_fail_at(fail_at)
-            , m_fail_policy(fail_policy)
-            , m_fail_build(fail_build)
-            , m_call_count(0)
-            , m_policy_count(0)
-            , m_build_count(0)
+    nucleus::registration_result set_registration_policy(std::shared_ptr<nucleus::registration_policy>)
     {
-    }
-
-    scripted_plugin_builder &name(std::string) { return *this; }
-
-    nucleus::registration_result set_registration_policy(
-            std::shared_ptr<nucleus::registration_policy>)
-    {
-        ++m_policy_count;
+        ++m_policies;
         if(m_fail_policy)
-            return nucleus::unexpected(plugin_policy_error());
+            return nucleus::unexpected(policy_error());
         return nucleus::registration_ok();
     }
 
     nucleus::registration_result register_element(
             nucleus::schema_element, const nucleus::owner_token &)
     {
-        ++m_call_count;
-        if(m_call_count == m_fail_at)
-            return nucleus::unexpected(
-                    plugin_setup_error(m_context, m_fail_at));
+        ++m_calls;
+        if(m_calls == m_fail_at)
+            return nucleus::unexpected(setup_error(m_context, m_fail_at));
+        if(m_calls == 7 && (m_context == "application" || m_context == "conflicts"))
+            return nucleus::unexpected(rogue_rejection());
+        if(m_calls == 7 && m_context == "rogue success")
+            return nucleus::registration_ok();
+        if(m_calls == 7 && m_context == "wrong error")
+            return nucleus::unexpected(nucleus::error{
+                    nucleus::errc::schema_violation, "wrong rejection"});
+        if(m_calls == 7 && m_context == "wrong diagnostic")
+            return nucleus::unexpected(nucleus::error{
+                    nucleus::errc::rejected_registration, "wrong diagnostic"});
         return nucleus::registration_ok();
     }
 
     nucleus::expected<nucleus::config_space, nucleus::error> build()
     {
-        ++m_build_count;
+        ++m_builds;
         if(m_fail_build)
-            return nucleus::unexpected(plugin_build_error(m_context));
+            return nucleus::unexpected(build_error(m_context));
         return nucleus::config_space_builder{}.build();
     }
 
-    std::vector<nucleus::conflict_report> conflicts() const { return {}; }
+    std::vector<nucleus::conflict_report> conflicts() const { return m_context == "conflicts" ? std::vector<nucleus::conflict_report>{nucleus::conflict_report("first"), nucleus::conflict_report("second")} : std::vector<nucleus::conflict_report>{}; }
 
-    std::size_t call_count() const { return m_call_count; }
-
-    std::size_t policy_count() const { return m_policy_count; }
-
-    std::size_t build_count() const { return m_build_count; }
-
-private:
-    std::string m_context;
-    std::size_t m_fail_at;
-    bool        m_fail_policy;
-    bool        m_fail_build;
-    std::size_t m_call_count;
-    std::size_t m_policy_count;
-    std::size_t m_build_count;
+    std::array<std::size_t, 3> state() const { return {m_calls, m_policies, m_builds}; }
 };
-
+scripted_builder make_builder(std::string context, std::size_t fail_at = 0, bool fail_policy = false, bool fail_build = false) { return {std::move(context), fail_at, fail_policy, fail_build, 0, 0, 0}; }
 template<typename Define>
-void verify_plugin_positions(std::string_view context, Define define)
+void verify_positions(std::string_view context, Define define)
 {
-    const nucleus::owner_token owner{std::string(context)};
+    const nucleus::owner_token owner;
     for(std::size_t ordinal = 1; ordinal <= 3; ++ordinal)
     {
-        DYNAMIC_SECTION(context << " registration " << ordinal)
-        {
-            scripted_plugin_builder builder(std::string(context), ordinal,
-                                            false, false);
-            const auto              result = define(builder, owner);
-            REQUIRE_FALSE(result.has_value());
-            REQUIRE(result.error() == plugin_setup_error(context, ordinal));
-            REQUIRE(builder.call_count() == ordinal);
-            REQUIRE(builder.build_count() == 0);
-        }
-    }
-}
-
-}
-
-TEST_CASE("plugin helpers preserve every first registration failure", "[policy][example]")
-{
-    verify_plugin_positions("net", [](auto &builder, const auto &owner)
-                            { return register_net(builder, owner); });
-    verify_plugin_positions("cache", [](auto &builder, const auto &owner)
-                            { return register_cache(builder, owner); });
-}
-
-TEST_CASE("composed plugin setup stops in either plugin", "[policy][example]")
-{
-    const nucleus::owner_token net(std::string("net"));
-    const nucleus::owner_token cache(std::string("cache"));
-    for(const std::size_t ordinal : {2U, 5U})
-    {
-        scripted_plugin_builder builder("plugins", ordinal, false, false);
-        const auto              result = register_plugins(builder, net, cache);
+        scripted_builder builder = make_builder(std::string(context), ordinal);
+        const auto       result  = define(builder, owner);
         REQUIRE_FALSE(result.has_value());
-        REQUIRE(result.error() == plugin_setup_error("plugins", ordinal));
-        REQUIRE(builder.call_count() == ordinal);
-        REQUIRE(builder.build_count() == 0);
+        REQUIRE(result.error() == setup_error(context, ordinal));
+        REQUIRE(builder.state() == std::array<std::size_t, 3>{ordinal, 0, 0});
     }
 }
-
-TEST_CASE("application and private factories preserve every failure", "[policy][example]")
+template<typename Product, typename Run>
+std::array<std::string, 3> observe(Product product, Run run)
 {
-    const nucleus::owner_token net(std::string("net"));
-    const nucleus::owner_token cache(std::string("cache"));
-    std::ostringstream         output;
-
-    scripted_plugin_builder policy("application", 0, true, false);
-    const auto              policy_product = make_application_space(policy, net, cache, output);
-    REQUIRE_FALSE(policy_product.has_value());
-    REQUIRE(policy_product.error() == plugin_policy_error());
-    REQUIRE(policy.policy_count() == 1);
-    REQUIRE(policy.call_count() == 0);
-    REQUIRE(policy.build_count() == 0);
-    scripted_plugin_builder setup("application", 4, false, false);
-    const auto              setup_product = make_application_space(setup, net, cache, output);
-    REQUIRE_FALSE(setup_product.has_value());
-    REQUIRE(setup_product.error() == plugin_setup_error("application", 4));
-    REQUIRE(setup.policy_count() == 1);
-    REQUIRE(setup.build_count() == 0);
-    scripted_plugin_builder app_build("application", 0, false, true);
-    const auto              app_product = make_application_space(app_build, net, cache, output);
-    REQUIRE_FALSE(app_product.has_value());
-    REQUIRE(app_product.error() == plugin_build_error("application"));
-    REQUIRE(app_build.build_count() == 1);
-    scripted_plugin_builder private_setup("private", 2, false, false);
-    const auto              private_product = make_private_space(private_setup, net);
-    REQUIRE_FALSE(private_product.has_value());
-    REQUIRE(private_product.error() == plugin_setup_error("private", 2));
-    REQUIRE(private_setup.build_count() == 0);
-    scripted_plugin_builder private_build("private", 0, false, true);
-    const auto              private_build_product = make_private_space(private_build, net);
-    REQUIRE_FALSE(private_build_product.has_value());
-    REQUIRE(private_build_product.error() == plugin_build_error("private"));
-    REQUIRE(private_build.build_count() == 1);
+    std::ostringstream output, errors;
+    const int          status = run(std::move(product), output, errors);
+    return {std::to_string(status), output.str(), errors.str()};
 }
-
-TEST_CASE("plugin terminals stop before load and display work", "[policy][example]")
+nucleus::expected<nucleus::config, nucleus::error> load_private_values(
+        bool include_listen, std::string listen,
+        bool include_proto, std::string proto)
 {
+    std::map<std::string, std::string> values;
+    if(include_listen)
+        values.emplace("net/listen", std::move(listen));
+    if(include_proto)
+        values.emplace("net/proto", std::move(proto));
+    return nucleus::config::from_values(std::move(values));
+}
+std::array<std::string, 3> failure_observation(const nucleus::error &failure, std::string prefix) { return {"1", "", std::move(prefix) + nucleus::to_string(failure) + "\n"}; }
+struct factory_case
+{
+    bool                       application;
+    std::size_t                fail_at;
+    bool                       fail_policy, fail_build;
+    nucleus::error             expected;
+    std::array<std::size_t, 3> state;
+};
+void verify_factories()
+{
+    const std::array<factory_case, 6> cases{
+            {{true, 0, true, false, policy_error(), {0, 1, 0}},
+             {true, 2, false, false, setup_error("application", 2), {2, 1, 0}},
+             {true, 5, false, false, setup_error("application", 5), {5, 1, 0}},
+             {true, 0, false, true, build_error("application"), {7, 1, 1}},
+             {false, 2, false, false, setup_error("private", 2), {2, 0, 0}},
+             {false, 0, false, true, build_error("private"), {3, 0, 1}}}};
+    const nucleus::owner_token net, cache;
+    for(const factory_case &test : cases)
+    {
+        scripted_builder builder = make_builder(
+                test.application ? "application" : "private",
+                test.fail_at, test.fail_policy, test.fail_build);
+        std::ostringstream output;
+        auto               product = test.application
+                ? make_application_space(builder, net, cache, output)
+                : make_private_space(builder, net);
+        REQUIRE_FALSE(product.has_value());
+        REQUIRE(product.error() == test.expected);
+        REQUIRE(builder.state() == test.state);
+    }
+}
+void verify_identity_policy()
+{
+    const nucleus::owner_token    net, cache, rogue;
+    nucleus::config_space_builder builder;
+    REQUIRE(builder.set_registration_policy(make_policy(net, cache)));
+    REQUIRE(register_net(builder, net));
+    const auto result = builder.register_element(
+            nucleus::element("net", nucleus::anchor::root()), rogue);
+    REQUIRE_FALSE(result.has_value());
+    REQUIRE(result.error() == rogue_rejection());
+    REQUIRE(builder.conflicts().empty());
+}
+void verify_integrity_contract()
+{
+    const std::array<std::pair<std::string_view, nucleus::error>, 4> cases{{
+            {"rogue success", {nucleus::errc::rejected_registration, "rogue plugin registration unexpectedly succeeded"}},
+            {"wrong error", {nucleus::errc::schema_violation, "wrong rejection"}},
+            {"wrong diagnostic", {nucleus::errc::rejected_registration, "wrong diagnostic"}},
+            {"conflicts", {nucleus::errc::rejected_registration, "cross-plugin conflicts detected: 2"}},
+    }};
+    const nucleus::owner_token                                       net, cache;
+    for(const auto &[context, expected] : cases)
+    {
+        scripted_builder   builder = make_builder(std::string(context));
+        std::ostringstream output;
+        const auto         result = make_application_space(builder, net, cache, output);
+        REQUIRE_FALSE(result.has_value());
+        REQUIRE(result.error() == expected);
+        REQUIRE(builder.state() == std::array<std::size_t, 3>{7, 1, 0});
+        REQUIRE(output.str().empty());
+    }
+    scripted_builder   app = make_builder("application");
     std::ostringstream output;
-    std::ostringstream errors;
-    const auto         app_error  = plugin_setup_error("application", 4);
-    const int          app_status = run_application(
-            nucleus::unexpected(app_error), output, errors);
-    REQUIRE(app_status == 1);
-    REQUIRE(output.str().empty());
-    REQUIRE(errors.str() == "application space setup failed: " + nucleus::to_string(app_error) + "\n");
-
-    output.str("");
-    errors.str("");
-    const auto private_error  = plugin_setup_error("private", 2);
-    const int  private_status = run_private_space(
-            nucleus::unexpected(private_error), output, errors);
-    REQUIRE(private_status == 1);
-    REQUIRE(output.str().empty());
-    REQUIRE(errors.str() == "private space setup failed: " + nucleus::to_string(private_error) + "\n");
+    REQUIRE(make_application_space(app, net, cache, output));
+    REQUIRE(app.state() == std::array<std::size_t, 3>{7, 1, 1});
+    REQUIRE(output.str() == "rogue plugin admitted: no\ncross-plugin conflicts: 0\n\n");
+}
+void verify_private_case(bool listen_set, std::string listen, bool proto_set, std::string proto, const std::string &diagnostic) { REQUIRE(observe(load_private_values(listen_set, std::move(listen), proto_set, std::move(proto)), run_private_config) == std::array<std::string, 3>{"1", "", diagnostic}); }
+void verify_private_contract()
+{
+    const nucleus::error failure{nucleus::errc::unreadable_source, "injected private load failure"};
+    REQUIRE(observe(nucleus::unexpected(failure),
+                    run_private_config) == failure_observation(failure, "private load failed: "));
+    verify_private_case(false, "", true, "tcp", "private value missing: net/listen\n");
+    verify_private_case(true, "0.0.0.0:8080", false, "", "private value missing: net/proto\n");
+    verify_private_case(true, "127.0.0.1:80", true, "tcp", "private value mismatch: net/listen expected '0.0.0.0:8080' observed '127.0.0.1:80'\n");
+    verify_private_case(true, "0.0.0.0:8080", true, "udp", "private value mismatch: net/proto expected 'tcp' observed 'udp'\n");
+    const nucleus::owner_token    owner;
+    nucleus::config_space_builder builder;
+    REQUIRE(observe(make_private_space(builder, owner), run_private_space) == std::array<std::string, 3>{"0", "private net/listen = 0.0.0.0:8080\nprivate net/proto = tcp\n", ""});
+}
+}
+TEST_CASE("plugin setup and terminal failures remain exact", "[policy][example]")
+{
+    verify_positions("net", register_net<scripted_builder>);
+    verify_positions("cache", register_cache<scripted_builder>);
+    verify_factories();
+    const nucleus::error app_failure = setup_error("application", 4);
+    REQUIRE(observe(nucleus::unexpected(app_failure), run_application) == failure_observation(app_failure, "application space setup failed: "));
+    const nucleus::error private_failure = setup_error("private", 2);
+    REQUIRE(observe(nucleus::unexpected(private_failure), run_private_space) == failure_observation(private_failure, "private space setup failed: "));
+    verify_identity_policy();
+    verify_integrity_contract();
+    verify_private_contract();
 }

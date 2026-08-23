@@ -11,6 +11,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <cstddef>
 #include <utility>
 #include <iostream>
 
@@ -18,12 +19,15 @@ namespace {
 class admitted_plugins_policy : public nucleus::registration_policy
 {
 public:
-    void admit(nucleus::owner_token who) { m_admitted.push_back(std::move(who)); }
+    explicit admitted_plugins_policy(std::vector<nucleus::owner_token> admitted)
+            : m_admitted(std::move(admitted))
+    {
+    }
 
     nucleus::policy_verdict review(const nucleus::registration_request &request) override
     {
-        for(const nucleus::owner_token &token : m_admitted)
-            if(token == request.owner)
+        for(const nucleus::owner_token &owner : m_admitted)
+            if(request.owner == owner)
                 return nucleus::policy_verdict::accept();
         return nucleus::policy_verdict::reject("registration from an unadmitted plugin");
     }
@@ -31,149 +35,141 @@ public:
 private:
     std::vector<nucleus::owner_token> m_admitted;
 };
-
 template<typename Builder>
-nucleus::registration_result register_net(Builder                    &builder,
-                                          const nucleus::owner_token &owner)
+nucleus::registration_result register_plugin(
+        Builder &builder, const nucleus::owner_token &owner,
+        const std::string &root, const std::string &value,
+        const std::string &choice, std::vector<std::string> allowed)
 {
-    if(auto r = builder.register_element(
-               nucleus::element("net", nucleus::anchor::root()), owner);
-       !r)
-        return r;
-    if(auto r = builder.register_element(
-               nucleus::element("listen", nucleus::anchor::keyspace("net")), owner);
-       !r)
-        return r;
-    return builder.register_element(
-            nucleus::enum_element("proto", nucleus::anchor::keyspace("net"),
-                                  std::vector<std::string>{"tcp", "udp"}),
-            owner);
-}
-
-template<typename Builder>
-nucleus::registration_result register_cache(Builder                    &builder,
-                                            const nucleus::owner_token &owner)
-{
-    if(auto r = builder.register_element(
-               nucleus::element("cache", nucleus::anchor::root()), owner);
-       !r)
-        return r;
-    if(auto r = builder.register_element(
-               nucleus::element("size_mb", nucleus::anchor::keyspace("cache")), owner);
-       !r)
-        return r;
-    return builder.register_element(
-            nucleus::enum_element("policy", nucleus::anchor::keyspace("cache"),
-                                  std::vector<std::string>{"lru", "lfu"}),
-            owner);
-}
-
-std::shared_ptr<admitted_plugins_policy> make_policy(
-        const nucleus::owner_token &net_owner,
-        const nucleus::owner_token &cache_owner)
-{
-    auto policy = std::make_shared<admitted_plugins_policy>();
-    policy->admit(net_owner);
-    policy->admit(cache_owner);
-    return policy;
-}
-
-template<typename Builder>
-nucleus::registration_result register_plugins(
-        Builder                    &builder,
-        const nucleus::owner_token &net_owner,
-        const nucleus::owner_token &cache_owner)
-{
-    if(auto result = register_net(builder, net_owner); !result)
+    if(auto result = builder.register_element(
+               nucleus::element(root, nucleus::anchor::root()), owner);
+       !result)
         return result;
-    return register_cache(builder, cache_owner);
+    if(auto result = builder.register_element(
+               nucleus::element(value, nucleus::anchor::keyspace(root)), owner);
+       !result)
+        return result;
+    return builder.register_element(
+            nucleus::enum_element(choice, nucleus::anchor::keyspace(root),
+                                  std::move(allowed)),
+            owner);
 }
-
+template<typename Builder>
+inline nucleus::registration_result register_net(Builder &builder, const nucleus::owner_token &owner)
+{
+    return register_plugin(builder, owner, "net", "listen", "proto", {"tcp", "udp"});
+}
+template<typename Builder>
+inline nucleus::registration_result register_cache(Builder &builder, const nucleus::owner_token &owner)
+{
+    return register_plugin(builder, owner, "cache", "size_mb", "policy", {"lru", "lfu"});
+}
+std::shared_ptr<admitted_plugins_policy> make_policy(const nucleus::owner_token &net_owner, const nucleus::owner_token &cache_owner) { return std::make_shared<admitted_plugins_policy>(std::vector<nucleus::owner_token>{net_owner, cache_owner}); }
+nucleus::registration_result             validate_application(
+        nucleus::registration_result rogue, std::size_t conflicts,
+        std::ostream &output)
+{
+    if(rogue)
+        return nucleus::unexpected(nucleus::error{
+                nucleus::errc::rejected_registration,
+                "rogue plugin registration unexpectedly succeeded"});
+    const nucleus::error rejection = std::move(rogue).error();
+    if(rejection.code != nucleus::errc::rejected_registration ||
+       rejection.message.find("registration from an unadmitted plugin") == std::string::npos)
+        return nucleus::unexpected(rejection);
+    if(conflicts != 0)
+        return nucleus::unexpected(nucleus::error{
+                nucleus::errc::rejected_registration,
+                "cross-plugin conflicts detected: " + std::to_string(conflicts)});
+    output << "rogue plugin admitted: no\ncross-plugin conflicts: 0\n\n";
+    return nucleus::registration_ok();
+}
 template<typename Builder>
 nucleus::expected<nucleus::config_space, nucleus::error> make_application_space(
-        Builder                    &builder,
-        const nucleus::owner_token &net_owner,
-        const nucleus::owner_token &cache_owner,
-        std::ostream               &output)
+        Builder &builder, const nucleus::owner_token &net_owner,
+        const nucleus::owner_token &cache_owner, std::ostream &output)
 {
     builder.name("app");
     if(auto result = builder.set_registration_policy(make_policy(net_owner, cache_owner)); !result)
         return nucleus::unexpected(std::move(result).error());
-    if(auto result = register_plugins(builder, net_owner, cache_owner); !result)
+    if(auto result = register_net(builder, net_owner); !result)
         return nucleus::unexpected(std::move(result).error());
-    const nucleus::owner_token rogue_owner(std::string("rogue"));
+    if(auto result = register_cache(builder, cache_owner); !result)
+        return nucleus::unexpected(std::move(result).error());
+    const nucleus::owner_token rogue_owner;
     auto                       rogue = builder.register_element(
             nucleus::element("rogue", nucleus::anchor::root()), rogue_owner);
-    output << "rogue plugin admitted: " << (rogue ? "yes" : "no")
-           << "  (" << (rogue ? "" : rogue.error().message) << ")\n";
-    output << "cross-plugin conflicts: " << builder.conflicts().size() << "\n\n";
+    if(auto result = validate_application(
+               std::move(rogue), builder.conflicts().size(), output);
+       !result)
+        return nucleus::unexpected(std::move(result).error());
     return builder.build();
 }
-
-nucleus::expected<nucleus::config_space, nucleus::error> make_application_space(
-        const nucleus::owner_token &net_owner,
-        const nucleus::owner_token &cache_owner)
-{
-    nucleus::config_space_builder builder;
-    return make_application_space(builder, net_owner, cache_owner, std::cout);
-}
-
-nucleus::runtime_source make_application_source()
-{
-    nucleus::runtime_source src;
-    src.set("net/listen", "0.0.0.0:8080")
-            .set("net/proto", "tcp")
-            .set("cache/size_mb", "256")
-            .set("cache/policy", "lru");
-    return src;
-}
-
-void print_application(const nucleus::config_space &app,
-                       const nucleus::config &config, std::ostream &output)
-{
-    output << "application-wide config (space \"" << app.space_name() << "\"):\n";
-    for(const std::string &key : config.keys())
-        output << "  " << key << " = " << config.get(key).value() << '\n';
-}
-
+nucleus::runtime_source make_net_source() { return nucleus::runtime_source({{"net/listen", "0.0.0.0:8080"}, {"net/proto", "tcp"}}); }
 template<typename Builder>
 nucleus::expected<nucleus::config_space, nucleus::error> make_private_space(
-        Builder                    &builder,
-        const nucleus::owner_token &net_owner)
+        Builder &builder, const nucleus::owner_token &net_owner)
 {
     builder.name("net");
     if(auto result = register_net(builder, net_owner); !result)
         return nucleus::unexpected(std::move(result).error());
     return builder.build();
 }
-
-nucleus::expected<nucleus::config_space, nucleus::error> make_private_space(
-        const nucleus::owner_token &net_owner)
-{
-    nucleus::config_space_builder builder;
-    return make_private_space(builder, net_owner);
-}
-
-int run_application(
-        nucleus::expected<nucleus::config_space, nucleus::error> app,
-        std::ostream &output, std::ostream &errors)
+int run_application(nucleus::expected<nucleus::config_space, nucleus::error> app,
+                    std::ostream &output, std::ostream &errors)
 {
     if(!app)
     {
         errors << "application space setup failed: " << app.error() << '\n';
         return 1;
     }
+    nucleus::runtime_source source = make_net_source();
+    source.set("cache/size_mb", "256").set("cache/policy", "lru");
     auto loaded = nucleus::load_config(
-            *app, nucleus::source_stack{make_application_source()}, {});
+            *app, nucleus::source_stack{std::move(source)}, {});
     if(!loaded)
     {
         errors << "app load failed: " << loaded.error() << '\n';
         return 1;
     }
-    print_application(*app, loaded.value(), output);
+    output << "application-wide config (space \"" << app->space_name() << "\"):\n";
+    for(const std::string &key : loaded->keys())
+        output << "  " << key << " = " << *loaded->get(key) << '\n';
     return 0;
 }
-
+bool read_private_value(const nucleus::config &config, const std::string &path,
+                        const std::string &expected, std::string &value,
+                        std::ostream &errors)
+{
+    auto observed = config.get(path);
+    if(!observed)
+    {
+        errors << "private value missing: " << path << '\n';
+        return false;
+    }
+    value = std::move(*observed);
+    if(value == expected)
+        return true;
+    errors << "private value mismatch: " << path << " expected '" << expected
+           << "' observed '" << value << "'\n";
+    return false;
+}
+int run_private_config(nucleus::expected<nucleus::config, nucleus::error> loaded,
+                       std::ostream &output, std::ostream &errors)
+{
+    if(!loaded)
+    {
+        errors << "private load failed: " << loaded.error() << '\n';
+        return 1;
+    }
+    std::string listen, proto;
+    if(!read_private_value(*loaded, "net/listen", "0.0.0.0:8080", listen, errors) ||
+       !read_private_value(*loaded, "net/proto", "tcp", proto, errors))
+        return 1;
+    output << "private net/listen = " << listen << '\n'
+           << "private net/proto = " << proto << '\n';
+    return 0;
+}
 int run_private_space(
         nucleus::expected<nucleus::config_space, nucleus::error> net_private,
         std::ostream &output, std::ostream &errors)
@@ -183,18 +179,22 @@ int run_private_space(
         errors << "private space setup failed: " << net_private.error() << '\n';
         return 1;
     }
-    output << "\nnet's private space is independent of the app space: "
-           << "schema elements = " << net_private->schema_elements().size() << '\n';
-    return 0;
+    return run_private_config(
+            nucleus::load_config(
+                    *net_private, nucleus::source_stack{make_net_source()}, {}),
+            output, errors);
 }
 }
-
 int main()
 {
-    const nucleus::owner_token net_owner(std::string("net")), cache_owner(std::string("cache"));
-    const int                  app_status = run_application(
-            make_application_space(net_owner, cache_owner), std::cout, std::cerr);
-    if(app_status != 0)
-        return app_status;
-    return run_private_space(make_private_space(net_owner), std::cout, std::cerr);
+    const nucleus::owner_token    net_owner, cache_owner;
+    nucleus::config_space_builder app_builder;
+    const int                     status = run_application(
+            make_application_space(app_builder, net_owner, cache_owner, std::cout),
+            std::cout, std::cerr);
+    if(status != 0)
+        return status;
+    nucleus::config_space_builder private_builder;
+    return run_private_space(make_private_space(private_builder, net_owner),
+                             std::cout, std::cerr);
 }
