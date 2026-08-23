@@ -1,0 +1,1 @@
+target_sources(facade_schema_test PRIVATE example_schema_contract_test.cpp)

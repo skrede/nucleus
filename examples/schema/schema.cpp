@@ -13,6 +13,7 @@
 #include "nucleus/runtime/runtime_source.h"
 
 #include <string>
+#include <utility>
 #include <iostream>
 
 static bool define_space(nucleus::config_space_builder &builder)
@@ -32,6 +33,24 @@ static bool is_missing_host(const nucleus::error &error)
             std::string::npos;
 }
 
+static int report_load_result(nucleus::load_result loaded,
+                              std::ostream        &output,
+                              std::ostream        &errors)
+{
+    if(loaded)
+    {
+        errors << "unexpected success\n";
+        return 1;
+    }
+    if(!is_missing_host(loaded.error()))
+    {
+        errors << "unexpected rejection: " << loaded.error() << '\n';
+        return 1;
+    }
+    output << "rejected as expected: " << loaded.error() << '\n';
+    return 0;
+}
+
 int main()
 {
     nucleus::config_space_builder builder;
@@ -43,17 +62,5 @@ int main()
     values.set("server/mode", "http");
 
     auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(values)}, {});
-    if(loaded)
-    {
-        std::cerr << "unexpected success\n";
-        return 1;
-    }
-    if(!is_missing_host(loaded.error()))
-    {
-        std::cerr << "unexpected rejection: " << loaded.error() << '\n';
-        return 1;
-    }
-
-    std::cout << "rejected as expected: " << loaded.error() << '\n';
-    return 0;
+    return report_load_result(std::move(loaded), std::cout, std::cerr);
 }

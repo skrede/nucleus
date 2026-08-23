@@ -487,7 +487,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_test(NAME system_round_trip_test COMMAND system_round_trip_test)
 
 endif()
-
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/example_review_tests.cmake)
 # ---------------------------------------------------------------------------
 # Negative compile tests: registries that violate the flat-ownership invariant
 # must NOT compile. WILL_FAIL asserts the build of each fixture fails, making the
