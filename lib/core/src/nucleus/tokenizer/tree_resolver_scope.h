@@ -28,10 +28,10 @@ using ensure_resolved_fn =
 
 // Pass-2 resolver for tree-access tokens (${abs:...} and ${rel:...}) in a
 // single value string. Constructed transiently per leaf during resolve_references();
-// borrows (never stores) the building keyspace and the shared substitution
-// counter. Cross-leaf cycle detection is owned by the caller (resolve_one_leaf
-// enters/exits the guard around each leaf); the recursive ensure_resolved
-// callback routes back through it.
+// borrows (never stores) the building keyspace, the shared substitution counter
+// and the load-wide dispatch chain. Cross-leaf cycle detection is owned by the
+// caller (resolve_one_leaf enters/exits the guard around each leaf); the
+// recursive ensure_resolved callback routes back through it.
 // Flat-registry purity: no stored cross-registry member; tree_resolver_scope
 // lives only for the duration of one leaf resolution.
 class tree_resolver_scope
@@ -40,6 +40,7 @@ public:
     tree_resolver_scope(const keyspace &building,
                         key_path current_path,
                         substitution_budget &budget,
+                        expansion_guard &dispatch_guard,
                         ensure_resolved_fn ensure_resolved,
                         const tree_tokenizer_registry *tree_reg = nullptr) noexcept;
 
@@ -48,7 +49,8 @@ public:
     token_result resolve_value(std::string_view value_text);
 
     // Resolves one fallback arm (the text between '??' separators, already trimmed).
-    token_result resolve_one_arm(std::string_view arm);
+    // A fallback arm may be a bare literal; the first arm of a token may not.
+    token_result resolve_one_arm(std::string_view arm, bool is_fallback);
 
 private:
     token_result expand_produced(token_result produced);
@@ -61,11 +63,9 @@ private:
     substitution_budget             &m_budget;
     ensure_resolved_fn               m_ensure_resolved;
     const tree_tokenizer_registry   *m_tree_tokenizer = nullptr;
-    // The chain for tokenizer-dispatch recursion within one leaf, keyed on
-    // category.field. The cross-leaf guard cannot see that recursion -- it never
-    // re-enters the leaf resolver -- and the substitution count alone would
-    // exhaust the stack long before it reached its ceiling.
-    expansion_guard                  m_dispatch_guard;
+    // Borrowed, never owned: one chain spans the whole depth-first expansion, so
+    // constructing a scope per leaf cannot reset the dispatch nesting.
+    expansion_guard                 &m_dispatch_guard;
 };
 
 }

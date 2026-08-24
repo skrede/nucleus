@@ -29,7 +29,7 @@ namespace nucleus {
 // Pass-2 tree-reference resolution. It BORROWS the building keyspace it reads
 // and writes back into, the tree tokenizer registry a token's category may name,
 // and the load-wide substitution count pass 1 has already charged against; the
-// guard and the cache live for the duration of one resolve() call.
+// cross-leaf guard and the cache live for the duration of one resolve() call.
 class reference_resolution
 {
 public:
@@ -39,6 +39,7 @@ public:
         : m_building(building)
         , m_tree_tokenizer(tree_tokenizer)
         , m_budget(budget)
+        , m_dispatch_guard(default_expansion_depth_cap)
     {
     }
 
@@ -68,6 +69,12 @@ private:
     keyspace                      &m_building;
     const tree_tokenizer_registry &m_tree_tokenizer;
     substitution_budget           &m_budget;
+    // The tokenizer-dispatch chain, keyed on category.field. It spans the whole
+    // depth-first expansion rather than one leaf, so a hop to another leaf cannot
+    // reset it and the reachable nesting is the cap rather than its product with
+    // the cross-leaf cap. It stays separate from the cross-leaf chain, so a token
+    // label and a key path never appear in one cycle report.
+    expansion_guard                m_dispatch_guard;
 
     // The tree shape is frozen by slice(), so a reference may only appear in a
     // value; one in a key segment would make the tree untraversable.
@@ -150,7 +157,7 @@ private:
         {
             return resolve_one_leaf(target, leaf_guard, resolved_cache);
         };
-        tree_resolver_scope scope(m_building, kp, m_budget,
+        tree_resolver_scope scope(m_building, kp, m_budget, m_dispatch_guard,
                                   std::move(ensure), &m_tree_tokenizer);
         auto resolved = scope.resolve_value(text);
         if(!resolved)

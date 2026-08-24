@@ -497,12 +497,43 @@ full acceptance suite.
 
 ### What happens to a resolver's output
 
-A tree tokenizer's output is not final text. It is scanned again, and any
-`${...}` it carries is resolved before the value is stored — the same fixpoint
-the `install_tokenizer` seam reaches. A resolver may therefore return a token, or
-text embedding one, and expect it to be expanded.
+A tree tokenizer's output is not final text. It is scanned again from the first
+`${` it carries, and the token found there is resolved before the value is stored
+— the same fixpoint the `install_tokenizer` seam reaches. A resolver may
+therefore return a token, or text embedding one, and expect it to be expanded.
 
-Two bounds hold that recursion:
+Three outcomes are possible, and the second is the one to design for:
+
+- **Output carrying no `${` is stored verbatim.** Nothing is rewritten.
+
+- **A token body naming no scheme and no registered category is reported.** An
+  `abs:`/`rel:` reference and a `category.field` dispatch are expanded; anything
+  else fails the load with `errc::unresolved_token`, naming the leaf and
+  reporting `unrecognized token body 'X'`. A resolver returning
+  `PREFIX=${HOME}/bin` gets that error rather than the silently debraced
+  `PREFIX=HOME/bin`. The bare-literal floor is reserved for a `??` fallback arm,
+  which may still be written unquoted: `${abs:a/missing ?? fallback}` yields
+  `fallback`.
+
+- **An unbalanced `${` fails the load** with `unterminated ${ in value`, because
+  the scan never finds the closing brace.
+
+To carry text that merely resembles a token, quote it. A token whose only arm is
+a double-quoted literal yields the text between the quotes verbatim, braces
+included:
+
+```
+${"${HOME}"}          ->  ${HOME}
+PREFIX=${"${HOME}"}/bin  ->  PREFIX=${HOME}/bin
+${"literal ${ brace"}    ->  literal ${ brace
+```
+
+Known limitation: the quoted arm has no escape of its own. Text containing a
+double quote cannot be carried through it — there is no backslash escape, and a
+single-quoted arm is not a literal arm (`${'x'}` is reported, not stripped). A
+resolver needing a literal double quote must emit it outside a token.
+
+Two bounds hold the recursion:
 
 - **The substitution count.** One running count spans both token passes, so
   expansion in the fold and dispatch in the reference stage draw on the same
@@ -511,13 +542,16 @@ Two bounds hold that recursion:
   default of 10000. Exhausting it fails the load with `errc::unresolved_token`,
   naming the leaf and reporting `substitution budget (N) exceeded`.
 
-- **The dispatch chain.** Within one leaf, each dispatch pushes `category.field`
-  onto a chain popped when the resolver returns. A resolver that re-emits its own
-  token is a cycle on that chain and fails at once with
+- **The dispatch chain.** Each dispatch pushes `category.field` onto one chain
+  popped when the resolver returns. A resolver that re-emits its own token is a
+  cycle on that chain and fails at once with
   `cyclic reference: category.field -> category.field`; nesting past the depth
-  cap fails with `token expansion depth N exceeded`. That chain belongs to the
-  leaf being resolved and never pools with the cross-leaf reference chain, so a
-  token label and a key path never appear in one cycle report.
+  cap fails with `token expansion depth N exceeded`. The chain spans the whole
+  depth-first expansion, so following a reference into another leaf does not
+  reset it — the depth a document can reach is the cap itself, not the cap
+  multiplied by the reference depth. It never pools with the cross-leaf
+  reference chain, so a token label and a key path never appear in one cycle
+  report.
 
 ---
 

@@ -13,6 +13,7 @@ namespace nucleus {
 tree_resolver_scope::tree_resolver_scope(const keyspace &building,
                                          key_path current_path,
                                          substitution_budget &budget,
+                                         expansion_guard &dispatch_guard,
                                          ensure_resolved_fn ensure_resolved,
                                          const tree_tokenizer_registry *tree_reg) noexcept
     : m_building(building)
@@ -20,7 +21,7 @@ tree_resolver_scope::tree_resolver_scope(const keyspace &building,
     , m_budget(budget)
     , m_ensure_resolved(std::move(ensure_resolved))
     , m_tree_tokenizer(tree_reg)
-    , m_dispatch_guard(default_expansion_depth_cap)
+    , m_dispatch_guard(dispatch_guard)
 {
 }
 
@@ -42,7 +43,6 @@ token_result tree_resolver_scope::resolve_value(std::string_view value_text)
             break;
         }
 
-        // Literal text before the token.
         result.append(value_text.substr(pos, open - pos));
 
         auto const close = scan_braced_span(value_text, open + 2);
@@ -59,9 +59,9 @@ token_result tree_resolver_scope::resolve_value(std::string_view value_text)
         token_result last = unexpected(resolve_error(
             resolve_errc::missing_field, "all fallback arms absent"));
         bool succeeded = false;
-        for(std::string_view const arm : arms)
+        for(std::size_t i = 0; i < arms.size(); ++i)
         {
-            auto r = resolve_one_arm(arm);
+            auto r = resolve_one_arm(arms[i], i > 0);
             if(r)
             {
                 result += std::move(r).value();
@@ -82,16 +82,10 @@ token_result tree_resolver_scope::resolve_value(std::string_view value_text)
 
 // Resolves one fallback arm. An arm is either an abs:/rel: tree token, a
 // category-named tree-tokenizer dispatch (${category.field}), or a literal
-// string (floor value). An unrecognised category returns unknown_category so
-// the ?? chain does NOT silently swallow typos (pitfall 5).
-token_result tree_resolver_scope::resolve_one_arm(std::string_view arm)
+// string, which only a fallback arm may be. An unrecognised category returns
+// unknown_category so the ?? chain does NOT silently swallow typos.
+token_result tree_resolver_scope::resolve_one_arm(std::string_view arm, bool is_fallback)
 {
-    // Trimmed arm forms (after split_fallback_arms removes surrounding whitespace):
-    //   abs:cluster/port         -> tree abs reference
-    //   rel:../sibling           -> tree rel reference
-    //   category.field           -> tree-tokenizer dispatch (no colon scheme)
-    //   "default"                -> quoted literal (strip quotes)
-    //   default                  -> unquoted literal
     auto stripped = arm;
 
     // Check for colon-scheme heads (abs: / rel:).
@@ -140,7 +134,6 @@ token_result tree_resolver_scope::resolve_one_arm(std::string_view arm)
         }
     }
 
-    // Treat as a literal floor value (strip surrounding quotes if present).
     if(stripped.size() >= 2 && stripped.front() == '"' && stripped.back() == '"')
         return std::string(stripped.substr(1, stripped.size() - 2));
 
@@ -148,7 +141,13 @@ token_result tree_resolver_scope::resolve_one_arm(std::string_view arm)
         return unexpected(resolve_error(resolve_errc::missing_field,
                                   "empty fallback arm"));
 
-    // Unquoted literal string floor.
+    // The unquoted floor exists for a ?? default arm. A whole token body reaching
+    // it would be returned with its braces silently removed, so it is reported
+    // instead; a quoted arm carries text that merely resembles a token.
+    if(!is_fallback)
+        return unexpected(resolve_error(resolve_errc::unknown_category,
+            nucleus::format("unrecognized token body '{}'", stripped)));
+
     return std::string(stripped);
 }
 
