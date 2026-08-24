@@ -37,11 +37,12 @@ struct inherit_declaration
 };
 
 // The host-injectable policy governing chain walking. admissibility is invoked
-// for each candidate parent source after it is pulled; returning a non-empty
-// string rejects that source and fails the load with the returned reason.
-// Returning an empty string admits the source. The default (null admissibility)
-// admits all sources. depth_cap is the maximum inheritance chain depth before
-// the walker fails loudly; default is 16.
+// for each candidate parent source before that source is projected or read, so a
+// refused parent is never pulled and its own ancestors are never constructed;
+// returning a non-empty string rejects that source and fails the load with the
+// returned reason. Returning an empty string admits the source. The default (null
+// admissibility) admits all sources. depth_cap is the maximum inheritance chain
+// depth before the walker fails loudly; default is 16.
 struct inherit_policy
 {
     // Returns a non-empty rejection reason if the candidate source is not

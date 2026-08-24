@@ -208,6 +208,19 @@ private:
         // Build the source handle via the host factory.
         source_handle handle = make(path);
 
+        // The policy is consulted before the projection and the pull, so a refused
+        // parent is never read and its own ancestors are never constructed. A source
+        // in the initially-requested set is exempt regardless of the order or role it
+        // is first reached in, so the outcome does not depend on whether it is walked
+        // as a request or as a parent first.
+        if(is_parent && m_admissibility && !m_requested.contains(norm))
+        {
+            std::string reason = m_admissibility(handle.capabilities());
+            if(!reason.empty())
+                return unexpected(error{errc::invalid_inheritance, nucleus::format(
+                    "chain admissibility check rejected parent '{}': {}", path, reason)});
+        }
+
         // The pull below produces this document's batch once; it is cached on
         // chain_entry so the fold consumes it directly instead of pulling the
         // same handle a second time.
@@ -242,19 +255,6 @@ private:
         }
         // kind::opt_out terminates the chain below this file (no recursion).
         // kind::inherit_default means "no parent declared" -- the chain terminates here.
-
-        // Admissibility check: invoked only for candidate parent sources; a
-        // source that appears anywhere in the initially-requested set is exempt
-        // regardless of the order or role it is first reached in, so the outcome
-        // does not depend on whether it is walked as a request or as a parent first.
-        if(is_parent && m_admissibility && !m_requested.contains(norm))
-        {
-            // Pull capabilities for the admissibility check via the handle.
-            std::string reason = m_admissibility(handle.capabilities());
-            if(!reason.empty())
-                return unexpected(error{errc::invalid_inheritance, nucleus::format(
-                    "chain admissibility check rejected parent '{}': {}", path, reason)});
-        }
 
         // Append this source AFTER its parent (root-first). The handle is move-only;
         // the walk-pull's batch travels with it so the fold never re-pulls.

@@ -1,6 +1,9 @@
-// Lexical and structural robustness of the xml source: input that is hostile,
-// malformed, or merely unusual must produce loud, accurate errors -- or resolve
-// correctly when the document is valid but exotic (CDATA values).
+// Lexical and structural robustness of the xml source, and the boundary checks
+// that must run before a document is read: input that is hostile, malformed, or
+// merely unusual must produce loud, accurate errors -- or resolve correctly when
+// the document is valid but exotic (CDATA values).
+
+#include "chain_admissibility_test_support.h"
 
 #include "nucleus/config.h"
 #include "nucleus/config_space.h"
@@ -12,6 +15,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <memory>
 #include <string>
 #include <optional>
 
@@ -134,4 +138,59 @@ TEST_CASE("an element-free document reports the missing document element",
     auto pulled = src.pull();
     REQUIRE_FALSE(pulled);
     REQUIRE(pulled.error().message.find("document element") != std::string::npos);
+}
+
+TEST_CASE("a parent the policy refuses is never read, and neither is its own parent",
+          "[xml][robustness]")
+{
+    namespace probe = nucleus::chain_admissibility_test;
+
+    const nucleus::config_space space = probe::chain_space();
+    auto log = std::make_shared<probe::probe_log>();
+
+    nucleus::load_options options;
+    options.document_paths        = {"child.xml"};
+    options.make_document         = probe::probe_factory(probe::refused_middle_chain(), log);
+    options.selection             = "web";
+    options.inherit.admissibility = probe::reject_without_nesting();
+
+    auto loaded = nucleus::load_config(space, nucleus::source_stack{}, options);
+    REQUIRE_FALSE(loaded);
+    REQUIRE(loaded.error().message.find("parent.xml") != std::string::npos);
+
+    REQUIRE(log->build_count["parent.xml"] == 1);
+    REQUIRE(log->pull_count["parent.xml"] == 0);
+    REQUIRE(log->build_count["grandparent.xml"] == 0);
+    REQUIRE(log->pull_count["grandparent.xml"] == 0);
+
+    // The requested-set exemption and the single-visit short-circuit both survive
+    // the reordering: parent.xml is now requested directly as well as reached.
+    auto exempt_log = std::make_shared<probe::probe_log>();
+    options.document_paths = {"child.xml", "parent.xml"};
+    options.make_document  = probe::probe_factory(probe::refused_middle_chain(), exempt_log);
+
+    auto exempt = nucleus::load_config(space, nucleus::source_stack{}, options);
+    REQUIRE(exempt);
+    REQUIRE(exempt_log->pull_count["parent.xml"] == 1);
+}
+
+TEST_CASE("an empty inherit attribute is a malformed declaration, not a parent path",
+          "[xml][robustness]")
+{
+    auto empty = xml_of(R"(<cluster inherit=""><server><port>80</port></server></cluster>)");
+    auto pulled = empty.pull();
+    REQUIRE_FALSE(pulled);
+    REQUIRE(pulled.error().code == nucleus::errc::malformed_source);
+    REQUIRE(pulled.error().message.find("cluster") != std::string::npos);
+
+    // A named-space envelope validates its root attributes on a separate path.
+    auto named_root = xml_of(R"(<engine inherit=""><port>80</port></engine>)");
+    REQUIRE_FALSE(named_root.with_space_name("engine").pull());
+
+    // The opt-out keyword and a named parent are unaffected; the chain suite pins
+    // what each of the three legal inherit shapes then resolves to.
+    auto opted_out = xml_of(R"(<cluster inherit="none"><server><port>80</port></server></cluster>)");
+    REQUIRE(opted_out.pull());
+    auto named = xml_of(R"(<cluster inherit="base.xml"><server><port>80</port></server></cluster>)");
+    REQUIRE(named.pull());
 }

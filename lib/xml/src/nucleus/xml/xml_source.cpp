@@ -1,5 +1,6 @@
 #include "xml_reader.h"
 #include "nucleus/xml/xml_source.h"
+#include "inherit_attr_rule.h"
 
 #include "nucleus/format.h"
 #include "nucleus/capability.h"
@@ -183,9 +184,8 @@ std::optional<value> keyed_value(const pugi::xml_node &node, const std::string &
 }
 
 // Validates grammar attributes on a transparent named-space root without emitting
-// any keyspace entries. Accepts inherit= (consumed by inheritance()) and rejects
-// extend= on the root (not a keyed instance). Other attributes pass silently --
-// the root envelope carries metadata, not keyspace content.
+// any keyspace entries: an empty inherit= and any extend= are refused, and every
+// other attribute passes silently as root-envelope metadata.
 expected<void, config_source_error>
 validate_root_attrs(const pugi::xml_node &root)
 {
@@ -199,8 +199,8 @@ validate_root_attrs(const pugi::xml_node &root)
                     "duplicate attribute '{}' on element '{}': "
                     "the same attribute appears more than once on this element",
                     name, root.name())});
-        if(name == "inherit")
-            continue; // consumed by inheritance()
+        if(auto r = check_inherit_attr(name, attr.value(), root.name()); !r)
+            return unexpected(r.error());
         if(name == "extend")
             return unexpected(config_source_error{errc::malformed_source,
                 nucleus::format(
@@ -309,8 +309,6 @@ walk(const pugi::xml_node &node, std::string_view path,
                     "the same attribute appears more than once on this element",
                     attr_name, node.name())});
 
-        // "inherit" is a grammar attribute: suppress on root (consumed by
-        // inheritance()), reject loudly on non-root elements.
         if(attr_name == "inherit")
         {
             if(!is_root)
@@ -319,7 +317,9 @@ walk(const pugi::xml_node &node, std::string_view path,
                         "inherit attribute is not permitted on element '{}'; "
                         "it is only valid on the document root element",
                         node.name())});
-            continue; // root: skip silently -- inheritance() reads m_arena
+            if(auto r = check_inherit_attr(attr_name, attr.value(), node.name()); !r)
+                return unexpected(r.error());
+            continue; // consumed by inheritance(), which reads m_arena
         }
 
         // "extend" is a grammar attribute valid only on primary-keyed container
