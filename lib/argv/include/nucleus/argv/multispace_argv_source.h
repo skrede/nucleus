@@ -16,9 +16,10 @@
 #include "nucleus/argv/cli_surface.h"
 #include "nucleus/config_source/argv/key_recognizer.h"
 
+#include "nucleus/utility/escaped_text.h"
+
 #include <string>
 #include <vector>
-#include <stdexcept>
 #include <string_view>
 
 namespace nucleus {
@@ -212,15 +213,13 @@ public:
         log_sink *m_log = nullptr;
     };
 
-    // Returns a space_view for the named space. Throws std::invalid_argument when
-    // `name` has not been registered (programming error, not a runtime pull failure).
-    space_view for_space(std::string_view name)
+    expected<space_view, error> for_space(std::string_view name)
     {
         for(const std::string &s : m_spaces)
             if(s == name)
                 return space_view(this, std::string(name));
-        throw std::invalid_argument(
-            nucleus::format("multispace_argv_source: '{}' is not a registered space name", name));
+        return unexpected(error{errc::malformed_source, nucleus::format(
+            "multispace_argv_source: '{}' is not a registered space name", escaped_text(name))});
     }
 
 private:

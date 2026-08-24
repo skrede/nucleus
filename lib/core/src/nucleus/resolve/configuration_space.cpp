@@ -22,6 +22,8 @@
 #include "nucleus/tokenizer/tokenizer_registry.h"
 #include "nucleus/tokenizer/tree_tokenizer_registry.h"
 
+#include "nucleus/utility/escaped_text.h"
+
 #include <map>
 #include <span>
 #include <memory>
@@ -29,7 +31,6 @@
 #include <vector>
 #include <utility>
 #include <optional>
-#include <stdexcept>
 #include <filesystem>
 #include <string_view>
 
@@ -111,6 +112,7 @@ class config_space_builder::impl : public space_core
 {
 public:
     bool built = false;
+    std::string naming_fault;
 };
 
 // The sealed space's state: the shared core, default-constructed (core tokenizers
@@ -411,12 +413,11 @@ registration_result config_space_builder::register_converter(
 
 config_space_builder &config_space_builder::name(std::string space_name)
 {
-    // Sealed-state door: name() has no expected return, so the loud channel is a
-    // throw (mirrors multispace_argv_source::for_space); message shape matches
-    // reject_if_built so all sealed-state rejections read consistently.
     if(m_impl->built)
-        throw std::invalid_argument("name() is not allowed: the builder has already been built");
-    m_impl->name = std::move(space_name);
+        m_impl->naming_fault = nucleus::format("; name('{}') was refused for the same reason",
+            escaped_text(space_name));
+    else
+        m_impl->name = std::move(space_name);
     return *this;
 }
 
@@ -428,13 +429,11 @@ std::size_t config_space_builder::converter_count() const noexcept { return m_im
 
 std::vector<conflict_report> config_space_builder::conflicts() const { return m_impl->conflicts(); }
 
-config_space config_space_builder::build()
+expected<config_space, error> config_space_builder::build()
 {
-    // Sealed-state door: a second build() would produce a divergent sealed space,
-    // so reject a spent builder loudly before doing any work (throw, not expected --
-    // build() returns config_space); message shape matches reject_if_built.
     if(m_impl->built)
-        throw std::invalid_argument("build() is not allowed: the builder has already been built");
+        return unexpected(error{errc::sealed_builder,
+            "build() is not allowed: the builder has already been built" + m_impl->naming_fault});
 
     // Auto-register a pkey tree tokenizer for every identity element.
     // If the host already registered a tokenizer for this category, skip
