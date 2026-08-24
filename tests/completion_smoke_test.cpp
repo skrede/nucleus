@@ -286,3 +286,42 @@ TEST_CASE("driving the completion leaves the caller's glob setting as it found i
     REQUIRE(run_bash("set +f\n" + completion + drive) == "kept\n");
     REQUIRE(run_bash("set -f\n" + completion + drive) == "kept\n");
 }
+
+// The description is the one host-supplied field that is prose, so it cannot take the word
+// list's byte allowlist -- that would backslash every space the tool emits. What can leave a
+// `[...]` description is enumerated instead: `]` ends it and puts what follows into the spec's
+// action, the one field _arguments evaluates; `[` moves where zsh reads the end; a trailing `\`
+// swallows the terminator; `:` separates the spec's fields. Nothing else there is structure, and
+// the single quote wrapping each spec is what holds the rest inert. No zsh exists on this
+// machine, so these pin the emitted text and the behavior they imply is unverified.
+TEST_CASE("a hostile option description cannot leave the zsh spec entry", "[completion]")
+{
+    const auto emitted = [](const std::string &description) {
+        return nucleus::zsh_emitter{}.emit({"myapp", {{"--f", description, {"v1"}}}});
+    };
+
+    // The breakout: an unescaped `]` would hand `:*:->state` to the action field.
+    REQUIRE(emitted("d]:*:->state").find("'--f=[d\\]\\:*\\:->state]:value:(v1)'")
+            != std::string::npos);
+    // A trailing backslash reaches the same field by swallowing the terminator.
+    REQUIRE(emitted("d\\").find("'--f=[d\\\\]:value:(v1)'") != std::string::npos);
+    REQUIRE(emitted("a[b").find("'--f=[a\\[b]:value:(v1)'") != std::string::npos);
+
+    // Inert unescaped, because the spec is one single-quoted word; a backslash on any of these
+    // would reach the menu rather than zsh, which strips one only where it documents doing so.
+    REQUIRE(emitted("d$(id)`id`;id|id&").find("'--f=[d$(id)`id`;id|id&]:value:(v1)'")
+            != std::string::npos);
+    // The one byte that wrapper does treat as special closes and reopens it instead of ending it.
+    REQUIRE(emitted("d'x").find("'--f=[d'\\''x]:value:(v1)'") != std::string::npos);
+
+    // No non-printable byte reaches the spec: a newline cannot break it across the script's
+    // lines, and an escape sequence cannot reach the terminal that draws the menu.
+    REQUIRE(emitted("a\nb\x1b[2Jc\x7f\x07").find("'--f=[a^Jb^\\[\\[2Jc^?^G]:value:(v1)'")
+            != std::string::npos);
+
+    // Prose keeps its spaces and its ordinary punctuation; only the colon carries a mark, and
+    // zsh strips that one before display.
+    REQUIRE(emitted("set the level (default: info), e.g. \"warn\" -- 100% sure")
+                .find("[set the level (default\\: info), e.g. \"warn\" -- 100% sure]")
+            != std::string::npos);
+}

@@ -66,18 +66,36 @@ private:
         return flag + "=[" + desc + "]:value:(" + group + ")";
     }
 
-    // Backslash-escape the characters that terminate a `[...]` description, and the
-    // backslash itself so a trailing one cannot swallow the terminator behind it.
+    // A description is prose, so the word list's byte allowlist cannot be reused here -- it would
+    // backslash every space. `\ [ ] :` are what an `_arguments` spec reads as structure around a
+    // description, and an unescaped `]` is the only route out of one and into the spec's action,
+    // which is the field `_arguments` evaluates; everything else is inert because the whole spec
+    // is a single-quoted word. A non-printable byte is substituted with its caret rendering rather
+    // than passed through or dropped, so a newline cannot break the spec across the script's lines
+    // and an escape sequence cannot reach the terminal that draws the menu.
     static std::string brackets(const std::string &text)
     {
         std::string out;
         for(char const c : text)
         {
-            if(c == '\\' || c == '[' || c == ']' || c == ':')
-                out.push_back('\\');
-            out.push_back(c);
+            const std::uint8_t byte = static_cast<std::uint8_t>(c);
+            if(byte < 0x20 || byte == 0x7f)
+            {
+                out.push_back('^');
+                append_escaped(out, static_cast<char>(byte ^ 0x40));
+            }
+            else
+                append_escaped(out, c);
         }
         return out;
+    }
+
+    static void append_escaped(std::string &out, char c)
+    {
+        static constexpr std::string_view structural = "\\[]:";
+        if(structural.find(c) != std::string_view::npos)
+            out.push_back('\\');
+        out.push_back(c);
     }
 
     // Every string the spec carries as a WORD -- a flag at its head, a member of a
