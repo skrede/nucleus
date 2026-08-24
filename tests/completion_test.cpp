@@ -56,7 +56,7 @@ const std::string expected_bash =
     "        local val=\"${cur#*=}\"\n"
     "        case \"$flag\" in\n"
     "        '--logging-level')\n"
-    "            COMPREPLY=( $(compgen -W 'debug info warn error' -- \"$val\") )\n"
+    "            local IFS=$'\\n'; COMPREPLY=( $(IFS=$' \\t\\n'; compgen -W 'debug info warn error' -- \"$val\") )\n"
     "            __ltrim_colon_completions \"$cur\" 2>/dev/null\n"
     "            return 0\n"
     "            ;;\n"

@@ -126,3 +126,25 @@ TEST_CASE("the generated bash script actually completes under real bash",
         REQUIRE(out.find("debug") == std::string::npos);
     }
 }
+
+TEST_CASE("an allowed value containing a space completes as one candidate",
+          "[completion][smoke]")
+{
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::element("region", anchor::root())));
+    REQUIRE(reg.attach(nucleus::enum_element("zone", anchor::keyspace(path_of("region")),
+                                     {"us east", "other"})));
+    const std::string completion = generate_completion(shell::bash, reg, "myapp").value();
+
+    // The separator inside the value is escaped; the one between the two values is not.
+    REQUIRE(completion.find("'us\\ east other'") != std::string::npos);
+
+    if(!bash_available())
+        return;
+
+    const std::string script = completion +
+        "\nCOMP_WORDS=(myapp --region-zone = us)\nCOMP_CWORD=3\n"
+        "_myapp_complete\nprintf '%s\\n' \"${#COMPREPLY[@]}\" \"${COMPREPLY[0]}\"\n";
+    const std::string out = run_bash(script);
+    REQUIRE(out == "1\nus east\n");
+}

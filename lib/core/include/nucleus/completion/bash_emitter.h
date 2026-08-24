@@ -27,6 +27,12 @@ namespace nucleus {
 //     absent; the call is guarded so the script degrades cleanly without it.
 //   * Quoting. Flag names and values are emitted inside single quotes with the
 //     `'\''` escape so an arbitrary value can never break out of the literal.
+//   * The field separator. `compgen -W` splits its word list on IFS, and the
+//     unquoted command substitution that fills COMPREPLY splits again on the same
+//     characters -- so a value carrying a separator has to survive both. Each
+//     value backslash-escapes its own separators for the first split, and the
+//     assignment narrows IFS to a newline for the second while restoring the
+//     default inside the substitution, where compgen still needs it.
 //
 // None of this leaks back into the generator or the model.
 class bash_emitter final : public shell_emitter
@@ -66,7 +72,7 @@ public:
             if(opt.values.empty())
                 continue;
             out += "        " + single_quote(opt.flag) + ")\n";
-            out += "            COMPREPLY=( $(compgen -W "
+            out += "            local IFS=$'\\n'; COMPREPLY=( $(IFS=$' \\t\\n'; compgen -W "
                    + single_quote(join_values(opt.values))
                    + " -- \"$val\") )\n";
             out += "            __ltrim_colon_completions \"$cur\" 2>/dev/null\n";
@@ -129,6 +135,20 @@ private:
         return out;
     }
 
+    // Backslash-escape the characters that separate members of a word list, and the
+    // backslash itself so it cannot swallow the escape that follows it.
+    static std::string word(const std::string &text)
+    {
+        std::string out;
+        for(char const c : text)
+        {
+            if(c == '\\' || c == ' ' || c == '\t' || c == '\n')
+                out.push_back('\\');
+            out.push_back(c);
+        }
+        return out;
+    }
+
     static std::string join_values(
         const std::vector<std::string> &values)
     {
@@ -137,7 +157,7 @@ private:
         {
             if(i != 0)
                 out.push_back(' ');
-            out += values[i];
+            out += word(values[i]);
         }
         return out;
     }
