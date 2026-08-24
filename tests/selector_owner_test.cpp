@@ -1,5 +1,5 @@
 #include "nucleus/query/query.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 #include "nucleus/config.h"
 #include "nucleus/identity.h"
 
@@ -30,7 +30,7 @@ config load_two_owners(config_space &space,
     REQUIRE(builder.register_element(element("cluster", anchor::root()), owner_a));
     REQUIRE(builder.register_element(element("port",    anchor::keyspace("cluster")), owner_a));
     REQUIRE(builder.register_element(element("host",    anchor::keyspace("cluster")), owner_b));
-    space = std::move(builder).build();
+    space = nucleus::builder_result_test::built(std::move(builder));
 
     runtime_source src;
     src.set("cluster/port", "8080");
@@ -120,7 +120,7 @@ TEST_CASE("Anonymous default-constructed owner tokens never match each other",
     owner_token anon_a; // used during registration
     REQUIRE(builder.register_element(element("cluster", anchor::root()), anon_a));
     REQUIRE(builder.register_element(element("port", anchor::keyspace("cluster"))));
-    auto space = std::move(builder).build();
+    auto space = nucleus::builder_result_test::built(std::move(builder));
     const auto ctx = space.query_context();
 
     runtime_source src;
@@ -141,7 +141,7 @@ TEST_CASE("owned_by(same_anon_token) matches the registered element",
     owner_token anon;
     REQUIRE(builder.register_element(element("cluster", anchor::root()), anon));
     REQUIRE(builder.register_element(element("port", anchor::keyspace("cluster"))));
-    auto space = std::move(builder).build();
+    auto space = nucleus::builder_result_test::built(std::move(builder));
     const auto ctx = space.query_context();
 
     runtime_source src;
@@ -163,7 +163,7 @@ TEST_CASE("owned_by(same_anon_token) matches the registered element",
 
 TEST_CASE("owned_by() with no registered owners yields empty", "[selector]")
 {
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
 
     runtime_source src;
     src.set("cluster/x", "1");

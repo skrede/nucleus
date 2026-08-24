@@ -1,5 +1,5 @@
 #include "nucleus/query/query.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 #include "nucleus/config.h"
 
 #include "nucleus/schema/anchor.h"
@@ -32,7 +32,7 @@ config_space make_space()
     REQUIRE(builder.register_element(element("cluster", anchor::root())));
     REQUIRE(builder.register_element(element("port",  anchor::keyspace("cluster"))));
     REQUIRE(builder.register_element(element("host",  anchor::keyspace("cluster"))));
-    return std::move(builder).build();
+    return nucleus::builder_result_test::built(std::move(builder));
 }
 
 config make_config(const config_space &space)

@@ -1,5 +1,5 @@
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -65,7 +65,7 @@ void require_mixed_rejection(const nucleus::config_space &space)
 nucleus::config_space empty_space()
 {
     nucleus::config_space_builder builder;
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 nucleus::config_space untyped_space()
@@ -73,7 +73,7 @@ nucleus::config_space untyped_space()
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(
             nucleus::element("tags", nucleus::anchor::root())));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 nucleus::config_space typed_space()
@@ -81,7 +81,7 @@ nucleus::config_space typed_space()
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::typed_element<std::int32_t>(
             "tags", nucleus::anchor::root())));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 }

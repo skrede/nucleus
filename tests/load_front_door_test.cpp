@@ -48,7 +48,7 @@ nucleus::config_space make_nested_typed_space()
         nucleus::primary_key_element("name", anchor::keyspace("node"))));
     REQUIRE(builder.register_element(
         nucleus::typed_element<int>("port", anchor::keyspace("node"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 // Registers a cluster/node keyed container with primary key "name" and leaf "port",

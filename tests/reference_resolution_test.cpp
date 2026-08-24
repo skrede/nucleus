@@ -1,4 +1,4 @@
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 #include "nucleus/identity.h"
 
 #include "nucleus/runtime/runtime_source.h"
@@ -19,7 +19,7 @@ using nucleus::source_stack;
 
 TEST_CASE("abs: reference resolves a value by absolute path", "[reference][abs]")
 {
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     src.set("cluster/port", "9090");
     src.set("cluster/alias", "${abs:cluster/port}");
@@ -31,7 +31,7 @@ TEST_CASE("abs: reference resolves a value by absolute path", "[reference][abs]"
 
 TEST_CASE("abs: reference to non-existent path is a hard error", "[reference][abs]")
 {
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     src.set("cluster/alias", "${abs:cluster/port}");
 
@@ -44,7 +44,7 @@ TEST_CASE("rel: child reference descends from containing scope", "[reference][re
 {
     // ${rel:other} from cluster/alias starts at cluster (parent of alias),
     // then descends to "other" -> cluster/other.
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     src.set("cluster/port", "8080");
     src.set("cluster/alias", "${rel:port}");
@@ -61,7 +61,7 @@ TEST_CASE("rel: ../ reference walks up then descends", "[reference][rel]")
     // ".." -> cluster
     // "sibling" -> cluster/sibling
     // "port" -> cluster/sibling/port
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     src.set("cluster/sibling/port", "7070");
     src.set("cluster/server/alias", "${rel:../sibling/port}");
@@ -75,7 +75,7 @@ TEST_CASE("rel: ./ is sugar for current-scope descend", "[reference][rel]")
 {
     // ${rel:./port} from cluster/alias:
     // base = cluster (parent of alias), "." = no-op, "port" -> cluster/port
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     src.set("cluster/port", "6060");
     src.set("cluster/alias", "${rel:./port}");
@@ -89,7 +89,7 @@ TEST_CASE("abs: reference including indexed segment resolves correctly", "[refer
 {
     // abs: can address an already-indexed path (node[N] form) once it is in the
     // keyspace. Supply the indexed path directly to avoid schema dependency.
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     // Supply paths in indexed form (as a tree source would emit them).
     src.set("cluster/node[0]/name", "primary");
@@ -106,7 +106,7 @@ TEST_CASE("resolve_references() runs post-slice, not during fold", "[reference][
 {
     // Confirm the pass resolves values in the sliced tree, not pre-slice.
     // A value referencing another leaf that only exists after slice must resolve.
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     src.set("host/port", "5050");
     src.set("host/display", "${abs:host/port}");
@@ -124,7 +124,7 @@ TEST_CASE("value-only invariant: reference in key position is a loud error",
     // via a runtime_source whose path literally contains "${...}".
     // Note: key_path::parse would reject "${" in most positions, but a source can
     // emit a path with that substring. The invariant fires before any resolution.
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     // This path segment contains "${abs:x}" -- illegal in structural position.
     src.set("cluster/${abs:x}/port", "1234");
@@ -136,7 +136,7 @@ TEST_CASE("value-only invariant: reference in key position is a loud error",
 
 TEST_CASE("multiple references in one value string all resolve", "[reference][abs]")
 {
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     src.set("host/name", "myhost");
     src.set("host/port", "8080");
@@ -150,7 +150,7 @@ TEST_CASE("multiple references in one value string all resolve", "[reference][ab
 TEST_CASE("a closing brace inside a quoted fallback arm does not end the tree token",
           "[reference][quoting]")
 {
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     src.set("cluster/alias", "${abs:cluster/absent ?? \"}\"}");
 

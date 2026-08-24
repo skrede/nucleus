@@ -2,7 +2,7 @@
 
 #include "nucleus/error.h"
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "../builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -107,7 +107,7 @@ nucleus::config_space output_space()
             nucleus::identity_group("output_names", anchor::keyspace("cluster/node"))
                     .members({"output"})
                     .field("name")));
-    return std::move(builder).build();
+    return nucleus::builder_result_test::built(std::move(builder));
 }
 
 nucleus::source_handle xml_of(const std::string &text)

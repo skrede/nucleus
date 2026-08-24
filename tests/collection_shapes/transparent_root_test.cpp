@@ -1,7 +1,7 @@
 #include "collection_shapes.h"
 
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "../builder_result_test_support.h"
 
 #include "nucleus/schema/schema_registry.h"
 
@@ -66,7 +66,7 @@ nucleus::config_space transparent_root_space()
 {
     nucleus::config_space_builder builder;
     nucleus::shapes::declare_transparent_root_nodes(builder);
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 // One document carrying every root-anchored shape at once -- repeated siblings,

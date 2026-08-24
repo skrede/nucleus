@@ -1,5 +1,5 @@
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -43,7 +43,7 @@ nucleus::config_space space_beside(const std::string &outside)
     REQUIRE(builder.register_element(nucleus::element("cluster", nucleus::anchor::root())));
     REQUIRE(builder.register_element(nucleus::element("port", nucleus::anchor::keyspace("cluster"))));
     REQUIRE(builder.register_element(nucleus::element(outside, nucleus::anchor::root())));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 nucleus::config_space annotated_space(std::vector<std::string> allowed)
@@ -51,7 +51,7 @@ nucleus::config_space annotated_space(std::vector<std::string> allowed)
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("cluster", nucleus::anchor::root())));
     REQUIRE(builder.register_element(nucleus::enum_element("port", nucleus::anchor::keyspace("cluster"), std::move(allowed))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 // A key carrying a forbidden byte reaches a checked config the way a host's data

@@ -1,4 +1,4 @@
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 #include "nucleus/config.h"
 
 #include "nucleus/schema/anchor.h"
@@ -44,7 +44,7 @@ TEST_CASE("at_most(1) over presence members rejects two active", "[constraint]")
     REQUIRE(b.register_constraint_group(
         exclusion_group("cache_policy", anchor::keyspace("server/cache"))
             .members({"eager", "lru", "ttl"}).at_most(1)));
-    auto space = std::move(b).build();
+    auto space = nucleus::builder_result_test::built(std::move(b));
 
     runtime_source one;
     one.set("server/cache/lru", "on");
@@ -68,7 +68,7 @@ TEST_CASE("when_value activation only counts the matching value", "[constraint]"
             .member("lru")
             .member("ttl")
             .at_most(1)));
-    auto space = std::move(b).build();
+    auto space = nucleus::builder_result_test::built(std::move(b));
 
     // eager=false is inactive; lru present is the single active member -> OK.
     runtime_source ok;
@@ -97,7 +97,7 @@ TEST_CASE("when_value activation finds a member at an indexed instance path", "[
                 .member("eager", when_value("true"))
                 .member("lru")
                 .at_most(1)));
-        return std::move(b).build();
+        return nucleus::builder_result_test::built(std::move(b));
     };
 
     // A single repeated value is stored at the indexed path server/cache/eager[0];
@@ -132,7 +132,7 @@ TEST_CASE("when_value activation fires per-instance under a repeated container",
             .member("mode", when_value("active"))
             .member("lru")
             .at_most(1)));
-    auto space = std::move(b).build();
+    auto space = nucleus::builder_result_test::built(std::move(b));
 
     // pool[0]: mode=active + lru=on -> two active -> violation on this instance.
     // pool[1]: mode=idle   + lru=on -> mode inactive -> one active -> fine.
@@ -154,7 +154,7 @@ TEST_CASE("exactly(1) and at_least(1) cardinality", "[constraint]")
         REQUIRE(b.register_constraint_group(
             exclusion_group("cache_policy", anchor::keyspace("server/cache"))
                 .members({"eager", "lru", "ttl"}).exactly(1)));
-        auto space = std::move(b).build();
+        auto space = nucleus::builder_result_test::built(std::move(b));
 
         runtime_source one;
         one.set("server/cache/lru", "on");
@@ -173,7 +173,7 @@ TEST_CASE("exactly(1) and at_least(1) cardinality", "[constraint]")
         REQUIRE(b.register_constraint_group(
             exclusion_group("cache_policy", anchor::keyspace("server/cache"))
                 .members({"eager", "lru", "ttl"}).at_least(1)));
-        auto space = std::move(b).build();
+        auto space = nucleus::builder_result_test::built(std::move(b));
         // Instance materialised by a non-member leaf; no policy member active.
         runtime_source src;
         src.set("server/cache/note", "x");
@@ -189,7 +189,7 @@ TEST_CASE("mutually_exclusive sugar desugars to at_most(1)", "[constraint]")
     REQUIRE(b.register_constraint_group(
         mutually_exclusive("cache_policy", anchor::keyspace("server/cache"),
                            {"lru", "ttl"})));
-    auto space = std::move(b).build();
+    auto space = nucleus::builder_result_test::built(std::move(b));
 
     runtime_source bad;
     bad.set("server/cache/lru", "on").set("server/cache/ttl", "60");
@@ -211,7 +211,7 @@ TEST_CASE("Choice over all_of bundles selects exactly one", "[constraint]")
             .option(all_of({"cert", "key"}))
             .option(all_of({"token"}))
             .exactly(1)));
-    auto space = std::move(b).build();
+    auto space = nucleus::builder_result_test::built(std::move(b));
 
     SECTION("one complete bundle -> OK")
     {
@@ -249,7 +249,7 @@ TEST_CASE("validate_group valve runs a host predicate", "[constraint]")
                 return nucleus::unexpected(std::string("ttl must not be zero"));
             return {};
         })));
-    auto space = std::move(b).build();
+    auto space = nucleus::builder_result_test::built(std::move(b));
 
     runtime_source ok;
     ok.set("server/cache/ttl", "60");
@@ -273,7 +273,7 @@ TEST_CASE("Root-anchored group-only schema enforces on an empty surface", "[cons
                     return nucleus::unexpected(std::string("host rejected the root"));
                 return {};
             })));
-        return std::move(b).build();
+        return nucleus::builder_result_test::built(std::move(b));
     };
 
     SECTION("rejecting validator fails the load")

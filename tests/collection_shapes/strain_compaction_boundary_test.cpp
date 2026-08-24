@@ -1,7 +1,7 @@
 #include "collection_shapes.h"
 
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "../builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -29,7 +29,7 @@ nucleus::config_space nested_space()
     REQUIRE(builder.register_element(nucleus::repeated_element("route", nucleus::anchor::keyspace("cluster/server/node"))));
     REQUIRE(builder.register_element(nucleus::element("port", nucleus::anchor::keyspace("cluster/server/node/route"))));
     REQUIRE(builder.register_element(nucleus::element("method", nucleus::anchor::keyspace("cluster/server/node/route"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 std::string nested_base()
@@ -80,7 +80,7 @@ nucleus::config_space keyed_merge_space()
             nucleus::identity_group("output_ids", nucleus::anchor::keyspace("cluster/server"))
                     .members({"output"})
                     .field("id")));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 std::string keyed_merge_document()

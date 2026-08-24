@@ -1,5 +1,5 @@
 #include "nucleus/query/query.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 #include "nucleus/config.h"
 
 #include "nucleus/schema/anchor.h"
@@ -33,7 +33,7 @@ config_space build_server_space()
         primary_key_element("name", anchor::keyspace("cluster/server"))));
     REQUIRE(builder.register_element(element("port",  anchor::keyspace("cluster/server"))));
     REQUIRE(builder.register_element(element("proto", anchor::keyspace("cluster/server"))));
-    return std::move(builder).build();
+    return nucleus::builder_result_test::built(std::move(builder));
 }
 
 // Ordinal paths survive fold — see resolution_context.h slice(): indexed segment

@@ -1,5 +1,5 @@
 #include "nucleus/query/query.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 #include "nucleus/config.h"
 
 #include "nucleus/schema/anchor.h"
@@ -29,7 +29,7 @@ config_space build_server_space()
     REQUIRE(builder.register_element(
         primary_key_element("name", anchor::keyspace("cluster/server"))));
     REQUIRE(builder.register_element(element("port", anchor::keyspace("cluster/server"))));
-    return std::move(builder).build();
+    return nucleus::builder_result_test::built(std::move(builder));
 }
 
 // Ordinal-indexed source paths survive the pkey fold (skipped as flat-source repeated).
@@ -124,7 +124,7 @@ TEST_CASE("role(repeated_container) classifies by schema, not tree structure",
     REQUIRE(builder.register_element(element("cluster", anchor::root())));
     REQUIRE(builder.register_element(repeated_element("node", anchor::keyspace("cluster"))));
     REQUIRE(builder.register_element(element("port", anchor::keyspace("cluster/node"))));
-    auto space = std::move(builder).build();
+    auto space = nucleus::builder_result_test::built(std::move(builder));
     const auto ctx = space.query_context();
 
     // No instances of cluster/node; the config is empty for the container.
@@ -151,7 +151,7 @@ TEST_CASE("role(repeated_container) returns nodes when instances exist",
     REQUIRE(builder.register_element(element("cluster", anchor::root())));
     REQUIRE(builder.register_element(repeated_element("node", anchor::keyspace("cluster"))));
     REQUIRE(builder.register_element(element("port", anchor::keyspace("cluster/node"))));
-    auto space = std::move(builder).build();
+    auto space = nucleus::builder_result_test::built(std::move(builder));
     const auto ctx = space.query_context();
 
     runtime_source src;

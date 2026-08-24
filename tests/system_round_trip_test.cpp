@@ -1,5 +1,5 @@
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -35,7 +35,7 @@ config_space make_space()
             std::vector<std::string>{"primary", "secondary"})));
     REQUIRE(builder.register_element(
             repeated_element("tag", anchor::keyspace("server"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 }

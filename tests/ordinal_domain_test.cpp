@@ -1,6 +1,6 @@
 #include "nucleus/error.h"
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -35,7 +35,7 @@ nucleus::config_space cluster_space()
             nucleus::repeated_element("node", nucleus::anchor::keyspace("cluster"))));
     REQUIRE(builder.register_element(
             nucleus::element("port", nucleus::anchor::keyspace("cluster/node"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 std::string indexed_path(const std::string &ordinal)

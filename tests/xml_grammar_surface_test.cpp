@@ -1,5 +1,5 @@
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -31,7 +31,7 @@ nucleus::config_space space_with(std::string              name,
             std::move(name), nucleus::anchor::keyspace("root"));
     field.allowed_values = std::move(allowed);
     REQUIRE(builder.register_element(std::move(field)));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 }

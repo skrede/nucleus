@@ -2,7 +2,7 @@
 
 #include "nucleus/error.h"
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "../builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -69,7 +69,7 @@ nucleus::config_space route_port_space()
         nucleus::repeated_element("route", anchor::keyspace("cluster/node"))));
     REQUIRE(builder.register_element(
         nucleus::unique_element("port", anchor::keyspace("cluster/node/route"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 nucleus::source_handle xml_of(const std::string &text)

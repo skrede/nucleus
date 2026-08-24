@@ -24,7 +24,7 @@ nucleus::config_space cluster_space()
 {
     nucleus::config_space_builder builder;
     nucleus::shapes::declare_cluster_nodes_routes(builder);
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 // Two node instances, each carrying a nested repeated container, so a key naming no

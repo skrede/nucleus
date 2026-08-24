@@ -1,7 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_TESTS_PKEY_IDENTITY_TEST_SUPPORT_H
 #define HPP_GUARD_NUCLEUS_TESTS_PKEY_IDENTITY_TEST_SUPPORT_H
 
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -36,7 +36,7 @@ inline config_space cluster_space(bool required_key = false)
             element("port", anchor::keyspace("cluster/server"))));
     REQUIRE(builder.register_element(
             element("protocol", anchor::keyspace("cluster/server"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 inline load_result load_doc(const config_space &space, std::string document,

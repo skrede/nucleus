@@ -2,7 +2,7 @@
 #define HPP_GUARD_NUCLEUS_TESTS_XML_REPEATED_TEST_SUPPORT_H
 
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -76,7 +76,7 @@ inline config_space cluster_space()
             element("metrics", anchor::keyspace("cluster/node"))));
     REQUIRE(builder.register_element(
             element("latency", anchor::keyspace("cluster/node/metrics"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 inline config_space simple_cluster_space()
@@ -87,7 +87,7 @@ inline config_space simple_cluster_space()
             repeated_element("node", anchor::keyspace("cluster"))));
     REQUIRE(builder.register_element(
             element("port", anchor::keyspace("cluster/node"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 inline config_space repeated_tags_space()
@@ -96,7 +96,7 @@ inline config_space repeated_tags_space()
     REQUIRE(builder.register_element(element("cluster", anchor::root())));
     REQUIRE(builder.register_element(
             repeated_element("tags", anchor::keyspace("cluster"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 inline source_handle source_of(std::string text)

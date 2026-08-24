@@ -1,4 +1,4 @@
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/completion/completion.h"
 
@@ -20,7 +20,7 @@ nucleus::config_space one_element_space()
 {
     nucleus::config_space_builder engine;
     REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
-    return engine.build();
+    return nucleus::builder_result_test::built(engine);
 }
 
 void require_refused(const nucleus::config_space &space, std::string_view prog)

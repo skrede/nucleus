@@ -36,7 +36,7 @@ public:
 
     nucleus::registration_result register_identity_group(nucleus::identity_group_spec) { return next_result(); }
 
-    nucleus::config_space build()
+    nucleus::expected<nucleus::config_space, nucleus::error> build()
     {
         ++m_build_count;
         return nucleus::config_space_builder{}.build();

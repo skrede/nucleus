@@ -1,7 +1,7 @@
 #include "collection_shapes.h"
 
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "../builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -38,7 +38,7 @@ nucleus::config_space combined_space()
             nucleus::repeated_element("route", anchor::keyspace("cluster/server"))));
     REQUIRE(builder.register_element(
             nucleus::element("port", anchor::keyspace("cluster/server/route"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 std::string case_dir()

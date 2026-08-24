@@ -1,7 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_TESTS_IDENTITY_ENVELOPE_TEST_SUPPORT_H
 #define HPP_GUARD_NUCLEUS_TESTS_IDENTITY_ENVELOPE_TEST_SUPPORT_H
 
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/config_source/source_stack.h"
 
@@ -46,14 +46,14 @@ inline config_space typed_plugin_space()
     REQUIRE(builder.register_element(element("plugin", anchor::root())));
     REQUIRE(builder.register_element(
             element("x", anchor::keyspace("plugin"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 inline config_space plugin_space()
 {
     config_space_builder builder;
     REQUIRE(builder.register_schema("plugin/x"));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 }

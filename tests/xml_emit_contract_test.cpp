@@ -1,4 +1,4 @@
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 #include "nucleus/config_emitter.h"
 
 #include "nucleus/schema/anchor.h"
@@ -26,7 +26,7 @@ nucleus::config_space make_template_space()
     REQUIRE(builder.register_element(nucleus::enum_element(
             "mode", nucleus::anchor::keyspace("server"),
             std::vector<std::string>{"primary", "secondary"})));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 nucleus::config_space make_document_space(bool required_key = false)
@@ -44,7 +44,7 @@ nucleus::config_space make_document_space(bool required_key = false)
             "port", nucleus::anchor::keyspace("cluster/node"))));
     REQUIRE(builder.register_element(nucleus::element(
             "note", nucleus::anchor::keyspace("cluster/node"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 nucleus::config config_of(std::map<std::string, std::string> values)
@@ -124,7 +124,7 @@ TEST_CASE("safe XML rejects schema and storage role conflicts before delivery",
         nucleus::config_space_builder builder;
         REQUIRE(builder.register_element(
                 nucleus::repeated_element("tag", nucleus::anchor::root())));
-        check_safe_rejection(builder.build(), {{"tag", "value"}}, "tag");
+        check_safe_rejection(nucleus::builder_result_test::built(builder), {{"tag", "value"}}, "tag");
     }
     SECTION("missing repeated container ordinal")
     {
@@ -133,7 +133,7 @@ TEST_CASE("safe XML rejects schema and storage role conflicts before delivery",
                 nucleus::repeated_element("node", nucleus::anchor::root())));
         REQUIRE(builder.register_element(nucleus::element(
                 "port", nucleus::anchor::keyspace("node"))));
-        check_safe_rejection(builder.build(), {{"node/port", "80"}},
+        check_safe_rejection(nucleus::builder_result_test::built(builder), {{"node/port", "80"}},
                              "node/port");
     }
     SECTION("value on structural container")

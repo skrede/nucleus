@@ -1,4 +1,4 @@
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 #include "nucleus/config.h"
 
 #include "nucleus/schema/anchor.h"
@@ -50,7 +50,7 @@ TEST_CASE("Distinct identifiers across pooled element-types validate", "[identit
 {
     auto b = pool_builder();
     REQUIRE(b.register_identity_group(pool_names()));
-    auto space = std::move(b).build();
+    auto space = nucleus::builder_result_test::built(std::move(b));
 
     runtime_source src;
     src.set("pool/worker[0]/name", "a").set("pool/worker[0]/port", "1")
@@ -64,7 +64,7 @@ TEST_CASE("A duplicate identifier value alone is a collision", "[identity]")
     {
         auto b = pool_builder();
         REQUIRE(b.register_identity_group(pool_names()));
-        auto space = std::move(b).build();
+        auto space = nucleus::builder_result_test::built(std::move(b));
 
         runtime_source src;
         src.set("pool/worker[0]/name", "shared").set("pool/worker[0]/port", "1")
@@ -80,7 +80,7 @@ TEST_CASE("A duplicate identifier value alone is a collision", "[identity]")
     {
         auto b = pool_builder();
         REQUIRE(b.register_identity_group(pool_names()));
-        auto space = std::move(b).build();
+        auto space = nucleus::builder_result_test::built(std::move(b));
 
         runtime_source src;
         src.set("pool/worker[0]/name", "dup").set("pool/worker[0]/port", "1")
@@ -96,7 +96,7 @@ TEST_CASE("An instance missing its identifier field is loud (xs:key present)",
 {
     auto b = pool_builder();
     REQUIRE(b.register_identity_group(pool_names()));
-    auto space = std::move(b).build();
+    auto space = nucleus::builder_result_test::built(std::move(b));
 
     runtime_source src;
     src.set("pool/worker[0]/port", "1");  // no name
@@ -120,7 +120,7 @@ TEST_CASE("Uniqueness scope is the resolved slice (per selected strain)",
     REQUIRE(b.register_identity_group(
         identity_group("worker_ids", anchor::keyspace("cluster/server/pool"))
             .members({"worker"}).field("id")));
-    auto space = std::move(b).build();
+    auto space = nucleus::builder_result_test::built(std::move(b));
 
     runtime_source src;
     src.set("cluster/server/web/pool/worker[0]/id", "w1")

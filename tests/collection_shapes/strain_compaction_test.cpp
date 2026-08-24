@@ -1,7 +1,7 @@
 #include "collection_shapes.h"
 
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "../builder_result_test_support.h"
 #include "nucleus/strain_scope.h"
 
 #include "nucleus/xml/xml_emitter.h"
@@ -22,7 +22,7 @@ nucleus::config_space server_space()
 {
     nucleus::config_space_builder builder;
     nucleus::shapes::declare_keyed_server_routes(builder);
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 nucleus::source_handle xml_of(const std::string &text)

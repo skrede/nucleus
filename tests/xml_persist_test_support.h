@@ -4,7 +4,7 @@
 #include "xml_persist_artifact.h"
 
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -71,14 +71,14 @@ inline config_space server_space()
             element("host", anchor::keyspace("server"))));
     REQUIRE(builder.register_element(
             repeated_element("tag", anchor::keyspace("server"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 inline config_space port_space()
 {
     config_space_builder builder;
     REQUIRE(builder.register_element(element("port", anchor::root())));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 inline config_space repeated_tags_space()
@@ -87,7 +87,7 @@ inline config_space repeated_tags_space()
     REQUIRE(builder.register_element(element("cluster", anchor::root())));
     REQUIRE(builder.register_element(
             repeated_element("tags", anchor::keyspace("cluster"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 inline source_handle source_of(std::string text)

@@ -1,4 +1,4 @@
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 #include "nucleus/config.h"
 
 #include "nucleus/xml/xml_source.h"
@@ -78,7 +78,7 @@ TEST_CASE("Two files in different directories resolve ${dir.path} to their own d
 
     const cleanup_guard guard{dir_a, dir_b};
 
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
 
     load_options opts;
     opts.document_paths = {file_a.string()};

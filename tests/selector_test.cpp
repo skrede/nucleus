@@ -1,5 +1,5 @@
 #include "nucleus/query/query.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 #include "nucleus/config.h"
 
 #include "nucleus/schema/anchor.h"
@@ -25,7 +25,7 @@ namespace {
 
 config load(config_space_builder &&builder, runtime_source src)
 {
-    auto space = std::move(builder).build();
+    auto space = nucleus::builder_result_test::built(std::move(builder));
     auto res   = load_config(space, source_stack{std::move(src)}, {});
     REQUIRE(res.has_value());
     return std::move(*res);
@@ -58,7 +58,7 @@ config load_indexed_11()
 TEST_CASE("query() returns a selector that collects all nodes from root", "[selector]")
 {
     const auto cfg = load_simple();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
     auto nodes = query(cfg.root(), ctx).collect();
     // Root itself + cluster + cluster/port + cluster/host + cluster/server + cluster/server/name + cluster/server/port
     // At minimum every concrete key is reachable.
@@ -68,7 +68,7 @@ TEST_CASE("query() returns a selector that collects all nodes from root", "[sele
 TEST_CASE("each() iterates in pre-order DFS order", "[selector]")
 {
     const auto cfg = load_simple();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
 
     std::vector<std::string> paths;
     query(cfg.root(), ctx).each([&](const config_node &n) {
@@ -90,7 +90,7 @@ TEST_CASE("each() iterates in pre-order DFS order", "[selector]")
 TEST_CASE("collect() on >=11 repeated instances is ordinal-stable", "[selector]")
 {
     const auto cfg = load_indexed_11();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
 
     // Collect the direct children of cluster/node (the repeated container).
     auto nodes = query(cfg.root()["cluster"]["node"], ctx).children().collect();
@@ -120,7 +120,7 @@ TEST_CASE("collect() on >=11 repeated instances is ordinal-stable", "[selector]"
 TEST_CASE("children() yields direct children only", "[selector]")
 {
     const auto cfg = load_simple();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
 
     auto children = query(cfg.root()["cluster"], ctx).children().collect();
 
@@ -141,7 +141,7 @@ TEST_CASE("children() yields direct children only", "[selector]")
 TEST_CASE("descendants() excludes the anchor itself", "[selector]")
 {
     const auto cfg = load_simple();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
 
     const std::string anchor_path = "cluster";
     auto nodes = query(cfg.root()["cluster"], ctx).descendants().collect();
@@ -153,7 +153,7 @@ TEST_CASE("descendants() excludes the anchor itself", "[selector]")
 TEST_CASE("descendants() includes all transitive descendants", "[selector]")
 {
     const auto cfg = load_simple();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
 
     auto nodes = query(cfg.root()["cluster"], ctx).descendants().collect();
 
@@ -169,7 +169,7 @@ TEST_CASE("descendants() includes all transitive descendants", "[selector]")
 TEST_CASE("at_depth(1) matches direct children only", "[selector]")
 {
     const auto cfg = load_simple();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
 
     auto nodes = query(cfg.root()["cluster"], ctx).at_depth(1).collect();
 
@@ -184,7 +184,7 @@ TEST_CASE("at_depth(1) matches direct children only", "[selector]")
 TEST_CASE("at_depth(2) matches grandchildren only", "[selector]")
 {
     const auto cfg = load_simple();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
 
     auto nodes = query(cfg.root()["cluster"], ctx).at_depth(2).collect();
 
@@ -199,7 +199,7 @@ TEST_CASE("at_depth(2) matches grandchildren only", "[selector]")
 TEST_CASE("under() restricts to a named subpath subtree", "[selector]")
 {
     const auto cfg = load_simple();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
 
     auto nodes = query(cfg.root(), ctx).under("cluster/server").collect();
 
@@ -219,7 +219,7 @@ TEST_CASE("under() restricts to a named subpath subtree", "[selector]")
 TEST_CASE("leaves() yields only scalar nodes", "[selector]")
 {
     const auto cfg = load_simple();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
 
     auto nodes = query(cfg.root(), ctx).leaves().collect();
     for(const auto &n : nodes)
@@ -236,7 +236,7 @@ TEST_CASE("leaves() yields only scalar nodes", "[selector]")
 TEST_CASE("containers() yields only container (non-leaf) nodes", "[selector]")
 {
     const auto cfg = load_simple();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
 
     auto nodes = query(cfg.root(), ctx).containers().collect();
     for(const auto &n : nodes)
@@ -252,7 +252,7 @@ TEST_CASE("containers() yields only container (non-leaf) nodes", "[selector]")
 TEST_CASE("repeated() yields repeated-container nodes", "[selector]")
 {
     const auto cfg = load_indexed_11();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
 
     auto nodes = query(cfg.root(), ctx).repeated().collect();
 
@@ -268,7 +268,7 @@ TEST_CASE("repeated() yields repeated-container nodes", "[selector]")
 TEST_CASE("collect_as<string>() returns all leaf values as strings", "[selector]")
 {
     const auto cfg = load_simple();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
 
     auto result = query(cfg.root(), ctx).leaves().collect_as<std::string>();
     REQUIRE(result.has_value());
@@ -282,7 +282,7 @@ TEST_CASE("collect_as<string>() returns all leaf values as strings", "[selector]
 TEST_CASE("collect_as<int>() fails on a non-integer leaf", "[selector]")
 {
     const auto cfg = load_simple();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
 
     // "localhost" is not a valid integer; collect_as<int>() must propagate the error.
     auto result = query(cfg.root(), ctx).leaves().collect_as<int>();
@@ -299,7 +299,7 @@ TEST_CASE("collect_as<int>() fails on a non-integer leaf", "[selector]")
 TEST_CASE("count() returns the number of matching nodes", "[selector]")
 {
     const auto cfg = load_simple();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
 
     std::size_t c = query(cfg.root(), ctx).leaves().count();
     CHECK(c >= 4); // port, host, server/name, server/port
@@ -308,7 +308,7 @@ TEST_CASE("count() returns the number of matching nodes", "[selector]")
 TEST_CASE("exists() is true when at least one node matches", "[selector]")
 {
     const auto cfg = load_simple();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
 
     CHECK(query(cfg.root(), ctx).leaves().exists());
     CHECK_FALSE(query(cfg.root()["nonexistent"], ctx).exists());

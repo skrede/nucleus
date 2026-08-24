@@ -1,6 +1,6 @@
 #include "nucleus/query/query.h"
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/keyspace/provenance.h"
 
@@ -39,7 +39,7 @@ config_space make_space()
     REQUIRE(b.register_element(element("route", anchor::root())));
     REQUIRE(b.register_element(
         keyref_element("target", anchor::keyspace("route"), "endpoint_names")));
-    return std::move(b).build();
+    return nucleus::builder_result_test::built(std::move(b));
 }
 
 runtime_source two_targets()

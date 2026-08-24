@@ -1,5 +1,5 @@
 #include "nucleus/query/query.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 #include "nucleus/config.h"
 
 #include "nucleus/runtime/runtime_source.h"
@@ -25,7 +25,7 @@ config load_simple()
     src.set("cluster/host",        "localhost");
     src.set("cluster/server/name", "primary");
     src.set("cluster/server/port", "443");
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     auto res   = load_config(space, source_stack{std::move(src)}, {});
     REQUIRE(res.has_value());
     return std::move(*res);
@@ -40,7 +40,7 @@ config load_simple()
 TEST_CASE("AND-chain narrows results (descendants + leaves)", "[selector]")
 {
     const auto cfg = load_simple();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
 
     // Children of cluster that are also leaves.
     auto nodes = query(cfg.root()["cluster"], ctx).children().leaves().collect();
@@ -63,7 +63,7 @@ TEST_CASE("AND-chain narrows results (descendants + leaves)", "[selector]")
 TEST_CASE("or_() produces the union of two selectors", "[selector]")
 {
     const auto cfg = load_simple();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
 
     auto left  = query(cfg.root(), ctx).under("cluster/port");
     auto right = query(cfg.root(), ctx).under("cluster/host");
@@ -87,7 +87,7 @@ TEST_CASE("or_() produces the union of two selectors", "[selector]")
 TEST_CASE("excluding() removes nodes matching the given predicate", "[selector]")
 {
     const auto cfg = load_simple();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
 
     // All children of cluster except those under cluster/server.
     node_predicate is_server = [](const config_node &n, const schema_query_context *) {
@@ -115,7 +115,7 @@ TEST_CASE("excluding() removes nodes matching the given predicate", "[selector]"
 TEST_CASE("one() returns absent_key when no node matches", "[selector]")
 {
     const auto cfg = load_simple();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
 
     // Query a path that does not exist.
     auto result = query(cfg.root()["nonexistent"], ctx).one();
@@ -133,7 +133,7 @@ TEST_CASE("one() returns absent_key when no node matches", "[selector]")
 TEST_CASE("one() returns ambiguous_result when many nodes match", "[selector]")
 {
     const auto cfg = load_simple();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
 
     // All leaves under root: definitely more than one.
     auto result = query(cfg.root(), ctx).leaves().one();
@@ -151,7 +151,7 @@ TEST_CASE("one() returns ambiguous_result when many nodes match", "[selector]")
 TEST_CASE("one() returns the node when exactly one matches", "[selector]")
 {
     const auto cfg = load_simple();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
 
     // cluster/server/name is a leaf under cluster/server with exactly one match.
     auto result = query(cfg.root()["cluster"]["server"]["name"], ctx)
@@ -169,7 +169,7 @@ TEST_CASE("one() returns the node when exactly one matches", "[selector]")
 TEST_CASE("single-pass evaluation — each() traverses the tree once", "[selector]")
 {
     const auto cfg = load_simple();
-    const auto ctx = config_space_builder{}.build().query_context();
+    const auto ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
 
     // The fact that this terminates in linear time (not quadratic) and returns a
     // deterministic result is the behavioural guarantee. We verify the result is

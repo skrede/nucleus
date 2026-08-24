@@ -1,4 +1,4 @@
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 #include "nucleus/identity.h"
 
 #include "nucleus/tokenizer/tree_tokenizer.h"
@@ -25,7 +25,7 @@ using nucleus::tree_tokenizer;
 TEST_CASE("cross-leaf cycle A->B->A is detected with the full FQN chain",
           "[reference][cycle]")
 {
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     // A references B, B references A.
     src.set("graph/a", "${abs:graph/b}");
@@ -42,7 +42,7 @@ TEST_CASE("cross-leaf cycle A->B->A is detected with the full FQN chain",
 
 TEST_CASE("self-referential leaf is detected as a cycle", "[reference][cycle]")
 {
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     src.set("host/port", "${abs:host/port}");
 
@@ -53,7 +53,7 @@ TEST_CASE("self-referential leaf is detected as a cycle", "[reference][cycle]")
 
 TEST_CASE("three-leaf cycle A->B->C->A names all nodes", "[reference][cycle]")
 {
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     src.set("ring/a", "${abs:ring/b}");
     src.set("ring/b", "${abs:ring/c}");
@@ -71,7 +71,7 @@ TEST_CASE("substitution budget exceeded stops billion-laughs amplification",
     // Build a ladder: b="${abs:a}${abs:a}", c="${abs:b}${abs:b}", ...
     // At 10 levels this would produce 2^10=1024 substitutions from the root.
     // With a tiny budget (e.g. 5 substitutions) this must fail with budget_exceeded.
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     src.set("ladder/a", "x");
     src.set("ladder/b", "${abs:ladder/a}${abs:ladder/a}");
@@ -96,7 +96,7 @@ TEST_CASE("budget_exceeded does NOT trigger ?? fallthrough",
           "[reference][budget][fallback]")
 {
     // Even with a fallback arm, budget_exceeded must propagate, not be swallowed.
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     src.set("ladder/a", "x");
     src.set("ladder/b", "${abs:ladder/a}${abs:ladder/a}");
@@ -117,7 +117,7 @@ TEST_CASE("rel: reference walking above the root reports a distinct error",
     // ${rel:../../x} from cluster/alias walks above the configuration root:
     // base = cluster (parent of alias), ".." -> root, ".." -> above root.
     // The error must name the offending rel body, not a misleading empty target.
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     src.set("cluster/alias", "${rel:../../x}");
 
@@ -132,7 +132,7 @@ TEST_CASE("rel: reference walking above the root reports a distinct error",
 TEST_CASE("an in-bounds rel: reference still resolves after the above-root guard",
           "[reference][rel]")
 {
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     src.set("cluster/sibling/port", "5050");
     src.set("cluster/server/alias", "${rel:../sibling/port}");
@@ -148,7 +148,7 @@ TEST_CASE("diamond fan-in resolves without exponential substitution count",
     // A -> B, A -> C; both B and C reference D.
     // Without memoization this would substitute D twice. With the default budget
     // (10000) and memoization the load must succeed -- we verify success only.
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     src.set("diamond/d", "leaf");
     src.set("diamond/b", "${abs:diamond/d}");
@@ -168,7 +168,7 @@ TEST_CASE("a tree tokenizer's own output is resolved to a fixpoint", "[reference
             ? std::string("head-${wrap.tail}-foot") : std::string("TAIL"); })));
     runtime_source src;
     src.set("box/text", "x${wrap.start}y");
-    auto loaded = load_config(engine.build(), source_stack{std::move(src)}, {});
+    auto loaded = load_config(nucleus::builder_result_test::built(engine), source_stack{std::move(src)}, {});
     REQUIRE(loaded.has_value());
     CHECK(loaded.value().get("box/text") == "xhead-TAIL-footy");
 }
@@ -180,7 +180,7 @@ TEST_CASE("a tree tokenizer re-emitting its own token halts", "[reference][tree]
         -> token_result { return std::string("${loop.self}"); })));
     runtime_source src;
     src.set("box/text", "${loop.self}");
-    auto loaded = load_config(engine.build(), source_stack{std::move(src)}, {});
+    auto loaded = load_config(nucleus::builder_result_test::built(engine), source_stack{std::move(src)}, {});
     REQUIRE_FALSE(loaded.has_value());
     CHECK(loaded.error().message.find("cyclic reference: loop.self") != std::string::npos);
 }
@@ -192,7 +192,7 @@ TEST_CASE("one substitution count spans both token passes", "[reference][budget]
        .set("pool/w", "${string.upper(value=a)}${string.upper(value=b)}${string.upper(value=c)}");
     load_options opts;
     opts.expansion_budget = 3;
-    auto loaded = load_config(config_space_builder{}.build(), source_stack{std::move(src)}, opts);
+    auto loaded = load_config(nucleus::builder_result_test::built(config_space_builder{}), source_stack{std::move(src)}, opts);
     REQUIRE_FALSE(loaded.has_value());
     CHECK(loaded.error().message.find("budget") != std::string::npos);
 }

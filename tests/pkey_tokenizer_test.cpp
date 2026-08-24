@@ -1,4 +1,4 @@
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -58,7 +58,7 @@ nucleus::load_result load_nested_field(bool host, std::size_t &calls)
                 {
                     ++calls;
                     return std::string("dispatched"); })));
-    const auto     space = engine.build();
+    const auto     space = nucleus::builder_result_test::built(engine);
     runtime_source source;
     source.set("cluster/server/alpha/name", "alpha")
             .set("cluster/server/alpha/endpoint/secret", "hidden")
@@ -76,7 +76,7 @@ TEST_CASE("auto-named tokenizer resolves pkey field", "[pkey_tokenizer]")
     declare_server_schema(engine);
     REQUIRE(engine.register_element(
             nucleus::element("desc", anchor::keyspace("cluster/server"))));
-    auto           space = engine.build();
+    auto           space = nucleus::builder_result_test::built(engine);
     runtime_source src;
     src.set("cluster/server/primary/name", "primary")
             .set("cluster/server/primary/port", "8080")
@@ -96,7 +96,7 @@ TEST_CASE("auto-named tokenizer: same-tag nested instances are unambiguous",
     declare_server_schema(engine);
     REQUIRE(engine.register_element(
             nucleus::element("label", anchor::keyspace("cluster/server"))));
-    auto           space = engine.build();
+    auto           space = nucleus::builder_result_test::built(engine);
     runtime_source src;
     src.set("cluster/server/primary/name", "primary")
             .set("cluster/server/primary/port", "9000")
@@ -118,7 +118,7 @@ TEST_CASE("Zero-instance: precise diagnostic when no selection", "[pkey_tokenize
     declare_server_schema(engine);
     REQUIRE(engine.register_element(nucleus::element("app", anchor::root())));
     REQUIRE(engine.register_element(nucleus::element("desc", anchor::keyspace("app"))));
-    auto           space = engine.build();
+    auto           space = nucleus::builder_result_test::built(engine);
     runtime_source src;
     src.set("app/desc", "${server.name ?? \"default\"}");
 
@@ -133,7 +133,7 @@ TEST_CASE("Zero-instance: hard error without fallback", "[pkey_tokenizer]")
     declare_server_schema(engine);
     REQUIRE(engine.register_element(nucleus::element("app", anchor::root())));
     REQUIRE(engine.register_element(nucleus::element("desc", anchor::keyspace("app"))));
-    auto space = engine.build();
+    auto space = nucleus::builder_result_test::built(engine);
 
     runtime_source src;
     src.set("app/desc", "${server.name}");
@@ -175,7 +175,7 @@ TEST_CASE("Host shadow wins over auto-registered pkey tokenizer", "[pkey_tokeniz
                            { return std::string("host-value"); }));
     REQUIRE(host_result.has_value());
 
-    auto space = engine.build();
+    auto space = nucleus::builder_result_test::built(engine);
 
     runtime_source src;
     src.set("cluster/server/primary/name", "primary")

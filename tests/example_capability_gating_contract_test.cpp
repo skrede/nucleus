@@ -1,3 +1,5 @@
+#include "builder_result_test_support.h"
+
 #include "nucleus/runtime/runtime_source.h"
 
 #define main capability_gating_example_main
@@ -37,7 +39,7 @@ nucleus::load_result load_capability_port(std::string_view port)
     values.set("server/primary/port", std::string(port));
     nucleus::load_options options;
     options.selection = "primary";
-    return nucleus::load_config(builder.build(),
+    return nucleus::load_config(nucleus::builder_result_test::built(builder),
                                 nucleus::source_stack{std::move(values)}, options);
 }
 
@@ -65,7 +67,7 @@ public:
         return nucleus::registration_ok();
     }
 
-    nucleus::config_space build()
+    nucleus::expected<nucleus::config_space, nucleus::error> build()
     {
         ++m_build_count;
         return nucleus::config_space_builder{}.build();

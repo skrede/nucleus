@@ -1,5 +1,5 @@
 #include "nucleus/config_node.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 #include "nucleus/config.h"
 
 #include "nucleus/runtime/runtime_source.h"
@@ -21,7 +21,7 @@ namespace {
 
 nucleus::config load_flat()
 {
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     src.set("cluster/server/port", "8080");
     auto loaded = load_config(space, source_stack{std::move(src)}, {});
@@ -31,7 +31,7 @@ nucleus::config load_flat()
 
 nucleus::config load_indexed()
 {
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     src.set("cluster/node[0]/port", "9090");
     auto loaded = load_config(space, source_stack{std::move(src)}, {});

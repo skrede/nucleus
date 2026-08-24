@@ -1,4 +1,4 @@
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 #include "nucleus/identity.h"
 
 #include "nucleus/runtime/runtime_source.h"
@@ -19,7 +19,7 @@ using nucleus::source_stack;
 
 TEST_CASE("?? falls through to second arm when first is absent", "[reference][fallback]")
 {
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     src.set("host/port", "8080");
     // First arm (abs:host/missing) is absent; second arm resolves.
@@ -33,7 +33,7 @@ TEST_CASE("?? falls through to second arm when first is absent", "[reference][fa
 TEST_CASE("?? uses literal string floor when all ref arms are absent",
           "[reference][fallback]")
 {
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     src.set("host/result", "${abs:host/missing ?? \"9090\"}");
 
@@ -44,7 +44,7 @@ TEST_CASE("?? uses literal string floor when all ref arms are absent",
 
 TEST_CASE("?? left-to-right: first present value wins", "[reference][fallback]")
 {
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     src.set("host/primary", "primary-value");
     src.set("host/secondary", "secondary-value");
@@ -58,7 +58,7 @@ TEST_CASE("?? left-to-right: first present value wins", "[reference][fallback]")
 
 TEST_CASE("cycle error propagates past all ?? arms", "[reference][fallback]")
 {
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     // cyclic reference -- the ?? fallback must NOT swallow this.
     src.set("loop/a", "${abs:loop/b ?? \"safe\"}");
@@ -71,7 +71,7 @@ TEST_CASE("cycle error propagates past all ?? arms", "[reference][fallback]")
 
 TEST_CASE("no ?? and missing reference is a hard error", "[reference][fallback]")
 {
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     src.set("host/result", "${abs:host/missing}");
 
@@ -83,7 +83,7 @@ TEST_CASE("no ?? and missing reference is a hard error", "[reference][fallback]"
 TEST_CASE("three-arm ?? chain falls through to the literal floor",
           "[reference][fallback]")
 {
-    auto space = config_space_builder{}.build();
+    auto space = nucleus::builder_result_test::built(config_space_builder{});
     runtime_source src;
     src.set("host/result", "${abs:host/a ?? abs:host/b ?? \"default\"}");
 

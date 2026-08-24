@@ -3,7 +3,7 @@
 
 #include "nucleus/config.h"
 #include "nucleus/capability.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/config_source/source_stack.h"
 #include "nucleus/config_source/source_handle.h"
@@ -124,7 +124,7 @@ inline config_space chain_space()
             primary_key_element("name", anchor::keyspace("cluster/server"))));
     REQUIRE(builder.register_element(element("port", anchor::keyspace("cluster/server"))));
     REQUIRE(builder.register_element(element("protocol", anchor::keyspace("cluster/server"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 }

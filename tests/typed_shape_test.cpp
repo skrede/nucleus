@@ -60,7 +60,7 @@ nucleus::config_space repeated_typed_cfg_space()
     auto el = nucleus::typed_element<int32_t>("nums", anchor::keyspace("cfg"));
     el.repeated = true;
     REQUIRE(engine.register_element(el));
-    return engine.build();
+    return nucleus::builder_result_test::built(engine);
 }
 
 nucleus::config_space repeated_typed_element_cfg_space()
@@ -69,7 +69,7 @@ nucleus::config_space repeated_typed_element_cfg_space()
     REQUIRE(engine.register_element(nucleus::element("cfg", anchor::root())));
     REQUIRE(engine.register_element(
         nucleus::repeated_typed_element<int32_t>("nums", anchor::keyspace("cfg"))));
-    return engine.build();
+    return nucleus::builder_result_test::built(engine);
 }
 
 // Document-path chain loader against the explicit stack API.

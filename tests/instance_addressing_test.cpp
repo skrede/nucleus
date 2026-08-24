@@ -1,6 +1,6 @@
 #include "nucleus/config.h"
 #include "nucleus/config_node.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/query/query.h"
 
@@ -134,7 +134,7 @@ struct pruning_walker final : config_tree_walker
 TEST_CASE("structural selection is relative and inclusive", "[instance_addressing]")
 {
     const config cfg = make_config();
-    const auto   ctx = config_space_builder{}.build().query_context();
+    const auto   ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
     CHECK(paths(query(cfg.root(), ctx).under("cluster/node")) == expected_node_tree());
     CHECK(paths(query(cfg.root(), ctx).under("cluster/node[2]")) == expected_outer_tree(2));
     CHECK(paths(query(cfg.root()["cluster"]["node"][1], ctx).under("")) == expected_outer_tree(1));
@@ -144,7 +144,7 @@ TEST_CASE("visit cancellation and walker pruning remain distinct", "[instance_ad
 {
     const config                   cfg      = make_config();
     const config_node              anchor   = cfg.root()["cluster"]["node"];
-    const auto                     ctx      = config_space_builder{}.build().query_context();
+    const auto                     ctx      = nucleus::builder_result_test::built(config_space_builder{}).query_context();
     const std::vector<std::string> complete = paths(query(anchor, ctx));
     for(std::size_t stop = 0; stop < complete.size(); ++stop)
     {
@@ -168,7 +168,7 @@ TEST_CASE("visit cancellation and walker pruning remain distinct", "[instance_ad
 TEST_CASE("nested omitted and explicit ordinals select exact subtrees", "[instance_addressing]")
 {
     const config cfg = make_config();
-    const auto   ctx = config_space_builder{}.build().query_context();
+    const auto   ctx = nucleus::builder_result_test::built(config_space_builder{}).query_context();
     struct selection_case
     {
         std::string                path;
@@ -185,7 +185,7 @@ TEST_CASE("nested omitted and explicit ordinals select exact subtrees", "[instan
 TEST_CASE("structural composition follows left-to-right scope", "[instance_addressing]")
 {
     const config      cfg    = make_config();
-    const auto        ctx    = config_space_builder{}.build().query_context();
+    const auto        ctx    = nucleus::builder_result_test::built(config_space_builder{}).query_context();
     const config_node plugin = cfg.root()["mount_a"]["plugin"];
     CHECK(paths(query(plugin, ctx).under("logging").at_depth(1)) == std::vector<std::string>{"mount_a/plugin/logging/sinks"});
     CHECK(paths(query(plugin, ctx).at_depth(1).under("logging")) == std::vector<std::string>{"mount_a/plugin/logging"});
@@ -193,7 +193,7 @@ TEST_CASE("structural composition follows left-to-right scope", "[instance_addre
 TEST_CASE("depth follows every observable tree generation", "[instance_addressing]")
 {
     const config                   cfg  = make_config();
-    const auto                     ctx  = config_space_builder{}.build().query_context();
+    const auto                     ctx  = nucleus::builder_result_test::built(config_space_builder{}).query_context();
     const config_node              node = cfg.root()["cluster"]["node"];
     const std::vector<config_node> anchors{cfg.root(), cfg.root()["cluster"], node,
                                            node[2], node[2]["route"], node[2]["route"][10]};

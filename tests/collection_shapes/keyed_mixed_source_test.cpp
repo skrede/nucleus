@@ -1,7 +1,7 @@
 #include "collection_shapes.h"
 
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "../builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -29,7 +29,7 @@ nucleus::config_space output_space()
             nucleus::identity_group("output_names", nucleus::anchor::keyspace("endpoints"))
                     .members({"output"})
                     .field("name")));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 nucleus::source_handle base_document(const std::string &)

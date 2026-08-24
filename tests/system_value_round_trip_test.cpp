@@ -40,7 +40,7 @@ config_space scalar_space()
             std::vector<std::string>{"primary", "secondary"})));
     REQUIRE(builder.register_element(
             repeated_element("tag", anchor::keyspace("server"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 }

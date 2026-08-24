@@ -1,5 +1,5 @@
 #include "nucleus/capability.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -46,7 +46,7 @@ nucleus::config_space make_nested_typed_space()
         nucleus::primary_key_element("name", nucleus::anchor::keyspace("server"))));
     REQUIRE(builder.register_element(
         nucleus::typed_element<int>("port", nucleus::anchor::keyspace("server"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 }

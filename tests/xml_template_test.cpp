@@ -38,7 +38,7 @@ nucleus::config_space make_server_space()
     REQUIRE(builder.register_element(nucleus::enum_element(
             "mode", nucleus::anchor::keyspace("server"),
             std::vector<std::string>{"primary", "secondary"})));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 }

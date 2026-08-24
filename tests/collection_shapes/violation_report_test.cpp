@@ -2,7 +2,7 @@
 
 #include "nucleus/error.h"
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "../builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -36,7 +36,7 @@ nucleus::config_space cluster_space()
         nucleus::element("label", anchor::keyspace("cluster/node"))));
     REQUIRE(builder.register_element(
         nucleus::unique_element("id", anchor::keyspace("cluster/node"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 nucleus::load_result load(const nucleus::config_space &space, const std::string &doc)

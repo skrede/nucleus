@@ -2,7 +2,7 @@
 
 #include "nucleus/error.h"
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "../builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -31,7 +31,7 @@ nucleus::config_space output_space(nucleus::merge_mode mode)
             nucleus::identity_group("output_names", nucleus::anchor::keyspace("endpoints"))
                     .members({"output"})
                     .field("name")));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 nucleus::config_space strain_space()
@@ -44,7 +44,7 @@ nucleus::config_space strain_space()
             nucleus::primary_key_element("name", nucleus::anchor::keyspace("cluster/server"))));
     REQUIRE(builder.register_element(
             nucleus::element("port", nucleus::anchor::keyspace("cluster/server"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 nucleus::source_handle xml_of(const std::string &text)

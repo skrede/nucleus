@@ -150,7 +150,7 @@ TEST_CASE("registering on a built builder fails with errc::sealed_builder",
           "[error][code]")
 {
     nucleus::config_space_builder builder;
-    (void)builder.build();
+    nucleus::builder_result_test::built((void)builder);
 
     auto rejected = builder.register_schema("server/host");
     REQUIRE_FALSE(rejected);

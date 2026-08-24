@@ -1,5 +1,5 @@
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/config_source/source_stack.h"
 
@@ -63,7 +63,7 @@ nucleus::config_space nested_space()
             nucleus::repeated_element("route", nucleus::anchor::keyspace("cluster/node"))));
     REQUIRE(builder.register_element(nucleus::typed_element<std::int32_t>(
             "port", nucleus::anchor::keyspace("cluster/node/route"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 nucleus::config_space typed_root_space()
@@ -71,7 +71,7 @@ nucleus::config_space typed_root_space()
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::typed_element<std::int32_t>(
             "port", nucleus::anchor::root())));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 std::string port_path(std::size_t outer, std::size_t inner)

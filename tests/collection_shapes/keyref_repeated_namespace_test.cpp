@@ -1,7 +1,7 @@
 #include "nucleus/query/query.h"
 
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "../builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -38,7 +38,7 @@ nucleus::config_space repeated_namespace_space(const bool require_global = false
             "global_target", nucleus::anchor::keyspace("cluster"), "output_names");
     global.required = require_global;
     REQUIRE(builder.register_element(std::move(global)));
-    return std::move(builder).build();
+    return nucleus::builder_result_test::built(std::move(builder));
 }
 
 nucleus::source_handle xml_of(const std::string &text)

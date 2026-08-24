@@ -1,5 +1,5 @@
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -66,7 +66,7 @@ nucleus::config_space repeated_space()
             nucleus::repeated_element("node", nucleus::anchor::keyspace("cluster"))));
     REQUIRE(builder.register_element(
             nucleus::element("port", nucleus::anchor::keyspace("cluster/node"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 }

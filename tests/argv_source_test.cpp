@@ -1,7 +1,7 @@
 #include "nucleus/log_sink.h"
 #include "nucleus/capability.h"
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 #include "nucleus/error.h"
 
 #include "nucleus/schema/anchor.h"
@@ -259,7 +259,7 @@ nucleus::config_space make_nested_space()
         nucleus::element("host", nucleus::anchor::keyspace("server"))));
     REQUIRE(builder.register_element(
         nucleus::repeated_element("tag", nucleus::anchor::keyspace("server"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 }
@@ -314,7 +314,7 @@ nucleus::config_space make_cluster_space()
         nucleus::element("endpoint", nucleus::anchor::keyspace("cluster/node"))));
     REQUIRE(builder.register_element(
         nucleus::element("port", nucleus::anchor::keyspace("cluster/node/endpoint"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 }
@@ -496,7 +496,7 @@ nucleus::config_space make_keyed_cluster_space()
         nucleus::repeated_element("route", nucleus::anchor::keyspace("cluster/server"))));
     REQUIRE(builder.register_element(
         nucleus::element("port", nucleus::anchor::keyspace("cluster/server/route"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 }
@@ -584,7 +584,7 @@ nucleus::config_space make_unite_endpoints_space()
     REQUIRE(builder.register_identity_group(
         nucleus::identity_group("output_names", nucleus::anchor::keyspace("endpoints"))
             .members({"output"}).field("name")));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 }

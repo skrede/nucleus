@@ -58,7 +58,7 @@ config_space make_space()
         enum_element("mode", anchor::keyspace("server"),
                      std::vector<std::string>{"primary", "secondary"})));
     REQUIRE(builder.register_element(element("port", anchor::keyspace("server"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 // Base document: supplies host and mode.

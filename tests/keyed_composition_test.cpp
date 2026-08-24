@@ -1,4 +1,4 @@
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 #include "nucleus/config.h"
 
 #include "nucleus/schema/anchor.h"
@@ -39,7 +39,7 @@ config_space make_space(merge_mode mode, bool with_identity = true)
         REQUIRE(b.register_identity_group(
             identity_group("output_names", anchor::keyspace("endpoints"))
                 .members({"output"}).field("name")));
-    return std::move(b).build();
+    return nucleus::builder_result_test::built(std::move(b));
 }
 
 std::vector<std::string> names(const config &cfg)
@@ -162,7 +162,7 @@ TEST_CASE("Keyed merge composes with strain slicing (nested in a pkey strain)",
     REQUIRE(b.register_identity_group(
         identity_group("output_ids", anchor::keyspace("cluster/server"))
             .members({"output"}).field("id")));
-    auto space = std::move(b).build();
+    auto space = nucleus::builder_result_test::built(std::move(b));
 
     runtime_source base;
     runtime_source over;

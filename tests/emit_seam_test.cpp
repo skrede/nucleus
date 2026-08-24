@@ -1,5 +1,5 @@
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -29,7 +29,7 @@ nucleus::config_space make_server_space()
     REQUIRE(builder.register_element(nucleus::enum_element(
             "mode", nucleus::anchor::keyspace("server"),
             std::vector<std::string>{"primary", "secondary"})));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 nucleus::config make_server_config()

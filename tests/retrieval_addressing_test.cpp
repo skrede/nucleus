@@ -1,5 +1,5 @@
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 #include "nucleus/error.h"
 
 #include "nucleus/schema/anchor.h"
@@ -37,7 +37,7 @@ nucleus::config_space retrieval_space()
             "route", nucleus::anchor::keyspace("cluster/node"))));
     REQUIRE(builder.register_element(nucleus::typed_element<std::int32_t>(
             "port", nucleus::anchor::keyspace("cluster/node/route"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 std::int32_t encoded(std::size_t outer, std::size_t inner)

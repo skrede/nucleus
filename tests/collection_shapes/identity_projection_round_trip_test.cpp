@@ -1,7 +1,7 @@
 #include "collection_shapes.h"
 
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "../builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -41,7 +41,7 @@ nucleus::config_space identity_space()
             nucleus::identity_group("output_ids", anchor::keyspace("cluster/server"))
                     .members({"output"})
                     .field("id")));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 std::map<std::string, std::string> expected_snapshot()

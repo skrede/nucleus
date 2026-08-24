@@ -59,7 +59,7 @@ config_space chain_space()
     REQUIRE(builder.register_element(element("host", anchor::keyspace("server"))));
     REQUIRE(builder.register_element(element("mode", anchor::keyspace("server"))));
     REQUIRE(builder.register_element(element("port", anchor::keyspace("server"))));
-    return builder.build();
+    return nucleus::builder_result_test::built(builder);
 }
 
 source_handle chain_document(const std::string &path)
