@@ -17,37 +17,45 @@
 
 #include <string>
 #include <vector>
+#include <utility>
 #include <iostream>
 
 namespace {
 
 // A `server` container primary-keyed by `name`, a unique-named `profile`, and a
 // constrained `mode` leaf.
-bool define_space(nucleus::config_space_builder &builder)
+nucleus::expected<nucleus::config_space, nucleus::error> make_space()
 {
-    return builder.register_element(
-                   nucleus::element("server", nucleus::anchor::root())) &&
-            builder.register_element(
-                    nucleus::primary_key_element("name", nucleus::anchor::keyspace("server"))) &&
-            builder.register_element(
-                    nucleus::unique_element("profile", nucleus::anchor::keyspace("server"))) &&
-            builder.register_element(
-                    nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
-                                          std::vector<std::string>{"primary", "secondary"}));
+    nucleus::config_space_builder builder;
+    if(auto result = builder.register_element(nucleus::element("server", nucleus::anchor::root())); !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::primary_key_element("name", nucleus::anchor::keyspace("server")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::unique_element("profile", nucleus::anchor::keyspace("server")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
+                                     std::vector<std::string>{"primary", "secondary"}));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    return builder.build();
 }
 
 }
 
 int main()
 {
-    nucleus::config_space_builder builder;
-    if(!define_space(builder))
-        return 1;
-    const auto sealed = builder.build();
+    const auto sealed = make_space();
     if(!sealed)
+    {
+        std::cerr << "space setup failed: " << sealed.error() << '\n';
         return 1;
-    const nucleus::config_space &space = sealed.value();
-    const auto                  rendered = nucleus::xml::render_template(space);
+    }
+    const auto rendered = nucleus::xml::render_template(sealed.value());
     if(!rendered)
     {
         std::cerr << "render failed: " << rendered.error() << '\n';

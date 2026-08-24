@@ -18,19 +18,26 @@
 #include "nucleus/xml/xml_emitter.h"
 
 #include <string>
+#include <utility>
 #include <iostream>
 
 namespace {
 
 // A server container with a host leaf and a repeated tag leaf.
-bool define_space(nucleus::config_space_builder &builder)
+nucleus::expected<nucleus::config_space, nucleus::error> make_space()
 {
-    return builder.register_element(
-                   nucleus::element("server", nucleus::anchor::root())) &&
-            builder.register_element(
-                    nucleus::element("host", nucleus::anchor::keyspace("server"))) &&
-            builder.register_element(
-                    nucleus::repeated_element("tag", nucleus::anchor::keyspace("server")));
+    nucleus::config_space_builder builder;
+    if(auto result = builder.register_element(nucleus::element("server", nucleus::anchor::root())); !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::element("host", nucleus::anchor::keyspace("server")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::repeated_element("tag", nucleus::anchor::keyspace("server")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    return builder.build();
 }
 
 nucleus::load_result load_values(const nucleus::config_space &space)
@@ -51,12 +58,12 @@ nucleus::load_result load_values(const nucleus::config_space &space)
 
 int main()
 {
-    nucleus::config_space_builder builder;
-    if(!define_space(builder))
-        return 1;
-    const auto sealed = builder.build();
+    const auto sealed = make_space();
     if(!sealed)
+    {
+        std::cerr << "space setup failed: " << sealed.error() << '\n';
         return 1;
+    }
     const nucleus::config_space &space = sealed.value();
     const nucleus::load_result  loaded = load_values(space);
     if(!loaded)

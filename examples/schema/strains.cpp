@@ -9,19 +9,31 @@
 #include "nucleus/xml/xml_source.h"
 
 #include <string>
+#include <utility>
 #include <iostream>
 
-static bool define_space(nucleus::config_space_builder &builder)
+static nucleus::expected<nucleus::config_space, nucleus::error> make_space()
 {
-    return builder.register_element(nucleus::element("cluster", nucleus::anchor::root())) &&
-            builder.register_element(
-                    nucleus::element("server", nucleus::anchor::keyspace("cluster"))) &&
-            builder.register_element(
-                    nucleus::primary_key_element("name", nucleus::anchor::keyspace("cluster/server"))) &&
-            builder.register_element(
-                    nucleus::element("port", nucleus::anchor::keyspace("cluster/server"))) &&
-            builder.register_element(
-                    nucleus::element("protocol", nucleus::anchor::keyspace("cluster/server")));
+    nucleus::config_space_builder builder;
+    if(auto result = builder.register_element(nucleus::element("cluster", nucleus::anchor::root())); !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::element("server", nucleus::anchor::keyspace("cluster")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::primary_key_element("name", nucleus::anchor::keyspace("cluster/server")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::element("port", nucleus::anchor::keyspace("cluster/server")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::element("protocol", nucleus::anchor::keyspace("cluster/server")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    return builder.build();
 }
 
 // One document containing an anonymous template (protocol) and two named
@@ -53,12 +65,12 @@ static void print_selected(const nucleus::config &config)
 
 int main()
 {
-    nucleus::config_space_builder builder;
-    if(!define_space(builder))
-        return 1;
-    const auto sealed = builder.build();
+    const auto sealed = make_space();
     if(!sealed)
+    {
+        std::cerr << "space setup failed: " << sealed.error() << '\n';
         return 1;
+    }
     const nucleus::config_space &space = sealed.value();
 
     // Select the "primary" strain for this load -- a per-load parameter.

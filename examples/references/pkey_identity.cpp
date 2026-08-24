@@ -19,24 +19,34 @@
 #include "nucleus/xml/xml_emitter.h"
 
 #include <string>
+#include <utility>
 #include <iostream>
 
 namespace {
 
 // cluster/server keyed by name; non-key leaves port and protocol.
-bool define_space(nucleus::config_space_builder &builder)
+nucleus::expected<nucleus::config_space, nucleus::error> make_space()
 {
-    return builder.register_element(
-                   nucleus::element("cluster", nucleus::anchor::root())) &&
-            builder.register_element(
-                    nucleus::element("server", nucleus::anchor::keyspace("cluster"))) &&
-            builder.register_element(
-                    nucleus::primary_key_element(
-                            "name", nucleus::anchor::keyspace("cluster/server"))) &&
-            builder.register_element(
-                    nucleus::element("port", nucleus::anchor::keyspace("cluster/server"))) &&
-            builder.register_element(
-                    nucleus::element("protocol", nucleus::anchor::keyspace("cluster/server")));
+    nucleus::config_space_builder builder;
+    if(auto result = builder.register_element(nucleus::element("cluster", nucleus::anchor::root())); !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::element("server", nucleus::anchor::keyspace("cluster")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::primary_key_element("name", nucleus::anchor::keyspace("cluster/server")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::element("port", nucleus::anchor::keyspace("cluster/server")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::element("protocol", nucleus::anchor::keyspace("cluster/server")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    return builder.build();
 }
 
 // The document carries two named strains plus a shared anonymous template;
@@ -129,12 +139,12 @@ bool render_and_reload(const nucleus::config_space &space,
 
 int main()
 {
-    nucleus::config_space_builder builder;
-    if(!define_space(builder))
-        return 1;
-    const auto sealed = builder.build();
+    const auto sealed = make_space();
     if(!sealed)
+    {
+        std::cerr << "space setup failed: " << sealed.error() << '\n';
         return 1;
+    }
     const nucleus::config_space &space = sealed.value();
     const nucleus::load_result  loaded = load_selected(space);
     if(!loaded)
