@@ -104,3 +104,23 @@ TEST_CASE("a program name opening with a letter, digit or underscore still yield
         REQUIRE(space.generate_completion(nucleus::shell::zsh, prog));
     }
 }
+
+// The space name prefixes every completion entry, so it lands in the same expanded word
+// list the flags do. The path parser it used to lean on constrains a path's SHAPE and
+// never the bytes a segment carries, which is how a substitution reached the word list.
+TEST_CASE("a space name outside the bare-token grammar is refused for both shells",
+          "[facade][completion]")
+{
+    const nucleus::config_space space = one_element_space();
+
+    for(std::string_view name : {"$(id)", "a;b", "a b", "a|b", "node[0]", "-lead", ".lead", "a/-b"})
+    {
+        CAPTURE(name);
+        const auto refused = space.generate_completion(nucleus::shell::bash, "myapp", {}, {}, name);
+        REQUIRE_FALSE(refused);
+        REQUIRE(refused.error().code == nucleus::errc::malformed_source);
+        REQUIRE_FALSE(space.generate_completion(nucleus::shell::zsh, "myapp", {}, {}, name));
+    }
+
+    REQUIRE(space.generate_completion(nucleus::shell::bash, "myapp", {}, {}, "a/b_2.x"));
+}

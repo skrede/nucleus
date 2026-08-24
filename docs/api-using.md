@@ -1103,7 +1103,9 @@ A host that re-delimits its CLI (`argv_source::delimit_with`) or anchors it
 (`argv_source::anchor_at`) passes the same `cli_delimiter` and anchor here,
 keeping the completed flags identical to the parsed ones. When `space_name` is
 non-empty, every completion entry is prefixed with the space name, matching a
-`multispace_argv_source` that routes tokens by their first segment.
+`multispace_argv_source` that routes tokens by their first segment. Each of its
+segments is held to the same bare-command-token grammar as `prog`, since the
+prefix reaches the generated script's word list beside every flag it carries.
 An `enum_element`'s value set becomes that flag's completion candidates. A pure
 read of the sealed schema. nucleus is a library, not a CLI — it returns the
 script and the host decides how to surface it.

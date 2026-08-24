@@ -13,10 +13,10 @@
 #include "nucleus/utility/escaped_text.h"
 
 #include <span>
-#include <cctype>
 #include <string>
 #include <cstdint>
 #include <algorithm>
+#include <string_view>
 
 namespace nucleus {
 
@@ -92,7 +92,7 @@ inline schema_attach_result check_not_repeated_unique(const schema_element &el)
 // ordinal index notation in the CLI bijection).
 inline schema_attach_result check_name_not_digit_led(const schema_element &el)
 {
-    if(el.name.empty() || !std::isdigit(static_cast<unsigned char>(el.name.front())))
+    if(el.name.empty() || el.name.front() < '0' || el.name.front() > '9')
         return {};
     return unexpected(nucleus::format(
         "schema element '{}' has a digit-led name: element names must not "
@@ -100,17 +100,17 @@ inline schema_attach_result check_name_not_digit_led(const schema_element &el)
         el.name));
 }
 
-// The declared path pushes this name onto the parent path unparsed, so a name that is not one clean
-// segment records as one segment here and reads back as two in every consumer that re-parses the string.
+// The declared path pushes this name onto the parent path unparsed, and the CLI surface pushes it into
+// a completion word list that is EXPANDED and not merely split -- so a name is one bare, inert segment.
 inline schema_attach_result check_name_wellformed(const schema_element &el)
 {
     const bool clean = std::ranges::none_of(el.name, [](char c) {
-        return static_cast<std::uint8_t>(c) < 0x20 || c == 0x7f || c == ' ' || c == '[' || c == ']' || c == '<' || c == '>';
+        return static_cast<std::uint8_t>(c) < 0x20 || c == 0x7f || std::string_view(" !\"#$%&'()*:;<>?[\\]`{|}~").find(c) != std::string_view::npos;
     });
     if(const auto parsed = key_path::parse(el.name); clean && parsed && parsed->size() == 1)
         return {};
     return unexpected(nucleus::format(
-        "schema element '{}' has a malformed name: an element name is one path segment carrying no separator, space, bracket, markup or control character",
+        "schema element '{}' has a malformed name: an element name is one path segment carrying no separator, space, control character or shell metacharacter",
         escaped_text(el.name)));
 }
 

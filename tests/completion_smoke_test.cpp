@@ -1,3 +1,5 @@
+#include "nucleus/completion/zsh_emitter.h"
+#include "nucleus/completion/bash_emitter.h"
 #include "nucleus/completion/completion_generator.h"
 
 #include "nucleus/schema/anchor.h"
@@ -166,4 +168,30 @@ TEST_CASE("a space name places the ordinal wildcard on the segment the path reac
     REQUIRE(one.find("--a-node-*-port") != std::string::npos);
     const std::string none = generate_completion(shell::bash, reg, "myapp").value();
     REQUIRE(none.find("--node-*-port") != std::string::npos);
+}
+
+// `compgen -W` EXPANDS each word it produces, command substitution included, so a word list is a
+// code channel; the model is built here directly because the emitter owes that guarantee alone.
+TEST_CASE("a command substitution in a word list neither fires nor corrupts the candidate",
+          "[completion][smoke]")
+{
+    namespace fs = std::filesystem;
+    const fs::path sentinel = fs::temp_directory_path() / "nucleus_completion_sentinel";
+    fs::remove(sentinel);
+    const std::string payload = "a$(touch " + sentinel.string() + ")'`{x,y}b";
+
+    const nucleus::completion_model model{"myapp", {{"--" + payload, "d", {}},
+                                                   {"--v", "d", {payload, "other"}}}};
+    if(bash_available())
+    {
+        const std::string script = nucleus::bash_emitter{}.emit(model)
+            + "\nCOMP_WORDS=(myapp --a)\nCOMP_CWORD=1\n_myapp_complete\n"
+              "printf '%s\\n' \"${COMPREPLY[@]}\"\n"
+              "COMP_WORDS=(myapp --v = a)\nCOMP_CWORD=3\n_myapp_complete\n"
+              "printf '%s\\n' \"${COMPREPLY[@]}\"\n";
+        const std::string out = run_bash(script);
+        REQUIRE_FALSE(fs::exists(sentinel));
+        REQUIRE(out == "--" + payload + "\n" + payload + "\n");
+    }
+    REQUIRE(nucleus::zsh_emitter{}.emit(model).find("a\\$\\(touch\\ ") != std::string::npos);
 }

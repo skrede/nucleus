@@ -25,8 +25,12 @@ namespace nucleus {
 //   * The `:` word-break (e.g. a value containing a colon) is healed by a guarded
 //     `__ltrim_colon_completions`, which is present in bash-completion but may be
 //     absent; the call is guarded so the script degrades cleanly without it.
-//   * Quoting. Flag names and values are emitted inside single quotes with the
-//     `'\''` escape so an arbitrary value can never break out of the literal.
+//   * Quoting. Single-quoting the word list holds it to one literal in the parse of
+//     the SCRIPT, which is not the parse that matters: `compgen -W` EXPANDS every
+//     word it produces -- command substitution, parameter expansion and tilde
+//     expansion all run there. Each flag and value is therefore backslash-escaped
+//     for that second, runtime parse as well, here at the emitter and never on the
+//     word of a validator upstream.
 //   * The field separator. `compgen -W` splits its word list on IFS, and the
 //     unquoted command substitution that fills COMPREPLY splits again on the same
 //     characters -- so a value carrying a separator has to survive both. Each
@@ -84,7 +88,7 @@ public:
         out += "    fi\n";
         out += "\n";
         // Flag-name completion.
-        out += "    COMPREPLY=( $(compgen -W \"$flags\" -- \"$cur\") )\n";
+        out += "    local IFS=$'\\n'; COMPREPLY=( $(IFS=$' \\t\\n'; compgen -W \"$flags\" -- \"$cur\") )\n";
         out += "    __ltrim_colon_completions \"$cur\" 2>/dev/null\n";
         out += "    return 0\n";
         out += "}\n";
@@ -130,19 +134,23 @@ private:
         {
             if(i != 0)
                 out.push_back(' ');
-            out += options[i].flag;
+            out += word(options[i].flag);
         }
         return out;
     }
 
-    // Backslash-escape the characters that separate members of a word list, and the
-    // backslash itself so it cannot swallow the escape that follows it.
+    // Backslash-escape every character that still carries meaning where the word list
+    // is expanded: the separators that split it, the substitutions and expansions bash
+    // runs over each word it produces, and the quotes and braces that rewrite one word
+    // into several. '*' is deliberately left alone -- a word list is not glob-expanded,
+    // and the ordinal wildcard in a flag is the emitter's own syntax, not host text.
     static std::string word(const std::string &text)
     {
         std::string out;
         for(char const c : text)
         {
-            if(c == '\\' || c == ' ' || c == '\t' || c == '\n')
+            if(c == '\\' || c == ' ' || c == '\t' || c == '\n' || c == '$' || c == '`'
+               || c == '\'' || c == '"' || c == '!' || c == '~' || c == '{' || c == '}')
                 out.push_back('\\');
             out.push_back(c);
         }

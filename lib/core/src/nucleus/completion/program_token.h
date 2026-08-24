@@ -51,22 +51,30 @@ inline expected<void, error> check_program_token(std::string_view prog)
                         escaped_text(prog))});
 }
 
-// The space name becomes the leading segments of every completion entry, so a
-// well-formed name is exactly what the path parser accepts; a second predicate
-// beside it could drift and re-admit a name the join then carries through
-// unchecked. The parser's own message is not forwarded -- it quotes the offending
-// text raw, which is the forgery every diagnostic here escapes.
+inline bool is_space_segment(std::string_view segment)
+{
+    return !segment.empty() && is_program_token_lead(segment.front())
+        && std::ranges::all_of(segment, is_program_token_char);
+}
+
+// The space name becomes the leading segments of every completion entry, so it lands in
+// the same emitted word list the flags do -- and a word list is expanded, not merely
+// split. The path parser constrains a path's SHAPE and never the bytes a segment
+// carries, so each segment is held to the bare command-token grammar beside it rather
+// than to the parser alone. The parser's own message is not forwarded -- it quotes the
+// offending text raw, which is the forgery every diagnostic here escapes.
 inline expected<key_path, error> check_space_name(std::string_view space_name)
 {
     if(space_name.empty())
         return key_path{};
-    if(auto parsed = key_path::parse(space_name); parsed)
+    auto parsed = key_path::parse(space_name);
+    if(parsed && std::ranges::all_of(parsed->segments(), is_space_segment))
         return *std::move(parsed);
     return unexpected(error{errc::malformed_source,
-        nucleus::format("space name '{}' is not a well-formed key path: a path carries "
-                        "no empty segment and no leading or trailing '/', and a "
-                        "bracketed segment names a non-empty base and an ordinal of at "
-                        "most ten digits",
+        nucleus::format("space name '{}' is not a path of bare command tokens: a path carries "
+                        "no empty segment and no leading or trailing '/', and each segment "
+                        "opens with a letter, digit or '_' and carries only letters, digits, "
+                        "'.', '_' and '-'",
                         escaped_text(space_name))});
 }
 

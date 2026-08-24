@@ -152,7 +152,9 @@ TEST_CASE("an element name that is not a single clean path segment is refused at
     REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
 
     const std::vector<std::string> malformed{
-        "", "logging/level", "level[0]", "level]", "<level>", "lev\x7f" "el"};
+        "", "logging/level", "level[0]", "level]", "<level>", "lev\x7f" "el", "log$(id)x",
+        "log`id`x", "log;x", "log|x", "log&x", "log'x", "log\"x", "log(x", "log~x", "log{x}",
+        "log:x", "log*x", "log?x", "log#x", "log!x", "log\\x", "log%x"};
     for(const std::string &name : malformed)
     {
         auto refused = engine.register_element(
@@ -170,8 +172,10 @@ TEST_CASE("an element name that is not a single clean path segment is refused at
     REQUIRE(newline.error().message.find("lev\\nel") != std::string::npos);
     REQUIRE(newline.error().message.find('\n') == std::string::npos);
 
-    REQUIRE(engine.register_element(
-        nucleus::element("log_level.2", nucleus::anchor::keyspace(path_of("logging")))));
+    // '=' stays admitted: it is the one unrenderable key a schema can still declare.
+    for(const char *admitted : {"log_level.2", "bad=key", "log+x", "log,x"})
+        REQUIRE(engine.register_element(
+            nucleus::element(admitted, nucleus::anchor::keyspace(path_of("logging")))));
 }
 
 TEST_CASE("a declared name carrying a space is refused at registration", "[facade][schema]")

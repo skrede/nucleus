@@ -64,7 +64,7 @@ const std::string expected_bash =
     "        return 0\n"
     "    fi\n"
     "\n"
-    "    COMPREPLY=( $(compgen -W \"$flags\" -- \"$cur\") )\n"
+    "    local IFS=$'\\n'; COMPREPLY=( $(IFS=$' \\t\\n'; compgen -W \"$flags\" -- \"$cur\") )\n"
     "    __ltrim_colon_completions \"$cur\" 2>/dev/null\n"
     "    return 0\n"
     "}\n"
@@ -170,8 +170,8 @@ TEST_CASE("a value containing a quote cannot break out of the bash literal",
     REQUIRE(reg.attach(nucleus::enum_element("kind", anchor::keyspace(path_of("mode")),
                                      {"a'b"})));
     const std::string bash = generate_completion(shell::bash, reg, "myapp").value();
-    // The single quote is escaped via the close/escape/reopen idiom.
-    REQUIRE(bash.find("'a'\\''b'") != std::string::npos);
+    // Escaped once for the word-list expansion, then again out of the script literal.
+    REQUIRE(bash.find("'a\\'\\''b'") != std::string::npos);
 }
 
 // project() emits a wildcard entry for paths that cross a repeated container.

@@ -49,41 +49,49 @@ private:
     // a `(...)` value group; without, it is a bare presence flag.
     static std::string spec_for(const completion_option &opt)
     {
+        const std::string flag = word(opt.flag);
         const std::string desc = brackets(opt.description);
         if(opt.values.empty())
-            return opt.flag + "[" + desc + "]";
+            return flag + "[" + desc + "]";
 
         std::string group;
         for(std::size_t i = 0; i < opt.values.size(); ++i)
         {
             if(i != 0)
                 group.push_back(' ');
-            group += paren(opt.values[i]);
+            group += word(opt.values[i]);
         }
-        return opt.flag + "=[" + desc + "]:value:(" + group + ")";
+        return flag + "=[" + desc + "]:value:(" + group + ")";
     }
 
-    // Backslash-escape the characters that terminate a `[...]` description.
+    // Backslash-escape the characters that terminate a `[...]` description, and the
+    // backslash itself so a trailing one cannot swallow the terminator behind it.
     static std::string brackets(const std::string &text)
     {
         std::string out;
         for(char const c : text)
         {
-            if(c == '[' || c == ']' || c == ':')
+            if(c == '\\' || c == '[' || c == ']' || c == ':')
                 out.push_back('\\');
             out.push_back(c);
         }
         return out;
     }
 
-    // Backslash-escape the characters that have meaning inside a `(...)` value
-    // group: the group delimiters and the whitespace that separates members.
-    static std::string paren(const std::string &text)
+    // Every string the spec carries as a WORD -- a flag at its head, a member of a
+    // `(...)` value group -- is escaped here: the spec-grammar delimiters, the
+    // whitespace that separates members, and the substitutions and expansions zsh
+    // would otherwise run over the word once it reads it back out of the spec. The
+    // escape is unconditional; what a registration rule refuses is not this file's
+    // business, and assuming otherwise is what left the word list a code channel.
+    static std::string word(const std::string &text)
     {
         std::string out;
         for(char const c : text)
         {
-            if(c == '(' || c == ')' || c == ' ' || c == ':')
+            if(c == '\\' || c == ' ' || c == '\t' || c == '\n' || c == '$' || c == '`'
+               || c == '\'' || c == '"' || c == '!' || c == '~' || c == '{' || c == '}'
+               || c == '(' || c == ')' || c == '[' || c == ']' || c == ':')
                 out.push_back('\\');
             out.push_back(c);
         }
