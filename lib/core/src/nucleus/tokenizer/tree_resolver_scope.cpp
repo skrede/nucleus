@@ -3,6 +3,8 @@
 
 #include "nucleus/format.h"
 
+#include "nucleus/utility/escaped_text.h"
+
 #include <string>
 #include <utility>
 #include <cstddef>
@@ -118,13 +120,13 @@ token_result tree_resolver_scope::resolve_one_arm(std::string_view arm, bool is_
                 {
                     return unexpected(resolve_error(resolve_errc::unknown_category,
                         nucleus::format("unknown tree tokenizer category '{}'",
-                                        category)));
+                                        escaped_text(category))));
                 }
 
                 if(auto charged = m_budget.charge(); !charged)
                     return unexpected(std::move(charged).error());
-
-                auto entered = m_dispatch_guard.enter(nucleus::format("{}.{}", category, field));
+                auto entered = m_dispatch_guard.enter(
+                    nucleus::format("{}.{}", escaped_text(category), escaped_text(field)));
                 if(!entered)
                     return unexpected(std::move(entered).error());
                 const tree_tokenizer *tok = m_tree_tokenizer->find(category);
@@ -146,7 +148,7 @@ token_result tree_resolver_scope::resolve_one_arm(std::string_view arm, bool is_
     // instead; a quoted arm carries text that merely resembles a token.
     if(!is_fallback)
         return unexpected(resolve_error(resolve_errc::unknown_category,
-            nucleus::format("unrecognized token body '{}'", stripped)));
+            nucleus::format("unrecognized token body '{}'", escaped_text(stripped))));
 
     return std::string(stripped);
 }
@@ -171,8 +173,8 @@ token_result tree_resolver_scope::resolve_absolute(std::string_view path_body)
 {
     auto kp = key_path::parse(path_body);
     if(!kp)
-        return unexpected(resolve_error(resolve_errc::parse_error,
-                              nucleus::format("invalid abs: path '{}': {}", path_body, kp.error())));
+        return unexpected(resolve_error(resolve_errc::parse_error, nucleus::format(
+            "invalid abs: path '{}': {}", escaped_text(path_body), escaped_text(kp.error()))));
 
     if(auto charged = m_budget.charge(); !charged)
         return unexpected(std::move(charged).error());
@@ -188,7 +190,7 @@ token_result tree_resolver_scope::resolve_absolute(std::string_view path_body)
     const value *v = m_building.find(kp.value());
     if(v == nullptr)
         return unexpected(resolve_error(resolve_errc::missing_field,
-                              nucleus::format("absent reference target '{}'", path_body)));
+                              nucleus::format("absent reference target '{}'", escaped_text(path_body))));
 
     return std::string(v->text());
 }
@@ -215,7 +217,7 @@ token_result tree_resolver_scope::resolve_relative(std::string_view rel_body)
     if(v == nullptr)
         return unexpected(resolve_error(resolve_errc::missing_field,
                               nucleus::format("absent relative reference target '{}'",
-                                             target.str())));
+                                             escaped_text(target.str()))));
 
     return std::string(v->text());
 }
@@ -256,7 +258,7 @@ tree_resolver_scope::resolve_relative_path(std::string_view rel_body)
             if(base.empty())
                 return unexpected(resolve_error(resolve_errc::parse_error,
                     nucleus::format("relative reference '{}' walks above the "
-                                    "configuration root", rel_body)));
+                                    "configuration root", escaped_text(rel_body))));
             base = base.parent();
         }
         else if(seg == ".")

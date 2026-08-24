@@ -85,7 +85,7 @@ current working branch.
 | | Over the line ceiling | Over the function ceiling |
 |---|---|---|
 | Before the resolution-context and schema-registry decomposition | 46 units | 62 functions in 25 files |
-| Now | 44 units | 45 functions in 23 files |
+| Now | 45 units | 45 functions in 23 files |
 
 Two units left the register: `resolution_context.h` fell from 1890 lines to 196, and
 `schema_registry.h` from 534 to 178. The twenty-nine units split out of them are all inside both
@@ -163,14 +163,14 @@ None.
 | `lib/core/include/nucleus/config_space.h` | 296 |
 | `lib/core/src/nucleus/tokenizer/resolver_scope.cpp` | 291 |
 | `lib/core/src/nucleus/resolve/chain_walker.h` | 285 |
-| `lib/core/src/nucleus/tokenizer/tree_resolver_scope.cpp` | 275 |
+| `lib/core/src/nucleus/tokenizer/tree_resolver_scope.cpp` | 277 |
 | `lib/core/src/nucleus/completion/completion.cpp` | 239 |
 | `lib/argv/include/nucleus/argv/multispace_argv_source.h` | 232 |
 | `lib/core/include/nucleus/schema/schema.h` | 217 |
 
 ## Carried — test files over the 200-line ceiling
 
-29 of 157 units. Test units are held to the same ceiling.
+30 of 157 units. Test units are held to the same ceiling.
 
 | File | Lines |
 |---|---|
@@ -193,12 +193,13 @@ None.
 | `tests/schema_enforcer_test.cpp` | 272 |
 | `tests/token_resolution_test.cpp` | 245 |
 | `tests/discovery_test.cpp` | 240 |
+| `tests/completion_test.cpp` | 233 |
 | `tests/keyed_selection_test.cpp` | 232 |
 | `tests/expected_test.cpp` | 227 |
 | `tests/pkey_tokenizer_test.cpp` | 226 |
-| `tests/completion_test.cpp` | 223 |
 | `tests/source_stack_test.cpp` | 218 |
 | `tests/system_multi_source_test.cpp` | 214 |
+| `tests/completion_smoke_test.cpp` | 213 |
 | `tests/collection_shapes/identity_pool_scope_test.cpp` | 208 |
 | `tests/source_handle_test.cpp` | 204 |
 | `tests/instance_addressing_test.cpp` | 202 |

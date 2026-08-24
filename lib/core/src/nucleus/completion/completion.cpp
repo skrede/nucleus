@@ -122,13 +122,13 @@ completion_model project(const schema_registry &schema, std::string_view prog,
             if(!prefix.empty())
                 prefix += key_path::separator;
             prefix += seg;
-            if(repeated_containers.contains(prefix) && depth < path.size())
+            if(repeated_containers.contains(prefix) && depth > anchor.size())
             {
                 // depth counts full-path segments; the flag counts effective-path
-                // segments, which drop the anchor prefix and gain the space name.
-                const std::size_t anchor_offset   = anchor.empty() ? 0 : anchor.size();
-                const std::size_t space_offset    = space.size();
-                const std::size_t effective_depth = depth - anchor_offset + space_offset;
+                // segments, which drop the anchor prefix and gain the space name. A
+                // crossing at or above the anchor is refused above: it has no position
+                // in the flag, and the subtraction would wrap into a duplicate of it.
+                const std::size_t effective_depth = depth - anchor.size() + space.size();
 
                 completion_option wild;
                 wild.flag = wildcard_flag(effective, effective_depth, delimiter);

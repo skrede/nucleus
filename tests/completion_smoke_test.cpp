@@ -11,6 +11,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
+#include <vector>
 #include <cstdio>
 #include <string>
 #include <cstdlib>
@@ -170,28 +171,43 @@ TEST_CASE("a space name places the ordinal wildcard on the segment the path reac
     REQUIRE(none.find("--node-*-port") != std::string::npos);
 }
 
-// `compgen -W` EXPANDS each word it produces, command substitution included, so a word list is a
-// code channel; the model is built here directly because the emitter owes that guarantee alone.
-TEST_CASE("a command substitution in a word list neither fires nor corrupts the candidate",
+// `compgen -W` EXPANDS every word it produces, so a word list is a code channel. The payloads are
+// chosen from what a shell does to a word rather than from what the emitter escapes -- a set drawn
+// from the escaper's own character list agrees with it by construction and can falsify nothing.
+// The three that can run a command each write the sentinel; the fourth gathers what only rewrites a
+// word -- tilde, arithmetic and brace expansion, redirection, control operators, a bidi override.
+TEST_CASE("no shell construct in a word list fires or corrupts the candidate",
           "[completion][smoke]")
 {
     namespace fs = std::filesystem;
     const fs::path sentinel = fs::temp_directory_path() / "nucleus_completion_sentinel";
-    fs::remove(sentinel);
-    const std::string payload = "a$(touch " + sentinel.string() + ")'`{x,y}b";
-
-    const nucleus::completion_model model{"myapp", {{"--" + payload, "d", {}},
-                                                   {"--v", "d", {payload, "other"}}}};
-    if(bash_available())
+    const std::string s = sentinel.string();
+    const std::vector<std::string> payloads{
+        "a<(:>" + s + ")b",     // process substitution
+        "a$(touch " + s + ")b", // command substitution
+        "a`touch " + s + "`b",  // its backquoted spelling
+        "~root/z$((6*7)){x,y}>q&r;t|u\xe2\x80\xae" "b"};
+    nucleus::completion_model model{"myapp", {{"--v", "d", payloads}}};
+    std::string expected = "--v\n";
+    for(const std::string &payload : payloads)
     {
-        const std::string script = nucleus::bash_emitter{}.emit(model)
-            + "\nCOMP_WORDS=(myapp --a)\nCOMP_CWORD=1\n_myapp_complete\n"
-              "printf '%s\\n' \"${COMPREPLY[@]}\"\n"
-              "COMP_WORDS=(myapp --v = a)\nCOMP_CWORD=3\n_myapp_complete\n"
-              "printf '%s\\n' \"${COMPREPLY[@]}\"\n";
-        const std::string out = run_bash(script);
-        REQUIRE_FALSE(fs::exists(sentinel));
-        REQUIRE(out == "--" + payload + "\n" + payload + "\n");
+        model.options.push_back({"--" + payload, "d", {}});
+        expected += "--" + payload + "\n";
     }
-    REQUIRE(nucleus::zsh_emitter{}.emit(model).find("a\\$\\(touch\\ ") != std::string::npos);
+    // No zsh interpreter is assumed to exist here, so the zsh half is pinned by text alone.
+    REQUIRE(nucleus::zsh_emitter{}.emit(model).find("a<(") == std::string::npos);
+    if(!bash_available())
+        return;
+
+    fs::remove(sentinel);
+    const std::string script = nucleus::bash_emitter{}.emit(model)
+        + "\nCOMP_WORDS=(myapp -)\nCOMP_CWORD=1\n_myapp_complete\n"
+          "printf '%s\\n' \"${COMPREPLY[@]}\"\n"
+          "COMP_WORDS=(myapp --v = \"\")\nCOMP_CWORD=3\n_myapp_complete\n"
+          "printf '%s\\n' \"${COMPREPLY[@]}\"\n";
+    const std::string out = run_bash(script);
+    REQUIRE_FALSE(fs::exists(sentinel));
+    for(const std::string &payload : payloads)
+        expected += payload + "\n";
+    REQUIRE(out == expected);
 }

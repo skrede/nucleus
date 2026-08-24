@@ -192,7 +192,7 @@ TEST_CASE("a resolver's output is expanded or reported, never rewritten",
           "[reference][tree][produced]")
 {
     CHECK(produced("plain") == "plain");
-    CHECK(produced("PREFIX=${HOME}/bin").find("unrecognized token body 'HOME'")
+    CHECK(produced("PREFIX=${HO\x1b[2JME}/bin").find("unrecognized token body 'HO\\x1b[2JME'")
           != std::string::npos);
     CHECK(produced("${\"PREFIX=${HOME}/bin\"}") == "PREFIX=${HOME}/bin");
     CHECK(produced("literal ${ brace").find("unterminated") != std::string::npos);

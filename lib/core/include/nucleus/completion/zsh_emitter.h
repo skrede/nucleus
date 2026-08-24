@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 #include <cstddef>
+#include <cstdint>
+#include <string_view>
 
 namespace nucleus {
 
@@ -79,19 +81,25 @@ private:
     }
 
     // Every string the spec carries as a WORD -- a flag at its head, a member of a
-    // `(...)` value group -- is escaped here: the spec-grammar delimiters, the
-    // whitespace that separates members, and the substitutions and expansions zsh
-    // would otherwise run over the word once it reads it back out of the spec. The
-    // escape is unconditional; what a registration rule refuses is not this file's
-    // business, and assuming otherwise is what left the word list a code channel.
+    // `(...)` value group -- is escaped here against an allowlist rather than a list of
+    // dangerous characters: a byte survives unescaped only by being in the safe set, and
+    // every other byte is backslashed. That covers the spec-grammar delimiters, the
+    // whitespace separating members, and the expansions zsh runs over a word once it reads
+    // it back out of the spec, without any of them having been thought of first. The safe
+    // set is the bash emitter's without `:`, which separates the fields of an `_arguments`
+    // spec. The escape is unconditional; what a registration rule refuses is not this
+    // file's business, and assuming otherwise is what left the word list a code channel.
     static std::string word(const std::string &text)
     {
+        static constexpr std::string_view safe_punctuation = "-_./=+,@%*";
         std::string out;
         for(char const c : text)
         {
-            if(c == '\\' || c == ' ' || c == '\t' || c == '\n' || c == '$' || c == '`'
-               || c == '\'' || c == '"' || c == '!' || c == '~' || c == '{' || c == '}'
-               || c == '(' || c == ')' || c == '[' || c == ']' || c == ':')
+            const bool safe = static_cast<std::uint8_t>(c) < 0x7f
+                           && ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                               || (c >= '0' && c <= '9')
+                               || safe_punctuation.find(c) != std::string_view::npos);
+            if(!safe)
                 out.push_back('\\');
             out.push_back(c);
         }

@@ -36,13 +36,15 @@ struct inherit_declaration
     std::string path; // non-empty only when which == parent_path
 };
 
-// The host-injectable policy governing chain walking. admissibility is invoked
-// for each candidate parent source before that source is projected or read, so a
-// refused parent is never pulled and its own ancestors are never constructed;
-// returning a non-empty string rejects that source and fails the load with the
-// returned reason. Returning an empty string admits the source. The default (null
-// admissibility) admits all sources. depth_cap is the maximum inheritance chain
-// depth before the walker fails loudly; default is 16.
+// The host-injectable policy governing chain walking. admissibility is invoked for
+// each candidate parent once the walker has built its handle through the host's
+// factory, and before that source is projected, pulled or recursed into, so a refused
+// parent contributes nothing and its own ancestors are never constructed. Any I/O the
+// factory itself performs to build the handle has already happened by then, and a
+// refusal does not undo it. Returning a non-empty string rejects that source and fails
+// the load with the returned reason. Returning an empty string admits the source. The
+// default (null admissibility) admits all sources. depth_cap is the maximum
+// inheritance chain depth before the walker fails loudly; default is 16.
 struct inherit_policy
 {
     // Returns a non-empty rejection reason if the candidate source is not

@@ -221,3 +221,13 @@ TEST_CASE("completion wildcard does not appear for non-repeated schema",
     // fixture() has no repeated container -- no wildcard should be present.
     REQUIRE(bash.find("-*-") == std::string::npos);
 }
+
+// An anchor below the repeated container leaves the crossing no position in the flag.
+// The subtraction that computed one used to wrap, emitting the flag a second time.
+TEST_CASE("an anchor below the repeated container emits no duplicate flag",
+          "[completion][repeated_container]")
+{
+    const std::string bash = generate_completion(shell::bash, repeated_cluster_registry(), "myapp",
+                                                 {}, path_of("cluster/node/endpoint")).value();
+    REQUIRE(bash.find("local flags='--port'\n") != std::string::npos);
+}

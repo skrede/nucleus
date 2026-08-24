@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 #include <cstddef>
+#include <cstdint>
+#include <string_view>
 
 namespace nucleus {
 
@@ -27,10 +29,11 @@ namespace nucleus {
 //     absent; the call is guarded so the script degrades cleanly without it.
 //   * Quoting. Single-quoting the word list holds it to one literal in the parse of
 //     the SCRIPT, which is not the parse that matters: `compgen -W` EXPANDS every
-//     word it produces -- command substitution, parameter expansion and tilde
-//     expansion all run there. Each flag and value is therefore backslash-escaped
-//     for that second, runtime parse as well, here at the emitter and never on the
-//     word of a validator upstream.
+//     word it produces -- brace, tilde, parameter and arithmetic expansion, command
+//     substitution and process substitution all run at that second, runtime stage.
+//     Each flag and value is therefore escaped for that stage here at the emitter,
+//     never on the word of a validator upstream, and escaped against an ALLOWLIST so
+//     that no construct anyone has to think of first survives into it.
 //   * The field separator. `compgen -W` splits its word list on IFS, and the
 //     unquoted command substitution that fills COMPREPLY splits again on the same
 //     characters -- so a value carrying a separator has to survive both. Each
@@ -139,18 +142,26 @@ private:
         return out;
     }
 
-    // Backslash-escape every character that still carries meaning where the word list
-    // is expanded: the separators that split it, the substitutions and expansions bash
-    // runs over each word it produces, and the quotes and braces that rewrite one word
-    // into several. '*' is deliberately left alone -- a word list is not glob-expanded,
-    // and the ordinal wildcard in a flag is the emitter's own syntax, not host text.
+    // Enumerating what a shell does to a word is a guess, and a word list is a code
+    // channel, so the test runs the other way: a byte survives unescaped only by being in
+    // the safe set, and every other byte -- control bytes and everything at or above 0x7f
+    // included -- is backslashed. A backslashed byte is exempt from every expansion
+    // `compgen -W` performs and its backslash is dropped by quote removal, so a multi-byte
+    // sequence escaped byte by byte reads back identical. `*` is safe because `compgen -W`
+    // does no pathname expansion: escaping it is consumed with no effect on the candidate,
+    // and the ordinal wildcard stays readable in the emitted script. A newline is the one
+    // byte this encoding cannot carry, since a backslash before it is a line continuation.
     static std::string word(const std::string &text)
     {
+        static constexpr std::string_view safe_punctuation = "-_./=+,:@%*";
         std::string out;
         for(char const c : text)
         {
-            if(c == '\\' || c == ' ' || c == '\t' || c == '\n' || c == '$' || c == '`'
-               || c == '\'' || c == '"' || c == '!' || c == '~' || c == '{' || c == '}')
+            const bool safe = static_cast<std::uint8_t>(c) < 0x7f
+                           && ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                               || (c >= '0' && c <= '9')
+                               || safe_punctuation.find(c) != std::string_view::npos);
+            if(!safe)
                 out.push_back('\\');
             out.push_back(c);
         }
