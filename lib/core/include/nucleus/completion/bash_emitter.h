@@ -34,12 +34,15 @@ namespace nucleus {
 //     Each flag and value is therefore escaped for that stage here at the emitter,
 //     never on the word of a validator upstream, and escaped against an ALLOWLIST so
 //     that no construct anyone has to think of first survives into it.
-//   * The field separator. `compgen -W` splits its word list on IFS, and the
-//     unquoted command substitution that fills COMPREPLY splits again on the same
-//     characters -- so a value carrying a separator has to survive both. Each
-//     value backslash-escapes its own separators for the first split, and the
-//     assignment narrows IFS to a newline for the second while restoring the
-//     default inside the substitution, where compgen still needs it.
+//   * The field separator, and pathname expansion. `compgen -W` splits its word list
+//     on IFS, and the unquoted command substitution that fills COMPREPLY splits again
+//     on the same characters -- so a value carrying a separator has to survive both.
+//     Each value backslash-escapes its own separators for the first split, and the
+//     assignment narrows IFS to a newline for the second while restoring the default
+//     inside the substitution, where compgen still needs it. That same unquoted
+//     substitution also GLOBS what it produces, which nothing escaped at the emitter
+//     can reach because compgen has already consumed the backslash -- so the
+//     assignment runs with globbing suppressed and puts the caller's setting back.
 //
 // None of this leaks back into the generator or the model.
 class bash_emitter final : public shell_emitter
@@ -79,9 +82,7 @@ public:
             if(opt.values.empty())
                 continue;
             out += "        " + single_quote(opt.flag) + ")\n";
-            out += "            local IFS=$'\\n'; COMPREPLY=( $(IFS=$' \\t\\n'; compgen -W "
-                   + single_quote(join_values(opt.values))
-                   + " -- \"$val\") )\n";
+            out += reply_assignment("            ", single_quote(join_values(opt.values)), "$val");
             out += "            __ltrim_colon_completions \"$cur\" 2>/dev/null\n";
             out += "            return 0\n";
             out += "            ;;\n";
@@ -91,7 +92,7 @@ public:
         out += "    fi\n";
         out += "\n";
         // Flag-name completion.
-        out += "    local IFS=$'\\n'; COMPREPLY=( $(IFS=$' \\t\\n'; compgen -W \"$flags\" -- \"$cur\") )\n";
+        out += reply_assignment("    ", "\"$flags\"", "$cur");
         out += "    __ltrim_colon_completions \"$cur\" 2>/dev/null\n";
         out += "    return 0\n";
         out += "}\n";
@@ -100,6 +101,17 @@ public:
     }
 
 private:
+    // The one place globbing is suppressed and restored. `case $-` reads the caller's setting
+    // portably, where `local -` would need bash 4.4 -- above the floor this script supports.
+    static std::string reply_assignment(const std::string &pad, const std::string &words,
+                                        const std::string &current)
+    {
+        return pad + "local noglob=0; case $- in *f*) noglob=1 ;; esac; set -f\n"
+             + pad + "local IFS=$'\\n'; COMPREPLY=( $(IFS=$' \\t\\n'; compgen -W "
+             + words + " -- \"" + current + "\") )\n"
+             + pad + "if [ \"$noglob\" = 0 ]; then set +f; fi\n";
+    }
+
     // bash single-quote escaping: close the quote, emit an escaped quote, reopen.
     static std::string single_quote(const std::string &text)
     {

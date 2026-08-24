@@ -116,8 +116,8 @@ example tree goes further and may register nothing at all, line counts included 
 example table is the policy, not a gap in the measurements.
 
 The test-file table is the single entry either tree has, and it records line counts only. Those
-twenty-nine units are carried debt awaiting a reorganization of the tree, and that table is expected
-to shrink rather than grow.
+thirty units are carried debt awaiting a reorganization of the tree, and that table is expected to
+shrink rather than grow; where it has grown, the reason sits beside it.
 
 What the policy costs is a ratchet, and the ratchet is the point. Because no row can be added, the
 gate refuses any change whose file listing contains an example unit with an over-ceiling function,
@@ -172,8 +172,16 @@ None.
 
 30 of 157 units. Test units are held to the same ceiling.
 
-| File | Lines |
-|---|---|
+Two rows here rose to close the pathname expansion the generated bash completion performed
+over its own candidates. `tests/completion_test.cpp` grew by the six emitted lines the pinned
+golden now carries, which is the whole point of pinning it: a change to the emitted script
+that does not move the golden is a change no reviewer sees.
+`tests/completion_smoke_test.cpp` grew by three cases that drive the generated script under a
+real shell with the working directory seeded to match a candidate. The defect was invisible to
+every text assertion that file already held — the emitted text was correct and the shell
+rewrote it one stage later — so a shorter test here is one that proves nothing, and
+compressing a case means dropping the seeding that is the case.
+
 | `tests/inherit_chain_test.cpp` | 1118 |
 | `tests/repeated_container_test.cpp` | 815 |
 | `tests/typed_element_test.cpp` | 809 |
@@ -188,18 +196,18 @@ None.
 | `tests/selector_test.cpp` | 315 |
 | `tests/constraint_group_test.cpp` | 305 |
 | `tests/load_front_door_test.cpp` | 289 |
+| `tests/completion_smoke_test.cpp` | 288 |
 | `tests/keyed_composition_test.cpp` | 286 |
 | `tests/resolution_test.cpp` | 278 |
 | `tests/schema_enforcer_test.cpp` | 272 |
 | `tests/token_resolution_test.cpp` | 245 |
 | `tests/discovery_test.cpp` | 240 |
-| `tests/completion_test.cpp` | 233 |
+| `tests/completion_test.cpp` | 237 |
 | `tests/keyed_selection_test.cpp` | 232 |
 | `tests/expected_test.cpp` | 227 |
 | `tests/pkey_tokenizer_test.cpp` | 226 |
 | `tests/source_stack_test.cpp` | 218 |
 | `tests/system_multi_source_test.cpp` | 214 |
-| `tests/completion_smoke_test.cpp` | 213 |
 | `tests/collection_shapes/identity_pool_scope_test.cpp` | 208 |
 | `tests/source_handle_test.cpp` | 204 |
 | `tests/instance_addressing_test.cpp` | 202 |
@@ -241,8 +249,8 @@ sets the decomposition problem.
 | `lib/core/include/nucleus/query/schema_query_context.h` | 2 | 58 |
 | `lib/argv/include/nucleus/argv/cli_surface.h` | 1 | 57 |
 | `lib/core/src/nucleus/tokenizer/token_lexer.cpp` | 5 | 57 |
-| `lib/core/include/nucleus/completion/bash_emitter.h` | 1 | 53 |
 | `lib/core/include/nucleus/config.h` | 1 | 52 |
+| `lib/core/include/nucleus/completion/bash_emitter.h` | 1 | 51 |
 | `lib/core/include/nucleus/config_source/feature_gate.h` | 2 | 47 |
 | `lib/argv/include/nucleus/argv/argv_source.h` | 1 | 42 |
 | `lib/core/src/nucleus/resolve/configuration_space.cpp` | 5 | 41 |

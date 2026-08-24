@@ -211,3 +211,78 @@ TEST_CASE("no shell construct in a word list fires or corrupts the candidate",
         expected += payload + "\n";
     REQUIRE(out == expected);
 }
+
+namespace {
+
+// Drives the generated completer with the working directory set to a scratch tree holding
+// `decoys`, so a candidate the shell would glob has something in reach to be replaced by.
+std::string run_seeded(const std::string &completion, const std::string &drive,
+                       const std::vector<std::string> &decoys)
+{
+    namespace fs = std::filesystem;
+    const fs::path dir = fs::temp_directory_path() / "nucleus_completion_glob";
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    for(const std::string &decoy : decoys)
+        std::ofstream(dir / decoy);
+    const std::string out = run_bash("cd '" + dir.string() + "' || exit 1\n" + completion + drive);
+    fs::remove_all(dir);
+    return out;
+}
+
+}
+
+// The ordinal wildcard needs no host cooperation to be glob-expanded: it is the emitter's own
+// text, and every repeated-container schema emits one.
+TEST_CASE("a directory holding the ordinal wildcard's matches cannot replace it",
+          "[completion][smoke]")
+{
+    if(!bash_available())
+        SKIP("bash not found on PATH -- driving the generated script needs it");
+
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::repeated_element("node", anchor::root())));
+    REQUIRE(reg.attach(nucleus::element("port", anchor::keyspace(path_of("node")))));
+
+    const std::string out = run_seeded(
+        generate_completion(shell::bash, reg, "myapp").value(),
+        "\nCOMP_WORDS=(myapp --node)\nCOMP_CWORD=1\n_myapp_complete\n"
+        "printf '%s\\n' \"${COMPREPLY[@]}\"\n",
+        {"--node-7-port", "--node-9-port"});
+    REQUIRE(out == "--node\n--node-port\n--node-*-port\n");
+}
+
+TEST_CASE("an allowed value carrying a glob is offered literally", "[completion][smoke]")
+{
+    if(!bash_available())
+        SKIP("bash not found on PATH -- driving the generated script needs it");
+
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::element("region", anchor::root())));
+    REQUIRE(reg.attach(nucleus::enum_element("zone", anchor::keyspace(path_of("region")),
+                                     {"*", "us-east"})));
+
+    const std::string out = run_seeded(
+        generate_completion(shell::bash, reg, "myapp").value(),
+        "\nCOMP_WORDS=(myapp --region-zone = \"\")\nCOMP_CWORD=3\n_myapp_complete\n"
+        "printf '%s\\n' \"${COMPREPLY[@]}\"\n",
+        {"all", "any"});
+    REQUIRE(out == "*\nus-east\n");
+}
+
+// Suppressing the glob is a change to the shell the completer is invoked from, so it has to be
+// undone -- and only when this function was what made it.
+TEST_CASE("driving the completion leaves the caller's glob setting as it found it",
+          "[completion][smoke]")
+{
+    if(!bash_available())
+        SKIP("bash not found on PATH -- driving the generated script needs it");
+
+    const std::string completion = generate_completion(shell::bash, fixture(), "myapp").value();
+    const std::string drive =
+        "\nbefore=$-\nCOMP_WORDS=(myapp --log)\nCOMP_CWORD=1\n_myapp_complete\n"
+        "COMP_WORDS=(myapp --logging-level = \"\")\nCOMP_CWORD=3\n_myapp_complete\n"
+        "if [ \"$-\" = \"$before\" ]; then echo kept; else echo \"$before -> $-\"; fi\n";
+    REQUIRE(run_bash("set +f\n" + completion + drive) == "kept\n");
+    REQUIRE(run_bash("set -f\n" + completion + drive) == "kept\n");
+}
