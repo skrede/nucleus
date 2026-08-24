@@ -15,6 +15,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 #include <utility>
 
 using nucleus::anchor;
@@ -80,17 +81,41 @@ TEST_CASE("a second build() on a spent builder reports sealed_builder",
     CHECK(resealed.error().message.find("already been built") != std::string::npos);
 }
 
-TEST_CASE("name() on a spent builder still chains and its fault surfaces at the next build()",
+TEST_CASE("a name() refused after the seal is observable without a second build()",
+          "[builder][lifecycle]")
+{
+    nucleus::config_space_builder builder;
+    builder.name("early");
+    nucleus::config_space space = nucleus::builder_result_test::built(builder);
+    (void)space;
+    REQUIRE(builder.conflicts().empty());
+
+    // The sequence a host actually writes: seal once, then name, and never seal again.
+    builder.name("late");
+
+    const std::vector<nucleus::conflict_report> reports = builder.conflicts();
+    REQUIRE(reports.size() == 1);
+    const std::string text = reports[0].describe();
+    CHECK(text.find("name('late')") != std::string::npos);
+    CHECK(text.find("'early'") != std::string::npos);
+}
+
+TEST_CASE("two refused namings are both retained and carry the escaped name",
           "[builder][lifecycle]")
 {
     nucleus::config_space_builder builder;
     nucleus::config_space space = nucleus::builder_result_test::built(builder);
     (void)space;
 
-    const auto resealed = builder.name("late").build();
-    REQUIRE_FALSE(resealed);
-    CHECK(resealed.error().code == nucleus::errc::sealed_builder);
-    CHECK(resealed.error().message.find("name('late')") != std::string::npos);
+    REQUIRE(&builder.name("first").name("se\ncond") == &builder);
+
+    const std::vector<nucleus::conflict_report> reports = builder.conflicts();
+    REQUIRE(reports.size() == 1);
+    REQUIRE(reports[0].size() == 3);
+    const std::string text = reports[0].describe();
+    CHECK(text.find("name('first')") != std::string::npos);
+    CHECK(text.find("name('se\\ncond')") != std::string::npos);
+    CHECK(text.find('\n' + std::string("cond")) == std::string::npos);
 }
 
 TEST_CASE("config_space_builder move transfers builder state to the moved-to builder",

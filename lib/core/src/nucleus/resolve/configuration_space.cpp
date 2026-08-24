@@ -113,8 +113,27 @@ struct space_core
 class config_space_builder::impl : public space_core
 {
 public:
+    // A name() call on a sealed builder cannot alter the space build() already
+    // produced, so the refusal is accumulated here and surfaced through conflicts()
+    // instead of being dropped: a later refusal joins the report rather than
+    // displacing an earlier one.
+    void note_naming_refusal(const std::string &space_name)
+    {
+        if(!naming.has_value())
+        {
+            naming.emplace("the space name");
+            naming->add(claimant{
+                nucleus::format("build() sealed the space as '{}'", escaped_text(name)),
+                owner_token{}});
+        }
+        naming->add(claimant{
+            nucleus::format("name('{}') refused: the builder is already sealed",
+                escaped_text(space_name)),
+            owner_token{}});
+    }
+
     bool built = false;
-    std::string naming_fault;
+    std::optional<conflict_report> naming;
 };
 
 // The sealed space's state: the shared core, default-constructed (core tokenizers
@@ -395,8 +414,7 @@ registration_result config_space_builder::register_converter(
 config_space_builder &config_space_builder::name(std::string space_name)
 {
     if(m_impl->built)
-        m_impl->naming_fault = nucleus::format("; name('{}') was refused for the same reason",
-            escaped_text(space_name));
+        m_impl->note_naming_refusal(space_name);
     else
         m_impl->name = std::move(space_name);
     return *this;
@@ -408,13 +426,19 @@ std::size_t config_space_builder::tokenizer_count() const noexcept { return m_im
 
 std::size_t config_space_builder::converter_count() const noexcept { return m_impl->converters.size(); }
 
-std::vector<conflict_report> config_space_builder::conflicts() const { return m_impl->conflicts(); }
+std::vector<conflict_report> config_space_builder::conflicts() const
+{
+    std::vector<conflict_report> out = m_impl->conflicts();
+    if(m_impl->naming.has_value())
+        out.push_back(*m_impl->naming);
+    return out;
+}
 
 expected<config_space, error> config_space_builder::build()
 {
     if(m_impl->built)
         return unexpected(error{errc::sealed_builder,
-            "build() is not allowed: the builder has already been built" + m_impl->naming_fault});
+            "build() is not allowed: the builder has already been built"});
 
     // Auto-register a pkey tree tokenizer for every identity element.
     // If the host already registered a tokenizer for this category, skip

@@ -165,9 +165,9 @@ public:
     std::size_t tokenizer_count() const noexcept;
     std::size_t converter_count() const noexcept;
 
-    // Key-path collisions detected during registration: each report names the key
-    // and every claimant (location + owner token) WITHOUT choosing a winner. The
-    // host adjudicates. Empty when none occurred.
+    // Key-path collisions detected during registration, plus any name() refused after
+    // build(): each report names the key and every claimant (location + owner token)
+    // WITHOUT choosing a winner. The host adjudicates. Empty when none occurred.
     std::vector<conflict_report> conflicts() const;
 
     // Sets the space name -- the identity each source format validates at its boundary
@@ -178,7 +178,8 @@ public:
     // copying the three registries + policy + ledger into the sealed product and
     // marking the builder spent. After build(), every register_* / install_* /
     // set_registration_policy is a LOUD state-machine error, a second build() reports
-    // sealed_builder, and a name() refused meanwhile is reported by that same build().
+    // sealed_builder, and a name() refused meanwhile is recorded in conflicts() --
+    // never a silent no-op.
     expected<config_space, error> build();
 
 private:

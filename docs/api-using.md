@@ -93,8 +93,9 @@ expected<config_space, error> build();   // seals; the builder is spent afterwar
 - After `build()`, every `register_*` / `install_*` call is a loud state-machine
   error (`errc::sealed_builder`), never a silent no-op.
 - A second `build()` reports `errc::sealed_builder` through the value it returns.
-  `name()` on a spent builder still returns the builder, so a chain compiles; it
-  records the refusal and the next `build()` reports it alongside its own.
+  `name()` on a spent builder still returns the builder, so a chain compiles; the
+  refusal is recorded as a `conflict_report` and read back through `conflicts()`,
+  which accumulates, so a later refusal never displaces an earlier one.
 
 See [`examples/basics/quickstart.cpp`](../examples/basics/quickstart.cpp).
 
