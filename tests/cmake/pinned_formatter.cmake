@@ -1,0 +1,50 @@
+include_guard(GLOBAL)
+
+set(nucleus_format_package clang-format-18)
+string(REGEX REPLACE "^.*-" "" nucleus_format_major "${nucleus_format_package}")
+
+function(format_tool_version exe out_major)
+    set(${out_major} "" PARENT_SCOPE)
+    execute_process(COMMAND "${exe}" --version
+        RESULT_VARIABLE status OUTPUT_VARIABLE reported ERROR_QUIET)
+    if(status EQUAL 0 AND reported MATCHES "([0-9]+)\\.[0-9]+\\.[0-9]+")
+        set(${out_major} "${CMAKE_MATCH_1}" PARENT_SCOPE)
+    endif()
+endfunction()
+
+# Resolution picks between two modes instead of simply refusing, because the gate that calls it
+# also configures, builds, runs the complete test suite, executes every example binary, asserts
+# their output contracts, runs the size gate and verifies the ledger. Refusing on the formatter's
+# version would take all of that away from a contributor whose distribution ships a different one,
+# rather than only the format step. The blocking check on a pull request remains the thing that
+# decides, and it is the only caller that sets NUCLEUS_GATE_AUTHORITATIVE.
+function(resolve_pinned_formatter out_exe out_status)
+    find_program(nucleus_format_exe NAMES ${nucleus_format_package} clang-format)
+    set(found "")
+    if(nucleus_format_exe)
+        format_tool_version("${nucleus_format_exe}" found)
+        set(detail "${nucleus_format_exe} reports major version ${found}")
+    else()
+        set(detail "no formatter was found")
+    endif()
+    if(found STREQUAL "${nucleus_format_major}")
+        set(${out_exe} "${nucleus_format_exe}" PARENT_SCOPE)
+        set(${out_status} "" PARENT_SCOPE)
+        return()
+    endif()
+    set(reason "the format check needs major version ${nucleus_format_major}, and ${detail}; install ${nucleus_format_package}")
+    if(NUCLEUS_GATE_AUTHORITATIVE)
+        message(FATAL_ERROR "${reason}")
+    endif()
+    message(WARNING "${reason}\nevery other step of this gate still runs; the format step is not verified")
+    set(${out_exe} "" PARENT_SCOPE)
+    set(${out_status} "${reason}" PARENT_SCOPE)
+endfunction()
+
+function(run_format_check exe files_var)
+    execute_process(COMMAND "${exe}" --dry-run --Werror ${${files_var}}
+        RESULT_VARIABLE status ERROR_VARIABLE stderr)
+    if(NOT status EQUAL 0)
+        message(FATAL_ERROR "clang-format failed with status ${status}\n${stderr}")
+    endif()
+endfunction()

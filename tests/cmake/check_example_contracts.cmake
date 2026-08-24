@@ -8,9 +8,11 @@ endforeach()
 get_filename_component(source_dir "${NUCLEUS_SOURCE_DIR}" ABSOLUTE)
 get_filename_component(build_dir "${NUCLEUS_BUILD_DIR}" ABSOLUTE)
 
+include("${CMAKE_CURRENT_LIST_DIR}/pinned_formatter.cmake")
+
 find_program(ctest_exe NAMES ctest REQUIRED)
-find_program(format_exe NAMES clang-format REQUIRED)
 find_program(git_exe NAMES git REQUIRED)
+resolve_pinned_formatter(format_exe format_declined)
 
 function(run_checked output label)
     execute_process(COMMAND ${ARGN}
@@ -108,8 +110,13 @@ set(format_files)
 foreach(file IN LISTS cpp_files)
     list(APPEND format_files "${source_dir}/${file}")
 endforeach()
-run_checked(format_output "clang-format" "${format_exe}" --dry-run --Werror ${format_files})
-set(size_files ${format_files} "${source_dir}/examples/CMakeLists.txt" "${source_dir}/tests/cmake/check_example_contracts.cmake")
+if(format_declined STREQUAL "")
+    run_format_check("${format_exe}" format_files)
+endif()
+set(size_files ${format_files}
+    "${source_dir}/examples/CMakeLists.txt"
+    "${source_dir}/tests/cmake/check_example_contracts.cmake"
+    "${source_dir}/tests/cmake/pinned_formatter.cmake")
 run_checked(size_output "local size gate" ${CMAKE_COMMAND}
     "-DNUCLEUS_SIZE_FILES=${size_files}" -P "${source_dir}/tests/cmake/check_local_size_growth.cmake")
 
@@ -163,3 +170,6 @@ if(NOT measured_count EQUAL 33 OR NOT recorded_count EQUAL 33 OR NOT "${measured
 endif()
 run_checked(diff_output "git diff --check" "${git_exe}" -C "${source_dir}" diff --check)
 message(STATUS "example contracts passed: 8 focused tests, complete CTest suite, and 33 executables")
+if(NOT format_declined STREQUAL "")
+    message(WARNING "the format step above was not verified: ${format_declined}")
+endif()

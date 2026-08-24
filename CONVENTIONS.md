@@ -27,9 +27,16 @@ The rules a change is reviewed against. Several are enforced mechanically
 
 ## Formatting
 
-`.clang-format` (derived from the project's CLion code style; needs
-clang-format 17+) is authoritative for layout; the include order below is the
-one rule it cannot express, so `SortIncludes` is off. The shape it encodes:
+`.clang-format` (derived from the project's CLion code style) is authoritative
+for layout; the include order below is the one rule it cannot express, so
+`SortIncludes` is off. The version is pinned rather than floored: the gate runs
+clang-format 18, and with no column limit a different release reads the
+alignment settings differently and returns a different verdict on the same tree.
+A contributor whose local formatter is not that version still gets every other
+step of the example contract gate, which names the version it found and the
+`clang-format-18` package to install and reports the format step as not
+verified; the blocking check on a pull request is what decides. The shape it
+encodes:
 
 * 4-space indent, spaces only; continuation and constructor-initializer lines
   indent 8.

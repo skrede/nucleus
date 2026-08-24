@@ -1,7 +1,9 @@
 # Derived from the project's CLion code style (.idea/codeStyles/Project.xml),
 # refined so a format run reproduces the codebase's authored shape (indented,
 # column-aligned single-line case statements; aligned struct members).
-# Requires clang-format 17+ (AlignConsecutiveShortCaseStatements).
+# The gate runs clang-format 18. A floor would be the wrong shape here: with no column
+# limit the alignment settings below are read differently by different releases, so two
+# accepted versions means two verdicts for one tree.
 # SortIncludes is off because the project's include order (grouped by origin and
 # folder, sorted by line length then alphabetically) is not expressible here;
 # see CONVENTIONS.md.

@@ -297,7 +297,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install gate tools
-        run: sudo apt-get update && sudo apt-get install -y clang-format universal-ctags jq
+        run: sudo apt-get update && sudo apt-get install -y clang-format-18 universal-ctags jq
 
       # Exuberant Ctags installs under the same command name and accepts no JSON
       # output format, so every function would measure 0 and the size gate inside
@@ -326,4 +326,5 @@ jobs:
           cmake -DNUCLEUS_SOURCE_DIR=. \
             -DNUCLEUS_BUILD_DIR=build-example-contracts \
             -DNUCLEUS_CONFIG=Debug \
+            -DNUCLEUS_GATE_AUTHORITATIVE=ON \
             -P tests/cmake/check_example_contracts.cmake
