@@ -1,9 +1,9 @@
-// Builder lifecycle: build() is infallible and seals into an immutable
+// Builder lifecycle: the first build() succeeds and seals into an immutable
 // config_space whose counts reflect the registrations; after build() every
-// mutating call on the spent builder is a LOUD state-machine error (never a silent
-// no-op).
+// mutating call on the spent builder is a LOUD state-machine error reported
+// through the value channel (never a silent no-op).
 
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -16,11 +16,10 @@
 #include <cstdint>
 #include <string>
 #include <utility>
-#include <stdexcept>
 
 using nucleus::anchor;
 
-TEST_CASE("build() is infallible and seals counts into the space", "[builder][lifecycle]")
+TEST_CASE("the first build() succeeds and seals counts into the space", "[builder][lifecycle]")
 {
     nucleus::config_space_builder builder;
     const std::size_t builtin_tokenizers = builder.tokenizer_count();
@@ -32,7 +31,7 @@ TEST_CASE("build() is infallible and seals counts into the space", "[builder][li
     REQUIRE(builder.register_tokenizer("custom"));
     REQUIRE(builder.register_converter<int>(nucleus::make_scalar_converter<int>()));
 
-    nucleus::config_space space = builder.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(builder);
 
     // The sealed space carries exactly what was registered.
     REQUIRE(space.schema_count() == 2);
@@ -45,7 +44,7 @@ TEST_CASE("registering on an already-built builder is a loud state-machine error
 {
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("server", anchor::root())));
-    nucleus::config_space space = builder.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(builder);
     (void)space;
 
     // Every mutating call returns an unexpected naming the attempted operation --
@@ -67,18 +66,31 @@ TEST_CASE("registering on an already-built builder is a loud state-machine error
     check(builder.set_registration_policy(nullptr), "set_registration_policy");
 }
 
-TEST_CASE("name() and a second build() on a spent builder throw loudly",
+TEST_CASE("a second build() on a spent builder reports sealed_builder",
           "[builder][lifecycle]")
 {
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("server", anchor::root())));
-    nucleus::config_space space = builder.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(builder);
     (void)space;
 
-    // These doors return config_space_builder& / config_space, not an expected, so
-    // the loud channel is a throw -- REQUIRE_THROWS_AS, not REQUIRE_FALSE.
-    REQUIRE_THROWS_AS(builder.name("late"), std::invalid_argument);
-    REQUIRE_THROWS_AS(builder.build(), std::invalid_argument);
+    const auto resealed = builder.build();
+    REQUIRE_FALSE(resealed);
+    CHECK(resealed.error().code == nucleus::errc::sealed_builder);
+    CHECK(resealed.error().message.find("already been built") != std::string::npos);
+}
+
+TEST_CASE("name() on a spent builder still chains and its fault surfaces at the next build()",
+          "[builder][lifecycle]")
+{
+    nucleus::config_space_builder builder;
+    nucleus::config_space space = nucleus::builder_result_test::built(builder);
+    (void)space;
+
+    const auto resealed = builder.name("late").build();
+    REQUIRE_FALSE(resealed);
+    CHECK(resealed.error().code == nucleus::errc::sealed_builder);
+    CHECK(resealed.error().message.find("name('late')") != std::string::npos);
 }
 
 TEST_CASE("config_space_builder move transfers builder state to the moved-to builder",
@@ -91,7 +103,7 @@ TEST_CASE("config_space_builder move transfers builder state to the moved-to bui
 
     nucleus::config_space_builder moved_ctor(std::move(source));
     REQUIRE(moved_ctor.schema_count() == 2);
-    nucleus::config_space from_ctor = moved_ctor.build();
+    nucleus::config_space from_ctor = nucleus::builder_result_test::built(moved_ctor);
     REQUIRE(from_ctor.schema_count() == 2);
 
     // Move-assign: the moved-to builder likewise carries the source's state.
@@ -101,6 +113,6 @@ TEST_CASE("config_space_builder move transfers builder state to the moved-to bui
     nucleus::config_space_builder moved_assign;
     moved_assign = std::move(assign_source);
     REQUIRE(moved_assign.schema_count() == 1);
-    nucleus::config_space from_assign = moved_assign.build();
+    nucleus::config_space from_assign = nucleus::builder_result_test::built(moved_assign);
     REQUIRE(from_assign.schema_count() == 1);
 }

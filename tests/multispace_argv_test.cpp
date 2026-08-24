@@ -1,5 +1,5 @@
 #include "nucleus/log_sink.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -14,7 +14,6 @@
 
 #include <string>
 #include <vector>
-#include <stdexcept>
 
 using namespace nucleus;
 
@@ -32,6 +31,13 @@ public:
     std::vector<std::string> warnings;
 };
 
+multispace_argv_source::space_view view_of(multispace_argv_source &src, std::string_view name)
+{
+    auto view = src.for_space(name);
+    REQUIRE(view);
+    return std::move(view).value();
+}
+
 }
 
 TEST_CASE("multispace_argv_source partitions flags by space name",
@@ -41,8 +47,8 @@ TEST_CASE("multispace_argv_source partitions flags by space name",
     multispace_argv_source src(tokens);
     src.register_space("alpha").register_space("beta");
 
-    auto alpha = src.for_space("alpha");
-    auto beta = src.for_space("beta");
+    auto alpha = view_of(src, "alpha");
+    auto beta = view_of(src, "beta");
 
     auto ar = alpha.pull();
     REQUIRE(ar);
@@ -70,8 +76,7 @@ TEST_CASE("multispace_argv_source: unaddressed flag yields schema_violation nami
     multispace_argv_source src(tokens);
     src.register_space("alpha").register_space("beta");
 
-    auto alpha = src.for_space("alpha");
-    auto result = alpha.pull();
+    auto result = view_of(src, "alpha").pull();
     REQUIRE_FALSE(result);
     REQUIRE(result.error().code == errc::schema_violation);
     REQUIRE(result.error().message.find("gamma") != std::string::npos);
@@ -88,8 +93,7 @@ TEST_CASE("multispace_argv_source: bare space name flag is skipped (not an addre
     multispace_argv_source src(tokens);
     src.register_space("alpha").register_space("beta");
 
-    auto alpha = src.for_space("alpha");
-    auto result = alpha.pull();
+    auto result = view_of(src, "alpha").pull();
     // A bare space-name flag is silently skipped (it is ambiguous and not addressable).
     REQUIRE(result);
     REQUIRE(result.value().entries.empty());
@@ -104,8 +108,7 @@ TEST_CASE("multispace_argv_source: bare space flag carrying a value is rejected 
     multispace_argv_source src(tokens);
     src.register_space("alpha").register_space("beta");
 
-    auto alpha = src.for_space("alpha");
-    auto result = alpha.pull();
+    auto result = view_of(src, "alpha").pull();
     REQUIRE_FALSE(result);
     REQUIRE(result.error().code == errc::schema_violation);
     REQUIRE(result.error().message.find("alpha") != std::string::npos);
@@ -121,7 +124,7 @@ TEST_CASE("multispace_argv_source: a space registered after a view is created is
     // View obtained BEFORE beta is registered. The space list is shared live, so
     // beta is addressable to this view without a re-fetch: the beta-addressed
     // flag is skipped, not reported as unaddressed.
-    auto alpha = src.for_space("alpha");
+    auto alpha = view_of(src, "alpha");
     src.register_space("beta");
 
     auto result = alpha.pull();
@@ -137,8 +140,7 @@ TEST_CASE("multispace_argv_source: malformed token propagates malformed_source",
     multispace_argv_source src(tokens);
     src.register_space("alpha");
 
-    auto alpha = src.for_space("alpha");
-    auto result = alpha.pull();
+    auto result = view_of(src, "alpha").pull();
     REQUIRE_FALSE(result);
     REQUIRE(result.error().code == errc::malformed_source);
 }
@@ -148,13 +150,13 @@ TEST_CASE("multispace_argv_source: recognizer integration rejects undeclared inn
 {
     config_space_builder b;
     REQUIRE(b.register_schema("z")); // x is NOT registered
-    auto space = b.build();
+    auto space = nucleus::builder_result_test::built(b);
 
     std::vector<std::string> tokens{"--alpha-x=1"};
     multispace_argv_source src(tokens);
     src.register_space("alpha");
 
-    auto alpha = src.for_space("alpha");
+    auto alpha = view_of(src, "alpha");
     alpha.recognize_with(recognizer_of(space));
 
     auto result = alpha.pull();
@@ -162,12 +164,15 @@ TEST_CASE("multispace_argv_source: recognizer integration rejects undeclared inn
     REQUIRE(result.error().code == errc::schema_violation);
 }
 
-TEST_CASE("multispace_argv_source: for_space with unregistered name throws invalid_argument",
+TEST_CASE("multispace_argv_source: for_space with an unregistered name reports malformed_source",
           "[multispace_argv][argv]")
 {
     multispace_argv_source src({});
     src.register_space("alpha");
-    REQUIRE_THROWS_AS(src.for_space("delta"), std::invalid_argument);
+    auto view = src.for_space("delta");
+    REQUIRE_FALSE(view);
+    REQUIRE(view.error().code == errc::malformed_source);
+    REQUIRE(view.error().message.find("delta") != std::string::npos);
 }
 
 TEST_CASE("multispace_argv_source: lenient policy + log_to passes unknown, emits warning",
@@ -179,10 +184,10 @@ TEST_CASE("multispace_argv_source: lenient policy + log_to passes unknown, emits
 
     config_space_builder b;
     REQUIRE(b.register_schema("known"));
-    auto space = b.build();
+    auto space = nucleus::builder_result_test::built(b);
 
     capturing_sink sink;
-    auto alpha = src.for_space("alpha");
+    auto alpha = view_of(src, "alpha");
     alpha.recognize_with(recognizer_of(space))
          .policy(unknown_key_policy::lenient)
          .log_to(sink);
