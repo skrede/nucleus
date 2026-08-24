@@ -125,7 +125,7 @@ private:
     {
         const bool decimal = !segment.empty() && std::ranges::all_of(segment,
             [](char c) { return c >= '0' && c <= '9'; });
-        key_path container{state.segments};
+        const key_path container{state.segments};
         if(state.segments.empty() || !decimal
            || !state.repeated.contains(m_schema.canonical_text(container)))
         {
@@ -141,8 +141,8 @@ private:
         return {};
     }
 
-    expected<std::size_t, resolve_fold_error>
-    cli_ordinal_of(const cli_rebracket_state &state, std::string_view segment) const
+    static expected<std::size_t, resolve_fold_error>
+    cli_ordinal_of(const cli_rebracket_state &state, std::string_view segment)
     {
         auto ordinal = key_path::ordinal_in_domain(segment);
         if(!ordinal)

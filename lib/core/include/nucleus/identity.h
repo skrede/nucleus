@@ -55,7 +55,7 @@ public:
 
 private:
     template<typename T>
-    inline static constexpr unsigned char type_tag = 0;
+    static constexpr unsigned char type_tag = 0;
 
     struct concept_base
     {

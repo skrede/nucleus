@@ -180,9 +180,9 @@ expected<std::string, error> render_validated_document(
     for(const validated_document_entry &entry : plan.entries)
         if(auto appended = append_entry(document, entry); !appended)
             return unexpected(std::move(appended).error());
-    const std::string wrapper = !plan.space_name.empty()
-            ? plan.space_name
-            : (root_count(document) == 1 ? std::string{} : "config");
+    std::string wrapper(plan.space_name);
+    if(wrapper.empty() && root_count(document) != 1)
+        wrapper = "config";
     if(!wrapper.empty())
         wrap_roots(document, wrapper);
     return serialize_xml(document, pugi::format_default);

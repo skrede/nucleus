@@ -107,7 +107,7 @@ private:
                                         const std::string &current)
     {
         return pad + "local noglob=0; case $- in *f*) noglob=1 ;; esac; set -f\n"
-             + pad + "local IFS=$'\\n'; COMPREPLY=( $(IFS=$' \\t\\n'; compgen -W "
+             + pad + R"(local IFS=$'\n'; COMPREPLY=( $(IFS=$' \t\n'; compgen -W )"
              + words + " -- \"" + current + "\") )\n"
              + pad + "if [ \"$noglob\" = 0 ]; then set +f; fi\n";
     }

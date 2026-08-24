@@ -78,7 +78,7 @@ private:
         std::string out;
         for(char const c : text)
         {
-            const std::uint8_t byte = static_cast<std::uint8_t>(c);
+            const auto byte = static_cast<std::uint8_t>(c);
             if(byte < 0x20 || byte == 0x7f)
             {
                 out.push_back('^');

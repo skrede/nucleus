@@ -88,8 +88,8 @@ private:
     const keyed_merge_state &m_keyed;
 
     // Shallowest first: renumbering an outer container invalidates inner paths.
-    expected<std::vector<key_path>, resolve_fold_error>
-    ordered_relayed_scopes(const std::set<std::string> &scopes) const
+    static expected<std::vector<key_path>, resolve_fold_error>
+    ordered_relayed_scopes(const std::set<std::string> &scopes)
     {
         std::vector<key_path> declared;
         declared.reserve(scopes.size());

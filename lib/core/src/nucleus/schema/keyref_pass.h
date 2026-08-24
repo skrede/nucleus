@@ -32,10 +32,10 @@ public:
         const identity_group_spec *group = group_of(schema, el);
         if(group == nullptr)
             return;
-        keyref_candidate_index index(resolved.root(), *group,
-                                     [&schema](std::string_view path)
-                                     { return canonicalize(schema, path); });
-        const std::string      declared = el.declared_path().str();
+        const keyref_candidate_index index(resolved.root(), *group,
+                                           [&schema](std::string_view path)
+                                           { return canonicalize(schema, path); });
+        const std::string            declared = el.declared_path().str();
         for(const std::string &key : resolved.keys())
             check_key(schema, resolved, *group, index, declared, key, out);
     }

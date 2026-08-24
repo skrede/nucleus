@@ -168,9 +168,9 @@ expected<std::string, error> render_xml_template(
     pugi::xml_document document;
     for(const schema_element &element : space.schema_elements())
         append_template_element(document, element);
-    const std::string wrapper = !space_name.empty()
-            ? std::string(space_name)
-            : (root_count(document) == 1 ? std::string{} : "config");
+    std::string wrapper(space_name);
+    if(wrapper.empty() && root_count(document) != 1)
+        wrapper = "config";
     if(!wrapper.empty())
         wrap_roots(document, wrapper);
     return serialize_xml(document,

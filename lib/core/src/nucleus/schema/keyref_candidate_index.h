@@ -34,7 +34,7 @@ class keyref_candidate_index
 public:
     using canonicalizer = std::function<std::string(std::string_view)>;
 
-    keyref_candidate_index(config_node root, identity_group_spec group,
+    keyref_candidate_index(const config_node &root, identity_group_spec group,
                            canonicalizer canonicalize)
             : m_group(std::move(group))
             , m_canonicalize_cb(std::move(canonicalize))
