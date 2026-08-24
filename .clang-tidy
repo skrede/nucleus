@@ -31,6 +31,8 @@ Checks: >
   # members are initialized in the constructor initializer list as a deliberate house rule giving one source of truth and this check is that rule's direct negation so no formulation satisfies both,
   -modernize-use-default-member-init,
   # alias of the cppcoreguidelines check directly above,
+  -readability-redundant-member-init,
+  # a third check pressing the same house rule from the other side by calling a value-initializing entry redundant where the rule requires every member to be named,
   -readability-identifier-length,
   # would flag idiomatic short names such as i / t / f,
   -readability-magic-numbers,
