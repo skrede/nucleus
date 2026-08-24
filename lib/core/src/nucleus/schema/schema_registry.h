@@ -165,7 +165,11 @@ private:
             return r;
         if(auto r = check_name_not_digit_led(el); !r)
             return r;
+        if(auto r = check_name_wellformed(el); !r)
+            return r;
         if(auto r = check_no_repeated_ancestor(el, m_elements); !r)
+            return r;
+        if(auto r = check_no_child_under_required(el, m_elements); !r)
             return r;
         if(auto r = check_keyref_target_registered(el, m_identity_groups); !r)
             return r;

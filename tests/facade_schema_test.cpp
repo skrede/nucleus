@@ -144,3 +144,32 @@ TEST_CASE("resolve admits a document that satisfies the schema", "[facade][schem
     REQUIRE(loaded.value().get("server/host") == "localhost");
     REQUIRE(loaded.value().get("server/port") == "8080");
 }
+
+TEST_CASE("an element name that is not a single clean path segment is refused at registration",
+          "[facade][schema]")
+{
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
+
+    const std::vector<std::string> malformed{
+        "", "logging/level", "level[0]", "level]", "<level>", "lev\x7f" "el"};
+    for(const std::string &name : malformed)
+    {
+        auto refused = engine.register_element(
+            nucleus::element(name, nucleus::anchor::keyspace(path_of("logging"))));
+        REQUIRE_FALSE(refused);
+        REQUIRE(refused.error().code == nucleus::errc::rejected_registration);
+        REQUIRE(refused.error().message.find("malformed name") != std::string::npos);
+    }
+
+    // The offending name reaches the diagnostic escaped, so a newline carried in it
+    // cannot forge a second log line out of the message it triggered.
+    auto newline = engine.register_element(
+        nucleus::element("lev\nel", nucleus::anchor::keyspace(path_of("logging"))));
+    REQUIRE_FALSE(newline);
+    REQUIRE(newline.error().message.find("lev\\nel") != std::string::npos);
+    REQUIRE(newline.error().message.find('\n') == std::string::npos);
+
+    REQUIRE(engine.register_element(
+        nucleus::element("log_level.2", nucleus::anchor::keyspace(path_of("logging")))));
+}

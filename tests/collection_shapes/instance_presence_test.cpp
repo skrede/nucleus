@@ -130,7 +130,7 @@ TEST_CASE("a repeated container resolving to zero instances emits no child viola
     REQUIRE(schema_enforcer::validate(reg, empty));
 }
 
-TEST_CASE("a required repeated container with zero instances is reported",
+TEST_CASE("a child cannot be declared under a required element",
           "[collection_shapes][presence]")
 {
     schema_registry reg;
@@ -138,23 +138,12 @@ TEST_CASE("a required repeated container with zero instances is reported",
     auto node = nucleus::repeated_element("node", anchor::keyspace(kp("cluster")));
     node.required = true;
     REQUIRE(reg.attach(std::move(node)));
-    REQUIRE(reg.attach(nucleus::required_element("port", anchor::keyspace(kp("cluster/node")))));
 
-    const keyspace empty;
-    const auto v = schema_enforcer::validate(reg, empty);
-    REQUIRE_FALSE(v);
-    REQUIRE(v.error().size() == 1);
-    REQUIRE(v.error().front().path == "cluster/node");
-
-    // Current contract, stated rather than endorsed: `required` means "carries a
-    // value", and a container never carries one, so the same violation is produced
-    // when instances DO exist. The flag therefore cannot express "at least one
-    // instance" -- it is unsatisfiable on a repeated container that has children.
-    keyspace populated;
-    populated.set(kp("cluster/node[0]/port"), nucleus::value::owned("80"));
-    const auto still = schema_enforcer::validate(reg, populated);
-    REQUIRE_FALSE(still);
-    REQUIRE(names(still.error(), "cluster/node"));
+    const auto refused =
+        reg.attach(nucleus::required_element("port", anchor::keyspace(kp("cluster/node"))));
+    REQUIRE_FALSE(refused);
+    REQUIRE(refused.error().find("'port'") != std::string::npos);
+    REQUIRE(refused.error().find("'cluster/node'") != std::string::npos);
 }
 
 TEST_CASE("a primary key cannot be declared under a repeated container",

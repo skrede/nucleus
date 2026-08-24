@@ -10,9 +10,12 @@
 
 #include "nucleus/keyspace/key_path.h"
 
+#include "nucleus/utility/escaped_text.h"
+
 #include <span>
 #include <cctype>
 #include <string>
+#include <cstdint>
 #include <algorithm>
 
 namespace nucleus {
@@ -97,6 +100,20 @@ inline schema_attach_result check_name_not_digit_led(const schema_element &el)
         el.name));
 }
 
+// The declared path pushes this name onto the parent path unparsed, so a name that is not one clean
+// segment records as one segment here and reads back as two in every consumer that re-parses the string.
+inline schema_attach_result check_name_wellformed(const schema_element &el)
+{
+    const bool clean = std::ranges::none_of(el.name, [](char c) {
+        return static_cast<std::uint8_t>(c) < 0x20 || c == 0x7f || c == '[' || c == ']' || c == '<' || c == '>';
+    });
+    if(const auto parsed = key_path::parse(el.name); clean && parsed && parsed->size() == 1)
+        return {};
+    return unexpected(nucleus::format(
+        "schema element '{}' has a malformed name: an element name is one path segment carrying no separator, bracket, markup or control character",
+        escaped_text(el.name)));
+}
+
 // A primary key under ANY repeated ancestor is ambiguous -- each ordinal instance
 // would need its own selector, which v1 does not support. Walk the full ancestor
 // chain of the container; reject if any ancestor is a declared repeated element.
@@ -117,6 +134,22 @@ inline schema_attach_result check_no_repeated_ancestor(const schema_element &el,
                 "ancestor '{}': keyed selection has no clean per-instance "
                 "meaning inside a repeated container (v1 restriction)",
                 el.name, a.str()));
+    }
+    return {};
+}
+
+// `required` means the element carries a value and a container carries none, so the flag can never be
+// satisfied on one. Containerness is knowable only once a child is declared, which is where this lands.
+inline schema_attach_result check_no_child_under_required(const schema_element &el,
+                                                          std::span<const schema_element> declared)
+{
+    for(key_path a = el.container(); !a.empty(); a = a.parent())
+    {
+        const auto ancestor = std::ranges::find_if(declared, [&](const schema_element &e) { return e.required && e.declared_path() == a; });
+        if(ancestor != declared.end())
+            return unexpected(nucleus::format(
+                "schema element '{}' cannot be declared under required element '{}': a container carries no value, so 'required' on it can never be satisfied",
+                escaped_text(el.name), escaped_text(a.str())));
     }
     return {};
 }

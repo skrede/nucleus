@@ -25,6 +25,11 @@ namespace {
 
 const std::array<std::string, 3> unrenderable{"bad=key", "bad\rkey", "bad\nkey"};
 
+// The one unrenderable key a schema can still declare: a name carrying a carriage
+// return or a newline is refused at registration, so '=' is the only delimiter that
+// reaches a renderer through a declared path.
+const std::string declarable{"bad=key"};
+
 nucleus::config checked_config(std::map<std::string, std::string> values)
 {
     auto made = nucleus::config::from_values(std::move(values));
@@ -67,33 +72,27 @@ nucleus::config resolved_config(const std::string &outside)
 TEST_CASE("both flat renderers reject a resolved key carrying record delimiters",
           "[flat][emit][argv][env][record]")
 {
-    for(const std::string &key : unrenderable)
-    {
-        const nucleus::config config = resolved_config(key);
+    const nucleus::config config = resolved_config(declarable);
 
-        const auto argv = nucleus::argv::render_document(config);
-        REQUIRE_FALSE(argv);
-        REQUIRE(argv.error().code == nucleus::errc::malformed_source);
-        REQUIRE(argv.error().message.find(key) != std::string::npos);
+    const auto argv = nucleus::argv::render_document(config);
+    REQUIRE_FALSE(argv);
+    REQUIRE(argv.error().code == nucleus::errc::malformed_source);
+    REQUIRE(argv.error().message.find(declarable) != std::string::npos);
 
-        const auto environment = nucleus::env::render_document(config);
-        REQUIRE_FALSE(environment);
-        REQUIRE(environment.error().code == nucleus::errc::malformed_source);
-        REQUIRE(environment.error().message.find(key) != std::string::npos);
-    }
+    const auto environment = nucleus::env::render_document(config);
+    REQUIRE_FALSE(environment);
+    REQUIRE(environment.error().code == nucleus::errc::malformed_source);
+    REQUIRE(environment.error().message.find(declarable) != std::string::npos);
 }
 
 TEST_CASE("an unrenderable key outside the anchor never blocks emission",
           "[flat][emit][argv][anchor][record]")
 {
-    for(const std::string &key : unrenderable)
-    {
-        const auto selected = nucleus::argv::render_document(
-                resolved_config(key), {},
-                nucleus::key_path(std::vector<std::string>{"cluster"}));
-        REQUIRE(selected);
-        REQUIRE(selected.value() == "--port=8000\n");
-    }
+    const auto selected = nucleus::argv::render_document(
+            resolved_config(declarable), {},
+            nucleus::key_path(std::vector<std::string>{"cluster"}));
+    REQUIRE(selected);
+    REQUIRE(selected.value() == "--port=8000\n");
 }
 
 TEST_CASE("selected values keep every '=' and reject line breaks",
@@ -130,13 +129,10 @@ TEST_CASE("template keys and allowed-value annotations obey the record grammar",
         REQUIRE(rejected.error().code == nucleus::errc::malformed_source);
     }
 
-    for(const std::string &key : unrenderable)
-    {
-        const auto rejected = nucleus::env::render_template(space_beside(key));
-        REQUIRE_FALSE(rejected);
-        REQUIRE(rejected.error().code == nucleus::errc::malformed_source);
-        REQUIRE(rejected.error().message.find(key) != std::string::npos);
-    }
+    const auto unspellable = nucleus::env::render_template(space_beside(declarable));
+    REQUIRE_FALSE(unspellable);
+    REQUIRE(unspellable.error().code == nucleus::errc::malformed_source);
+    REQUIRE(unspellable.error().message.find(declarable) != std::string::npos);
 }
 
 TEST_CASE("an argv space name obeys the same key grammar",

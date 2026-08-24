@@ -102,13 +102,13 @@ TEST_CASE("XML repeated containers name a domain-boundary ordinal gap exactly",
 TEST_CASE("XML template element names are checked as the template emits them",
           "[xml][emit][grammar]")
 {
-    SECTION("a declared name carrying bracket-index notation is reported")
+    SECTION("bracket-index notation never reaches the emitter as a declared name")
     {
-        const auto rendered = nucleus::xml::render_template(space_with("node[0]", {}));
-        REQUIRE_FALSE(rendered);
-        CHECK(rendered.error().code == nucleus::errc::malformed_source);
-        CHECK(rendered.error().message.find("not a valid XML name") != std::string::npos);
-        CHECK(rendered.error().message.find("node[0]") != std::string::npos);
+        nucleus::config_space_builder builder;
+        REQUIRE(builder.register_element(
+                nucleus::element("root", nucleus::anchor::root())));
+        CHECK_FALSE(builder.register_element(
+                nucleus::element("node[0]", nucleus::anchor::keyspace("root"))));
     }
     SECTION("an ordinary declared name still renders")
     {
