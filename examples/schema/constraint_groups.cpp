@@ -41,9 +41,9 @@ static expected<void, std::string> validate_positive_ttl(const config_node &cach
     std::int32_t value  = 0;
     const auto   parsed = std::from_chars(ttl->data(), ttl->data() + ttl->size(), value);
     if(parsed.ec != std::errc{} || parsed.ptr != ttl->data() + ttl->size())
-        return unexpected(std::string("ttl must be a base-10 int32 without trailing characters"));
+        return nucleus::unexpected(std::string("ttl must be a base-10 int32 without trailing characters"));
     if(value <= 0)
-        return unexpected(std::string("ttl must be greater than zero"));
+        return nucleus::unexpected(std::string("ttl must be greater than zero"));
     return {};
 }
 
@@ -113,13 +113,13 @@ template<typename Builder>
 static expected<config_space, error> make_space(Builder &&builder)
 {
     if(auto result = builder.register_element(element("server", anchor::root())); !result)
-        return unexpected(std::move(result).error());
+        return nucleus::unexpected(std::move(result).error());
     if(auto result = register_cache_constraints(builder); !result)
-        return unexpected(std::move(result).error());
+        return nucleus::unexpected(std::move(result).error());
     if(auto result = register_auth_constraints(builder); !result)
-        return unexpected(std::move(result).error());
+        return nucleus::unexpected(std::move(result).error());
     if(auto result = register_pool_identity(builder); !result)
-        return unexpected(std::move(result).error());
+        return nucleus::unexpected(std::move(result).error());
     return builder.build();
 }
 

@@ -44,7 +44,7 @@ template<typename Builder>
 static expected<config_space, error> make_server_space(Builder &builder)
 {
     if(auto result = define_server_space(builder); !result)
-        return unexpected(std::move(result).error());
+        return nucleus::unexpected(std::move(result).error());
     return builder.build();
 }
 
