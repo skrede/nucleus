@@ -148,3 +148,22 @@ TEST_CASE("an allowed value containing a space completes as one candidate",
     const std::string out = run_bash(script);
     REQUIRE(out == "1\nus east\n");
 }
+
+TEST_CASE("a space name places the ordinal wildcard on the segment the path reaches",
+          "[completion][smoke]")
+{
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::repeated_element("node", anchor::root())));
+    REQUIRE(reg.attach(nucleus::element("port", anchor::keyspace(path_of("node")))));
+
+    const std::string two = generate_completion(shell::bash, reg, "myapp", {}, {}, "a/b").value();
+    REQUIRE(two.find("--a-b-node-*-port") != std::string::npos);
+    REQUIRE(two.find("--a-b-*-node-port") == std::string::npos);
+
+    // The one- and zero-segment shapes are what the replaced ternary already got right; they
+    // are asserted here so widening the count cannot move them.
+    const std::string one = generate_completion(shell::bash, reg, "myapp", {}, {}, "a").value();
+    REQUIRE(one.find("--a-node-*-port") != std::string::npos);
+    const std::string none = generate_completion(shell::bash, reg, "myapp").value();
+    REQUIRE(none.find("--node-*-port") != std::string::npos);
+}

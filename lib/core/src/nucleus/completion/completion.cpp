@@ -127,7 +127,7 @@ completion_model project(const schema_registry &schema, std::string_view prog,
                 // depth counts full-path segments; the flag counts effective-path
                 // segments, which drop the anchor prefix and gain the space name.
                 const std::size_t anchor_offset   = anchor.empty() ? 0 : anchor.size();
-                const std::size_t space_offset    = space.empty() ? 0 : 1;
+                const std::size_t space_offset    = space.size();
                 const std::size_t effective_depth = depth - anchor_offset + space_offset;
 
                 completion_option wild;

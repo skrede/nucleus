@@ -162,13 +162,12 @@ TEST_CASE("safe XML enforces primary-key requiredness and cardinality",
     }
 }
 
-TEST_CASE("XML names and values are validated before document mutation",
+TEST_CASE("a malformed name never reaches the emitter and a value is checked before mutation",
           "[xml][emit][contract][matrix]")
 {
     nucleus::config_space_builder builder;
-    REQUIRE(builder.register_element(
+    CHECK_FALSE(builder.register_element(
             nucleus::element("bad name", nucleus::anchor::root())));
-    check_safe_rejection(builder.build(), {{"bad name", "value"}}, "bad name");
     const nucleus::config_space space = make_document_space();
     check_safe_rejection(space, {{"cluster/node/port", "a\rb"}},
                          "cluster/node/port");

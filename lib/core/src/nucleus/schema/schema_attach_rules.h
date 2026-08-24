@@ -105,12 +105,12 @@ inline schema_attach_result check_name_not_digit_led(const schema_element &el)
 inline schema_attach_result check_name_wellformed(const schema_element &el)
 {
     const bool clean = std::ranges::none_of(el.name, [](char c) {
-        return static_cast<std::uint8_t>(c) < 0x20 || c == 0x7f || c == '[' || c == ']' || c == '<' || c == '>';
+        return static_cast<std::uint8_t>(c) < 0x20 || c == 0x7f || c == ' ' || c == '[' || c == ']' || c == '<' || c == '>';
     });
     if(const auto parsed = key_path::parse(el.name); clean && parsed && parsed->size() == 1)
         return {};
     return unexpected(nucleus::format(
-        "schema element '{}' has a malformed name: an element name is one path segment carrying no separator, bracket, markup or control character",
+        "schema element '{}' has a malformed name: an element name is one path segment carrying no separator, space, bracket, markup or control character",
         escaped_text(el.name)));
 }
 

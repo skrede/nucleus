@@ -173,3 +173,24 @@ TEST_CASE("an element name that is not a single clean path segment is refused at
     REQUIRE(engine.register_element(
         nucleus::element("log_level.2", nucleus::anchor::keyspace(path_of("logging")))));
 }
+
+TEST_CASE("a declared name carrying a space is refused at registration", "[facade][schema]")
+{
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
+
+    auto spaced = engine.register_element(
+        nucleus::element("my flag", nucleus::anchor::keyspace(path_of("logging"))));
+    REQUIRE_FALSE(spaced);
+    REQUIRE(spaced.error().code == nucleus::errc::rejected_registration);
+    REQUIRE(spaced.error().message.find("malformed name") != std::string::npos);
+    REQUIRE(spaced.error().message.find("my flag") != std::string::npos);
+
+    // A space is printable and reaches the diagnostic verbatim; a tab does not, which is what
+    // tells the two refusals apart in the one message they share.
+    auto tabbed = engine.register_element(
+        nucleus::element("my\tflag", nucleus::anchor::keyspace(path_of("logging"))));
+    REQUIRE_FALSE(tabbed);
+    REQUIRE(tabbed.error().message.find("my\\tflag") != std::string::npos);
+    REQUIRE(tabbed.error().message.find('\t') == std::string::npos);
+}
