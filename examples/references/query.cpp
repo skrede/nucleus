@@ -17,45 +17,43 @@
 #include <iostream>
 #include <string_view>
 
-using namespace nucleus;
-
-static owner_token network_owner(std::string("network.module"));
+static nucleus::owner_token network_owner(std::string("network.module"));
 
 template<typename Builder>
-static registration_result define_server_space(Builder &builder)
+static nucleus::registration_result define_server_space(Builder &builder)
 {
-    if(auto result = builder.register_element(element("cluster", anchor::root()), network_owner); !result)
+    if(auto result = builder.register_element(nucleus::element("cluster", nucleus::anchor::root()), network_owner); !result)
         return result;
-    if(auto result = builder.register_element(element("server", anchor::keyspace("cluster")), network_owner); !result)
+    if(auto result = builder.register_element(nucleus::element("server", nucleus::anchor::keyspace("cluster")), network_owner); !result)
         return result;
     if(auto result = builder.register_element(
-               primary_key_element("name", anchor::keyspace("cluster/server")), network_owner);
+               nucleus::primary_key_element("name", nucleus::anchor::keyspace("cluster/server")), network_owner);
        !result)
         return result;
     if(auto result = builder.register_element(
-               element("port", anchor::keyspace("cluster/server")), network_owner);
+               nucleus::element("port", nucleus::anchor::keyspace("cluster/server")), network_owner);
        !result)
         return result;
     return builder.register_element(
-            element("host", anchor::keyspace("cluster/server")), network_owner);
+            nucleus::element("host", nucleus::anchor::keyspace("cluster/server")), network_owner);
 }
 
 template<typename Builder>
-static expected<config_space, error> make_server_space(Builder &builder)
+static nucleus::expected<nucleus::config_space, nucleus::error> make_server_space(Builder &builder)
 {
     if(auto result = define_server_space(builder); !result)
         return nucleus::unexpected(std::move(result).error());
     return builder.build();
 }
 
-static expected<config_space, error> make_server_space()
+static nucleus::expected<nucleus::config_space, nucleus::error> make_server_space()
 {
-    config_space_builder builder;
+    nucleus::config_space_builder builder;
     return make_server_space(builder);
 }
 
 static void print_nodes(std::ostream &output, const char *header,
-                        const std::vector<config_node> &nodes)
+                        const std::vector<nucleus::config_node> &nodes)
 {
     output << "\n--- " << header << " ---\n";
     if(nodes.empty())
@@ -67,9 +65,9 @@ static void print_nodes(std::ostream &output, const char *header,
         output << "  " << n.path() << '\n';
 }
 
-static runtime_source make_server_source()
+static nucleus::runtime_source make_server_source()
 {
-    runtime_source source;
+    nucleus::runtime_source source;
     source.set("cluster/server[0]/name", "primary");
     source.set("cluster/server[0]/port", "8080");
     source.set("cluster/server[0]/host", "10.0.0.1");
@@ -79,20 +77,20 @@ static runtime_source make_server_source()
     return source;
 }
 
-static void show_primary_key_nodes(std::ostream &output, const config &cfg,
-                                   const schema_query_context &ctx)
+static void show_primary_key_nodes(std::ostream &output, const nucleus::config &cfg,
+                                   const nucleus::schema_query_context &ctx)
 {
-    const auto nodes = query(cfg.root(), ctx).role(node_role::primary_key).collect();
+    const auto nodes = nucleus::query(cfg.root(), ctx).role(nucleus::node_role::primary_key).collect();
     print_nodes(output, "role(primary_key) — all pkey leaves", nodes);
 }
 
 static int show_ambiguous_one(std::ostream &output, std::ostream &errors,
-                              expected<config_node, error> ambiguous)
+                              nucleus::expected<nucleus::config_node, nucleus::error> ambiguous)
 {
     output << "\n--- one() on many matches (two servers -> ambiguous_result) ---\n";
     constexpr std::string_view message =
             "query matched 2 nodes; one() requires exactly one match";
-    if(ambiguous || ambiguous.error().code != errc::ambiguous_result ||
+    if(ambiguous || ambiguous.error().code != nucleus::errc::ambiguous_result ||
        ambiguous.error().message != message)
     {
         errors << "unexpected ambiguous query result\n";
@@ -103,7 +101,7 @@ static int show_ambiguous_one(std::ostream &output, std::ostream &errors,
 }
 
 static int show_single_one(std::ostream &output, std::ostream &errors,
-                           expected<config_node, error> single)
+                           nucleus::expected<nucleus::config_node, nucleus::error> single)
 {
     output << "\n--- one() on server[0] (single pkey) ---\n";
     if(!single)
@@ -121,33 +119,33 @@ static int show_single_one(std::ostream &output, std::ostream &errors,
     return 0;
 }
 
-static void show_leaves(std::ostream &output, const config &cfg,
-                        const schema_query_context &ctx)
+static void show_leaves(std::ostream &output, const nucleus::config &cfg,
+                        const nucleus::schema_query_context &ctx)
 {
     const auto anchor0 = cfg.root()["cluster"]["server"][std::size_t{0}];
-    const auto nodes   = query(anchor0, ctx).children().leaves().collect();
+    const auto nodes   = nucleus::query(anchor0, ctx).children().leaves().collect();
     print_nodes(output, "children().leaves() under server[0]", nodes);
 }
 
-static void show_owned_nodes(std::ostream &output, const config &cfg,
-                             const schema_query_context &ctx,
-                             const owner_token          &owner)
+static void show_owned_nodes(std::ostream &output, const nucleus::config &cfg,
+                             const nucleus::schema_query_context &ctx,
+                             const nucleus::owner_token          &owner)
 {
-    const auto nodes = query(cfg.root(), ctx).owned_by(owner).collect();
+    const auto nodes = nucleus::query(cfg.root(), ctx).owned_by(owner).collect();
     print_nodes(output, "owned_by(network_owner)", nodes);
 }
 
-static void show_strain_nodes(std::ostream &output, const config &cfg,
-                              const schema_query_context &ctx)
+static void show_strain_nodes(std::ostream &output, const nucleus::config &cfg,
+                              const nucleus::schema_query_context &ctx)
 {
     const auto anchor0 = cfg.root()["cluster"]["server"][std::size_t{0}];
-    const auto nodes   = query(anchor0, ctx).in_strain().collect();
+    const auto nodes   = nucleus::query(anchor0, ctx).in_strain().collect();
     print_nodes(output, "in_strain() from server[0]", nodes);
 }
 
-static int run_queries(const config &cfg, const schema_query_context &ctx,
-                       expected<config_node, error> ambiguous,
-                       expected<config_node, error> single,
+static int run_queries(const nucleus::config &cfg, const nucleus::schema_query_context &ctx,
+                       nucleus::expected<nucleus::config_node, nucleus::error> ambiguous,
+                       nucleus::expected<nucleus::config_node, nucleus::error> single,
                        std::ostream &output, std::ostream &errors)
 {
     show_primary_key_nodes(output, cfg, ctx);
@@ -161,24 +159,24 @@ static int run_queries(const config &cfg, const schema_query_context &ctx,
     return 0;
 }
 
-static int run_queries(const config_space &space, std::ostream &output, std::ostream &errors)
+static int run_queries(const nucleus::config_space &space, std::ostream &output, std::ostream &errors)
 {
-    runtime_source source = make_server_source();
-    const auto     loaded = load_config(space, source_stack{std::move(source)}, {});
+    nucleus::runtime_source source = make_server_source();
+    const auto              loaded = nucleus::load_config(space, nucleus::source_stack{std::move(source)}, {});
     if(!loaded)
     {
         errors << "load failed: " << loaded.error() << '\n';
         return 1;
     }
-    const config              &cfg       = *loaded;
-    const schema_query_context ctx       = space.query_context();
-    const auto                 ambiguous = query(cfg.root(), ctx).role(node_role::primary_key).one();
-    const auto                 anchor0   = cfg.root()["cluster"]["server"][std::size_t{0}];
-    const auto                 single    = query(anchor0, ctx).role(node_role::primary_key).one();
+    const nucleus::config              &cfg       = *loaded;
+    const nucleus::schema_query_context ctx       = space.query_context();
+    const auto                          ambiguous = nucleus::query(cfg.root(), ctx).role(nucleus::node_role::primary_key).one();
+    const auto                          anchor0   = cfg.root()["cluster"]["server"][std::size_t{0}];
+    const auto                          single    = nucleus::query(anchor0, ctx).role(nucleus::node_role::primary_key).one();
     return run_queries(cfg, ctx, ambiguous, single, output, errors);
 }
 
-static int run_query_example(expected<config_space, error> space, std::ostream &output,
+static int run_query_example(nucleus::expected<nucleus::config_space, nucleus::error> space, std::ostream &output,
                              std::ostream &errors)
 {
     if(!space)

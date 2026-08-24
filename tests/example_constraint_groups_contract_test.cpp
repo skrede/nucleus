@@ -77,14 +77,14 @@ void verify_constraint_positions(std::string_view context, std::size_t count, De
     }
 }
 
-load_result load_ttl(const config_space &space, std::string_view ttl)
+nucleus::load_result load_ttl(const nucleus::config_space &space, std::string_view ttl)
 {
-    runtime_source source;
+    nucleus::runtime_source source;
     source.set("server/cache/ttl", std::string(ttl)).set("server/auth/token", "t");
-    return load_config(space, source_stack{std::move(source)}, {});
+    return load_config(space, nucleus::source_stack{std::move(source)}, {});
 }
 
-void require_mismatch(load_result result, expected_outcome expected,
+void require_mismatch(nucleus::load_result result, expected_outcome expected,
                       std::string_view actual)
 {
     std::ostringstream output;
@@ -156,7 +156,7 @@ TEST_CASE("constraint ttl accepts only complete positive int32 values", "[constr
         else
         {
             REQUIRE_FALSE(result.has_value());
-            REQUIRE(result.error().code == errc::schema_violation);
+            REQUIRE(result.error().code == nucleus::errc::schema_violation);
             REQUIRE(result.error().message.find(cue) != std::string::npos);
         }
     }
@@ -166,15 +166,15 @@ TEST_CASE("constraint result comparison rejects every mismatch", "[constraint][e
 {
     const auto product = make_space();
     REQUIRE(product.has_value());
-    require_mismatch(load_config(*product, source_stack{make_source({{"server/cache/lru", "on"}, {"server/auth/token", "t"}})}, {}),
-                     {false, errc::schema_violation, "expected cue"}, "actual: success");
-    require_mismatch(nucleus::unexpected(error{errc::schema_violation, "actual rejection"}),
-                     {true, errc::schema_violation, {}},
+    require_mismatch(load_config(*product, nucleus::source_stack{make_source({{"server/cache/lru", "on"}, {"server/auth/token", "t"}})}, {}),
+                     {false, nucleus::errc::schema_violation, "expected cue"}, "actual: success");
+    require_mismatch(nucleus::unexpected(nucleus::error{nucleus::errc::schema_violation, "actual rejection"}),
+                     {true, nucleus::errc::schema_violation, {}},
                      "actual error: schema_violation: actual rejection");
-    require_mismatch(nucleus::unexpected(error{errc::unmet_capability, "expected cue"}),
-                     {false, errc::schema_violation, "expected cue"}, "unmet_capability");
-    require_mismatch(nucleus::unexpected(error{errc::schema_violation, "wrong cue"}),
-                     {false, errc::schema_violation, "expected cue"}, "wrong cue");
+    require_mismatch(nucleus::unexpected(nucleus::error{nucleus::errc::unmet_capability, "expected cue"}),
+                     {false, nucleus::errc::schema_violation, "expected cue"}, "unmet_capability");
+    require_mismatch(nucleus::unexpected(nucleus::error{nucleus::errc::schema_violation, "wrong cue"}),
+                     {false, nucleus::errc::schema_violation, "expected cue"}, "wrong cue");
 }
 
 TEST_CASE("constraint scenarios declare and enforce exact outcomes", "[constraint][example][outcome]")
@@ -187,14 +187,14 @@ TEST_CASE("constraint scenarios declare and enforce exact outcomes", "[constrain
     for(std::size_t index = 1; index < scenarios.size(); ++index)
     {
         REQUIRE_FALSE(scenarios[index].expected.success);
-        REQUIRE(scenarios[index].expected.code == errc::schema_violation);
+        REQUIRE(scenarios[index].expected.code == nucleus::errc::schema_violation);
         REQUIRE(scenarios[index].expected.cue == cues[index - 1]);
     }
     std::ostringstream output, errors;
     REQUIRE(run_scenarios(*product, scenarios, output, errors) == 0);
     auto               early_stop = make_scenarios();
     std::ostringstream early_output, early_errors;
-    early_stop[0].expected = {false, errc::schema_violation, "wrong declaration"};
+    early_stop[0].expected = {false, nucleus::errc::schema_violation, "wrong declaration"};
     REQUIRE(run_scenarios(*product, early_stop, early_output, early_errors) == 1);
     REQUIRE(early_output.str().find(early_stop[0].title) != std::string::npos);
     REQUIRE(early_output.str().find(early_stop[1].title) == std::string::npos);

@@ -148,7 +148,7 @@ TEST_CASE("single query reporting requires the exact primary value", "[selector]
 {
     auto space = make_server_space();
     REQUIRE(space.has_value());
-    auto loaded = load_config(*space, source_stack{make_server_source()}, {});
+    auto loaded = load_config(*space, nucleus::source_stack{make_server_source()}, {});
     REQUIRE(loaded.has_value());
     const auto error = report_single(nucleus::unexpected(nucleus::error{
             nucleus::errc::absent_key, "injected single failure"}));
@@ -166,7 +166,7 @@ TEST_CASE("query result mismatches stop later query sections", "[selector][examp
 {
     auto space = make_server_space();
     REQUIRE(space.has_value());
-    auto loaded = load_config(*space, source_stack{make_server_source()}, {});
+    auto loaded = load_config(*space, nucleus::source_stack{make_server_source()}, {});
     REQUIRE(loaded.has_value());
     const auto         ctx     = space->query_context();
     const auto         primary = loaded->root()["cluster"]["server"][std::size_t{0}]["name"];
@@ -185,7 +185,7 @@ TEST_CASE("network ownership includes every concrete host leaf", "[selector][exa
 {
     auto space = make_server_space();
     REQUIRE(space.has_value());
-    auto loaded = load_config(*space, source_stack{make_server_source()}, {});
+    auto loaded = load_config(*space, nucleus::source_stack{make_server_source()}, {});
     REQUIRE(loaded.has_value());
     const auto                    nodes = query(loaded->root(), space->query_context()).owned_by(network_owner).collect();
     std::vector<std::string_view> paths;
