@@ -51,7 +51,7 @@ void append_value(pugi::xml_node node, const std::string &value)
 expected<pugi::xml_node, error> entry_parent(
         pugi::xml_document &document, const validated_document_entry &entry)
 {
-    pugi::xml_node parent = document;
+    pugi::xml_node parent = document.root();
     for(std::size_t index = 0; index + 1 < entry.segments.size(); ++index)
     {
         const std::string &segment = entry.segments[index];

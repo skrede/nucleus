@@ -429,8 +429,8 @@ std::size_t config_space_builder::converter_count() const noexcept { return m_im
 std::vector<conflict_report> config_space_builder::conflicts() const
 {
     std::vector<conflict_report> out = m_impl->conflicts();
-    if(m_impl->naming.has_value())
-        out.push_back(*m_impl->naming);
+    if(const std::optional<conflict_report> &naming = m_impl->naming; naming.has_value())
+        out.push_back(*naming);
     return out;
 }
 

@@ -133,8 +133,9 @@ private:
                                                                                 "in compact_relayed_instances(): '{}'",
                                                                                 text)});
             const std::uint64_t ordinal = key_path::ordinal_of(actual->leaf());
-            groups[actual->parent().str()].emplace_back(
-                    static_cast<std::size_t>(ordinal), std::move(actual).value());
+
+            std::vector<std::pair<std::size_t, key_path>> &group = groups[actual->parent().str()];
+            group.emplace_back(static_cast<std::size_t>(ordinal), std::move(actual).value());
         }
         for(auto &[_, instances] : groups)
             std::sort(instances.begin(), instances.end(),

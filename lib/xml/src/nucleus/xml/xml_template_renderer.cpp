@@ -55,7 +55,7 @@ std::string join_values(const std::vector<std::string> &values)
 void append_template_element(pugi::xml_document   &document,
                              const schema_element &element)
 {
-    pugi::xml_node                 current  = document;
+    pugi::xml_node                 current  = document.root();
     const std::vector<std::string> segments = element.declared_path().segments();
     for(const std::string &segment : segments)
         current = child_or_append(current, segment);

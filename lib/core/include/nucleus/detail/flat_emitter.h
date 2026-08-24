@@ -19,6 +19,7 @@
 #include <string>
 #include <vector>
 #include <utility>
+#include <optional>
 #include <algorithm>
 #include <string_view>
 
@@ -63,8 +64,9 @@ select_flat_keys(const config &config, const key_path &anchor)
         auto relative = select_flat_path(parsed.value(), anchor);
         if(!relative)
             return unexpected(relative.error());
-        if(relative.value())
-            selected.push_back({std::move(key), std::move(*relative.value())});
+        std::optional<key_path> &relative_path = relative.value();
+        if(relative_path)
+            selected.push_back({std::move(key), std::move(*relative_path)});
     }
     return selected;
 }
@@ -158,9 +160,10 @@ expected<std::vector<flat_template_record>, error> preflight_flat_template(
         auto relative = select_flat_path(element.declared_path(), anchor);
         if(!relative)
             return unexpected(relative.error());
-        if(!relative.value())
+        std::optional<key_path> &relative_path = relative.value();
+        if(!relative_path)
             continue;
-        auto record = preflight_flat_template_record(element, *relative.value(), render_key);
+        auto record = preflight_flat_template_record(element, *relative_path, render_key);
         if(!record)
             return unexpected(record.error());
         records.push_back(std::move(record).value());
