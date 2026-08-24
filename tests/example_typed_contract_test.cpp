@@ -1,3 +1,4 @@
+int typed_example_main();
 #define main typed_example_main
 #include "../examples/schema/typed.cpp"
 #undef main

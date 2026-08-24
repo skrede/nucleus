@@ -85,7 +85,7 @@ current working branch.
 | | Over the line ceiling | Over the function ceiling |
 |---|---|---|
 | Before the resolution-context and schema-registry decomposition | 46 units | 62 functions in 25 files |
-| Now | 45 units | 45 functions in 23 files |
+| Now | 48 units | 45 functions in 23 files |
 
 Two units left the register: `resolution_context.h` fell from 1890 lines to 196, and
 `schema_registry.h` from 534 to 178. The twenty-nine units split out of them are all inside both
@@ -93,6 +93,10 @@ ceilings, so none joined. The fifteen over-ceiling functions those two files hel
 are gone with them. The figure has since fallen by two more: `config.h` and
 `configuration_space.cpp` each measure one fewer over-ceiling function than the register had
 recorded.
+
+Three units have since joined, all of them contract tests that rename the example entry point they
+include. Declaring that renamed entry point is one line each, and each of the three was within a
+line of the ceiling already.
 
 The "before" figures needed a correction before they could be compared against. The earlier
 tables covered C++ files only, while the gate has always measured CMake units by name as well;
@@ -116,7 +120,7 @@ example tree goes further and may register nothing at all, line counts included 
 example table is the policy, not a gap in the measurements.
 
 The test-file table is the single entry either tree has, and it records line counts only. Those
-thirty units are carried debt awaiting a reorganization of the tree, and that table is expected to
+thirty-three units are carried debt awaiting a reorganization of the tree, and that table is expected to
 shrink rather than grow; where it has grown, the reason sits beside it.
 
 What the policy costs is a ratchet, and the ratchet is the point. Because no row can be added, the
@@ -170,7 +174,7 @@ None.
 
 ## Carried — test files over the 200-line ceiling
 
-30 of 157 units. Test units are held to the same ceiling.
+33 of 157 units. Test units are held to the same ceiling.
 
 Two rows here rose to close the pathname expansion the generated bash completion performed
 over its own candidates, and one of the two rose again for the zsh description escaper.
@@ -184,6 +188,11 @@ the shell rewrote it one stage later — so a shorter test there is one that pro
 compressing a case means dropping the seeding that is the case. The zsh case is long because it
 is an enumeration: no zsh runs on the machine that wrote it, so each construct it claims to
 neutralize has to be named and asserted rather than covered by driving a shell once.
+
+The three newest rows are contract tests that rename the example's entry point through the
+preprocessor so it cannot collide with the test runner's own. That rename leaves the renamed
+function defined but never declared, which a missing-prototype diagnostic refuses; the declaration
+that makes it legal is the single line that carried each of the three past the ceiling.
 
 | `tests/inherit_chain_test.cpp` | 1118 |
 | `tests/repeated_container_test.cpp` | 815 |
@@ -215,6 +224,9 @@ neutralize has to be named and asserted rather than covered by driving a shell o
 | `tests/source_handle_test.cpp` | 204 |
 | `tests/instance_addressing_test.cpp` | 202 |
 | `tests/token_cycle_test.cpp` | 202 |
+| `tests/example_constraint_groups_contract_test.cpp` | 201 |
+| `tests/example_pkey_tokenizer_contract_test.cpp` | 201 |
+| `tests/example_plugin_spaces_contract_test.cpp` | 201 |
 
 ## Carried — CMake units over the 200-line ceiling
 

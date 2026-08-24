@@ -1,3 +1,4 @@
+int argv_recognizer_example_main();
 #define main argv_recognizer_example_main
 #include "../examples/cli/argv_recognizer.cpp"
 #undef main

@@ -1,3 +1,4 @@
+int query_example_main();
 #define main query_example_main
 #include "../examples/references/query.cpp"
 #undef main

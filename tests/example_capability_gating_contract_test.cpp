@@ -2,6 +2,7 @@
 
 #include "nucleus/runtime/runtime_source.h"
 
+int capability_gating_example_main();
 #define main capability_gating_example_main
 #include "../examples/sources/capability_gating.cpp"
 #undef main

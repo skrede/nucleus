@@ -1,3 +1,4 @@
+int plugin_spaces_example_main();
 #define main plugin_spaces_example_main
 #include "../examples/composition/plugin_spaces.cpp"
 #undef main
@@ -124,7 +125,8 @@ void verify_factories()
                 test.application ? "application" : "private",
                 test.fail_at, test.fail_policy, test.fail_build);
         std::ostringstream output;
-        auto               product = test.application
+
+        auto product = test.application
                 ? make_application_space(builder, net, cache, output)
                 : make_private_space(builder, net);
         REQUIRE_FALSE(product.has_value());

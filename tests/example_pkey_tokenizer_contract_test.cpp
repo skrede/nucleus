@@ -1,3 +1,4 @@
+int pkey_tokenizer_example_main();
 #define main pkey_tokenizer_example_main
 #include "../examples/tokens/pkey_tokenizer.cpp"
 #undef main

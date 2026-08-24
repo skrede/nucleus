@@ -1,3 +1,4 @@
+int constraint_groups_example_main();
 #define main constraint_groups_example_main
 #include "../examples/schema/constraint_groups.cpp"
 #undef main
