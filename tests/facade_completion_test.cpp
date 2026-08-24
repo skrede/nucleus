@@ -171,3 +171,27 @@ TEST_CASE("a plain program name still yields a script for both shells",
     REQUIRE(zsh);
     REQUIRE(zsh.value().starts_with("#compdef my-tool.v2\n"));
 }
+
+TEST_CASE("a malformed space name is refused and a well-formed one still prefixes entries",
+          "[facade][completion]")
+{
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
+    nucleus::config_space space = engine.build();
+
+    for(const char *name : {"/", "a//b", "x[", "app/", "[0]", "node[999999999999]"})
+    {
+        CAPTURE(name);
+        const auto refused = space.generate_completion(nucleus::shell::bash, "t", {}, {}, name);
+        REQUIRE_FALSE(refused);
+        REQUIRE(refused.error().code == nucleus::errc::malformed_source);
+        REQUIRE(refused.error().message.find(name) != std::string::npos);
+    }
+
+    const auto prefixed = space.generate_completion(nucleus::shell::bash, "t", {}, {}, "app");
+    REQUIRE(prefixed);
+    REQUIRE(prefixed.value().find("--app-logging") != std::string::npos);
+    const auto bare = space.generate_completion(nucleus::shell::bash, "t");
+    REQUIRE(bare);
+    REQUIRE(bare.value().find("--logging") != std::string::npos);
+}

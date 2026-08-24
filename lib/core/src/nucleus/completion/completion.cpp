@@ -82,13 +82,11 @@ std::string wildcard_flag(const key_path &effective,
 // argv surface uses, so completion and the real CLI share one mapping.
 // For paths that cross a repeated container, an additional wildcard entry
 // is emitted with '*' at the container ordinal position.
-// When space_name is non-empty, it is prepended as the leading segment before
+// When `space` is non-empty, it is prepended as the leading segment before
 // applying flag_of(), so the completion entries match the multispace_argv_source grammar.
-completion_model project(const schema_registry &schema,
-                                       std::string_view prog,
-                                       const cli_delimiter &delimiter,
-                                       const key_path &anchor,
-                                       std::string_view space_name)
+completion_model project(const schema_registry &schema, std::string_view prog,
+                         const cli_delimiter &delimiter, const key_path &anchor,
+                         const key_path &space)
 {
     const auto values = value_sets(schema);
     const auto descs = descriptions(schema);
@@ -105,8 +103,7 @@ completion_model project(const schema_registry &schema,
             continue;
 
         const key_path relative = anchor.empty() ? path : path.relative_to(anchor);
-        const key_path effective = space_name.empty() ? relative
-            : key_path::parse(std::string(space_name) + "/" + relative.str()).value();
+        const key_path effective = space.empty() ? relative : space.join(relative);
 
         completion_option opt;
         opt.flag = flag_of(effective, delimiter);
@@ -130,7 +127,7 @@ completion_model project(const schema_registry &schema,
                 // depth counts full-path segments; the flag counts effective-path
                 // segments, which drop the anchor prefix and gain the space name.
                 const std::size_t anchor_offset   = anchor.empty() ? 0 : anchor.size();
-                const std::size_t space_offset    = space_name.empty() ? 0 : 1;
+                const std::size_t space_offset    = space.empty() ? 0 : 1;
                 const std::size_t effective_depth = depth - anchor_offset + space_offset;
 
                 completion_option wild;
@@ -180,7 +177,10 @@ expected<std::string, error> generate_completion(shell which, const schema_regis
 {
     if(auto valid = check_program_token(prog); !valid)
         return unexpected(std::move(valid).error());
-    const completion_model model = project(schema, prog, delimiter, anchor, space_name);
+    auto space = check_space_name(space_name);
+    if(!space)
+        return unexpected(std::move(space).error());
+    const completion_model model = project(schema, prog, delimiter, anchor, *space);
     // No default label: an added shell must gain a case here rather than fall
     // through silently to the bash emitter.
     std::string script;
