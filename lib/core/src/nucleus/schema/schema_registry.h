@@ -93,6 +93,8 @@ public:
 
     schema_attach_result attach_identity_group(identity_group_spec group)
     {
+        if(auto rejected = check_identity_group_name_unique(group, m_identity_groups); !rejected)
+            return rejected;
         if(auto rejected = check_identity_group(group, m_defined); !rejected)
             return rejected;
         m_identity_groups.push_back(std::move(group));

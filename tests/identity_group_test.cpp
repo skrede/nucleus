@@ -150,3 +150,34 @@ TEST_CASE("A reserved namespace name is rejected at registration", "[identity]")
         REQUIRE_FALSE(reg.has_value());
     }
 }
+
+TEST_CASE("Two identity groups cannot share a namespace name", "[identity]")
+{
+    auto b = pool_builder();
+    REQUIRE(b.register_identity_group(pool_names()));
+    auto reg = b.register_identity_group(
+        identity_group("component_names", anchor::keyspace("pool")).members({"gateway"}).field("name"));
+    REQUIRE_FALSE(reg.has_value());
+    REQUIRE(reg.error().code == errc::rejected_registration);
+    REQUIRE(mentions(reg.error(), "'component_names'"));
+}
+
+TEST_CASE("An identity group cannot list the same member twice", "[identity]")
+{
+    auto b = pool_builder();
+    auto reg = b.register_identity_group(
+        identity_group("component_names", anchor::keyspace("pool"))
+            .members({"worker", "gateway", "worker"}).field("name"));
+    REQUIRE_FALSE(reg.has_value());
+    REQUIRE(reg.error().code == errc::rejected_registration);
+    REQUIRE(mentions(reg.error(), "'worker'"));
+}
+
+TEST_CASE("Two differently named identity groups share one container", "[identity]")
+{
+    auto b = pool_builder();
+    REQUIRE(b.register_identity_group(
+        identity_group("worker_names", anchor::keyspace("pool")).members({"worker"}).field("name")));
+    REQUIRE(b.register_identity_group(
+        identity_group("gateway_names", anchor::keyspace("pool")).members({"gateway"}).field("name")));
+}
