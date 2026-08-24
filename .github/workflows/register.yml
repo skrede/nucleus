@@ -1,0 +1,132 @@
+name: Register
+
+# The two gates here are the ones whose verdict depends on the exception
+# register. That register is a markdown file, so the '**.md' ignore every build
+# workflow carries would skip precisely the edit that can turn these gates red:
+# a row added, a figure moved, a ledger count that no longer matches the tree.
+# So this workflow carries no path filter of any kind. The build workflows keep
+# theirs, because none of their jobs reads a markdown file -- a workflow's
+# triggers are derived from what its own jobs read, and the divergence here is
+# deliberate. Do not align this block with the sibling workflows.
+#
+# The size-ceiling gate below measures the whole tree rather than the units one
+# change touched, and that is what takes the pull request out of the equation.
+# The shape it replaces asked git for a common ancestor with the target branch,
+# had none to find on a push to a working branch, and exited zero having
+# measured nothing -- a green in the run summary that nothing had earned.
+#
+# What measuring the whole tree does NOT claim: it does not establish that every
+# unit is the right size. It establishes only that each unit is inside its
+# ceiling, or inside the figure the register records for it -- and that figure is
+# a decision a human made, not a fact the gate found.
+on:
+  push:
+    branches:
+      - master
+      - develop
+      - milestone/**
+  pull_request:
+    branches: [ develop, master ]
+  workflow_dispatch:
+
+# This workflow reads the repository and writes nothing back to it, so say so
+# structurally rather than leaving it to the discipline of whoever edits next.
+permissions:
+  contents: read
+
+# One run per branch per workflow: a push to develop and an open develop->master
+# PR share a concurrency group (head_ref for PRs, ref_name for pushes), so the
+# newer run supersedes the older instead of burning a duplicate job.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  size-gate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install measurement tools
+        run: sudo apt-get update && sudo apt-get install -y universal-ctags jq
+
+      # Exuberant Ctags installs under the same command name and accepts no JSON
+      # output format, so every function would measure 0 and the gate would pass
+      # without having measured anything. Here that has to be loud, unlike the
+      # local hook, which warns and lets the commit through.
+      - name: Assert the ctags flavor
+        run: |
+          if ! ctags --version | head -n 1 | grep -q 'Universal Ctags'; then
+            ctags --version | head -n 1 >&2
+            echo "universal-ctags is required to measure function spans" >&2
+            exit 1
+          fi
+
+      # A gate only ever run against a tree that passes cannot tell you it still
+      # fails. This unit is built to be refused -- one line over the ceiling and
+      # absent from the register -- so a widened exclusion, a dropped extension
+      # or a register lookup that has started matching everything shows up as a
+      # red step here rather than as a whole-tree green that measured nothing.
+      # It is written under a build directory name because the listing in the
+      # step below must not reach it.
+      - name: Assert the gate still refuses
+        run: |
+          mkdir -p build-size-control
+          awk 'BEGIN { for (i = 0; i < 201; i++) print "int over_ceiling_control();" }' > build-size-control/over_ceiling.cpp
+          if cmake -DNUCLEUS_SIZE_FILES=build-size-control/over_ceiling.cpp \
+              -P tests/cmake/check_local_size_growth.cmake; then
+            echo "the gate accepted a unit over the ceiling carrying no register row" >&2
+            exit 1
+          fi
+          rm -rf build-size-control
+
+      # The listing is every unit the register could possibly speak about, and it
+      # is not a changed-file listing: a unit someone else left over the ceiling
+      # is refused on this commit rather than on theirs. The listing decides what
+      # is looked at; EXCEPTIONS.md decides what an over-ceiling unit is held to.
+      # Neither role substitutes for the other.
+      - name: Size-ceiling gate
+        run: |
+          files=$(git ls-files |
+            grep -E '\.(h|hpp|cpp|cc|cmake)$|(^|/)CMakeLists\.txt$' |
+            paste -sd';')
+          cmake -DNUCLEUS_SIZE_FILES="$files" \
+            -P tests/cmake/check_local_size_growth.cmake
+
+  example-contracts:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install gate tools
+        run: sudo apt-get update && sudo apt-get install -y clang-format-18 universal-ctags jq
+
+      # Exuberant Ctags installs under the same command name and accepts no JSON
+      # output format, so every function would measure 0 and the size gate inside
+      # the checker would pass without having measured anything.
+      - name: Assert the ctags flavor
+        run: |
+          if ! ctags --version | head -n 1 | grep -q 'Universal Ctags'; then
+            ctags --version | head -n 1 >&2
+            echo "universal-ctags is required to measure function spans" >&2
+            exit 1
+          fi
+
+      # Configure only: the point is that enabling examples does not drag in the
+      # optional XML module, which a build would not tell us any more clearly.
+      - name: Examples configure without the XML module
+        run: |
+          cmake . -B build-xml-off \
+            -DNUCLEUS_BUILD_TESTS=OFF \
+            -DNUCLEUS_BUILD_EXAMPLES=ON \
+            -DNUCLEUS_BUILD_SOURCE_XML=OFF
+
+      # Its own job rather than a CTest entry: the checker runs the complete CTest
+      # suite itself, so registering it there would recurse.
+      - name: Example contract gate
+        run: |
+          cmake -DNUCLEUS_SOURCE_DIR=. \
+            -DNUCLEUS_BUILD_DIR=build-example-contracts \
+            -DNUCLEUS_CONFIG=Debug \
+            -DNUCLEUS_GATE_AUTHORITATIVE=ON \
+            -P tests/cmake/check_example_contracts.cmake
