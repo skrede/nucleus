@@ -20,13 +20,20 @@
 
 namespace {
 
-bool declare_space(nucleus::config_space_builder &engine)
+nucleus::expected<nucleus::config_space, nucleus::error> make_space()
 {
-    return engine.register_element(nucleus::element("server", nucleus::anchor::root()))
-        && engine.register_element(
-            nucleus::typed_element<std::int32_t>("port", nucleus::anchor::keyspace("server")))
-        && engine.register_element(
-            nucleus::element("name", nucleus::anchor::keyspace("server")));
+    nucleus::config_space_builder engine;
+    if(auto result = engine.register_element(
+            nucleus::element("server", nucleus::anchor::root())); !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = engine.register_element(
+            nucleus::typed_element<std::int32_t>("port", nucleus::anchor::keyspace("server")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = engine.register_element(
+            nucleus::element("name", nucleus::anchor::keyspace("server"))); !result)
+        return nucleus::unexpected(std::move(result).error());
+    return engine.build();
 }
 
 bool read_back(const nucleus::config &config)
@@ -48,13 +55,13 @@ bool read_back(const nucleus::config &config)
 
 bool consume_runtime_stack()
 {
-    nucleus::config_space_builder engine;
-    if(!declare_space(engine))
+    const auto sealed = make_space();
+    if(!sealed)
     {
-        std::cerr << "schema registration rejected\n";
+        std::cerr << "schema registration rejected: " << sealed.error() << '\n';
         return false;
     }
-    nucleus::config_space space = engine.build();
+    const nucleus::config_space &space = sealed.value();
 
     nucleus::runtime_source values;
     values.set("server/port", "8080").set("server/name", "edge");
@@ -73,19 +80,29 @@ bool consume_runtime_stack()
 #ifdef NUCLEUS_INTEGRATION_WITH_XML
 // The xml module rides the same install: parse a document through the
 // exported nucleus::xml target and read a value back.
+nucleus::expected<nucleus::config_space, nucleus::error> make_xml_space()
+{
+    nucleus::config_space_builder xml_engine;
+    if(auto result = xml_engine.register_element(
+            nucleus::element("server", nucleus::anchor::root())); !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = xml_engine.register_element(
+            nucleus::element("zone", nucleus::anchor::keyspace("server"))); !result)
+        return nucleus::unexpected(std::move(result).error());
+    return xml_engine.build();
+}
+
 bool consume_installed_xml()
 {
     auto doc = nucleus::xml_source::from(
         nucleus::xml_source_options::of_string("<server><zone>edge-1</zone></server>"));
-    nucleus::config_space_builder xml_engine;
-    if(!(xml_engine.register_element(nucleus::element("server", nucleus::anchor::root()))
-         && xml_engine.register_element(
-             nucleus::element("zone", nucleus::anchor::keyspace("server")))))
+    const auto sealed = make_xml_space();
+    if(!sealed)
     {
-        std::cerr << "xml schema registration rejected\n";
+        std::cerr << "xml schema registration rejected: " << sealed.error() << '\n';
         return false;
     }
-    nucleus::config_space xml_space = xml_engine.build();
+    const nucleus::config_space &xml_space = sealed.value();
     auto xml_loaded = nucleus::load_config(xml_space,
         nucleus::source_stack{std::move(doc)},
         {});

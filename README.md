@@ -221,7 +221,10 @@ if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())
 if(!builder.register_element(
     nucleus::element("port", nucleus::anchor::keyspace("server"))))
     return 1;
-nucleus::config_space space = builder.build();
+auto sealed = builder.build();
+if(!sealed)
+    return 1;
+const nucleus::config_space &space = sealed.value();
 
 nucleus::argv_source argv(std::vector<std::string>{"--server-port=8080"});
 argv.recognize_with(nucleus::recognizer_of(space));
@@ -301,7 +304,10 @@ if(!builder.register_element(nucleus::enum_element(
     "level", nucleus::anchor::keyspace("logging"),
     {"debug", "info", "warn", "error"})))
     return 1;
-nucleus::config_space space = builder.build();
+auto sealed = builder.build();
+if(!sealed)
+    return 1;
+const nucleus::config_space &space = sealed.value();
 
 auto script = space.generate_completion(nucleus::shell::bash, "mytool");
 if(!script)

@@ -21,7 +21,7 @@ using namespace nucleus;
 
 // endpoints/{output,endpoint}[name] pooled into the `endpoint_names` namespace; a
 // route/target keyref points into it.
-static config_space make_space()
+static expected<config_space, error> make_space()
 {
     config_space_builder b;
     b.register_element(element("endpoints", anchor::root()));
@@ -48,7 +48,10 @@ static runtime_source populated(const char *target)
 
 int main()
 {
-    const config_space space = make_space();
+    const auto sealed = make_space();
+    if(!sealed)
+        return 1;
+    const config_space &space = sealed.value();
     const auto ctx = space.query_context();
 
     std::cout << "--- valid keyref: route/target = 'primary' ---\n";

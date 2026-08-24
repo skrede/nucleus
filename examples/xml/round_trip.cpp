@@ -32,17 +32,27 @@ namespace {
 
 // A server container with a host leaf, a constrained mode leaf, and a repeated
 // tag leaf.
-bool define_space(nucleus::config_space_builder &builder)
+nucleus::expected<nucleus::config_space, nucleus::error> make_space()
 {
-    return builder.register_element(
-                   nucleus::element("server", nucleus::anchor::root())) &&
-            builder.register_element(
-                    nucleus::element("host", nucleus::anchor::keyspace("server"))) &&
-            builder.register_element(
-                    nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
-                                          {"primary", "secondary"})) &&
-            builder.register_element(
-                    nucleus::repeated_element("tag", nucleus::anchor::keyspace("server")));
+    nucleus::config_space_builder builder;
+    if(auto result = builder.register_element(
+               nucleus::element("server", nucleus::anchor::root()));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::element("host", nucleus::anchor::keyspace("server")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
+                                     {"primary", "secondary"}));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::repeated_element("tag", nucleus::anchor::keyspace("server")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    return builder.build();
 }
 
 // The runtime_source sits at stack[0] and carries the scalars; the document
@@ -83,11 +93,11 @@ bool print_artifact(
 
 int main()
 {
-    nucleus::config_space_builder builder;
-    if(!define_space(builder))
+    const auto sealed = make_space();
+    if(!sealed)
         return 1;
-    const nucleus::config_space space  = builder.build();
-    const nucleus::load_result  loaded = load_values(space);
+    const nucleus::config_space &space  = sealed.value();
+    const nucleus::load_result   loaded = load_values(space);
     if(!loaded)
     {
         std::cerr << "load failed: " << loaded.error() << '\n';

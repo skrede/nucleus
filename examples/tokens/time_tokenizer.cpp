@@ -102,6 +102,15 @@ nucleus::env_source make_fixed_values()
     return values;
 }
 
+nucleus::expected<nucleus::config_space, nucleus::error> make_space(
+        std::chrono::system_clock::time_point instant)
+{
+    nucleus::config_space_builder builder;
+    if(auto installed = builder.install_tokenizer(make_time_tokenizer(instant)); !installed)
+        return nucleus::unexpected(std::move(installed).error());
+    return builder.build();
+}
+
 // build/local reflects the host time zone; the utc-derived keys are stable.
 void print_values(const nucleus::config &config)
 {
@@ -116,15 +125,15 @@ int main()
     // Inject the clock. Swap this single line for
     // std::chrono::system_clock::now() in production; the fixed instant here
     // makes the utc output below deterministic and the tokenizer testable.
-    const auto                    instant = std::chrono::system_clock::from_time_t(1700000000);
-    nucleus::env_source           values  = make_fixed_values();
-    nucleus::config_space_builder builder;
-    if(auto installed = builder.install_tokenizer(make_time_tokenizer(instant)); !installed)
+    const auto          instant = std::chrono::system_clock::from_time_t(1700000000);
+    nucleus::env_source values  = make_fixed_values();
+    const auto          sealed  = make_space(instant);
+    if(!sealed)
     {
-        std::cerr << "install failed: " << installed.error() << '\n';
+        std::cerr << "space setup failed: " << sealed.error() << '\n';
         return 1;
     }
-    nucleus::config_space space = builder.build();
+    const nucleus::config_space &space = sealed.value();
 
     auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(values)}, {});
     if(!loaded)

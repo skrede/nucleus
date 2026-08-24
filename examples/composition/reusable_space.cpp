@@ -11,20 +11,30 @@
 #include "nucleus/runtime/runtime_source.h"
 
 #include <vector>
+#include <utility>
 #include <iostream>
 
-static bool define_space(nucleus::config_space_builder &builder)
+static nucleus::expected<nucleus::config_space, nucleus::error> make_space()
 {
-    return builder.register_element(
-                   nucleus::element("server", nucleus::anchor::root())) &&
-            builder.register_element(
-                    nucleus::element("host", nucleus::anchor::keyspace("server"))) &&
-            builder.register_element(
-                    nucleus::element("port", nucleus::anchor::keyspace("server"))) &&
-            builder.register_element(
-                    nucleus::enum_element(
-                            "mode", nucleus::anchor::keyspace("server"),
-                            std::vector<std::string>{"primary", "secondary"}));
+    nucleus::config_space_builder builder;
+    if(auto result = builder.register_element(
+               nucleus::element("server", nucleus::anchor::root()));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::element("host", nucleus::anchor::keyspace("server")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::element("port", nucleus::anchor::keyspace("server")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
+                                     std::vector<std::string>{"primary", "secondary"}));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    return builder.build();
 }
 
 static nucleus::runtime_source make_primary_source()
@@ -66,11 +76,11 @@ static void print_profiles(const nucleus::config &primary,
 
 int main()
 {
-    nucleus::config_space_builder builder;
-    if(!define_space(builder))
+    const auto sealed = make_space();
+    if(!sealed)
         return 1;
-    const nucleus::config_space space          = builder.build();
-    auto                        loaded_primary = nucleus::load_config(
+    const nucleus::config_space &space          = sealed.value();
+    auto                         loaded_primary = nucleus::load_config(
             space, nucleus::source_stack{make_primary_source()}, {});
     auto loaded_secondary = nucleus::load_config(
             space, nucleus::source_stack{make_secondary_source()}, {});

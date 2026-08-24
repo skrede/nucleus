@@ -19,7 +19,7 @@
 using namespace nucleus;
 
 // endpoints/output (repeated, `mode`) keyed by `name` via an identity group.
-static config_space make_space(merge_mode mode, bool with_identity)
+static expected<config_space, error> make_space(merge_mode mode, bool with_identity)
 {
     config_space_builder b;
     b.register_element(element("endpoints", anchor::root()));
@@ -38,7 +38,13 @@ static void show(const char *title, merge_mode mode, bool with_identity,
                  runtime_source base, runtime_source over)
 {
     std::cout << "--- " << title << " ---\n";
-    const config_space space = make_space(mode, with_identity);
+    const auto sealed = make_space(mode, with_identity);
+    if(!sealed)
+    {
+        std::cout << "  REJECTED: " << sealed.error().message << "\n\n";
+        return;
+    }
+    const config_space &space = sealed.value();
     auto r = load_config(space, source_stack{std::move(base), std::move(over)}, {});
     if(!r)
     {

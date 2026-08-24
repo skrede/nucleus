@@ -54,7 +54,10 @@ int main()
     nucleus::config_space_builder builder;
     if(!define_space(builder))
         return 1;
-    const nucleus::config_space space  = builder.build();
+    const auto sealed = builder.build();
+    if(!sealed)
+        return 1;
+    const nucleus::config_space &space = sealed.value();
     const nucleus::load_result  loaded = load_values(space);
     if(!loaded)
     {

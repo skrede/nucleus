@@ -12,7 +12,10 @@
 
 int main()
 {
-    nucleus::config_space space = nucleus::config_space_builder{}.build();
+    const auto sealed = nucleus::config_space_builder{}.build();
+    if(!sealed)
+        return 1;
+    const nucleus::config_space &space = sealed.value();
 
     // An env_source carrying the host-mapped (path, value) entries by value.
     nucleus::env_source values;

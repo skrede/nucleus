@@ -32,7 +32,10 @@ int main()
     values.set("service/region", "${string.upper(value=${env.NUCLEUS_REGION})}")
           .set("service/instance", "${string.lower(value=NODE-${env.NUCLEUS_REGION})}");
 
-    nucleus::config_space space = nucleus::config_space_builder{}.build();
+    const auto sealed = nucleus::config_space_builder{}.build();
+    if(!sealed)
+        return 1;
+    const nucleus::config_space &space = sealed.value();
 
     auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(values)}, {});
     if(!loaded)

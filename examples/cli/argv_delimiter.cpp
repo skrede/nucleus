@@ -17,16 +17,25 @@
 #include "nucleus/completion/completion.h"
 
 #include <vector>
+#include <utility>
 #include <iostream>
 
-static bool define_space(nucleus::config_space_builder &builder)
+static nucleus::expected<nucleus::config_space, nucleus::error> make_space()
 {
-    return builder.register_element(
-                   nucleus::element("server", nucleus::anchor::root())) &&
-            builder.register_element(
-                    nucleus::element("host", nucleus::anchor::keyspace("server"))) &&
-            builder.register_element(
-                    nucleus::element("port", nucleus::anchor::keyspace("server")));
+    nucleus::config_space_builder builder;
+    if(auto result = builder.register_element(
+               nucleus::element("server", nucleus::anchor::root()));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::element("host", nucleus::anchor::keyspace("server")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::element("port", nucleus::anchor::keyspace("server")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    return builder.build();
 }
 
 // The source parses `--server__host=...` instead of `--server-host=...`.
@@ -84,11 +93,11 @@ static bool print_completion(
 // delimiters (other than `/` itself) are rejected.
 int main()
 {
-    nucleus::config_space_builder builder;
-    if(!define_space(builder))
+    const auto sealed = make_space();
+    if(!sealed)
         return 1;
-    const nucleus::config_space space = builder.build();
-    auto                        delim = nucleus::cli_delimiter::parse("__");
+    const nucleus::config_space &space = sealed.value();
+    auto                         delim = nucleus::cli_delimiter::parse("__");
     if(!delim)
     {
         std::cerr << "bad delimiter: " << delim.error() << '\n';

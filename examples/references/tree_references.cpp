@@ -16,7 +16,10 @@
 // absolute path so the label is always consistent with the port.
 static int demonstrate_absolute_reference()
 {
-    const auto              space = nucleus::config_space_builder{}.build();
+    const auto sealed = nucleus::config_space_builder{}.build();
+    if(!sealed)
+        return 1;
+    const nucleus::config_space &space = sealed.value();
     nucleus::runtime_source source;
     source.set("server/port", "8080");
     source.set("app/port_label", "Port: ${abs:server/port}");
@@ -39,7 +42,10 @@ static int demonstrate_absolute_reference()
 // starts at the parent of server/url (i.e. server), then descends to host.
 static int demonstrate_relative_reference()
 {
-    const auto              space = nucleus::config_space_builder{}.build();
+    const auto sealed = nucleus::config_space_builder{}.build();
+    if(!sealed)
+        return 1;
+    const nucleus::config_space &space = sealed.value();
     nucleus::runtime_source source;
     source.set("server/host", "localhost");
     source.set("server/url", "${rel:./host}:8080");
@@ -62,7 +68,10 @@ static int demonstrate_relative_reference()
 // "30" is used.
 static int demonstrate_fallback_reference()
 {
-    const auto              space = nucleus::config_space_builder{}.build();
+    const auto sealed = nucleus::config_space_builder{}.build();
+    if(!sealed)
+        return 1;
+    const nucleus::config_space &space = sealed.value();
     nucleus::runtime_source source;
     source.set("app/timeout", "${abs:server/timeout ?? \"30\"}");
     const auto loaded = nucleus::load_config(

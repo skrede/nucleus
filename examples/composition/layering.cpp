@@ -25,7 +25,10 @@ static nucleus::source_stack make_sources()
 
 int main()
 {
-    nucleus::config_space space  = nucleus::config_space_builder{}.build();
+    const auto sealed = nucleus::config_space_builder{}.build();
+    if(!sealed)
+        return 1;
+    const nucleus::config_space &space = sealed.value();
     auto                  loaded = nucleus::load_config(space, make_sources(), {});
     if(!loaded)
     {

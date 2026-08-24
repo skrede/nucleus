@@ -386,7 +386,10 @@ builder.add_function("hello",
     });
 if(!engine.install_tokenizer(std::move(builder).build()))
     return 1;
-nucleus::config_space space = engine.build();
+auto sealed = engine.build();
+if(!sealed)
+    return 1;
+const nucleus::config_space &space = sealed.value();
 
 // A value "${greet.hello(who=world)}" now resolves to "hello world" at load.
 ```
@@ -459,7 +462,10 @@ nucleus::tree_tokenizer tok("server",
 
 if(!engine.install_tree_tokenizer(std::move(tok)))
     return 1;
-auto space = engine.build();
+auto sealed = engine.build();
+if(!sealed)
+    return 1;
+const nucleus::config_space &space = sealed.value();
 // A value "${server.name}" in a source now resolves via the host tokenizer.
 ```
 

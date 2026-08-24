@@ -56,7 +56,10 @@ int main()
     nucleus::config_space_builder builder;
     if(!define_space(builder))
         return 1;
-    nucleus::config_space space = builder.build();
+    const auto sealed = builder.build();
+    if(!sealed)
+        return 1;
+    const nucleus::config_space &space = sealed.value();
 
     // Select the "primary" strain for this load -- a per-load parameter.
     auto loaded = nucleus::load_config(space, nucleus::source_stack{},

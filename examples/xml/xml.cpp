@@ -16,16 +16,26 @@
 
 #include <vector>
 #include <string>
+#include <utility>
 #include <iostream>
 
-static bool define_space(nucleus::config_space_builder &builder)
+static nucleus::expected<nucleus::config_space, nucleus::error> make_space()
 {
-    return builder.register_element(nucleus::element("server", nucleus::anchor::root())) &&
-            builder.register_element(
-                    nucleus::required_element("host", nucleus::anchor::keyspace("server"))) &&
-            builder.register_element(
-                    nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
-                                          {"http", "https"}));
+    nucleus::config_space_builder builder;
+    if(auto result = builder.register_element(
+               nucleus::element("server", nucleus::anchor::root()));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::required_element("host", nucleus::anchor::keyspace("server")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::enum_element("mode", nucleus::anchor::keyspace("server"),
+                                     {"http", "https"}));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    return builder.build();
 }
 
 // Parse from an in-memory string so the example needs no file on disk. The
@@ -43,10 +53,10 @@ static nucleus::source_handle make_document(const std::string &)
 // `host` survives.
 int main()
 {
-    nucleus::config_space_builder builder;
-    if(!define_space(builder))
+    const auto sealed = make_space();
+    if(!sealed)
         return 1;
-    nucleus::config_space space = builder.build();
+    const nucleus::config_space &space = sealed.value();
 
     nucleus::argv_source argv(std::vector<std::string>{"--server-mode=https"});
     argv.recognize_with(nucleus::recognizer_of(space));

@@ -36,7 +36,10 @@ int main()
         nucleus::enum_element("level", nucleus::anchor::keyspace("logging"),
                               {"debug", "info", "warn", "error"})))
         return 1;
-    nucleus::config_space space = builder.build();
+    const auto sealed = builder.build();
+    if(!sealed)
+        return 1;
+    const nucleus::config_space &space = sealed.value();
 
     const auto bash = space.generate_completion(nucleus::shell::bash, "mytool");
     const auto zsh  = space.generate_completion(nucleus::shell::zsh, "mytool");

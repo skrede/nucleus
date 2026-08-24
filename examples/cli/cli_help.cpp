@@ -12,6 +12,7 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
+#include <utility>
 #include <iostream>
 
 static bool print_zsh_completion(const nucleus::config_space &space)
@@ -26,23 +27,37 @@ static bool print_zsh_completion(const nucleus::config_space &space)
     return true;
 }
 
-int main()
+static nucleus::expected<nucleus::config_space, nucleus::error> make_space()
 {
     nucleus::config_space_builder builder;
-    if(!builder.register_element(nucleus::element("logging", nucleus::anchor::root())))
+    if(auto result = builder.register_element(
+               nucleus::element("logging", nucleus::anchor::root()));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(nucleus::described(
+               nucleus::enum_element("level", nucleus::anchor::keyspace("logging"),
+                                     {"debug", "info", "warn", "error"}),
+               "set the logging level"));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::element("server", nucleus::anchor::root()));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(nucleus::described(
+               nucleus::required_element("host", nucleus::anchor::keyspace("server")),
+               "the address the server binds to"));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    return builder.build();
+}
+
+int main()
+{
+    const auto sealed = make_space();
+    if(!sealed)
         return 1;
-    if(!builder.register_element(nucleus::described(
-            nucleus::enum_element("level", nucleus::anchor::keyspace("logging"),
-                                  {"debug", "info", "warn", "error"}),
-            "set the logging level")))
-        return 1;
-    if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
-        return 1;
-    if(!builder.register_element(nucleus::described(
-            nucleus::required_element("host", nucleus::anchor::keyspace("server")),
-            "the address the server binds to")))
-        return 1;
-    nucleus::config_space space = builder.build();
+    const nucleus::config_space &space = sealed.value();
 
     std::cout << "# ---- --help ----\n";
     std::cout << space.generate_help("mytool");

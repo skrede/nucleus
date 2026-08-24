@@ -43,7 +43,10 @@ struct table_source
 
 int main()
 {
-    nucleus::config_space space = nucleus::config_space_builder{}.build();
+    const auto sealed = nucleus::config_space_builder{}.build();
+    if(!sealed)
+        return 1;
+    const nucleus::config_space &space = sealed.value();
 
     // A custom source that satisfies the source concept is moved directly into a
     // source_handle and layered through the explicit stack.

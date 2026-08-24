@@ -81,7 +81,7 @@ std::size_t tokenizer_count() const noexcept;
 std::size_t converter_count() const noexcept;
 std::vector<conflict_report> conflicts() const;
 
-config_space build();   // seals; the builder is spent afterwards
+expected<config_space, error> build();   // seals; the builder is spent afterwards
 ```
 
 - `registration_result` is `expected<void, error>`: truthy on success. On
@@ -92,6 +92,9 @@ config_space build();   // seals; the builder is spent afterwards
   [registration policy](api-extending.md#registration_policy).
 - After `build()`, every `register_*` / `install_*` call is a loud state-machine
   error (`errc::sealed_builder`), never a silent no-op.
+- A second `build()` reports `errc::sealed_builder` through the value it returns.
+  `name()` on a spent builder still returns the builder, so a chain compiles; it
+  records the refusal and the next `build()` reports it alongside its own.
 
 See [`examples/basics/quickstart.cpp`](../examples/basics/quickstart.cpp).
 

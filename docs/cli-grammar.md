@@ -170,16 +170,19 @@ sites without a space name are unaffected.
 nucleus::multispace_argv_source src(argv_tokens);
 src.register_space("alpha").register_space("beta");
 
-// Each view sees only its own flags.
+// Each view sees only its own flags. A name that was never registered is
+// reported as errc::malformed_source, not returned as a view.
 auto alpha_view = src.for_space("alpha");
 auto beta_view  = src.for_space("beta");
+if(!alpha_view || !beta_view)
+    return 1;
 
 // Wire schema-coupled recognition.
-alpha_view.recognize_with(nucleus::recognizer_of(alpha_space));
-beta_view.recognize_with(nucleus::recognizer_of(beta_space));
+alpha_view->recognize_with(nucleus::recognizer_of(alpha_space));
+beta_view->recognize_with(nucleus::recognizer_of(beta_space));
 
-nucleus::source_stack alpha_stack{nucleus::source_handle(alpha_view)};
-nucleus::source_stack beta_stack{nucleus::source_handle(beta_view)};
+nucleus::source_stack alpha_stack{nucleus::source_handle(alpha_view.value())};
+nucleus::source_stack beta_stack{nucleus::source_handle(beta_view.value())};
 
 auto alpha_cfg = nucleus::load_config(alpha_space, alpha_stack);
 auto beta_cfg  = nucleus::load_config(beta_space,  beta_stack);

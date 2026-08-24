@@ -71,7 +71,10 @@ int main()
     nucleus::config_space_builder builder;
     if(!define_space(builder))
         return 1;
-    const nucleus::config_space space       = builder.build();
+    const auto sealed = builder.build();
+    if(!sealed)
+        return 1;
+    const nucleus::config_space &space = sealed.value();
     nucleus::runtime_source     defaults    = make_defaults();
     nucleus::env_source         environment = make_environment();
     nucleus::argv_source        arguments   = make_arguments(space);

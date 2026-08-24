@@ -12,17 +12,29 @@
 #include "nucleus/runtime/runtime_source.h"
 
 #include <vector>
+#include <utility>
 #include <iostream>
+
+static nucleus::expected<nucleus::config_space, nucleus::error> make_argv_space()
+{
+    nucleus::config_space_builder builder;
+    if(auto result = builder.register_element(
+               nucleus::element("server", nucleus::anchor::root()));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::element("port", nucleus::anchor::keyspace("server")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    return builder.build();
+}
 
 static int demo_argv()
 {
-    nucleus::config_space_builder builder;
-    if(!builder.register_element(nucleus::element("server", nucleus::anchor::root())))
+    const auto sealed = make_argv_space();
+    if(!sealed)
         return 1;
-    if(!builder.register_element(
-               nucleus::element("port", nucleus::anchor::keyspace("server"))))
-        return 1;
-    nucleus::config_space space = builder.build();
+    const nucleus::config_space &space = sealed.value();
 
     nucleus::argv_source argv(std::vector<std::string>{"--server-port=8080"});
     argv.recognize_with(nucleus::recognizer_of(space));
@@ -39,16 +51,22 @@ static int demo_argv()
     return 0;
 }
 
-static bool define_repeated_space(nucleus::config_space_builder &builder)
+static nucleus::expected<nucleus::config_space, nucleus::error> make_repeated_space()
 {
-    return builder.register_element(
-                   nucleus::element("cluster", nucleus::anchor::root())) &&
-            builder.register_element(
-                    nucleus::repeated_element(
-                            "node", nucleus::anchor::keyspace("cluster"))) &&
-            builder.register_element(
-                    nucleus::element(
-                            "port", nucleus::anchor::keyspace("cluster/node")));
+    nucleus::config_space_builder builder;
+    if(auto result = builder.register_element(
+               nucleus::element("cluster", nucleus::anchor::root()));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::repeated_element("node", nucleus::anchor::keyspace("cluster")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    if(auto result = builder.register_element(
+               nucleus::element("port", nucleus::anchor::keyspace("cluster/node")));
+       !result)
+        return nucleus::unexpected(std::move(result).error());
+    return builder.build();
 }
 
 static nucleus::runtime_source make_repeated_source()
@@ -61,11 +79,11 @@ static nucleus::runtime_source make_repeated_source()
 
 static int demo_repeated()
 {
-    nucleus::config_space_builder builder;
-    if(!define_repeated_space(builder))
+    const auto sealed = make_repeated_space();
+    if(!sealed)
         return 1;
-    nucleus::config_space space  = builder.build();
-    auto                  loaded = nucleus::load_config(
+    const nucleus::config_space &space  = sealed.value();
+    auto                         loaded = nucleus::load_config(
             space, nucleus::source_stack{make_repeated_source()}, {});
     if(!loaded)
     {
