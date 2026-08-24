@@ -1,4 +1,4 @@
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -70,7 +70,7 @@ TEST_CASE("a single named strain resolves onto the unified hierarchy",
 
     nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto loaded = load_doc(space, doc);
     REQUIRE(loaded);
@@ -96,7 +96,7 @@ TEST_CASE("several named strains with no selection fail loudly",
 
     nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto loaded = load_doc(space, doc);
 
@@ -118,7 +118,7 @@ TEST_CASE("a key carried as a text-leaf child is consumed the same way",
 
     nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto loaded = load_doc(space, doc);
     REQUIRE(loaded);
@@ -143,7 +143,7 @@ TEST_CASE("a named strain composes on top of anonymous template instances",
 
     nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto loaded = load_doc(space, doc);
     REQUIRE(loaded);
@@ -168,7 +168,7 @@ TEST_CASE("anonymous strains alone collapse into the config space",
 
     nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto loaded = load_doc(space, doc);
     REQUIRE(loaded);
@@ -184,7 +184,7 @@ TEST_CASE("an explicitly-empty primary-key value is rejected",
 {
     nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     // A present-but-empty key is an empty identity, not an anonymous instance:
     // it cannot silently degrade to the structural walk and shadow real strains.
@@ -228,7 +228,7 @@ TEST_CASE("a genuinely absent key still loads as an anonymous instance",
 
     nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto loaded = load_doc(space, doc);
     REQUIRE(loaded);
@@ -299,7 +299,7 @@ TEST_CASE("an anonymous keyed instance keeps its nested containers intact",
         nucleus::unique_element("name", anchor::keyspace("cluster/server/profile"))));
     REQUIRE(engine.register_element(
         nucleus::element("message", anchor::keyspace("cluster/server/profile"))));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     const char *doc = R"(
         <cluster>
@@ -327,7 +327,7 @@ TEST_CASE("without a declared primary key the structural walk is unchanged",
 
     // No schema at all: projection is empty, so the source walks structurally and
     // the name attribute is an ordinary leaf.
-    nucleus::config_space space = nucleus::config_space_builder{}.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(nucleus::config_space_builder{});
     auto loaded = load_doc(space, doc);
     REQUIRE(loaded);
     const nucleus::config &config = loaded.value();

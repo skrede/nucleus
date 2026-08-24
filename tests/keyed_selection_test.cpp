@@ -1,4 +1,4 @@
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -66,7 +66,7 @@ TEST_CASE("a selection resolves the matching strain and prunes others",
 
     nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto loaded = load_doc(space, doc, "web");
     REQUIRE(loaded);
@@ -92,7 +92,7 @@ TEST_CASE("a selection strips the key segment from the resolved path",
 
     nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto loaded = load_doc(space, doc, "web");
     REQUIRE(loaded);
@@ -114,7 +114,7 @@ TEST_CASE("selecting an unknown strain value fails with available listed",
 
     nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto loaded = load_doc(space, doc, "missing");
     REQUIRE_FALSE(loaded);
@@ -138,7 +138,7 @@ TEST_CASE("selecting when schema has no primary key fails",
     REQUIRE(engine.register_element(nucleus::element("cluster", anchor::root())));
     REQUIRE(engine.register_element(nucleus::element("server", anchor::keyspace("cluster"))));
     REQUIRE(engine.register_element(nucleus::element("port", anchor::keyspace("cluster/server"))));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto loaded = load_doc(space, doc, "anything");
     REQUIRE_FALSE(loaded);
@@ -157,7 +157,7 @@ TEST_CASE("anonymous-only content collapses without a selection",
 
     nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto loaded = load_doc(space, doc);
     REQUIRE(loaded);
@@ -180,7 +180,7 @@ TEST_CASE("a selection against anonymous-only content fails loudly",
 
     nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto loaded = load_doc(space, doc, "web");
     REQUIRE_FALSE(loaded);
@@ -201,7 +201,7 @@ TEST_CASE("a bracket-shaped primary-key value is rejected loudly, never silently
 
     nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto loaded = load_doc(space, doc, "node[3]");
     REQUIRE_FALSE(loaded);
@@ -223,7 +223,7 @@ TEST_CASE("a key value shadowing a declared element name is a loud error",
 
     nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto loaded = load_doc(space, doc);
     REQUIRE_FALSE(loaded);

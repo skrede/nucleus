@@ -17,7 +17,7 @@
 
 #include "nucleus/strain_scope.h"
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -160,7 +160,7 @@ TEST_CASE("integration: select primary resolves unified keyspace with template c
 {
     nucleus::config_space_builder engine;
     declare_cluster_with_unique(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto loaded = load_chain(space, {"leaf.xml"}, make_main_factory(), "primary");
     REQUIRE(loaded);
@@ -207,7 +207,7 @@ TEST_CASE("integration: auto-resolve single named strain succeeds without select
 
     nucleus::config_space_builder engine;
     declare_cluster_with_unique(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
     // No selection -- single named strain auto-resolves.
 
     auto loaded = load_chain(space, {"derived2.xml"}, factory);
@@ -244,7 +244,7 @@ TEST_CASE("integration: file_level scope policy excludes derived-layer entries",
 
     nucleus::config_space_builder engine;
     declare_cluster_with_unique(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto loaded = load_chain(space, {"derived3.xml"}, factory, "primary",
                              strain_scope_policy::file_level);
@@ -268,7 +268,7 @@ TEST_CASE("integration: scope-policy contrast for primary's derived entry",
     {
         nucleus::config_space_builder engine;
         declare_cluster_with_unique(engine);
-        nucleus::config_space space = engine.build();
+        nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
         auto loaded = load_chain(space, {"yang_tc4.xml"}, make_tc4_factory(), "primary",
                                  strain_scope_policy::container_open_until_next_strain);
@@ -284,7 +284,7 @@ TEST_CASE("integration: scope-policy contrast for primary's derived entry",
     {
         nucleus::config_space_builder engine;
         declare_cluster_with_unique(engine);
-        nucleus::config_space space = engine.build();
+        nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
         auto loaded = load_chain(space, {"yang_tc4.xml"}, make_tc4_factory(), "primary",
                                  strain_scope_policy::space_open_container_closed);
@@ -324,7 +324,7 @@ TEST_CASE("integration: opt-out terminates the chain by declaration",
 
     nucleus::config_space_builder engine;
     declare_cluster_with_unique(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto loaded = load_chain(space, {"leaf5.xml"}, factory, "primary");
     REQUIRE(loaded);
@@ -360,7 +360,7 @@ TEST_CASE("integration: multiple strains with no selection is a loud error",
 
     nucleus::config_space_builder engine;
     declare_cluster_with_unique(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
     // No selection -- multiple strains without selection must be a loud error.
 
     auto loaded = load_chain(space, {"derived6.xml"}, factory);
@@ -395,7 +395,7 @@ TEST_CASE("integration: select with unknown key value is a loud error",
 
     nucleus::config_space_builder engine;
     declare_cluster_with_unique(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto loaded = load_chain(space, {"derived7.xml"}, factory, "ghost");
     REQUIRE_FALSE(loaded);
@@ -416,7 +416,7 @@ TEST_CASE("integration: duplicate unique field value across strains is a loud er
 
     nucleus::config_space_builder engine;
     declare_cluster_with_unique(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     // Select "primary" so the unique check runs before the multiple-strains-no-selection
     // guard, which would fire first otherwise.

@@ -6,7 +6,7 @@
 // Repeated instances in numeric ordinal order (correct for N >= 11)
 
 #include "nucleus/config_node.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -60,7 +60,7 @@ nucleus::config load_two_nodes(const std::string &port0, const std::string &port
 {
     nucleus::config_space_builder engine;
     declare_flat_cluster_schema(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     const std::string xml = "<cluster><node><port>" + port0 + "</port></node>"
                             "<node><port>" + port1 + "</port></node></cluster>";
@@ -323,7 +323,7 @@ TEST_CASE("config_node N >= 11 instances visit in numeric order not lexicographi
     // Numeric order is: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11  (CORRECT)
     nucleus::config_space_builder engine;
     declare_flat_cluster_schema(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     std::string xml = "<cluster>";
     for(int i = 0; i < 12; ++i)
@@ -422,7 +422,7 @@ TEST_CASE("config_node deep navigation reaches scalar value", "[config_node][nav
 {
     nucleus::config_space_builder engine;
     declare_cluster_schema(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     const std::string xml =
         "<cluster>"

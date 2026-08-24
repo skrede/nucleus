@@ -1,4 +1,4 @@
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 #include "nucleus/identity.h"
 #include "nucleus/error.h"
 
@@ -24,7 +24,7 @@
 
 TEST_CASE("resolve folds a precedence stack and freezes an immutable result", "[resolution]")
 {
-    nucleus::config_space space = nucleus::config_space_builder{}.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(nucleus::config_space_builder{});
 
     nucleus::env_source defaults;
     defaults.set("server/host", "localhost").set("server/port", "80");
@@ -46,7 +46,7 @@ TEST_CASE("resolve folds a precedence stack and freezes an immutable result", "[
 
 TEST_CASE("value and provenance are recorded in the same fold and cannot diverge", "[resolution]")
 {
-    nucleus::config_space space = nucleus::config_space_builder{}.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(nucleus::config_space_builder{});
 
     nucleus::env_source base;
     base.set("a", "from-base").set("b", "base-only");
@@ -76,7 +76,7 @@ TEST_CASE("value and provenance are recorded in the same fold and cannot diverge
 
 TEST_CASE("explicit precedence is argv over overlay over base over env over defaults", "[resolution]")
 {
-    nucleus::config_space space = nucleus::config_space_builder{}.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(nucleus::config_space_builder{});
 
     nucleus::env_source defaults;  defaults.set("k", "defaults");
     nucleus::env_source env;       env.set("k", "env");
@@ -99,7 +99,7 @@ TEST_CASE("a sealed space loads repeatedly and a built builder rejects registrat
           "[resolution][lifecycle]")
 {
     nucleus::config_space_builder engine;
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     nucleus::env_source one; one.set("k", "v");
 
@@ -123,7 +123,7 @@ TEST_CASE("the args-only options wire the argv recognizer to the schema", "[reso
     {
         nucleus::config_space_builder engine;
         REQUIRE(engine.register_schema("logging/level"));
-        nucleus::config_space space = engine.build();
+        nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
         nucleus::argv_source argv(std::vector<std::string>{"--logging-level=debug"});
         argv.recognize_with(nucleus::recognizer_of(space));
@@ -136,7 +136,7 @@ TEST_CASE("the args-only options wire the argv recognizer to the schema", "[reso
     {
         nucleus::config_space_builder engine;
         REQUIRE(engine.register_schema("logging/level"));
-        nucleus::config_space space = engine.build();
+        nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
         nucleus::argv_source argv(std::vector<std::string>{"--logging-levle=debug"});
         argv.recognize_with(nucleus::recognizer_of(space));
@@ -156,7 +156,7 @@ TEST_CASE("a later-listed stack source wins a same-key contest against an earlie
     // or document paths.
     nucleus::config_space_builder engine;
     REQUIRE(engine.register_schema("k"));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     nucleus::env_source lower; lower.set("k", "from-lower");
     nucleus::env_source higher; higher.set("k", "from-higher");
@@ -183,7 +183,7 @@ TEST_CASE("the last config document wins among layered paths", "[resolution][pre
 
     nucleus::config_space_builder engine;
     REQUIRE(engine.register_schema("k"));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto loaded = nucleus::load_config(space, nucleus::source_stack{},
         nucleus::load_options{.document_paths = {"first", "second", "third", "fourth"},
@@ -194,7 +194,7 @@ TEST_CASE("the last config document wins among layered paths", "[resolution][pre
 
 TEST_CASE("an unresolvable token fails the fold loudly rather than passing through", "[resolution][tokens]")
 {
-    nucleus::config_space space = nucleus::config_space_builder{}.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(nucleus::config_space_builder{});
 
     nucleus::env_source env;
     // No tokenizer answers the `nope` category (the core builtins are
@@ -212,7 +212,7 @@ TEST_CASE("the space resolves core builtin tokens with no extra registration", "
 {
     // A host that registers nothing special must still get token expansion: the
     // generic core tokenizers are installed by default on the builder.
-    nucleus::config_space space = nucleus::config_space_builder{}.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(nucleus::config_space_builder{});
 
     nucleus::env_source env;
     env.set("greeting", "${string.upper(value=hi)}");
@@ -234,7 +234,7 @@ TEST_CASE("install_tokenizer injects an additional tokenizer reachable at resolv
         return std::string("hello ") + std::string(who);
     });
     REQUIRE(engine.install_tokenizer(std::move(builder).build()));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     nucleus::env_source env;
     env.set("msg", "${greet.world}");
@@ -247,7 +247,7 @@ TEST_CASE("install_tokenizer injects an additional tokenizer reachable at resolv
 TEST_CASE("a malformed key path fails the load loudly, naming the source and the offending path",
           "[resolution]")
 {
-    nucleus::config_space space = nucleus::config_space_builder{}.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(nucleus::config_space_builder{});
 
     nucleus::runtime_source src;
     src.set("server//port", "80"); // empty segment -- malformed
@@ -263,7 +263,7 @@ TEST_CASE("tokens are expanded per-source before layering (expand-then-layer)", 
 {
     // A single env source carrying one token and one plain value: the token must
     // be expanded at fold time so the frozen config holds the resolved form.
-    nucleus::config_space space = nucleus::config_space_builder{}.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(nucleus::config_space_builder{});
 
     nucleus::env_source env;
     env.set("loud", "${string.upper(value=hi)}").set("plain", "kept");

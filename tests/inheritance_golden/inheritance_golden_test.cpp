@@ -1,6 +1,6 @@
 #include "golden_runner.h"
 
-#include "nucleus/config_space.h"
+#include "../builder_result_test_support.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -105,7 +105,7 @@ TEST_CASE("inheritance golden fixtures match nucleus-derived resolution", "[gold
 
             nucleus::config_space_builder builder;
             nucleus::golden::declare_schema(builder);
-            const nucleus::config_space space = builder.build();
+            const nucleus::config_space space = nucleus::builder_result_test::built(builder);
 
             nucleus::load_options opts;
             opts.document_paths = spec.inputs;

@@ -1,3 +1,4 @@
+#include "builder_result_test_support.h"
 #include "identity_envelope_test_support.h"
 
 #include "nucleus/xml/xml_emitter.h"
@@ -14,7 +15,7 @@ TEST_CASE("emit_document + load round-trip preserves a root-anchored leaf under 
 {
     config_space_builder builder;
     REQUIRE(builder.register_element(element("motd", anchor::root())));
-    const config_space space   = builder.build();
+    const config_space space   = nucleus::builder_result_test::built(builder);
     const load_options options = envelope_test::make_options(
             "<engine><motd>hello</motd></engine>", "engine");
 

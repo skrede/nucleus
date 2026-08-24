@@ -1,3 +1,4 @@
+#include "builder_result_test_support.h"
 #include "identity_envelope_test_support.h"
 
 #include "nucleus/error.h"
@@ -42,7 +43,7 @@ TEST_CASE("xml_source: a root-anchored leaf under a named space keeps its value"
     config_space_builder builder;
     REQUIRE(builder.register_schema("motd"));
     REQUIRE(builder.register_schema("plugin/x"));
-    const config_space space   = builder.build();
+    const config_space space   = nucleus::builder_result_test::built(builder);
     const load_options options = envelope_test::make_options(
             "<engine><motd>hello</motd><plugin><x>1</x></plugin></engine>",
             "engine");
@@ -98,7 +99,7 @@ TEST_CASE("xml_source: unnamed space keeps root name as first key segment",
 {
     config_space_builder builder;
     REQUIRE(builder.register_schema("engine/plugin/x"));
-    const config_space space   = builder.build();
+    const config_space space   = nucleus::builder_result_test::built(builder);
     const load_options options = envelope_test::make_options(
             "<engine><plugin><x>1</x></plugin></engine>");
 
@@ -113,10 +114,10 @@ TEST_CASE("config_space::space_name() returns the name set on the builder",
 {
     config_space_builder named_builder;
     named_builder.name("mynamespace");
-    const config_space named_space = named_builder.build();
+    const config_space named_space = nucleus::builder_result_test::built(named_builder);
     REQUIRE(named_space.space_name() == "mynamespace");
 
     config_space_builder unnamed_builder;
-    const config_space   unnamed_space = unnamed_builder.build();
+    const config_space   unnamed_space = nucleus::builder_result_test::built(unnamed_builder);
     REQUIRE(unnamed_space.space_name().empty());
 }

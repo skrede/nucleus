@@ -1,5 +1,5 @@
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 #include "nucleus/config_source/inherit_declaration.h"
 
 #include "nucleus/schema/anchor.h"
@@ -156,7 +156,7 @@ TEST_CASE("multi-source system: env base shows through when document does not ov
     REQUIRE(builder.register_element(element("server", anchor::root())));
     REQUIRE(builder.register_element(element("host", anchor::keyspace("server"))));
     REQUIRE(builder.register_element(element("mode", anchor::keyspace("server"))));
-    const config_space space = builder.build();
+    const config_space space = nucleus::builder_result_test::built(builder);
 
     env_source env;
     env.set("server/host", "env-only-host");
@@ -194,7 +194,7 @@ TEST_CASE("multi-source system: argv overrides env for a contested key",
     // can satisfy the capability gate (neither declares nesting capability).
     config_space_builder builder;
     REQUIRE(builder.register_element(element("port", anchor::root())));
-    const config_space space = builder.build();
+    const config_space space = nucleus::builder_result_test::built(builder);
 
     env_source env;
     env.set("port", "7000");

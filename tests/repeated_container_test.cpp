@@ -3,7 +3,7 @@
 // schema_enforcer normalizes indexed paths via canonical_text.
 // get_as() loud error for unindexed crossing; get_all_as() typed gather.
 
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -63,7 +63,7 @@ TEST_CASE("unified fold -- two-node indexed scalars stored in m_values",
 {
     nucleus::config_space_builder engine;
     declare_cluster_node_schema(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto src = xml_of(
         "<cluster>"
@@ -88,7 +88,7 @@ TEST_CASE("unified fold -- repeated leaf stored as indexed scalars",
 {
     nucleus::config_space_builder engine;
     declare_tags_schema(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto src = xml_of("<config><tags>a</tags><tags>b</tags></config>");
     auto loaded = nucleus::load_config(space,
@@ -110,7 +110,7 @@ TEST_CASE("wholesale-replace -- a two-node layer over a three-node base replaces
 {
     nucleus::config_space_builder engine;
     declare_cluster_node_schema(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto src1 = xml_of(
         "<cluster>"
@@ -155,7 +155,7 @@ TEST_CASE("wholesale-replace -- nested repeated-in-repeated sweep operates at "
         nucleus::repeated_element("tags", anchor::keyspace("cluster/node"))));
     REQUIRE(engine.register_element(
         nucleus::element("name", anchor::keyspace("cluster/node/tags"))));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     // Layer 1 supplies both label and a tag under node[0].
     auto src1 = xml_of(
@@ -190,7 +190,7 @@ TEST_CASE("extend= on repeated container returns layering_violation",
 {
     nucleus::config_space_builder engine;
     declare_cluster_node_schema(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     // An extend= attribute on a repeated container instance is not supported.
     auto src1 = xml_of(
@@ -218,7 +218,7 @@ TEST_CASE("get_all gather -- cluster/node/port across indexed instances",
 {
     nucleus::config_space_builder engine;
     declare_cluster_node_schema(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto src = xml_of(
         "<cluster>"
@@ -243,7 +243,7 @@ TEST_CASE("get_all gather -- repeated leaf in numeric ordinal order",
 {
     nucleus::config_space_builder engine;
     declare_tags_schema(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto src = xml_of("<config><tags>a</tags><tags>b</tags></config>");
     auto loaded = nucleus::load_config(space,
@@ -269,7 +269,7 @@ TEST_CASE("get_all gather -- numeric ordinal order with N >= 11 instances",
         nucleus::repeated_element("node", anchor::keyspace("cluster"))));
     REQUIRE(engine.register_element(
         nucleus::element("port", anchor::keyspace("cluster/node"))));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     // Inject 12 indexed scalar entries directly via runtime_source.
     // Paths are cluster/node[0]/port through cluster/node[11]/port.
@@ -378,7 +378,7 @@ TEST_CASE("get_as on unindexed repeated container path returns errc::index_requi
 {
     nucleus::config_space_builder engine;
     declare_cluster_node_schema(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto src = xml_of(
         "<cluster>"
@@ -408,7 +408,7 @@ TEST_CASE("get on unindexed repeated container path returns nullopt",
 {
     nucleus::config_space_builder engine;
     declare_cluster_node_schema(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto src = xml_of(
         "<cluster>"
@@ -439,7 +439,7 @@ TEST_CASE("get_all_as gathers typed values across indexed instances",
     nucleus::schema_element port_el =
         nucleus::typed_element<double>("port", anchor::keyspace("cluster/node"));
     REQUIRE(engine.register_element(std::move(port_el)));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto src = xml_of(
         "<cluster>"
@@ -473,7 +473,7 @@ TEST_CASE("Repeated element with no identity or unique attaches and loads",
             nucleus::repeated_element("node", anchor::keyspace("cluster"))));
         REQUIRE(engine.register_element(
             nucleus::element("port", anchor::keyspace("cluster/node"))));
-        nucleus::config_space space = engine.build();
+        nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
         auto src = xml_of("<cluster><node><port>80</port></node></cluster>");
         auto loaded = nucleus::load_config(space,
@@ -500,7 +500,7 @@ TEST_CASE("Repeated element with no identity or unique attaches and loads",
         REQUIRE(engine.register_element(
             nucleus::primary_key_element("name", anchor::keyspace("registry/server"))));
         // Both registrations must succeed: no conflict between the two containers.
-        nucleus::config_space space = engine.build();
+        nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
         auto src = xml_of(
             "<cluster><node><port>80</port></node></cluster>");
@@ -542,7 +542,7 @@ TEST_CASE("Repeated container inside keyed container -- ordinals survive slice",
         nucleus::repeated_element("route", anchor::keyspace("cluster/server"))));
     REQUIRE(engine.register_element(
         nucleus::element("port", anchor::keyspace("cluster/server/route"))));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto src = xml_of(
         "<cluster>"
@@ -586,7 +586,7 @@ TEST_CASE("Repeated container inside keyed container -- later layer's new strain
         nucleus::repeated_element("route", anchor::keyspace("cluster/server"))));
     REQUIRE(engine.register_element(
         nucleus::element("port", anchor::keyspace("cluster/server/route"))));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     const char *base_doc =
         "<cluster>"
@@ -633,7 +633,7 @@ TEST_CASE("extend= on repeated container via document inheritance is a layering 
     // the repeated container. The fold must return layering_violation.
     nucleus::config_space_builder engine;
     declare_cluster_node_schema(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     const char *base_doc =
         "<cluster>"
@@ -669,7 +669,7 @@ TEST_CASE("get_all gathers across three repeated instances in ordinal order",
     // Three-node schema; XML with port values 1.5, 2.0, 3.0 (as text scalars).
     nucleus::config_space_builder engine;
     declare_cluster_node_schema(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto src = xml_of(
         "<cluster>"
@@ -700,7 +700,7 @@ TEST_CASE("get_all_as gathers typed double values across three instances",
     nucleus::schema_element port_el =
         nucleus::typed_element<double>("port", anchor::keyspace("cluster/node"));
     REQUIRE(engine.register_element(std::move(port_el)));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto src = xml_of(
         "<cluster>"
@@ -734,7 +734,7 @@ TEST_CASE("get_as index_required reports instance count not entry count",
         nucleus::element("port",   anchor::keyspace("cluster/node"))));
     REQUIRE(engine.register_element(
         nucleus::element("weight", anchor::keyspace("cluster/node"))));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     // Two instances, each with two fields -> 4 indexed entries in m_values.
     auto src = xml_of(
@@ -767,7 +767,7 @@ TEST_CASE("A flat scalar under a repeated container is rejected at the source bo
     nucleus::schema_element port_el =
         nucleus::typed_element<int>("port", anchor::keyspace("cluster/node"));
     REQUIRE(engine.register_element(std::move(port_el)));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     // Two properly-indexed instances from a document source...
     auto src = xml_of(
@@ -800,7 +800,7 @@ TEST_CASE("Indexed-only instances under a repeated container convert without err
     nucleus::schema_element port_el =
         nucleus::typed_element<int>("port", anchor::keyspace("cluster/node"));
     REQUIRE(engine.register_element(std::move(port_el)));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto src = xml_of(
         "<cluster>"

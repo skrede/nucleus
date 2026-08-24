@@ -6,7 +6,7 @@
 #include "chain_admissibility_test_support.h"
 
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -77,7 +77,7 @@ TEST_CASE("a CDATA leaf value resolves like plain text", "[xml][robustness]")
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("server", anchor::root())));
     REQUIRE(builder.register_element(nucleus::element("motd", anchor::keyspace("server"))));
-    const nucleus::config_space space = builder.build();
+    const nucleus::config_space space = nucleus::builder_result_test::built(builder);
 
     auto loaded = nucleus::load_config(space,
         nucleus::source_stack{xml_of(
@@ -95,7 +95,7 @@ TEST_CASE("a CDATA primary-key child element names its strain", "[xml][robustnes
     REQUIRE(builder.register_element(
         nucleus::primary_key_element("name", anchor::keyspace("cluster/server"))));
     REQUIRE(builder.register_element(nucleus::element("port", anchor::keyspace("cluster/server"))));
-    const nucleus::config_space space = builder.build();
+    const nucleus::config_space space = nucleus::builder_result_test::built(builder);
 
     nucleus::load_options options;
     options.selection = "web";

@@ -5,7 +5,7 @@
 //   - a per-element converter overrides the registry converter for the same element;
 //   - an element whose type has no registered converter is left unconverted (no error).
 
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/converters.h"
@@ -36,7 +36,7 @@ TEST_CASE("registry supplies the converter for a deferred-converter element", "[
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_converter<int>(nucleus::make_scalar_converter<int>()));
     REQUIRE(builder.register_element(nucleus::registered_element<int>("port", anchor::root())));
-    nucleus::config_space space = builder.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(builder);
 
     auto loaded = nucleus::load_config(space, env_with("port", "8080"), {});
     REQUIRE(loaded);
@@ -58,7 +58,7 @@ TEST_CASE("a per-element converter overrides the registry converter", "[converte
     REQUIRE(builder.register_converter<int>(failing));
     REQUIRE(builder.register_element(
         nucleus::typed_element<int>("port", anchor::root(), nucleus::make_scalar_converter<int>())));
-    nucleus::config_space space = builder.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(builder);
 
     auto loaded = nucleus::load_config(space, env_with("port", "8080"), {});
     REQUIRE(loaded);
@@ -74,7 +74,7 @@ TEST_CASE("a type with no registered converter is left unconverted", "[converter
     // without error: convert() skips it and the raw string remains reachable.
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::registered_element<int>("port", anchor::root())));
-    nucleus::config_space space = builder.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(builder);
 
     auto loaded = nucleus::load_config(space, env_with("port", "8080"), {});
     REQUIRE(loaded);

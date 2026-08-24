@@ -1,5 +1,5 @@
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -85,7 +85,7 @@ TEST_CASE("fidelity: empty, whitespace, comment-split and CDATA leaves read as e
     REQUIRE(builder.register_element(element("blank", anchor::keyspace("server"))));
     REQUIRE(builder.register_element(element("port", anchor::keyspace("server"))));
     REQUIRE(builder.register_element(element("note", anchor::keyspace("server"))));
-    const config_space space = builder.build();
+    const config_space space = nucleus::builder_result_test::built(builder);
 
     const std::string document =
             "<server><host>localhost</host><motd></motd><blank>   </blank>"
@@ -114,7 +114,7 @@ TEST_CASE("round-trip: an empty-string value survives emit -> reload",
     REQUIRE(builder.register_element(element("server", anchor::root())));
     REQUIRE(builder.register_element(element("host", anchor::keyspace("server"))));
     REQUIRE(builder.register_element(element("motd", anchor::keyspace("server"))));
-    const config_space space = builder.build();
+    const config_space space = nucleus::builder_result_test::built(builder);
 
     runtime_source source;
     source.set("server/host", "localhost").set("server/motd", "");
@@ -145,7 +145,7 @@ TEST_CASE("round-trip via env emitter: scalar subset reloads its keys",
     config_space_builder builder;
     REQUIRE(builder.register_element(element("host", anchor::root())));
     REQUIRE(builder.register_element(element("port", anchor::root())));
-    const config_space space = builder.build();
+    const config_space space = nucleus::builder_result_test::built(builder);
 
     env_source source;
     source.set("host", "rt-host").set("port", "5050");

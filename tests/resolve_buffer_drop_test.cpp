@@ -1,4 +1,4 @@
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/xml/xml_source.h"
 
@@ -33,7 +33,7 @@ TEST_CASE("resolved values survive dropping every source buffer", "[resolution][
     std::optional<nucleus::config> config;
 
     {
-        nucleus::config_space space = nucleus::config_space_builder{}.build();
+        nucleus::config_space space = nucleus::builder_result_test::built(nucleus::config_space_builder{});
 
         // A document source (views into the parser arena) layered beneath an env
         // overlay that overrides one key -- so both a view-backed and an

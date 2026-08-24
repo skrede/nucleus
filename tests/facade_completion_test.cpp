@@ -1,4 +1,4 @@
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/completion/completion.h"
 
@@ -35,7 +35,7 @@ TEST_CASE("the facade generates a bash completion script from the registered sch
     REQUIRE(engine.register_element(nucleus::element("plexus", nucleus::anchor::root())));
     REQUIRE(engine.register_element(
         nucleus::element("port", nucleus::anchor::keyspace(path_of("plexus")))));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     const std::string bash = space.generate_completion(nucleus::shell::bash, "mytool").value();
 
@@ -56,7 +56,7 @@ TEST_CASE("the facade generates a zsh completion script from the registered sche
     REQUIRE(engine.register_element(nucleus::enum_element(
         "level", nucleus::anchor::keyspace(path_of("logging")),
         {"debug", "info", "warn", "error"})));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     const std::string zsh = space.generate_completion(nucleus::shell::zsh, "mytool").value();
 
@@ -79,7 +79,7 @@ TEST_CASE("the facade generates --help text with description, values and require
     REQUIRE(engine.register_element(nucleus::described(
         nucleus::required_element("host", nucleus::anchor::keyspace(path_of("server"))),
         "the address to bind")));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     const std::string help = space.generate_help("mytool");
 
@@ -107,7 +107,7 @@ TEST_CASE("the facade --help lists a bare path-tagged flag alongside typed eleme
     // it must still appear in --help -- the same surface the completions project,
     // so the two never disagree on which flags exist.
     REQUIRE(engine.register_schema("logging/verbose"));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     const std::string help = space.generate_help("mytool");
     const std::string completion = space.generate_completion(nucleus::shell::bash, "mytool").value();
@@ -122,7 +122,7 @@ TEST_CASE("a program name carrying a newline is refused instead of emitted as sc
 {
     nucleus::config_space_builder engine;
     REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     const auto refused = space.generate_completion(nucleus::shell::bash, "my\ntool");
 
@@ -141,7 +141,7 @@ TEST_CASE("a program name carrying a shell metacharacter is refused for both she
 {
     nucleus::config_space_builder engine;
     REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     const auto bash = space.generate_completion(nucleus::shell::bash, "x; rm -rf ~");
     const auto zsh  = space.generate_completion(nucleus::shell::zsh, "x; rm -rf ~");
@@ -158,7 +158,7 @@ TEST_CASE("a plain program name still yields a script for both shells",
 {
     nucleus::config_space_builder engine;
     REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     const auto bash = space.generate_completion(nucleus::shell::bash, "my-tool.v2");
     const auto zsh  = space.generate_completion(nucleus::shell::zsh, "my-tool.v2");
@@ -177,7 +177,7 @@ TEST_CASE("a malformed space name is refused and a well-formed one still prefixe
 {
     nucleus::config_space_builder engine;
     REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     for(const char *name : {"/", "a//b", "x[", "app/", "[0]", "node[999999999999]"})
     {

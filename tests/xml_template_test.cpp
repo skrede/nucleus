@@ -1,4 +1,4 @@
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -77,7 +77,7 @@ TEST_CASE("emit_template leaves an unconstrained field unannotated", "[template]
     REQUIRE(builder.register_element(nucleus::element("server", nucleus::anchor::root())));
     REQUIRE(builder.register_element(
             nucleus::element("host", nucleus::anchor::keyspace("server"))));
-    nucleus::config_space space = builder.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(builder);
 
     const std::string xml = template_of(space);
     REQUIRE(xml.find("allowed=") == std::string::npos);

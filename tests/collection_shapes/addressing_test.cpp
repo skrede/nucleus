@@ -2,7 +2,7 @@
 
 #include "nucleus/error.h"
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "../builder_result_test_support.h"
 
 #include "nucleus/schema/converters.h"
 
@@ -133,7 +133,7 @@ TEST_CASE("an empty source stack reaches resolution with no entries and produces
 {
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("solo", nucleus::anchor::root())));
-    const nucleus::config_space flat = builder.build();
+    const nucleus::config_space flat = nucleus::builder_result_test::built(builder);
 
     const nucleus::load_result loaded =
         nucleus::load_config(flat, nucleus::source_stack{}, {});
@@ -161,7 +161,7 @@ TEST_CASE("mixed canonical storage is rejected before schema-specific conversion
     REQUIRE(builder.register_element(
         nucleus::typed_element<std::int32_t>(
                 "port", nucleus::anchor::keyspace("cluster/x"))));
-    const nucleus::config_space space = builder.build();
+    const nucleus::config_space space = nucleus::builder_result_test::built(builder);
 
     const nucleus::load_result loaded = nucleus::load_config(space,
         nucleus::source_stack{nucleus::shapes::runtime_layer(
@@ -186,7 +186,7 @@ TEST_CASE("a malformed ordinal under a single-segment repeated container prefix 
         nucleus::repeated_element("node", nucleus::anchor::root())));
     REQUIRE(builder.register_element(
         nucleus::element("port", nucleus::anchor::keyspace("node"))));
-    const nucleus::config_space space = builder.build();
+    const nucleus::config_space space = nucleus::builder_result_test::built(builder);
     const std::string key = "node/0000000000000000000/port";
 
     const nucleus::load_result loaded = nucleus::load_config(space,

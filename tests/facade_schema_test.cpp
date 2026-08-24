@@ -1,4 +1,4 @@
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -59,7 +59,7 @@ TEST_CASE("resolve rejects an undeclared key and suggests the nearest declared o
     REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
     REQUIRE(engine.register_element(
         nucleus::element("level", nucleus::anchor::keyspace(path_of("logging")))));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto src = one("logging/levle", "debug"); // typo'd key
     auto loaded = nucleus::load_config(space, nucleus::source_stack{std::move(src)}, {});
@@ -77,7 +77,7 @@ TEST_CASE("resolve rejects a missing required field", "[facade][schema]")
         nucleus::required_element("host", nucleus::anchor::keyspace(path_of("server")))));
     REQUIRE(engine.register_element(
         nucleus::element("port", nucleus::anchor::keyspace(path_of("server")))));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     // Only the optional port is supplied; the required host is missing.
     auto src = one("server/port", "8080");
@@ -95,7 +95,7 @@ TEST_CASE("resolve admits an anonymous strain without the identity field",
         nucleus::identity_element("name", nucleus::anchor::keyspace(path_of("node")))));
     REQUIRE(engine.register_element(
         nucleus::element("role", nucleus::anchor::keyspace(path_of("node")))));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     // A flat source contributing fields without the key is an anonymous strain:
     // it collapses into the config space. The primary key is a selector,
@@ -117,7 +117,7 @@ TEST_CASE("resolve rejects anonymous-only content when the identity is required"
     REQUIRE(engine.register_element(std::move(id)));
     REQUIRE(engine.register_element(
         nucleus::element("role", nucleus::anchor::keyspace(path_of("node")))));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     // Requiring the identity element is the host's knob for demanding a NAMED
     // strain; anonymous-only content now fails in required-field vocabulary.
@@ -135,7 +135,7 @@ TEST_CASE("resolve admits a document that satisfies the schema", "[facade][schem
         nucleus::required_element("host", nucleus::anchor::keyspace(path_of("server")))));
     REQUIRE(engine.register_element(
         nucleus::element("port", nucleus::anchor::keyspace(path_of("server")))));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     nucleus::runtime_source src;
     src.set("server/host", "localhost").set("server/port", "8080");

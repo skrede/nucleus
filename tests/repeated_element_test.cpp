@@ -1,7 +1,7 @@
 // Repeated-values mode: schema flag, fold accumulation/replacement, get_all()
 // accessor, relay through keyed containers, capability gating, provenance.
 
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -82,7 +82,7 @@ TEST_CASE("N values in one layer -- order preserved", "[repeated][ordering]")
 {
     nucleus::config_space_builder engine;
     declare_tags_schema(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto src = xml_of("<config><tag>a</tag><tag>b</tag><tag>c</tag></config>");
     auto loaded = nucleus::load_config(space,
@@ -99,7 +99,7 @@ TEST_CASE("cross-layer replace -- higher rank replaces lower collection wholesal
 {
     nucleus::config_space_builder engine;
     declare_tags_schema(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto src1 = xml_of("<config><tag>x</tag><tag>y</tag></config>");
     auto src2 = xml_of("<config><tag>p</tag></config>");
@@ -119,7 +119,7 @@ TEST_CASE("get() on indexed repeated path returns that element", "[repeated][acc
 {
     nucleus::config_space_builder engine;
     declare_tags_schema(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto src = xml_of("<config><tag>a</tag><tag>b</tag><tag>c</tag></config>");
     auto loaded = nucleus::load_config(space,
@@ -141,7 +141,7 @@ TEST_CASE("get_all() on single-value path returns one-element vector", "[repeate
     nucleus::config_space_builder engine;
     REQUIRE(engine.register_element(nucleus::element("config", anchor::root())));
     REQUIRE(engine.register_element(nucleus::element("key", anchor::keyspace("config"))));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto src = xml_of("<config><key>v</key></config>");
     auto loaded = nucleus::load_config(space,
@@ -158,7 +158,7 @@ TEST_CASE("get_all() on absent path returns empty vector", "[repeated][accessor]
     nucleus::config_space_builder engine;
     REQUIRE(engine.register_element(nucleus::element("config", anchor::root())));
     REQUIRE(engine.register_element(nucleus::element("key", anchor::keyspace("config"))));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto src = xml_of("<config><key>v</key></config>");
     auto loaded = nucleus::load_config(space,
@@ -176,7 +176,7 @@ TEST_CASE("keys() returns one entry per indexed scalar instance", "[repeated][ac
     REQUIRE(engine.register_element(nucleus::element("config", anchor::root())));
     REQUIRE(engine.register_element(nucleus::element("other", anchor::keyspace("config"))));
     REQUIRE(engine.register_element(nucleus::repeated_element("tag", anchor::keyspace("config"))));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto src = xml_of("<config><other>x</other><tag>a</tag><tag>b</tag></config>");
     auto loaded = nucleus::load_config(space,
@@ -206,7 +206,7 @@ TEST_CASE("repeated path with required flag satisfies required check", "[repeate
     auto el = nucleus::repeated_element("tag", anchor::keyspace("config"));
     el.required = true;
     REQUIRE(engine.register_element(el));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto src = xml_of("<config><tag>present</tag></config>");
 
@@ -223,7 +223,7 @@ TEST_CASE("repeated leaf under keyed container with selection resolves to collec
 {
     nucleus::config_space_builder engine;
     declare_cluster_tags(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     const char *doc = R"(
         <cluster>
@@ -247,7 +247,7 @@ TEST_CASE("token expansion per value -- each value expanded independently",
     nucleus::config_space_builder engine;
     REQUIRE(engine.register_element(nucleus::element("config", anchor::root())));
     REQUIRE(engine.register_element(nucleus::repeated_element("val", anchor::keyspace("config"))));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     // ${string.upper(value=x)} is the built-in string tokenizer's upper function.
     auto src = xml_of(
@@ -302,7 +302,7 @@ TEST_CASE("capability degradation -- non-duplicate_keys source into repeated fie
     // naming that capability specifically (not nesting).
     nucleus::config_space_builder engine;
     REQUIRE(engine.register_element(nucleus::repeated_element("tag", anchor::root())));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     dual_entry_source fake("tag");
     auto loaded = nucleus::load_config(space,
@@ -320,7 +320,7 @@ TEST_CASE("ASan: freeze copies values out before buffer drop", "[repeated][lifet
         nucleus::config_space_builder engine;
         REQUIRE(engine.register_element(nucleus::element("config", anchor::root())));
         REQUIRE(engine.register_element(nucleus::repeated_element("tag", anchor::keyspace("config"))));
-        nucleus::config_space space = engine.build();
+        nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
         auto src = xml_of("<config><tag>x</tag><tag>y</tag></config>");
         auto result = nucleus::load_config(space,
@@ -339,7 +339,7 @@ TEST_CASE("relay_strain: higher-rank keyed collection wins over lower-rank flat 
 {
     nucleus::config_space_builder engine;
     declare_cluster_tags(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     nucleus::env_source flat;
     flat.set("cluster/server/tags", "low");
@@ -368,7 +368,7 @@ TEST_CASE("relay_strain: higher-rank flat override wins over lower-rank keyed co
 {
     nucleus::config_space_builder engine;
     declare_cluster_tags(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     const char *doc = R"(
         <cluster>
@@ -397,7 +397,7 @@ TEST_CASE("collection scope-policy exclusion and admission",
     {
         nucleus::config_space_builder engine;
         declare_cluster_tags(engine);
-        nucleus::config_space space = engine.build();
+        nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
         nucleus::runtime_source L0;
         L0.set("cluster/server/primary/name", "primary")
@@ -422,7 +422,7 @@ TEST_CASE("collection scope-policy exclusion and admission",
     {
         nucleus::config_space_builder engine;
         declare_cluster_tags(engine);
-        nucleus::config_space space = engine.build();
+        nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
         nucleus::runtime_source L0;
         L0.set("cluster/server/primary/name", "primary")
@@ -456,7 +456,7 @@ TEST_CASE("a runtime source supplies multiple values for a repeated path",
     // instead of failing as a flat-source violation.
     nucleus::config_space_builder engine;
     declare_tags_schema(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     nucleus::runtime_source src;
     src.set("config/tag", "alpha").set("config/tag", "beta");

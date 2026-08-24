@@ -1,4 +1,5 @@
 #include "xml_persist_test_support.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/xml/xml_emitter.h"
 
@@ -21,7 +22,7 @@ TEST_CASE("emit_document wraps a multi-root config so its own reader accepts it"
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_schema("config/alpha/x"));
     REQUIRE(builder.register_schema("config/beta/y"));
-    const nucleus::config_space space    = builder.build();
+    const nucleus::config_space space    = nucleus::builder_result_test::built(builder);
     const auto                  reloaded = nucleus::load_config(
             space, nucleus::source_stack{},
             test::document_options(rendered.value()));
@@ -52,7 +53,7 @@ TEST_CASE("emit_document wraps an empty config so its own reader accepts it",
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(
             nucleus::element("config", nucleus::anchor::root())));
-    const nucleus::config_space space    = builder.build();
+    const nucleus::config_space space    = nucleus::builder_result_test::built(builder);
     const auto                  rendered = nucleus::xml::render_document(config, space);
     REQUIRE(rendered);
 

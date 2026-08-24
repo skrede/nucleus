@@ -4,7 +4,7 @@
 
 #include "concurrent_collection_load_test_support.h"
 
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -102,7 +102,7 @@ TEST_CASE("concurrent loads of nested ordinal collections produce identical tree
 {
     nucleus::config_space_builder builder;
     declare_nested_collection(builder);
-    const nucleus::config_space space = builder.build();
+    const nucleus::config_space space = nucleus::builder_result_test::built(builder);
 
     const std::vector<std::string> results = load_test::concurrent_results(
             space, ordinal_layers, {}, 8, 64);
@@ -116,7 +116,7 @@ TEST_CASE("concurrent selected-strain loads resolve keyed collections identicall
 {
     nucleus::config_space_builder builder;
     declare_keyed_collection(builder);
-    const nucleus::config_space space   = builder.build();
+    const nucleus::config_space space   = nucleus::builder_result_test::built(builder);
     const nucleus::load_options options = keyed_options();
 
     constexpr std::size_t thread_counts[] = {2, 4, 8, 16};

@@ -1,5 +1,5 @@
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -130,7 +130,7 @@ TEST_CASE("config outlives a drop of the simplest xml+env stack on the new path"
     std::optional<config> result;
 
     {
-        config_space space = config_space_builder{}.build();
+        config_space space = nucleus::builder_result_test::built(config_space_builder{});
 
         constexpr const char *kDoc =
             "<app>"

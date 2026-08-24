@@ -1,4 +1,4 @@
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -73,7 +73,7 @@ void declare_cluster(nucleus::config_space_builder &engine)
 TEST_CASE("load with a two-source stack: last-listed source wins a same-key contest",
           "[load_front_door]")
 {
-    nucleus::config_space space = nucleus::config_space_builder{}.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(nucleus::config_space_builder{});
 
     nucleus::runtime_source base;
     base.set("server/host", "base-host").set("server/port", "80");
@@ -99,7 +99,7 @@ TEST_CASE("load_options.selection picks the named strain from a keyed container"
 {
     nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     nucleus::runtime_source src;
     src.set("cluster/node/alpha/name", "alpha")
@@ -132,7 +132,7 @@ TEST_CASE("load_options.scope = file_level excludes container entries above the 
 {
     nucleus::config_space_builder engine;
     declare_cluster(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     // L0 (rank 0): defines the alpha strain with its port; Ld=0.
     // L1 (rank 1): adds a general entry with no inheritance_layer (a stack
@@ -270,7 +270,7 @@ TEST_CASE("the stack is borrowed: pre-flight then load then load again, one stac
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("server", anchor::root())));
     REQUIRE(builder.register_element(nucleus::element("host", anchor::keyspace("server"))));
-    const nucleus::config_space space = builder.build();
+    const nucleus::config_space space = nucleus::builder_result_test::built(builder);
 
     nucleus::runtime_source src;
     src.set("server/host", "localhost");

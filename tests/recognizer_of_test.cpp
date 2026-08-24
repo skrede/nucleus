@@ -1,4 +1,4 @@
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -28,7 +28,7 @@ TEST_CASE("recognizer_of answers true for a declared key and false for an unknow
     nucleus::config_space_builder engine;
     REQUIRE(engine.register_schema("logging/level"));
     REQUIRE(engine.register_schema("server/host"));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto rec = nucleus::recognizer_of(space);
 
@@ -52,7 +52,7 @@ TEST_CASE("argv_source composed with recognizer_of resolves a recognized flag vi
 {
     nucleus::config_space_builder engine;
     REQUIRE(engine.register_schema("logging/level"));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     // Explicit composition: the argv_source is constructed and wired by the caller,
     // never instantiated automatically by the space.
@@ -73,7 +73,7 @@ TEST_CASE("argv_source with recognizer_of rejects an undeclared flag in strict m
 {
     nucleus::config_space_builder engine;
     REQUIRE(engine.register_schema("logging/level"));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     // The flag maps to "logging/verbosity" which is NOT in the schema.
     nucleus::argv_source argv(std::vector<std::string>{"--logging-verbosity=3"});
@@ -98,7 +98,7 @@ TEST_CASE("argv_source with recognizer_of does not abort on an undeclared flag i
     // without aborting at pull(). When the space has declared elements the
     // schema enforcer would reject the unknown key as undeclared -- that is
     // correct behavior and separate from the lenient/strict source policy.
-    nucleus::config_space space = nucleus::config_space_builder{}.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(nucleus::config_space_builder{});
 
     nucleus::argv_source argv(std::vector<std::string>{
         "--logging-level=info",
@@ -126,7 +126,7 @@ TEST_CASE("recognizer_of distinguishes multiple declared paths from non-declared
     REQUIRE(engine.register_schema("db/host"));
     REQUIRE(engine.register_schema("db/port"));
     REQUIRE(engine.register_schema("auth/token"));
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto rec = nucleus::recognizer_of(space);
 

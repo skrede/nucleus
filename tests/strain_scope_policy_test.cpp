@@ -1,4 +1,4 @@
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/strain_scope.h"
 #include "nucleus/config.h"
@@ -83,7 +83,7 @@ TEST_CASE("default policy (space-open container-closed) excludes container entri
 
     nucleus::config_space_builder engine;
     declare_cluster_with_app(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     // L0(stack[0]) < Lderived(stack[1]) < Lcompeting(stack[2]); no scope override.
     auto loaded = nucleus::load_config(space,
@@ -124,7 +124,7 @@ TEST_CASE("file_level policy excludes chain content above the defining layer but
 
     nucleus::config_space_builder engine;
     declare_cluster_with_app(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
@@ -167,7 +167,7 @@ TEST_CASE("container_open_until_next_strain admits container entries below Ls an
 
     nucleus::config_space_builder engine;
     declare_cluster_with_app(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto loaded = nucleus::load_config(space,
         nucleus::source_stack{std::move(L0), std::move(Lderived), std::move(Lcompeting)},
@@ -203,7 +203,7 @@ TEST_CASE("container_open_until_next_strain with no competing strain is fully op
 
     nucleus::config_space_builder engine;
     declare_cluster_with_app(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto loaded = nucleus::load_config(space,
         nucleus::source_stack{std::move(L0), std::move(Lderived)},
@@ -234,7 +234,7 @@ TEST_CASE("a competing strain introduced below the defining layer never bounds t
 
     nucleus::config_space_builder engine;
     declare_cluster_with_app(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     // Learly(stack[0]) < Lweb(stack[1]) < Lderived(stack[2]).
     auto loaded = nucleus::load_config(space,
@@ -271,7 +271,7 @@ TEST_CASE("Ls is bound by the layer that INTRODUCES the competing strain, not th
 
     nucleus::config_space_builder engine;
     declare_cluster_with_app(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     // L0(stack[0]) < Lcompeting(stack[1]) < Lbetween(stack[2]) < Loverwrite(stack[3]).
     auto loaded = nucleus::load_config(space,
@@ -304,7 +304,7 @@ TEST_CASE("scope policies apply when the single named strain auto-resolves",
 
     nucleus::config_space_builder engine;
     declare_cluster_with_app(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     // No selection, no scope override -- default space_open_container_closed.
     auto loaded = nucleus::load_config(space,
@@ -332,7 +332,7 @@ TEST_CASE("file_level applies on auto-resolve, cutting chain content but admitti
 
     nucleus::config_space_builder engine;
     declare_cluster_with_app(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto factory = [&](const std::string &path) -> nucleus::source_handle {
         const std::string name = filename_of(path);
@@ -375,7 +375,7 @@ TEST_CASE("file_level exempts stack-sourced entries above the defining layer, ma
 
     nucleus::config_space_builder engine;
     declare_cluster_with_app(engine);
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     auto loaded = nucleus::load_config(space,
         nucleus::source_stack{std::move(L0), std::move(Lderived), std::move(Lcompeting)},

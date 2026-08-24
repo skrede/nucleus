@@ -6,7 +6,7 @@
 // repeated x typed (get_all_as), and orthogonality with other schema axes.
 
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -41,7 +41,7 @@ nucleus::xml_source xml_of(const std::string &text)
 template<typename S>
 nucleus::load_result resolve_one(nucleus::config_space_builder &engine, S src)
 {
-    nucleus::config_space space = engine.build();
+    nucleus::config_space space = nucleus::builder_result_test::built(engine);
     return nucleus::load_config(space, nucleus::source_stack{std::move(src)}, {});
 }
 

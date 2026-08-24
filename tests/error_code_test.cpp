@@ -1,6 +1,6 @@
 #include "nucleus/error.h"
 #include "nucleus/config.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 #include "nucleus/registration_policy.h"
 
 #include "nucleus/schema/anchor.h"
@@ -66,7 +66,7 @@ TEST_CASE("garbage xml pulls errc::malformed_source and the load preserves it",
     REQUIRE_FALSE(pulled);
     CHECK(pulled.error().code == errc::malformed_source);
 
-    nucleus::config_space space  = nucleus::config_space_builder{}.build();
+    nucleus::config_space space  = nucleus::builder_result_test::built(nucleus::config_space_builder{});
     auto                  loaded = nucleus::load_config(space, source_stack{xml_of("<garbage")}, {});
     REQUIRE_FALSE(loaded);
     CHECK(loaded.error().code == errc::malformed_source);
@@ -79,7 +79,7 @@ TEST_CASE("a flat-only stack against a nested schema fails with errc::unmet_capa
     REQUIRE(builder.register_element(nucleus::element("node", anchor::root())));
     REQUIRE(builder.register_element(
             nucleus::primary_key_element("name", anchor::keyspace("node"))));
-    const nucleus::config_space space = builder.build();
+    const nucleus::config_space space = nucleus::builder_result_test::built(builder);
 
     auto loaded = nucleus::load_config(space, source_stack{flat_only_source{}}, {});
     REQUIRE_FALSE(loaded);
@@ -100,7 +100,7 @@ TEST_CASE("an unknown selection fails with errc::invalid_selection", "[error][co
             nucleus::primary_key_element("name", anchor::keyspace("cluster/node"))));
     REQUIRE(builder.register_element(
             nucleus::element("port", anchor::keyspace("cluster/node"))));
-    const nucleus::config_space space = builder.build();
+    const nucleus::config_space space = nucleus::builder_result_test::built(builder);
 
     nucleus::runtime_source src;
     src.set("cluster/node/alpha/name", "alpha")
@@ -119,7 +119,7 @@ TEST_CASE("an undeclared path fails validation with errc::schema_violation",
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(nucleus::element("server", anchor::root())));
     REQUIRE(builder.register_element(nucleus::element("host", anchor::keyspace("server"))));
-    const nucleus::config_space space = builder.build();
+    const nucleus::config_space space = nucleus::builder_result_test::built(builder);
 
     nucleus::runtime_source src;
     src.set("server/bogus", "x");
@@ -136,7 +136,7 @@ TEST_CASE("a typed element with a garbage value fails with errc::failed_conversi
     REQUIRE(builder.register_element(nucleus::element("server", anchor::root())));
     REQUIRE(builder.register_element(
             nucleus::typed_element<std::int32_t>("port", anchor::keyspace("server"))));
-    const nucleus::config_space space = builder.build();
+    const nucleus::config_space space = nucleus::builder_result_test::built(builder);
 
     nucleus::runtime_source src;
     src.set("server/port", "notanumber");
@@ -178,7 +178,7 @@ TEST_CASE("get_as distinguishes absent_key, missing_converter, and mismatched_ty
     REQUIRE(builder.register_element(nucleus::element("name", anchor::keyspace("cfg"))));
     REQUIRE(builder.register_element(
             nucleus::typed_element<std::int32_t>("val", anchor::keyspace("cfg"))));
-    const nucleus::config_space space = builder.build();
+    const nucleus::config_space space = nucleus::builder_result_test::built(builder);
 
     nucleus::runtime_source src;
     src.set("cfg/name", "hello").set("cfg/val", "42");

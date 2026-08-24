@@ -1,7 +1,7 @@
 #include "nucleus/config.h"
 #include "nucleus/log_sink.h"
 #include "nucleus/capability.h"
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -124,7 +124,7 @@ TEST_CASE("a load-time degradation reaches both the host sink and config::degrad
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(
         nucleus::typed_element<std::int32_t>("port", nucleus::anchor::root())));
-    const nucleus::config_space space = builder.build();
+    const nucleus::config_space space = nucleus::builder_result_test::built(builder);
 
     recording_sink log;
     nucleus::env_source env;
@@ -156,7 +156,7 @@ TEST_CASE("the provenance channel records the degradation even without a host si
     nucleus::config_space_builder builder;
     REQUIRE(builder.register_element(
         nucleus::typed_element<std::int32_t>("port", nucleus::anchor::root())));
-    const nucleus::config_space space = builder.build();
+    const nucleus::config_space space = nucleus::builder_result_test::built(builder);
 
     nucleus::env_source env;
     env.set("port", "7000");

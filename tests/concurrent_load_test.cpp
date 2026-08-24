@@ -7,7 +7,7 @@
 // genuinely overlapping access windows rather than threads that serialize
 // through their own setup.
 
-#include "nucleus/config_space.h"
+#include "builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -90,7 +90,7 @@ TEST_CASE("N threads load one shared const space lock-free with identical result
     REQUIRE(builder.register_element(nucleus::element("server", anchor::root())));
     REQUIRE(builder.register_element(nucleus::element("host", anchor::keyspace("server"))));
     REQUIRE(builder.register_element(nucleus::element("port", anchor::keyspace("server"))));
-    const nucleus::config_space space = builder.build();
+    const nucleus::config_space space = nucleus::builder_result_test::built(builder);
 
     constexpr std::size_t thread_count = 8;
     const concurrent_run run = load_from_threads(space, thread_count, 64);
