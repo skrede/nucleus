@@ -73,9 +73,9 @@ inline std::string probe_filename(const std::string &path)
 }
 
 inline std::function<source_handle(const std::string &)>
-probe_factory(std::map<std::string, probe_document> docs, std::shared_ptr<probe_log> log)
+probe_factory(std::map<std::string, probe_document> documents, std::shared_ptr<probe_log> log)
 {
-    return [docs = std::move(docs), log](const std::string &path) -> source_handle
+    return [docs = std::move(documents), log](const std::string &path) -> source_handle
     {
         const std::string name = probe_filename(path);
         ++log->build_count[name];
