@@ -13,7 +13,9 @@
 
 #include "nucleus/resolve/chain_walker.h"
 #include "nucleus/strain_scope.h"
+#include "nucleus/resolve/installable_checks.h"
 #include "nucleus/resolve/resolution_context.h"
+#include "nucleus/resolve/pkey_tree_tokenizer.h"
 
 #include "nucleus/diagnostics/key_suggester.h"
 #include "nucleus/diagnostics/conflict_report.h"
@@ -136,41 +138,6 @@ inline bool is_reserved_tree_tokenizer_name(std::string_view name) noexcept
         || name == "dir"  || name == "self";
 }
 
-// Builds the auto-named pkey tree tokenizer for identity element `el`.
-// Category = the container's last segment; resolver reads the sliced
-// keyspace anchored to the pkey container, with a precise diagnostic
-// when no instance is in scope post-slice.
-tree_tokenizer make_pkey_tree_tokenizer(const schema_element &el)
-{
-    std::string category = std::string(key_path::base_name(el.container().leaf()));
-    key_path const pkey_container = el.container();
-    std::string const identity_field = el.name;
-
-    return tree_tokenizer(
-        std::move(category),
-        [pkey_container, identity_field](const tree_access &access) -> token_result
-        {
-            // Verify an instance is selected by checking the identity leaf.
-            key_path const identity_path = pkey_container.child(identity_field);
-            if(access.building.find(identity_path) == nullptr)
-                return unexpected(resolve_error(resolve_errc::missing_field,
-                    nucleus::format("${{{}}} requires a selected primary-key instance; "
-                                    "this configuration has none in scope",
-                                    std::string(access.category) + "." +
-                                    std::string(access.field_name))));
-
-            // Resolve the requested field within the pkey container.
-            key_path const field_path = pkey_container.child(std::string(access.field_name));
-            const value *v = access.building.find(field_path);
-            if(v == nullptr)
-                return unexpected(resolve_error(resolve_errc::missing_field,
-                    nucleus::format("${{{}}} has no field '{}' in the selected instance",
-                                    access.category, access.field_name)));
-
-            return std::string(v->text());
-        });
-}
-
 // A malformed anchor path (from anchor::keyspace(string)) never attaches: reject it
 // loudly before attach so a mis-anchored element cannot silently take effect at root.
 registration_result reject_if_invalid_anchor(const anchor &at, std::string_view what)
@@ -192,6 +159,22 @@ registration_result reject_if_built(bool built, std::string_view what)
     return registration_ok();
 }
 
+registration_result expand_document_chain(const space_core &state, const load_options &options,
+                                          std::vector<chain_walker::chain_entry> &entries)
+{
+    if(options.document_paths.empty())
+        return registration_ok();
+    if(auto usable = reject_missing_document_factory(options); !usable)
+        return usable;
+    const schema_projection projection = state.schema.projection();
+    auto expanded = chain_walker::expand(options.document_paths, options.make_document,
+                                         projection, options.inherit);
+    if(!expanded)
+        return unexpected(std::move(expanded).error());
+    entries = std::move(expanded).value();
+    return registration_ok();
+}
+
 // Assembles the fold handles under the unified precedence scheme: the
 // inheritance chain (if any) sits at the BASE, occupying the lowest ranks
 // [0, m) base-first so the within-chain order (base below, derived above) is
@@ -210,15 +193,8 @@ assemble_handles(const space_core &state,
 {
     // Expand the inheritance chain first so the stack handles can be ranked
     // above it. expand() returns entries base-first (index 0 = deepest ancestor).
-    if(!options.document_paths.empty() && options.make_document)
-    {
-        const schema_projection projection = state.schema.projection();
-        auto expanded = chain_walker::expand(options.document_paths, options.make_document,
-                                             projection, options.inherit);
-        if(!expanded)
-            return unexpected(std::move(expanded).error());
-        entries = std::move(expanded).value();
-    }
+    if(auto expanded = expand_document_chain(state, options, entries); !expanded)
+        return unexpected(std::move(expanded).error());
 
     std::span<source_handle> const layers = stack.layers();
 
@@ -376,6 +352,8 @@ registration_result config_space_builder::install_tokenizer(tokenizer tok, owner
         return guard;
     if(auto verdict = m_impl->review(registration_kind::tokenizer, owner); !verdict)
         return verdict;
+    if(auto usable = reject_empty_tokenizer_resolver(tok); !usable)
+        return usable;
     m_impl->tokenizer.add(std::move(tok), std::move(owner));
     return registration_ok();
 }
@@ -391,9 +369,10 @@ registration_result config_space_builder::install_tree_tokenizer(tree_tokenizer 
                             "rename the schema element", tok.category())});
     if(auto verdict = m_impl->review(registration_kind::tokenizer, owner); !verdict)
         return verdict;
+    if(auto usable = reject_empty_tree_resolver(tok); !usable)
+        return usable;
     // Host shadows the auto-registered pkey tokenizer for this category —
-    // last-registration-wins is correct; wire a log_sink to space_core to emit
-    // a debug-level message here when that seam is added.
+    // last-registration-wins is correct.
     m_impl->tree_tokenizer.add(std::move(tok), std::move(owner));
     return registration_ok();
 }
@@ -407,6 +386,8 @@ registration_result config_space_builder::register_converter(
         return guard;
     if(auto verdict = m_impl->review(registration_kind::converter, owner); !verdict)
         return verdict;
+    if(auto usable = reject_empty_converter(id, conv); !usable)
+        return usable;
     m_impl->converters.add(id, std::move(conv));
     return registration_ok();
 }
@@ -626,15 +607,8 @@ gate_result check_capabilities(const config_space &space,
     // descriptors, both readable through the const surface, so a pre-flight
     // leaves the stack intact for the load() that follows.
     std::vector<chain_walker::chain_entry> entries;
-    if(!options.document_paths.empty() && options.make_document)
-    {
-        const schema_projection projection = state.schema.projection();
-        auto expanded = chain_walker::expand(options.document_paths, options.make_document,
-                                             projection, options.inherit);
-        if(!expanded)
-            return unexpected(std::move(expanded).error());
-        entries = std::move(expanded).value();
-    }
+    if(auto expanded = expand_document_chain(state, options, entries); !expanded)
+        return unexpected(std::move(expanded).error());
 
     std::vector<std::pair<std::string, capability_descriptor>> descriptors;
     const std::span<const source_handle> layers = stack.layers();

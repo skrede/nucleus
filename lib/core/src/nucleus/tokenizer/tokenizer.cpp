@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <utility>
+#include <optional>
 
 namespace nucleus {
 
@@ -92,6 +93,17 @@ token_result tokenizer::resolve_field(std::string_view name) const
         return m_wildcard(name);
     return unexpected(resolve_error(resolve_errc::missing_field,
                               nucleus::format("'{}' has no field '{}'", m_category, name)));
+}
+
+std::optional<std::string_view> tokenizer::has_empty_resolver() const
+{
+    for(const token_field &field : m_fields)
+        if(!field.resolve)
+            return field.name;
+    for(const token_function &fn : m_functions)
+        if(!fn.resolve)
+            return fn.name;
+    return std::nullopt;
 }
 
 token_result tokenizer::resolve_function(std::string_view name,

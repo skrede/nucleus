@@ -1,13 +1,24 @@
 // The registration-policy seam: surface naming, the accept/reject verdict, the
 // permissive default, and a host override that intercepts one surface. Mechanism
 // lives in core; policy is the host's -- these cover both ends of that contract.
+// Also the emptiness rejections that sit beside the policy seam: a host callable
+// handed over empty is refused where it is handed over, never called where it is used.
 
+#include "builder_result_test_support.h"
 #include "nucleus/registration_policy.h"
 #include "nucleus/identity.h"
 
+#include "nucleus/tokenizer/tokenizer.h"
+#include "nucleus/tokenizer/tree_tokenizer.h"
+
 #include <catch2/catch_test_macros.hpp>
 
+#include <any>
 #include <string>
+#include <utility>
+#include <typeindex>
+#include <functional>
+#include <string_view>
 
 using nucleus::registration_kind;
 using nucleus::registration_policy;
@@ -67,4 +78,84 @@ TEST_CASE("a host policy can reject a specific surface", "[policy]")
     const auto verdict = policy.review({registration_kind::converter, owner_token{}});
     CHECK_FALSE(verdict.accepted());
     CHECK(verdict.reason() == "converters are closed");
+}
+
+TEST_CASE("a tokenizer carrying an empty field resolver is refused at installation",
+          "[policy][registration]")
+{
+    nucleus::config_space_builder builder;
+    nucleus::tokenizer tok("host", {nucleus::token_field{"release", nucleus::field_resolver{}}},
+                           {}, nullptr);
+
+    const auto installed = builder.install_tokenizer(std::move(tok));
+    REQUIRE_FALSE(installed);
+    CHECK(installed.error().code == nucleus::errc::rejected_registration);
+    CHECK(installed.error().message.find("release") != std::string::npos);
+}
+
+TEST_CASE("a tokenizer carrying an empty function resolver is refused at installation",
+          "[policy][registration]")
+{
+    nucleus::config_space_builder builder;
+    nucleus::tokenizer tok("host", {},
+        {nucleus::token_function{"upper", {}, nucleus::named_function_resolver{}}}, nullptr);
+
+    const auto installed = builder.install_tokenizer(std::move(tok));
+    REQUIRE_FALSE(installed);
+    CHECK(installed.error().code == nucleus::errc::rejected_registration);
+    CHECK(installed.error().message.find("upper") != std::string::npos);
+}
+
+TEST_CASE("a tree tokenizer carrying an empty resolver is refused at installation",
+          "[policy][registration]")
+{
+    nucleus::config_space_builder builder;
+    const auto installed = builder.install_tree_tokenizer(
+        nucleus::tree_tokenizer("hosts", nucleus::tree_field_resolver{}));
+
+    REQUIRE_FALSE(installed);
+    CHECK(installed.error().code == nucleus::errc::rejected_registration);
+    CHECK(installed.error().message.find("hosts") != std::string::npos);
+}
+
+TEST_CASE("an empty converter is refused at registration", "[policy][registration]")
+{
+    nucleus::config_space_builder builder;
+    const auto registered = builder.register_converter<int>(
+        std::function<nucleus::expected<std::any, std::string>(std::string_view)>{});
+
+    REQUIRE_FALSE(registered);
+    CHECK(registered.error().code == nucleus::errc::rejected_registration);
+    CHECK(registered.error().message.find(typeid(int).name()) != std::string::npos);
+}
+
+TEST_CASE("a tokenizer that sets no wildcard still installs", "[policy][registration]")
+{
+    // An empty wildcard is the only spelling of "no wildcard", so the emptiness
+    // rejection must not read it as a missing callable.
+    nucleus::config_space_builder builder;
+    nucleus::tokenizer tok("host",
+        {nucleus::token_field{"release", [] { return nucleus::token_result(std::string("1.0")); }}},
+        {}, nullptr);
+
+    CHECK(builder.install_tokenizer(std::move(tok)));
+    CHECK(builder.install_tokenizer(nucleus::tokenizer("bare", {}, {}, nullptr)));
+}
+
+TEST_CASE("document paths named with no parser factory are refused, not skipped",
+          "[policy][load]")
+{
+    nucleus::config_space_builder builder;
+    REQUIRE(builder.register_schema("k"));
+    nucleus::config_space space = nucleus::builder_result_test::built(builder);
+
+    nucleus::load_options options;
+    options.document_paths = {"config.xml"};
+
+    const auto loaded = nucleus::load_config(space, nucleus::source_stack{}, options);
+    REQUIRE_FALSE(loaded);
+    CHECK(loaded.error().message.find("config.xml") != std::string::npos);
+
+    // The capability pre-flight consumes the same option and must refuse alike.
+    CHECK_FALSE(nucleus::check_capabilities(space, nucleus::source_stack{}, options));
 }

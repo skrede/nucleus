@@ -11,6 +11,7 @@
 #include <vector>
 #include <cstddef>
 #include <utility>
+#include <optional>
 #include <functional>
 #include <string_view>
 
@@ -85,6 +86,12 @@ public:
     token_result resolve_field(std::string_view name) const;
     token_result resolve_function(std::string_view name,
                                   std::span<const token_argument> args) const;
+
+    // Names the first field or function whose stored resolver is empty, or nullopt when
+    // every one carries a callable. The wildcard is deliberately outside the query: it
+    // has no accompanying set-flag, so an empty wildcard is the only spelling of "no
+    // wildcard" and resolve_field already guards it before calling.
+    std::optional<std::string_view> has_empty_resolver() const;
 
 private:
     std::string m_category;

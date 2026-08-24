@@ -40,6 +40,8 @@ public:
 
     std::string_view category() const noexcept { return m_category; }
 
+    bool has_empty_resolver() const noexcept { return !m_resolver; }
+
     token_result resolve(const tree_access &access) const
     {
         if(access.field_name.find(key_path::separator) != std::string_view::npos)
