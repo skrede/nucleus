@@ -85,12 +85,14 @@ current working branch.
 | | Over the line ceiling | Over the function ceiling |
 |---|---|---|
 | Before the resolution-context and schema-registry decomposition | 46 units | 62 functions in 25 files |
-| Now | 44 units | 47 functions in 23 files |
+| Now | 44 units | 45 functions in 23 files |
 
 Two units left the register: `resolution_context.h` fell from 1890 lines to 196, and
 `schema_registry.h` from 534 to 178. The twenty-nine units split out of them are all inside both
 ceilings, so none joined. The fifteen over-ceiling functions those two files held — ten and five —
-are gone with them.
+are gone with them. The figure has since fallen by two more: `config.h` and
+`configuration_space.cpp` each measure one fewer over-ceiling function than the register had
+recorded.
 
 The "before" figures needed a correction before they could be compared against. The earlier
 tables covered C++ files only, while the gate has always measured CMake units by name as well;
@@ -148,27 +150,27 @@ None.
 
 ## Carried — library files over the 200-line ceiling
 
-13 of 154 units.
+13 of 160 units.
 
 | File | Lines |
 |---|---|
-| `lib/core/src/nucleus/resolve/configuration_space.cpp` | 656 |
+| `lib/core/src/nucleus/resolve/configuration_space.cpp` | 652 |
 | `lib/xml/src/nucleus/xml/xml_source.cpp` | 630 |
 | `lib/core/include/nucleus/detail/expected.h` | 543 |
-| `lib/core/include/nucleus/config.h` | 501 |
+| `lib/core/include/nucleus/config.h` | 495 |
 | `lib/core/include/nucleus/schema/converters.h` | 387 |
 | `lib/core/src/nucleus/tokenizer/token_lexer.cpp` | 335 |
-| `lib/core/src/nucleus/tokenizer/resolver_scope.cpp` | 305 |
 | `lib/core/include/nucleus/config_space.h` | 296 |
+| `lib/core/src/nucleus/tokenizer/resolver_scope.cpp` | 291 |
 | `lib/core/src/nucleus/resolve/chain_walker.h` | 285 |
-| `lib/core/src/nucleus/tokenizer/tree_resolver_scope.cpp` | 277 |
-| `lib/core/src/nucleus/completion/completion.cpp` | 240 |
-| `lib/argv/include/nucleus/argv/multispace_argv_source.h` | 233 |
+| `lib/core/src/nucleus/tokenizer/tree_resolver_scope.cpp` | 275 |
+| `lib/core/src/nucleus/completion/completion.cpp` | 239 |
+| `lib/argv/include/nucleus/argv/multispace_argv_source.h` | 232 |
 | `lib/core/include/nucleus/schema/schema.h` | 217 |
 
 ## Carried — test files over the 200-line ceiling
 
-29 of 145 units. Test units are held to the same ceiling.
+29 of 157 units. Test units are held to the same ceiling.
 
 | File | Lines |
 |---|---|
@@ -204,7 +206,7 @@ None.
 
 ## Carried — CMake units over the 200-line ceiling
 
-2 of 24 units.
+2 of 26 units.
 
 | File | Lines |
 |---|---|
@@ -221,7 +223,7 @@ lines twice.
 
 ## Carried — library functions over the 25-line ceiling
 
-47 functions across 23 files. Listed per file, since a file's largest function is the one that
+45 functions across 23 files. Listed per file, since a file's largest function is the one that
 sets the decomposition problem.
 
 | File | Functions over ceiling | Longest |
@@ -229,20 +231,20 @@ sets the decomposition problem.
 | `lib/xml/src/nucleus/xml/xml_source.cpp` | 3 | 203 |
 | `lib/core/src/nucleus/resolve/chain_walker.h` | 2 | 94 |
 | `lib/argv/include/nucleus/argv/multispace_argv_source.h` | 1 | 86 |
-| `lib/core/src/nucleus/tokenizer/tree_resolver_scope.cpp` | 4 | 74 |
 | `lib/core/src/nucleus/tokenizer/resolver_scope.cpp` | 4 | 69 |
-| `lib/core/src/nucleus/completion/completion.cpp` | 2 | 66 |
+| `lib/core/src/nucleus/tokenizer/tree_resolver_scope.cpp` | 4 | 66 |
 | `lib/core/include/nucleus/schema/converters.h` | 2 | 65 |
 | `lib/core/src/nucleus/tokenizer/tokenizer.cpp` | 1 | 63 |
 | `lib/core/src/nucleus/tokenizer/builtin_tokenizers.cpp` | 1 | 61 |
+| `lib/core/src/nucleus/completion/completion.cpp` | 2 | 60 |
 | `lib/core/include/nucleus/query/schema_query_context.h` | 2 | 58 |
 | `lib/argv/include/nucleus/argv/cli_surface.h` | 1 | 57 |
 | `lib/core/src/nucleus/tokenizer/token_lexer.cpp` | 5 | 57 |
 | `lib/core/include/nucleus/completion/bash_emitter.h` | 1 | 53 |
-| `lib/core/include/nucleus/config.h` | 2 | 52 |
+| `lib/core/include/nucleus/config.h` | 1 | 52 |
 | `lib/core/include/nucleus/config_source/feature_gate.h` | 2 | 47 |
 | `lib/argv/include/nucleus/argv/argv_source.h` | 1 | 42 |
-| `lib/core/src/nucleus/resolve/configuration_space.cpp` | 6 | 42 |
+| `lib/core/src/nucleus/resolve/configuration_space.cpp` | 5 | 41 |
 | `lib/core/include/nucleus/diagnostics/key_suggester.h` | 2 | 33 |
 | `lib/core/src/nucleus/query/query.cpp` | 1 | 33 |
 | `lib/core/include/nucleus/config_source/extension_registry.h` | 1 | 32 |
