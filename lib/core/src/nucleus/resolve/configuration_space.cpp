@@ -598,7 +598,6 @@ load_result load_config(const config_space &space,
         return unexpected(std::move(sliced).error());
     if(auto applied = ctx.apply_deferred_cli_overrides(); !applied)
         return unexpected(std::move(applied).error());
-    ctx.set_reference_budget(options.reference_budget);
     if(auto refs = ctx.resolve_references(); !refs)
         return unexpected(std::move(refs).error());
     if(auto checked = ctx.validate(); !checked)

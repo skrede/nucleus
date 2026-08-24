@@ -1,6 +1,8 @@
 #include "nucleus/config_space.h"
 #include "nucleus/identity.h"
 
+#include "nucleus/tokenizer/tree_tokenizer.h"
+
 #include "nucleus/runtime/runtime_source.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -16,6 +18,9 @@ using nucleus::load_config;
 using nucleus::load_options;
 using nucleus::runtime_source;
 using nucleus::source_stack;
+using nucleus::token_result;
+using nucleus::tree_access;
+using nucleus::tree_tokenizer;
 
 TEST_CASE("cross-leaf cycle A->B->A is detected with the full FQN chain",
           "[reference][cycle]")
@@ -81,7 +86,7 @@ TEST_CASE("substitution budget exceeded stops billion-laughs amplification",
     src.set("ladder/k", "${abs:ladder/j}${abs:ladder/j}");
 
     load_options opts;
-    opts.reference_budget = 5; // tiny budget to force early trip
+    opts.expansion_budget = 5; // tiny budget to force early trip
     auto loaded = load_config(space, source_stack{std::move(src)}, opts);
     REQUIRE_FALSE(loaded.has_value());
     CHECK(loaded.error().message.find("budget") != std::string::npos);
@@ -100,7 +105,7 @@ TEST_CASE("budget_exceeded does NOT trigger ?? fallthrough",
     src.set("ladder/result", "${abs:ladder/d ?? \"fallback\"}");
 
     load_options opts;
-    opts.reference_budget = 3; // trip before ladder/d finishes
+    opts.expansion_budget = 3; // trip before ladder/d finishes
     auto loaded = load_config(space, source_stack{std::move(src)}, opts);
     REQUIRE_FALSE(loaded.has_value());
     CHECK(loaded.error().message.find("budget") != std::string::npos);
@@ -153,4 +158,41 @@ TEST_CASE("diamond fan-in resolves without exponential substitution count",
     auto loaded = load_config(space, source_stack{std::move(src)}, {});
     REQUIRE(loaded.has_value());
     CHECK(loaded.value().get("diamond/a") == "leaf-leaf");
+}
+
+TEST_CASE("a tree tokenizer's own output is resolved to a fixpoint", "[reference][tree]")
+{
+    config_space_builder engine;
+    REQUIRE(engine.install_tree_tokenizer(tree_tokenizer("wrap", [](const tree_access &a)
+        -> token_result { return a.field_name == "start"
+            ? std::string("head-${wrap.tail}-foot") : std::string("TAIL"); })));
+    runtime_source src;
+    src.set("box/text", "x${wrap.start}y");
+    auto loaded = load_config(engine.build(), source_stack{std::move(src)}, {});
+    REQUIRE(loaded.has_value());
+    CHECK(loaded.value().get("box/text") == "xhead-TAIL-footy");
+}
+
+TEST_CASE("a tree tokenizer re-emitting its own token halts", "[reference][tree][budget]")
+{
+    config_space_builder engine;
+    REQUIRE(engine.install_tree_tokenizer(tree_tokenizer("loop", [](const tree_access &)
+        -> token_result { return std::string("${loop.self}"); })));
+    runtime_source src;
+    src.set("box/text", "${loop.self}");
+    auto loaded = load_config(engine.build(), source_stack{std::move(src)}, {});
+    REQUIRE_FALSE(loaded.has_value());
+    CHECK(loaded.error().message.find("cyclic reference: loop.self") != std::string::npos);
+}
+
+TEST_CASE("one substitution count spans both token passes", "[reference][budget][passes]")
+{
+    runtime_source src;
+    src.set("pool/seed", "s").set("pool/ref", "${abs:pool/seed}")
+       .set("pool/w", "${string.upper(value=a)}${string.upper(value=b)}${string.upper(value=c)}");
+    load_options opts;
+    opts.expansion_budget = 3;
+    auto loaded = load_config(config_space_builder{}.build(), source_stack{std::move(src)}, opts);
+    REQUIRE_FALSE(loaded.has_value());
+    CHECK(loaded.error().message.find("budget") != std::string::npos);
 }

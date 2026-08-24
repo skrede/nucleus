@@ -20,6 +20,7 @@ tree_resolver_scope::tree_resolver_scope(const keyspace &building,
     , m_budget(budget)
     , m_ensure_resolved(std::move(ensure_resolved))
     , m_tree_tokenizer(tree_reg)
+    , m_dispatch_guard(default_expansion_depth_cap)
 {
 }
 
@@ -129,9 +130,12 @@ token_result tree_resolver_scope::resolve_one_arm(std::string_view arm)
                 if(auto charged = m_budget.charge(); !charged)
                     return unexpected(std::move(charged).error());
 
+                auto entered = m_dispatch_guard.enter(nucleus::format("{}.{}", category, field));
+                if(!entered)
+                    return unexpected(std::move(entered).error());
                 const tree_tokenizer *tok = m_tree_tokenizer->find(category);
                 tree_access const access{m_building, m_current_path, category, field};
-                return tok->resolve(access);
+                return expand_produced(tok->resolve(access));
             }
         }
     }
@@ -146,6 +150,22 @@ token_result tree_resolver_scope::resolve_one_arm(std::string_view arm)
 
     // Unquoted literal string floor.
     return std::string(stripped);
+}
+
+// Recursive-to-fixpoint, mirroring resolver_scope::resolve_one: a tokenizer's own
+// output may carry a further tree token. Resume from the first ${.
+token_result tree_resolver_scope::expand_produced(token_result produced)
+{
+    if(!produced)
+        return produced;
+    const std::string &out = produced.value();
+    auto const splice = out.find("${");
+    if(splice == std::string::npos)
+        return produced;
+    auto tail = resolve_value(std::string_view(out).substr(splice));
+    if(!tail)
+        return unexpected(std::move(tail).error());
+    return out.substr(0, splice) + std::move(tail).value();
 }
 
 token_result tree_resolver_scope::resolve_absolute(std::string_view path_body)

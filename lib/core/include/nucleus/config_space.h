@@ -80,9 +80,8 @@ struct load_options
     inherit_policy                                      inherit;
     std::vector<std::string>                            document_paths;
     std::function<source_handle(const std::string &)>   make_document;
-    // Maximum tree-reference substitutions in one pass-2 resolve. 0 = engine default (10000).
-    std::size_t                                         reference_budget = 0;
-    // Maximum token-expansion substitutions in one pass-1 fold. 0 = engine default (2500).
+    // Maximum token substitutions in one load, spanning both token passes.
+    // 0 = engine default (10000).
     std::size_t                                         expansion_budget = 0;
     // Optional host sink for load-time warnings (soft-capability degradations).
     // nullptr = no logging; degradations are still recorded on config::degradations().

@@ -17,8 +17,6 @@ namespace nucleus {
 // resolution failure, surfaced verbatim with the offending layer named.
 using resolve_fold_error = error;
 
-// Maximum total reference substitutions across one pass-2 resolve. Stops billion-laughs amplification.
-inline constexpr std::size_t default_reference_budget = 10000;
 // Maximum cross-leaf reference chain depth. Per-value nesting cap (16) stays in expansion_guard.h.
 inline constexpr std::size_t default_reference_depth_cap = 64;
 

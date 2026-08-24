@@ -538,8 +538,7 @@ struct load_options {
     inherit_policy                                    inherit;     // chain admissibility + depth cap (default 16)
     std::vector<std::string>                          document_paths;
     std::function<source_handle(const std::string &)> make_document;
-    std::size_t                                       reference_budget = 0;  // max tree-reference substitutions per pass-2 resolve; 0 = engine default (10000)
-    std::size_t                                       expansion_budget = 0;  // max token-expansion substitutions per pass-1 fold; 0 = engine default (2500)
+    std::size_t                                       expansion_budget = 0;  // max token substitutions in one load, spanning both passes; 0 = engine default (10000)
     log_sink*                                         log = nullptr;         // optional host sink for load-time warnings; nullptr = no logging
 };
 ```

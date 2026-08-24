@@ -26,7 +26,6 @@
 #include "nucleus/tokenizer/tree_tokenizer_registry.h"
 
 #include <string>
-#include <cstddef>
 #include <utility>
 
 namespace nucleus {
@@ -34,8 +33,8 @@ namespace nucleus {
 // Folds one source entry into the building keyspace: expands its tokens, parses
 // its path, offers it to each interceptor that may claim it for a later stage,
 // and stores whatever no interceptor claimed. Every collaborator it consults is
-// borrowed and outlives the resolve; the substitution budget is the one piece of
-// per-load state it owns, because the ceiling is per load rather than per value.
+// borrowed and outlives the resolve, the substitution count included: the ceiling
+// spans the whole load, so both token passes charge the one object.
 //
 // Unified storage: ALL repeated paths, leaves and containers alike, are stored as
 // indexed scalars -- "config/tag" with duplicate entries becomes "config/tag[0]",
@@ -47,7 +46,8 @@ public:
     fold_entry(layer_fold &layers, repeated_sweep &sweep, cli_ordinal &cli,
                keyed_divert &divert, keyspace &building, provenance &prov,
                const schema_registry &schema, const tokenizer_registry &tokenizer,
-               const tree_tokenizer_registry &tree_tokenizer) noexcept
+               const tree_tokenizer_registry &tree_tokenizer,
+               substitution_budget &budget) noexcept
         : m_cli(cli)
         , m_layers(layers)
         , m_building(building)
@@ -55,15 +55,9 @@ public:
         , m_provenance(prov)
         , m_tokenizer(tokenizer)
         , m_tree_tokenizer(tree_tokenizer)
+        , m_budget(budget)
         , m_placement(layers, sweep, schema)
     {
-    }
-
-    // A bounded-depth fanout spanning several values is charged against a single
-    // running count, so the total-substitution ceiling holds across the load.
-    void begin_fold(std::size_t expansion_budget) noexcept
-    {
-        m_budget = substitution_budget(expansion_budget);
     }
 
     expected<void, resolve_fold_error>
@@ -91,8 +85,8 @@ private:
     provenance                      &m_provenance;
     const tokenizer_registry        &m_tokenizer;
     const tree_tokenizer_registry   &m_tree_tokenizer;
-    substitution_budget m_budget;
-    repeated_placement  m_placement;
+    substitution_budget             &m_budget;
+    repeated_placement               m_placement;
 
     expected<std::string, resolve_fold_error>
     expand(const keyspace_entry &entry, const layered_handle &layer)

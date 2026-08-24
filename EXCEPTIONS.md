@@ -258,7 +258,7 @@ declaration.
 
 The table below is **not** a tree-wide count, and reading it as one would be a mistake. It records
 exactly the members the resolution-context decomposition relocated verbatim rather than fixed, so
-that the movement stayed reviewable as movement. Three qualify on that basis.
+that the movement stayed reviewable as movement. One qualifies on that basis.
 
 Others exist outside that scope and are not listed, counted, or waived here — `anchor::m_invalid`
 in `lib/core/include/nucleus/schema/anchor.h`, `cli_flag::m_text` in
@@ -272,13 +272,10 @@ tree should be quoted from this page.
 | Member | Unit |
 |---|---|
 | `layered_handle::cached_batch` | `lib/core/src/nucleus/resolve/resolve_types.h` |
-| `resolution_context::m_reference_budget` | `lib/core/src/nucleus/resolve/resolution_context.h` |
-| `resolution_context::m_expansion_budget` | `lib/core/src/nucleus/resolve/resolution_context.h` |
 
-`layered_handle` is the constrained one. It is an aggregate, brace-initialized at its construction
+`layered_handle` is constrained. It is an aggregate, brace-initialized at its construction
 site in `lib/core/src/nucleus/resolve/configuration_space.cpp`; giving it a constructor to hold
 the initializer would make it a non-aggregate and break that site. Fixing it therefore means
-changing the caller, which the decomposition deliberately avoided doing anywhere. The other two
-are unconstrained and simply not yet moved.
+changing the caller, which the decomposition deliberately avoided doing anywhere.
 
 These are counted, not waived. `Sanctioned` above stays empty.

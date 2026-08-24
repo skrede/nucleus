@@ -489,6 +489,30 @@ live side-by-side comparison and
 [`tests/pkey_tokenizer_test.cpp`](../tests/pkey_tokenizer_test.cpp) for the
 full acceptance suite.
 
+### What happens to a resolver's output
+
+A tree tokenizer's output is not final text. It is scanned again, and any
+`${...}` it carries is resolved before the value is stored — the same fixpoint
+the `install_tokenizer` seam reaches. A resolver may therefore return a token, or
+text embedding one, and expect it to be expanded.
+
+Two bounds hold that recursion:
+
+- **The substitution count.** One running count spans both token passes, so
+  expansion in the fold and dispatch in the reference stage draw on the same
+  allowance; moving work from one to the other buys no second allowance. A host
+  sets it with `load_options::expansion_budget`, where `0` selects the engine
+  default of 10000. Exhausting it fails the load with `errc::unresolved_token`,
+  naming the leaf and reporting `substitution budget (N) exceeded`.
+
+- **The dispatch chain.** Within one leaf, each dispatch pushes `category.field`
+  onto a chain popped when the resolver returns. A resolver that re-emits its own
+  token is a cycle on that chain and fails at once with
+  `cyclic reference: category.field -> category.field`; nesting past the depth
+  cap fails with `token expansion depth N exceeded`. That chain belongs to the
+  leaf being resolved and never pools with the cross-leaf reference chain, so a
+  token label and a key path never appear in one cycle report.
+
 ---
 
 <a id="converters"></a>

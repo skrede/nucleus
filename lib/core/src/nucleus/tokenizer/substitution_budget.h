@@ -10,15 +10,15 @@
 
 namespace nucleus {
 
-// Default ceiling on total pass-1 substitutions in one load. Pass-2 keeps its
-// larger default_reference_budget; the two defaults deliberately diverge.
-inline constexpr std::size_t default_expansion_budget = 2500;
+// Default ceiling on total substitutions in one load, spanning both token passes.
+// Stops billion-laughs amplification.
+inline constexpr std::size_t default_expansion_budget = 10000;
 
-// A running substitution-count budget shared across one whole expansion pass.
+// A running substitution-count budget shared across one whole load.
 // charge() is called once per substitution; when the running count passes the
 // cap it fails loudly with budget_exceeded, bounding fanout amplification that a
 // depth cap alone cannot stop. Borrowed by reference so every value in a load
-// shares one count: the ceiling is per-load, not per-value.
+// shares one count: the ceiling is per-load, not per-value and not per-pass.
 struct substitution_budget
 {
     std::size_t count = 0;

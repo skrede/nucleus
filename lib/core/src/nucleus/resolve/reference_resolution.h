@@ -19,7 +19,6 @@
 
 #include <string>
 #include <vector>
-#include <cstddef>
 #include <utility>
 #include <optional>
 #include <string_view>
@@ -28,16 +27,18 @@
 namespace nucleus {
 
 // Pass-2 tree-reference resolution. It BORROWS the building keyspace it reads
-// and writes back into, and the tree tokenizer registry a token's category may
-// name; it keeps no state between passes -- the guard, the cache and the budget
-// all live for the duration of one resolve() call.
+// and writes back into, the tree tokenizer registry a token's category may name,
+// and the load-wide substitution count pass 1 has already charged against; the
+// guard and the cache live for the duration of one resolve() call.
 class reference_resolution
 {
 public:
     reference_resolution(keyspace &building,
-                         const tree_tokenizer_registry &tree_tokenizer) noexcept
+                         const tree_tokenizer_registry &tree_tokenizer,
+                         substitution_budget &budget) noexcept
         : m_building(building)
         , m_tree_tokenizer(tree_tokenizer)
+        , m_budget(budget)
     {
     }
 
@@ -47,19 +48,18 @@ public:
     //   - Cross-leaf cycle detection via expansion_guard.
     //   - Substitution-count budget: budget_exceeded stops billion-laughs.
     //   - ?? chaining: missing_field falls through; all other errors propagate.
-    expected<void, resolve_fold_error> resolve(std::size_t reference_budget)
+    expected<void, resolve_fold_error> resolve()
     {
         if(auto scanned = scan_structural_keys(); !scanned)
             return scanned;
 
         expansion_guard leaf_guard(default_reference_depth_cap);
         std::unordered_map<std::string, std::string> resolved_cache;
-        substitution_budget budget(reference_budget);
 
         // Snapshot the paths: resolving writes back through m_building.set().
         const std::vector<key_path> all_paths = m_building.paths();
         for(const key_path &kp : all_paths)
-            if(auto one = resolve_leaf(kp, leaf_guard, resolved_cache, budget); !one)
+            if(auto one = resolve_leaf(kp, leaf_guard, resolved_cache); !one)
                 return one;
         return {};
     }
@@ -67,6 +67,7 @@ public:
 private:
     keyspace                      &m_building;
     const tree_tokenizer_registry &m_tree_tokenizer;
+    substitution_budget           &m_budget;
 
     // The tree shape is frozen by slice(), so a reference may only appear in a
     // value; one in a key segment would make the tree untraversable.
@@ -85,13 +86,12 @@ private:
     // recursive resolver's resolve_error into the error the stage reports.
     expected<void, resolve_fold_error>
     resolve_leaf(const key_path &kp, expansion_guard &leaf_guard,
-                 std::unordered_map<std::string, std::string> &resolved_cache,
-                 substitution_budget &budget)
+                 std::unordered_map<std::string, std::string> &resolved_cache)
     {
         const value *v = m_building.find(kp);
         if(v == nullptr || v->text().find("${") == std::string_view::npos)
             return {};
-        auto one = resolve_one_leaf(kp, leaf_guard, resolved_cache, budget);
+        auto one = resolve_one_leaf(kp, leaf_guard, resolved_cache);
         if(one)
             return {};
         return unexpected(error{errc::unresolved_token,
@@ -105,8 +105,7 @@ private:
     // ensure_resolved_fn callback type tree_resolver_scope takes.
     expected<void, resolve_error>
     resolve_one_leaf(const key_path &kp, expansion_guard &leaf_guard,
-                     std::unordered_map<std::string, std::string> &resolved_cache,
-                     substitution_budget &budget)
+                     std::unordered_map<std::string, std::string> &resolved_cache)
     {
         const std::string path_str = kp.str();
         const std::optional<std::string_view> text =
@@ -118,7 +117,7 @@ private:
         auto guard_scope = leaf_guard.enter(path_str);
         if(!guard_scope)
             return unexpected(std::move(guard_scope).error());
-        return expand_leaf(kp, text.value(), leaf_guard, resolved_cache, budget);
+        return expand_leaf(kp, text.value(), leaf_guard, resolved_cache);
     }
 
     // The value awaiting expansion at `kp`, or nothing when the leaf is already
@@ -144,15 +143,14 @@ private:
     expected<void, resolve_error>
     expand_leaf(const key_path &kp, std::string_view text,
                 expansion_guard &leaf_guard,
-                std::unordered_map<std::string, std::string> &resolved_cache,
-                substitution_budget &budget)
+                std::unordered_map<std::string, std::string> &resolved_cache)
     {
         ensure_resolved_fn ensure = [&](const key_path &target)
             -> expected<void, resolve_error>
         {
-            return resolve_one_leaf(target, leaf_guard, resolved_cache, budget);
+            return resolve_one_leaf(target, leaf_guard, resolved_cache);
         };
-        tree_resolver_scope scope(m_building, kp, budget,
+        tree_resolver_scope scope(m_building, kp, m_budget,
                                   std::move(ensure), &m_tree_tokenizer);
         auto resolved = scope.resolve_value(text);
         if(!resolved)

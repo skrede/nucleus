@@ -61,19 +61,20 @@ public:
         , m_tokenizer(tokenizer)
         , m_converters(converters)
         , m_tree_tokenizer(tree_tokenizer)
+        , m_budget(default_expansion_budget)
         , m_layers(m_schema, m_buffers, m_dispositions)
         , m_sweep(m_building, m_provenance, m_schema)
         , m_cli_ordinal(m_building, m_provenance, m_schema)
         , m_conversion(m_building, m_provenance, m_schema, m_converters, m_typed)
         , m_merge(m_building, m_provenance, m_keyed)
-        , m_references(m_building, m_tree_tokenizer)
+        , m_references(m_building, m_tree_tokenizer, m_budget)
         , m_gate(m_building, m_schema, m_sweep, m_keyed_satisfied,
                  [this] { return group_snapshot(); })
         , m_divert(m_keyed, m_schema)
         , m_slicing(m_building, m_provenance, m_schema, m_sweep, m_keyed,
                     m_dispositions, m_keyed_satisfied)
         , m_entry(m_layers, m_sweep, m_cli_ordinal, m_divert, m_building,
-                  m_provenance, m_schema, m_tokenizer, m_tree_tokenizer)
+                  m_provenance, m_schema, m_tokenizer, m_tree_tokenizer, m_budget)
     {
     }
 
@@ -99,7 +100,6 @@ public:
         if(auto built = m_keyed.build(m_schema); !built)
             return unexpected(built.error());
         m_cli_ordinal.reset();
-        m_entry.begin_fold(m_expansion_budget);
         for(layered_handle *lh : ordered)
         {
             auto acquired = m_layers.acquire(*lh);
@@ -128,7 +128,7 @@ public:
 
     expected<void, resolve_fold_error> apply_deferred_cli_overrides() { return m_cli_ordinal.apply(); }
 
-    expected<void, resolve_fold_error> resolve_references() { return m_references.resolve(m_reference_budget); }
+    expected<void, resolve_fold_error> resolve_references() { return m_references.resolve(); }
 
     expected<void, resolve_fold_error> validate() { return m_gate.validate(); }
 
@@ -140,18 +140,12 @@ public:
         return {owned_values(m_building), m_typed, m_provenance, std::move(degraded)};
     }
 
-    // 0 maps to the engine default, so a budget is never capped at zero.
-    void set_reference_budget(std::size_t budget) noexcept
-    {
-        if(budget != 0)
-            m_reference_budget = budget;
-    }
-
-    // 0 maps to the engine default; must be set before fold(), where pass-1 expands.
+    // 0 maps to the engine default, so a budget is never capped at zero. Must be
+    // set before fold(), the first of the two passes that charge the one count.
     void set_expansion_budget(std::size_t budget) noexcept
     {
         if(budget != 0)
-            m_expansion_budget = budget;
+            m_budget.cap = budget;
     }
 
 private:
@@ -163,8 +157,9 @@ private:
     const converter_registry        &m_converters;
     const tree_tokenizer_registry   &m_tree_tokenizer;
 
-    std::size_t m_reference_budget = default_reference_budget;
-    std::size_t m_expansion_budget = default_expansion_budget;
+    // Both token passes charge this one count, so work moved from one to the
+    // other buys no second allowance.
+    substitution_budget m_budget;
 
     keyspace m_building;
     provenance m_provenance;

@@ -31,7 +31,7 @@ using ensure_resolved_fn =
 // borrows (never stores) the building keyspace and the shared substitution
 // counter. Cross-leaf cycle detection is owned by the caller (resolve_one_leaf
 // enters/exits the guard around each leaf); the recursive ensure_resolved
-// callback routes back through it, so this scope never touches the guard itself.
+// callback routes back through it.
 // Flat-registry purity: no stored cross-registry member; tree_resolver_scope
 // lives only for the duration of one leaf resolution.
 class tree_resolver_scope
@@ -51,6 +51,7 @@ public:
     token_result resolve_one_arm(std::string_view arm);
 
 private:
+    token_result expand_produced(token_result produced);
     token_result resolve_absolute(std::string_view path_body);
     token_result resolve_relative(std::string_view rel_body);
     expected<key_path, resolve_error> resolve_relative_path(std::string_view rel_body);
@@ -60,6 +61,11 @@ private:
     substitution_budget             &m_budget;
     ensure_resolved_fn               m_ensure_resolved;
     const tree_tokenizer_registry   *m_tree_tokenizer = nullptr;
+    // The chain for tokenizer-dispatch recursion within one leaf, keyed on
+    // category.field. The cross-leaf guard cannot see that recursion -- it never
+    // re-enters the leaf resolver -- and the substitution count alone would
+    // exhaust the stack long before it reached its ceiling.
+    expansion_guard                  m_dispatch_guard;
 };
 
 }
