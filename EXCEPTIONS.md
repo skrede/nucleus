@@ -174,7 +174,7 @@ None.
 
 Two rows here rose to close the pathname expansion the generated bash completion performed
 over its own candidates, and one of the two rose again for the zsh description escaper.
-`tests/completion_test.cpp` grew by the six emitted lines the pinned golden now carries, which
+`tests/completion_test.cpp` grew by the four emitted lines the pinned golden now carries, which
 is the whole point of pinning it: a change to the emitted script that does not move the golden
 is a change no reviewer sees. `tests/completion_smoke_test.cpp` grew by three cases that drive
 the generated script under a real shell with the working directory seeded to match a candidate,
