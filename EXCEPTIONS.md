@@ -49,6 +49,14 @@ git ls-files '*.cmake' '*CMakeLists.txt' | sort \
   | sort -k1,1rn -k2,2 | awk '{ print $2, $1 }'
 ```
 
+Example files over the line ceiling:
+
+```
+find examples \( -name '*.h' -o -name '*.cpp' \) | sort \
+  | xargs wc -l | awk '$2 != "total" && $1 > 200 { print $1, $2 }' \
+  | sort -k1,1rn -k2,2 | awk '{ print $2, $1 }'
+```
+
 Library functions over the function ceiling, aggregated per file:
 
 ```
@@ -85,7 +93,7 @@ current working branch.
 | | Over the line ceiling | Over the function ceiling |
 |---|---|---|
 | Before the resolution-context and schema-registry decomposition | 46 units | 62 functions in 25 files |
-| Now | 48 units | 45 functions in 23 files |
+| Now | 49 units | 45 functions in 23 files |
 
 Two units left the register: `resolution_context.h` fell from 1890 lines to 196, and
 `schema_registry.h` from 534 to 178. The twenty-nine units split out of them are all inside both
@@ -97,6 +105,10 @@ recorded.
 Three units have since joined, all of them contract tests that rename the example entry point they
 include. Declaring that renamed entry point is one line each, and each of the three was within a
 line of the ceiling already.
+
+A fourth has joined that is not a test. `examples/composition/plugin_spaces.cpp` crossed the ceiling
+when its one packed 245-character definition was broken into the multi-line form the rest of the
+file uses, and it is the first example the register carries.
 
 The "before" figures needed a correction before they could be compared against. The earlier
 tables covered C++ files only, while the gate has always measured CMake units by name as well;
@@ -111,22 +123,26 @@ missing CMake units were the sole correction the baseline needed.
 
 ## What the two trees outside `lib/` may register
 
-The function table below covers library units only, and the example tree has no table of any kind.
-Both omissions are deliberate rather than oversights.
+Outside `lib/` the register holds two tables, both of line counts: one for test files and one for
+example files. Neither tree has a function table, and the function table below covers library units
+only. That asymmetry is deliberate rather than an oversight.
 
 No function outside `lib/` may be registered. A function over the 25-line ceiling in `tests/` or in
-`examples/` has exactly one remedy, which is to be decomposed; there is no row for it to take. The
-example tree goes further and may register nothing at all, line counts included — the absence of an
-example table is the policy, not a gap in the measurements.
+`examples/` has exactly one remedy, which is to be decomposed; there is no row for it to take and
+none may be added. That half is a ratchet and the ratchet is the point: because no function row can
+be added, the gate refuses any change whose file listing contains a unit outside `lib/` with an
+over-ceiling function, and the only way through is to bring that unit into compliance first.
 
-The test-file table is the single entry either tree has, and it records line counts only. Those
-thirty-three units are carried debt awaiting a reorganization of the tree, and that table is expected to
-shrink rather than grow; where it has grown, the reason sits beside it.
+The grant is to line counts only. An example file may be recorded over the 200-line ceiling when
+splitting it would harm the file, and the reason is stated beside it: a worked walkthrough is read
+top to bottom, and splitting one breaks the order the reader follows, which is the whole point of
+the file. That is the kind of reason this accepts, and it is a reason a reviewer can disagree with
+in the diff that takes the row. Packing lines wide to hold a file under its ceiling is not a remedy
+and never was — it is what produced the collision between this register and the formatter.
 
-What the policy costs is a ratchet, and the ratchet is the point. Because no row can be added, the
-gate refuses any change whose file listing contains an example unit with an over-ceiling function,
-and the only way through is to bring that unit into compliance first.
-Every example file is inside both ceilings today.
+The test-file table records line counts only. Those thirty-three units are carried debt awaiting a
+reorganization of the tree, and that table is expected to shrink rather than grow; where it has
+grown, the reason sits beside it.
 
 The test tree carries one exemption, and only the test tree. A Catch2 test-case body — the block a
 `TEST_CASE`, `SCENARIO`, `TEMPLATE_TEST_CASE` or `TEST_CASE_METHOD` macro introduces — is held to a
@@ -136,17 +152,18 @@ test-function table here and none may be added. Ordinary functions under `tests/
 ceiling, again with no row available. The 200-line file ceiling is unchanged everywhere.
 
 The exemption reaches neither of the other trees. In `lib/` the 25-line ceiling stays hard and a
-register row remains the only escape; in `examples/` the ceiling stays hard and nothing may be
-registered at all.
+register row remains the only escape; in `examples/` it stays hard with no escape at all, since the
+example grant reaches line counts and nothing else.
 
 It exists because ctags emits no function tag for a macro-introduced body, so until the gate was
 taught to walk them by brace depth it had measured none of the lines holding nearly all the test
 logic. Of the 840 bodies under `tests/` the median is 16 lines and the longest is 60, so 60 refuses
 what no readable scenario needs while leaving setup-heavy integration cases room.
 
-None of this moves the figures in "Where the count stands". Those count registered units, and this
-policy adds no row to any table, so the before-and-after numbers recorded there stand exactly as
-they were measured.
+The test-case-body exemption moves no figure in "Where the count stands". Those count registered
+units and the exemption adds no row, so the before-and-after numbers stand exactly as measured. The
+example grant above is not in that position: it adds a row and moves the line-ceiling figure by one,
+and the figure recorded there is a fresh measurement rather than the old one adjusted.
 
 ## Sanctioned
 
@@ -244,6 +261,22 @@ fill. That is the intended behavior and not a gap in the gate.
 Decomposing `tests/CMakeLists.txt` is held back deliberately: it is entangled with a
 reorganization of the test tree into folders, and doing one without the other would move the same
 lines twice.
+
+## Carried — example files over the 200-line ceiling
+
+1 of 33 units.
+
+An example is a worked walkthrough read top to bottom; splitting it breaks the order the reader
+follows, which is the whole point of the file. The row below is granted on that reason and on
+nothing else. `plugin_spaces.cpp` crossed the ceiling when the one packed 245-character definition
+it carried was broken into the multi-line form the rest of the file uses, which is what both the
+formatter and readability ask of it. The three lines are not bought back by packing something else,
+and narrowing the example is not available either: the aggregate example gate asserts this
+example's output, so a shorter walkthrough would mean editing the gate that checks it.
+
+| File | Lines |
+|---|---|
+| `examples/composition/plugin_spaces.cpp` | 203 |
 
 ## Carried — library functions over the 25-line ceiling
 

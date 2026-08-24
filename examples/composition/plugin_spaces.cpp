@@ -64,8 +64,11 @@ inline nucleus::registration_result register_cache(Builder &builder, const nucle
 {
     return register_plugin(builder, owner, "cache", "size_mb", "policy", {"lru", "lfu"});
 }
-std::shared_ptr<admitted_plugins_policy> make_policy(const nucleus::owner_token &net_owner, const nucleus::owner_token &cache_owner) { return std::make_shared<admitted_plugins_policy>(std::vector<nucleus::owner_token>{net_owner, cache_owner}); }
-nucleus::registration_result             validate_application(
+std::shared_ptr<admitted_plugins_policy> make_policy(const nucleus::owner_token &net_owner, const nucleus::owner_token &cache_owner)
+{
+    return std::make_shared<admitted_plugins_policy>(std::vector<nucleus::owner_token>{net_owner, cache_owner});
+}
+nucleus::registration_result validate_application(
         nucleus::registration_result rogue, std::size_t conflicts,
         std::ostream &output)
 {
