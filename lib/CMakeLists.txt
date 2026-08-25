@@ -58,12 +58,18 @@ function(nucleus_add_module name)
         add_library(${alias} ALIAS ${target})
     endforeach()
 
-    install(TARGETS ${target}
-        EXPORT nucleus-targets
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-    install(DIRECTORY ${include_root}/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+    # Gated with the aggregate install(EXPORT) in the root rather than instead of it: leaving this
+    # ungated would populate an export set nobody emits and still write nucleus headers into
+    # whatever prefix the consumer installs into.
+    if(NUCLEUS_INSTALL)
+        install(TARGETS ${target}
+            EXPORT nucleus-targets
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+        install(DIRECTORY ${include_root}/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+            FILES_MATCHING PATTERN "*.h")
+    endif()
 endfunction()
 
 # core: the format-agnostic engine. EXPORT_NAME nucleus preserves nucleus::nucleus
@@ -90,6 +96,23 @@ nucleus_add_module(core
         core/src/nucleus/query/structural_selector.cpp)
 
 set_target_properties(nucleus_core PROPERTIES VERSION ${PROJECT_VERSION})
+
+# The root's std::format probe answered once for this build; carry that answer into a generated
+# public header so the format() seam reads it instead of re-testing the consumer's own standard
+# library. The template lives outside the include root because that root is installed wholesale.
+# BUILD_INTERFACE covers an add_subdirectory consumer; the INSTALL_INTERFACE entry every module
+# already carries covers a find_package one, so one include spelling resolves for both.
+set(NUCLEUS_USE_STD_FORMAT ${NUCLEUS_HAVE_STD_FORMAT})
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/core/format_backend.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/nucleus/detail/format_backend.h
+    @ONLY)
+target_include_directories(nucleus_core
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/generated>)
+if(NUCLEUS_INSTALL)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/generated/nucleus/detail/format_backend.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nucleus/detail)
+endif()
 
 if(NUCLEUS_BUILD_TESTS AND
    (MSVC OR CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang"))

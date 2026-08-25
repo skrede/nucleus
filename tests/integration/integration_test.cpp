@@ -5,6 +5,8 @@
 #include "nucleus/config.h"
 #include "nucleus/config_space.h"
 
+#include "nucleus/detail/format_backend.h"
+
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/converters.h"
@@ -16,7 +18,16 @@
 #endif
 
 #include <cstdint>
+#include <version>
 #include <iostream>
+
+// The one pairing that cannot work: the installed package declares std::format, so its archive
+// carries std::format in the interface vocabulary, while this consumer's standard library does
+// not offer the type. The reverse pairing is legal and must keep building -- the {fmt} fallback
+// lives in a public header and fmt is on the link line.
+#if NUCLEUS_USE_STD_FORMAT && !defined(__cpp_lib_format)
+#error "the installed nucleus declares std::format, which this standard library does not provide"
+#endif
 
 namespace {
 

@@ -23,9 +23,12 @@ target_compile_features(ordinal_width_probe PRIVATE cxx_std_20)
 target_link_libraries(ordinal_width_probe PRIVATE nucleus::core)
 
 # The sub-compiles below are standalone compiler invocations that inherit nothing from
-# the probe target, so its include set is spelled out here. Bar-separated, because a
-# CMake list would split into separate script arguments on the way into the driver.
-set(ordinal_width_includes ${CMAKE_SOURCE_DIR}/lib/core/include)
+# the probe target, so its include set is read off the core target here rather than
+# named: the production headers reach the generated backend header, whose root lives in
+# the build tree. Bar-separated, because a CMake list would split into separate script
+# arguments on the way into the driver.
+set(ordinal_width_includes
+    "$<JOIN:$<TARGET_PROPERTY:nucleus::core,INTERFACE_INCLUDE_DIRECTORIES>,|>")
 if(NOT NUCLEUS_HAVE_STD_FORMAT)
     string(APPEND ordinal_width_includes
         "|$<JOIN:$<TARGET_PROPERTY:fmt::fmt,INTERFACE_INCLUDE_DIRECTORIES>,|>")

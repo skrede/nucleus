@@ -1,16 +1,15 @@
 #ifndef HPP_GUARD_NUCLEUS_FORMAT_H
 #define HPP_GUARD_NUCLEUS_FORMAT_H
 
-#include <version>
+#include "nucleus/detail/format_backend.h"
 
-// Diagnostic / sink vocabulary. std::format is the interface vocabulary, but it
-// is not yet portable enough to depend on unconditionally (Apple Clang / libc++
-// has historically lagged). When the standard library advertises std::format
-// via __cpp_lib_format we use it directly; otherwise we fall back to the {fmt}
-// library, which is the reference implementation and API-compatible. The seam's
-// signature never changes regardless of which backend is active.
+// Diagnostic / sink vocabulary, over std::format where it was available and the {fmt} reference
+// implementation where it was not. Which one is settled at nucleus's configure time and carried
+// in the generated header above: the consuming translation unit's own standard library is not the
+// one nucleus's archive was compiled against, so it cannot answer the question. The seam's
+// signature is the same under either backend.
 
-#ifdef __cpp_lib_format
+#if NUCLEUS_USE_STD_FORMAT
 
 #include <string>
 #include <format>

@@ -10,6 +10,12 @@ option(NUCLEUS_BUILD_SANITIZER "Build with AddressSanitizer" OFF)
 option(NUCLEUS_COVERAGE "Instrument the library and tests for coverage (gcc/clang)" OFF)
 option(NUCLEUS_FETCH_TEST_DEPS "Fetch test dependencies (Catch2) via FetchContent" ON)
 
+# Nucleus's own install and export rules, and nothing a dependency emits. The default follows
+# nucleus_IS_TOP_LEVEL because a project that vendors nucleus and installs its own targets must
+# not be forced to leave a transitive dependency's install rules enabled just to satisfy an
+# export set that dependency is not in.
+option(NUCLEUS_INSTALL "Generate nucleus install and export rules" ${nucleus_IS_TOP_LEVEL})
+
 # Repo-local hook wiring, written to this clone's .git/config only. The default
 # follows nucleus_IS_TOP_LEVEL for the same reason NUCLEUS_WERROR's does: a project
 # that pulls nucleus in via add_subdirectory()/FetchContent must never have its own
@@ -101,43 +107,45 @@ add_subdirectory(lib)
 # ---------------------------------------------------------------------------
 # The single export set; each module joined it via nucleus_add_module(). Generated
 # once here so it sees every installed target (core + any format modules).
-install(EXPORT nucleus-targets
-    FILE nucleus-targets.cmake
-    NAMESPACE nucleus::
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/nucleus
-)
+if(NUCLEUS_INSTALL)
+    install(EXPORT nucleus-targets
+        FILE nucleus-targets.cmake
+        NAMESPACE nucleus::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/nucleus
+    )
 
-# ---------------------------------------------------------------------------
-# Package config
-#
-# Generate and install the find_package(nucleus) entry point. Without these a
-# consumer's find_package(nucleus) fails even though the targets export exists.
-# The config includes the targets export and, when the XML module is part of
-# this install, requires pugixml so the exported $<LINK_ONLY:pugixml::pugixml>
-# reference resolves for adopters. Emitted last so NUCLEUS_XML_INSTALLED is
-# final.
-# ---------------------------------------------------------------------------
-configure_package_config_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/nucleus-config.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}/nucleus-config.cmake
-    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/nucleus
-)
-write_basic_package_version_file(
-    ${CMAKE_CURRENT_BINARY_DIR}/nucleus-config-version.cmake
-    VERSION ${PROJECT_VERSION}
-    COMPATIBILITY SameMinorVersion
-)
-install(FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/nucleus-config.cmake
-    ${CMAKE_CURRENT_BINARY_DIR}/nucleus-config-version.cmake
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/nucleus
-)
+    # ---------------------------------------------------------------------------
+    # Package config
+    #
+    # Generate and install the find_package(nucleus) entry point. Without these a
+    # consumer's find_package(nucleus) fails even though the targets export exists.
+    # The config includes the targets export and, when the XML module is part of
+    # this install, requires pugixml so the exported $<LINK_ONLY:pugixml::pugixml>
+    # reference resolves for adopters. Emitted last so NUCLEUS_XML_INSTALLED is
+    # final.
+    # ---------------------------------------------------------------------------
+    configure_package_config_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/nucleus-config.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/nucleus-config.cmake
+        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/nucleus
+    )
+    write_basic_package_version_file(
+        ${CMAKE_CURRENT_BINARY_DIR}/nucleus-config-version.cmake
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY SameMinorVersion
+    )
+    install(FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/nucleus-config.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/nucleus-config-version.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/nucleus
+    )
 
-# Apache-2.0 section 4(a) requires the license to travel with every distributed copy, and an
-# installed tree is a distributed copy -- a binary redistributor has nothing else to carry.
-install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE
-    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/licenses/nucleus
-)
+    # Apache-2.0 section 4(a) requires the license to travel with every distributed copy, and an
+    # installed tree is a distributed copy -- a binary redistributor has nothing else to carry.
+    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/licenses/nucleus
+    )
+endif()
 
 if(NUCLEUS_BUILD_TESTS)
     enable_testing()

@@ -1,0 +1,8 @@
+#ifndef HPP_GUARD_NUCLEUS_DETAIL_FORMAT_BACKEND_H
+#define HPP_GUARD_NUCLEUS_DETAIL_FORMAT_BACKEND_H
+
+// Decided once at nucleus's configure time, so a consumer compiles against the backend the
+// installed archive was built with instead of re-deciding it from its own standard library.
+#cmakedefine01 NUCLEUS_USE_STD_FORMAT
+
+#endif
