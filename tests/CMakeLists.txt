@@ -82,6 +82,7 @@ include(keyspace/tests.cmake)
 include(identity/tests.cmake)
 include(compile_refusal/tests.cmake)
 include(sanitizer_proof/tests.cmake)
+include(core_purity/tests.cmake)
 
 if(NUCLEUS_BUILD_SOURCE_XML)
     include(system/tests.cmake)
@@ -143,17 +144,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # unit test's budget, and a per-test TIMEOUT outranks ctest --timeout.
     set_tests_properties(nested_consumer_install_default_off PROPERTIES TIMEOUT 1200)
 endif()
-
-# ---------------------------------------------------------------------------
-# Core-purity check: the core must carry no format/host vocabulary. Greps the
-# core headers/sources for xml/pugi/host symbols; nonzero hits fail the test.
-# ---------------------------------------------------------------------------
-add_test(
-    NAME core_purity_check
-    COMMAND ${CMAKE_COMMAND}
-        -DNUCLEUS_ROOT=${CMAKE_SOURCE_DIR}
-        -P ${CMAKE_SOURCE_DIR}/scripts/core_purity_check.cmake
-)
 
 # ---------------------------------------------------------------------------
 # Public-surface gate: a generated TU includes EVERY public header and compiles
