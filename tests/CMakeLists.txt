@@ -71,8 +71,6 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     nucleus_add_test(strain_scope_policy_test nucleus::runtime nucleus::xml)
 endif()
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/emit_gap_tests.cmake)
-nucleus_add_test(flat_emit_round_trip_test nucleus::env nucleus::argv nucleus::runtime)
-nucleus_add_test(emitter_contract_test nucleus::env nucleus::argv)
 
 # ---------------------------------------------------------------------------
 # Buffer-lifetime test: exercises the XML document source through the seam and
@@ -107,18 +105,6 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
     add_test(NAME xml_template_test COMMAND xml_template_test)
-
-    # The emit-seam proof builds all three emitters (env, args, xml) from one space,
-    # so it links all three modules; headers arrive via the respective links.
-    add_executable(emit_seam_test emit_seam_test.cpp)
-    nucleus_enable_coverage(emit_seam_test)
-    nucleus_warnings(emit_seam_test)
-    target_link_libraries(emit_seam_test
-        PRIVATE nucleus::nucleus nucleus::xml nucleus::env nucleus::argv Catch2::Catch2WithMain)
-    target_include_directories(emit_seam_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
-    add_test(NAME emit_seam_test COMMAND emit_seam_test)
 
     add_executable(buffer_lifetime_test buffer_lifetime_test.cpp)
     nucleus_enable_coverage(buffer_lifetime_test)
@@ -288,6 +274,7 @@ include(config_source/tests.cmake)
 include(query/tests.cmake)
 include(tokenizer/tests.cmake)
 include(schema/tests.cmake)
+include(emit/tests.cmake)
 
 if(NUCLEUS_BUILD_SOURCE_XML)
     include(system/tests.cmake)
