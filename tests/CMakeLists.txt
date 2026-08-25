@@ -67,28 +67,12 @@ nucleus_add_test(identity_test)
 nucleus_add_test(key_path_test)
 nucleus_add_test(keyspace_test)
 nucleus_add_test(config_storage_shape_test nucleus::runtime)
-nucleus_add_test(schema_registry_test)
-nucleus_add_test(schema_enforcer_test)
-nucleus_add_test(constraint_group_test nucleus::runtime)
-nucleus_add_test(identity_group_test nucleus::runtime)
-nucleus_add_test(keyed_composition_test nucleus::runtime nucleus::argv nucleus::env)
 if(NUCLEUS_BUILD_SOURCE_XML)
     nucleus_add_test(strain_scope_policy_test nucleus::runtime nucleus::xml)
 endif()
-nucleus_add_test(schema_cli_bijection_test nucleus::argv)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/emit_gap_tests.cmake)
 nucleus_add_test(flat_emit_round_trip_test nucleus::env nucleus::argv nucleus::runtime)
 nucleus_add_test(emitter_contract_test nucleus::env nucleus::argv)
-nucleus_add_test(converter_registry_test nucleus::env)
-nucleus_add_test(converter_edge_cases_test)
-# Forces the strtof/strtod fallback so it is exercised on every platform, not
-# only Apple libc++; the test switches the thread locale to a comma-decimal one.
-nucleus_add_test(converter_locale_test)
-target_compile_definitions(converter_locale_test PRIVATE
-    NUCLEUS_FORCE_FP_FROM_CHARS_FALLBACK)
-# Catch2 exits 4 when every test skips (here: no comma-decimal locale installed);
-# tell CTest that is a skip, not a failure.
-set_tests_properties(converter_locale_test PROPERTIES SKIP_RETURN_CODE 4)
 
 # ---------------------------------------------------------------------------
 # Buffer-lifetime test: exercises the XML document source through the seam and
@@ -242,45 +226,6 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     )
     add_test(NAME repeated_container_test COMMAND repeated_container_test)
 
-    # Repeated-values mode: schema flag, fold accumulation/replacement, get_all(),
-    # relay through keyed containers, capability gating, scope-policy exclusion.
-    add_executable(repeated_element_test repeated_element_test.cpp)
-    nucleus_enable_coverage(repeated_element_test)
-    nucleus_warnings(repeated_element_test)
-    target_link_libraries(repeated_element_test
-        PRIVATE nucleus::nucleus nucleus::xml nucleus::runtime nucleus::env Catch2::Catch2WithMain)
-    target_include_directories(repeated_element_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
-    add_test(NAME repeated_element_test COMMAND repeated_element_test)
-
-    # Typed-field converter seam: built-in scalar edge cases, custom converter,
-    # conversion failure surfacing, get_as error distinctions, repeated x typed,
-    # orthogonality checks. Links the XML module for document-driven resolution.
-    add_executable(typed_element_test typed_element_test.cpp)
-    nucleus_enable_coverage(typed_element_test)
-    nucleus_warnings(typed_element_test)
-    target_link_libraries(typed_element_test
-        PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
-    target_include_directories(typed_element_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
-    add_test(NAME typed_element_test COMMAND typed_element_test)
-
-    # Typed-seam interaction shapes: typed x inheritance chain, typed x pruned
-    # strain, typed x repeated across layers, typed x scope policy exclusion,
-    # and access surface agreement. Complements typed_element_test.cpp with
-    # composition-model integration rather than unit behavior.
-    add_executable(typed_shape_test typed_shape_test.cpp)
-    nucleus_enable_coverage(typed_shape_test)
-    nucleus_warnings(typed_shape_test)
-    target_link_libraries(typed_shape_test
-        PRIVATE nucleus::nucleus nucleus::xml nucleus::env Catch2::Catch2WithMain)
-    target_include_directories(typed_shape_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
-    add_test(NAME typed_shape_test COMMAND typed_shape_test)
-
     # Collection shapes: nested repetition under sibling outer instances, repeated
     # leaves inside and outside a repeated container, and layered sources over a
     # single document -- asserting both the resolved values and the provenance the
@@ -342,6 +287,7 @@ include(runtime/tests.cmake)
 include(config_source/tests.cmake)
 include(query/tests.cmake)
 include(tokenizer/tests.cmake)
+include(schema/tests.cmake)
 
 if(NUCLEUS_BUILD_SOURCE_XML)
     include(system/tests.cmake)
