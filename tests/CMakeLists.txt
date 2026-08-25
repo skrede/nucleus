@@ -64,13 +64,6 @@ endfunction()
 set(nucleus_test_dir .)
 
 nucleus_add_test(identity_test)
-nucleus_add_test(key_path_test)
-nucleus_add_test(keyspace_test)
-nucleus_add_test(config_storage_shape_test nucleus::runtime)
-if(NUCLEUS_BUILD_SOURCE_XML)
-    nucleus_add_test(strain_scope_policy_test nucleus::runtime nucleus::xml)
-endif()
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/emit_gap_tests.cmake)
 
 # ---------------------------------------------------------------------------
 # Buffer-lifetime test: exercises the XML document source through the seam and
@@ -200,18 +193,6 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     )
     add_test(NAME xml_repeated_container_test COMMAND xml_repeated_container_test)
 
-    # Unified fold: repeated containers and repeated leaves stored as indexed scalars;
-    # replace_by_ordinal across layers; extend= guard; get_all numeric ordinal order.
-    add_executable(repeated_container_test repeated_container_test.cpp)
-    nucleus_enable_coverage(repeated_container_test)
-    nucleus_warnings(repeated_container_test)
-    target_link_libraries(repeated_container_test
-        PRIVATE nucleus::nucleus nucleus::xml nucleus::runtime Catch2::Catch2WithMain)
-    target_include_directories(repeated_container_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
-    add_test(NAME repeated_container_test COMMAND repeated_container_test)
-
     # Collection shapes: nested repetition under sibling outer instances, repeated
     # leaves inside and outside a repeated container, and layered sources over a
     # single document -- asserting both the resolved values and the provenance the
@@ -275,6 +256,7 @@ include(query/tests.cmake)
 include(tokenizer/tests.cmake)
 include(schema/tests.cmake)
 include(emit/tests.cmake)
+include(keyspace/tests.cmake)
 
 if(NUCLEUS_BUILD_SOURCE_XML)
     include(system/tests.cmake)

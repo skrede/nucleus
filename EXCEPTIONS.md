@@ -224,14 +224,14 @@ local-and-CI divergence this register exists to keep visible. The line is the pr
 being stable under both, and the row is the price of the line.
 
 | `tests/config_source/inherit_chain_test.cpp` | 1118 |
-| `tests/repeated_container_test.cpp` | 815 |
+| `tests/keyspace/repeated_container_test.cpp` | 815 |
 | `tests/schema/typed_element_test.cpp` | 809 |
 | `tests/config_node/config_node_test.cpp` | 777 |
 | `tests/argv/source_test.cpp` | 615 |
 | `tests/schema/typed_shape_test.cpp` | 518 |
 | `tests/schema/repeated_element_test.cpp` | 470 |
 | `tests/system/integration_shape_test.cpp` | 428 |
-| `tests/strain_scope_policy_test.cpp` | 401 |
+| `tests/keyspace/strain_scope_policy_test.cpp` | 401 |
 | `tests/keyed_projection_test.cpp` | 338 |
 | `tests/schema/registry_test.cpp` | 333 |
 | `tests/completion/smoke_test.cpp` | 327 |

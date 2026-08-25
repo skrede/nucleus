@@ -1,12 +1,23 @@
+set(nucleus_test_dir keyspace)
+
+nucleus_add_test(key_path_test)
+nucleus_add_test(keyspace_test)
+nucleus_add_test(config_storage_shape_test LINK nucleus::runtime)
+
+if(NUCLEUS_BUILD_SOURCE_XML)
+    nucleus_add_test(repeated_container_test LINK nucleus::xml nucleus::runtime)
+    nucleus_add_test(strain_scope_policy_test LINK nucleus::runtime nucleus::xml)
+endif()
+
 # The ordinal-domain rejection proof drives argv, env and runtime sources, so it
 # links the flat surfaces alongside the core.
-nucleus_add_test(ordinal_domain_test nucleus::env nucleus::argv nucleus::runtime)
+nucleus_add_test(ordinal_domain_test LINK nucleus::env nucleus::argv nucleus::runtime)
 
 # The ordinal bound has to hold where std::size_t is 32 bits, so this probe compiles
 # against the production headers alone and is run at that actual width rather than
 # simulated at 64. Those headers reach the diagnostic formatting seam, so the probe
 # carries a real link dependency on a standard library without std::format.
-add_executable(ordinal_width_probe ${CMAKE_CURRENT_SOURCE_DIR}/ordinal_width_probe.cpp)
+add_executable(ordinal_width_probe ${CMAKE_CURRENT_SOURCE_DIR}/keyspace/ordinal_width_probe.cpp)
 nucleus_warnings(ordinal_width_probe)
 target_compile_features(ordinal_width_probe PRIVATE cxx_std_20)
 target_link_libraries(ordinal_width_probe PRIVATE nucleus::core)
@@ -26,7 +37,7 @@ endif()
 set(ordinal_width_driver ${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_ordinal_width.cmake)
 set(ordinal_width_args
     -DPROBE_EXE=$<TARGET_FILE:ordinal_width_probe>
-    -DPROBE_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/ordinal_width_probe.cpp
+    -DPROBE_SOURCE=${CMAKE_CURRENT_SOURCE_DIR}/keyspace/ordinal_width_probe.cpp
     -DINCLUDE_DIRS=${ordinal_width_includes}
     -DCXX_COMPILER=${CMAKE_CXX_COMPILER}
     -DCXX_COMPILER_ID=${CMAKE_CXX_COMPILER_ID}
@@ -71,3 +82,5 @@ endif()
 set_tests_properties(ordinal_32bit_unavailable_normal_test
     PROPERTIES SKIP_RETURN_CODE 77)
 set_tests_properties(ordinal_32bit_unavailable_strict_test PROPERTIES WILL_FAIL TRUE)
+
+unset(nucleus_test_dir)
