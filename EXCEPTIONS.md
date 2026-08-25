@@ -213,15 +213,15 @@ function defined but never declared, which a missing-prototype diagnostic refuse
 three, the declaration that makes it legal is the single line that carried the unit past the
 ceiling.
 
-The third, `tests/example_plugin_spaces_contract_test.cpp`, was at 199 and the declaration alone
-left it at exactly 200, needing no row. It takes one because of a second line: a blank that ends
-an `AlignConsecutiveDeclarations` run so the declaration below it is not column-padded. That blank
-is load-bearing across formatter versions rather than cosmetic. Measured on the pinned tool and on
-the newer one the development host carries, the padded form this file held before is clean under
-clang-format 18 and rejected by 22, while the form with the blank is accepted by both. A unit only
-one version will leave alone is a unit that changes under whoever saves it next, which is the
-local-and-CI divergence this register exists to keep visible. The line is the price of the file
-being stable under both, and the row is the price of the line.
+The third, `tests/example_contracts/plugin_spaces_contract_test.cpp`, was at 199 and the
+declaration alone left it at exactly 200, needing no row. It takes one because of a second line: a
+blank that ends an `AlignConsecutiveDeclarations` run so the declaration below it is not
+column-padded. That blank is load-bearing across formatter versions rather than cosmetic. Measured
+on the pinned tool and on the newer one the development host carries, the padded form this file
+held before is clean under clang-format 18 and rejected by 22, while the form with the blank is
+accepted by both. A unit only one version will leave alone is a unit that changes under whoever
+saves it next, which is the local-and-CI divergence this register exists to keep visible. The line
+is the price of the file being stable under both, and the row is the price of the line.
 
 | `tests/config_source/inherit_chain_test.cpp` | 1118 |
 | `tests/keyspace/repeated_container_test.cpp` | 815 |
@@ -253,9 +253,9 @@ being stable under both, and the row is the price of the line.
 | `tests/config_source/source_handle_test.cpp` | 204 |
 | `tests/query/instance_addressing_test.cpp` | 202 |
 | `tests/tokenizer/token_cycle_test.cpp` | 202 |
-| `tests/example_constraint_groups_contract_test.cpp` | 201 |
-| `tests/example_pkey_tokenizer_contract_test.cpp` | 201 |
-| `tests/example_plugin_spaces_contract_test.cpp` | 201 |
+| `tests/example_contracts/constraint_groups_contract_test.cpp` | 201 |
+| `tests/example_contracts/pkey_tokenizer_contract_test.cpp` | 201 |
+| `tests/example_contracts/plugin_spaces_contract_test.cpp` | 201 |
 
 ## Carried — CMake units over the 200-line ceiling
 

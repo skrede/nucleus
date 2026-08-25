@@ -102,10 +102,14 @@ set(cpp_files
     examples/schema/schema.cpp examples/schema/typed.cpp
     examples/sources/capability_gating.cpp examples/tokens/pkey_tokenizer.cpp
     lib/core/include/nucleus/tokenizer/tree_tokenizer.h
-    tests/example_argv_recognizer_contract_test.cpp tests/example_capability_gating_contract_test.cpp
-    tests/example_constraint_groups_contract_test.cpp tests/example_pkey_tokenizer_contract_test.cpp
-    tests/example_plugin_spaces_contract_test.cpp tests/example_query_contract_test.cpp
-    tests/example_schema_contract_test.cpp tests/example_typed_contract_test.cpp
+    tests/example_contracts/argv_recognizer_contract_test.cpp
+    tests/example_contracts/capability_gating_contract_test.cpp
+    tests/example_contracts/constraint_groups_contract_test.cpp
+    tests/example_contracts/pkey_tokenizer_contract_test.cpp
+    tests/example_contracts/plugin_spaces_contract_test.cpp
+    tests/example_contracts/query_contract_test.cpp
+    tests/example_contracts/schema_contract_test.cpp
+    tests/example_contracts/typed_contract_test.cpp
     tests/tokenizer/pkey_tokenizer_test.cpp)
 set(format_files)
 foreach(file IN LISTS cpp_files)

@@ -1,6 +1,6 @@
 int typed_example_main();
 #define main typed_example_main
-#include "../examples/schema/typed.cpp"
+#include "../../examples/schema/typed.cpp"
 #undef main
 
 #include <catch2/catch_test_macros.hpp>

@@ -4,7 +4,7 @@
 
 int capability_gating_example_main();
 #define main capability_gating_example_main
-#include "../examples/sources/capability_gating.cpp"
+#include "../../examples/sources/capability_gating.cpp"
 #undef main
 
 #include <catch2/catch_test_macros.hpp>

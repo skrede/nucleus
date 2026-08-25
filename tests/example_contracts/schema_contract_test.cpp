@@ -1,6 +1,6 @@
 int schema_example_main();
 #define main schema_example_main
-#include "../examples/schema/schema.cpp"
+#include "../../examples/schema/schema.cpp"
 #undef main
 
 #include <catch2/catch_test_macros.hpp>

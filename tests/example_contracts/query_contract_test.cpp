@@ -1,6 +1,6 @@
 int query_example_main();
 #define main query_example_main
-#include "../examples/references/query.cpp"
+#include "../../examples/references/query.cpp"
 #undef main
 
 #include <catch2/catch_test_macros.hpp>

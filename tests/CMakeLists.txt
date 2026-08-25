@@ -92,4 +92,6 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     include(xml/tests.cmake)
 endif()
 
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/example_review_tests.cmake)
+# Last on purpose: every statement in this fragment names a target an earlier fragment
+# registered, and one of them is guarded by a target-existence test that fails silently.
+include(example_contracts/tests.cmake)

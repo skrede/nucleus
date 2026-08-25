@@ -1,6 +1,6 @@
 int plugin_spaces_example_main();
 #define main plugin_spaces_example_main
-#include "../examples/composition/plugin_spaces.cpp"
+#include "../../examples/composition/plugin_spaces.cpp"
 #undef main
 
 #include <catch2/catch_test_macros.hpp>

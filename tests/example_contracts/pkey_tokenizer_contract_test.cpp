@@ -1,6 +1,6 @@
 int pkey_tokenizer_example_main();
 #define main pkey_tokenizer_example_main
-#include "../examples/tokens/pkey_tokenizer.cpp"
+#include "../../examples/tokens/pkey_tokenizer.cpp"
 #undef main
 
 #include <catch2/catch_test_macros.hpp>
