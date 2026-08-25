@@ -838,7 +838,7 @@ cfg.root().walk(collector);
 ```
 
 See [`examples/basics/quickstart.cpp`](../examples/basics/quickstart.cpp) (Part 2 repeated
-container demo), [`tests/config_node_test.cpp`](../tests/config_node_test.cpp).
+container demo), [`tests/config_node/config_node_test.cpp`](../tests/config_node/config_node_test.cpp).
 
 ---
 
