@@ -198,7 +198,8 @@ default), and the header-only `nucleus::env`, `nucleus::argv`, and
 link only the modules you use.
 
 Or vendor it directly with `FetchContent` (or `add_subdirectory`), which defines
-the same targets:
+the same targets. Vendoring builds nucleus from source, so it is the 3.25 tier
+that applies, not the 3.21 one:
 
 ```cmake
 include(FetchContent)
