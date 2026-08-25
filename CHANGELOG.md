@@ -13,6 +13,11 @@ name, a collapsed instance ordinal &mdash; the emitter now reports before produc
 any output. Every entry below can turn a previously clean emit into a failure. One
 entry narrows what a document may contain at all; read that one first.
 
+Two groups after the emitter ones do not concern emission at all: the schema API
+carries one breaking rename, and what nucleus requires to build and what an
+installed package hands a consumer both changed. An upgrader who does not emit
+still wants those.
+
 ### Instance ordinals
 
 - **An instance ordinal above 4294967295 is now rejected.** The bracket grammar
@@ -60,6 +65,49 @@ entry narrows what a document may contain at all; read that one first.
   emitter never flushes: success means the stream buffer accepted every byte, and a
   later flush, close or persistence failure is the caller's and lies outside the
   emitter result. A short write's accepted prefix is not rolled back.
+
+### Schema API
+
+- **`merge_mode::wholesale_replace` is now `merge_mode::replace_by_ordinal`.** The
+  old enumerator is gone under every spelling &mdash; there is no alias and no
+  deprecated form &mdash; so a translation unit that names it no longer compiles.
+  This is a compile error, not a behavior change: the mode is still the default and
+  still replaces, whole, each instance a higher layer supplies while leaving the
+  lower layer's unaddressed instances in place. Only code that spelled the default
+  explicitly is affected; a schema that never named a merge mode needs no edit. The
+  new name states the axis the replacement runs on, beside its sibling
+  `replace_by_key`. Six Catch2 tags moved with it, from `[wholesale_replace]` to
+  `[replace_by_ordinal]`, so a local script that filters tests on the old tag now
+  selects nothing and says nothing.
+
+### Building and consuming nucleus
+
+- **Building nucleus now requires CMake 3.25, up from 3.24; consuming an installed
+  package still requires only 3.21.** 3.24 does configure and build nucleus without
+  complaint, which is exactly the problem: it parses `FetchContent_MakeAvailable`
+  without the `SYSTEM` keyword and drops it silently, so a fetched pugixml, `{fmt}`
+  or Catch2 is compiled as an ordinary include rather than a system one. Its own
+  headers' diagnostics then reach nucleus's curated warning set, and because
+  warnings are errors by default for a top-level nucleus build, a warning in code
+  that is not yours fails the build with nothing saying why. The declaration now
+  matches the insulation the build actually relies on. Consuming an installed
+  package is unaffected and keeps its own lower minimum.
+- **An installed package now declares the formatting backend it was built with.**
+  The install tree carries `nucleus/detail/format_backend.h`, defining
+  `NUCLEUS_USE_STD_FORMAT` to the answer settled when nucleus was configured, and
+  `nucleus/format.h` branches on that rather than on the consuming translation
+  unit's own `__cpp_lib_format`. The two can disagree: a standard library that
+  provides `std::format`, consuming an archive built against the `{fmt}` fallback,
+  previously gave `nucleus::format` one meaning in your translation units and
+  another in the archive's. A consumer now compiles against the archive's choice
+  whatever its own library advertises.
+- **`NUCLEUS_INSTALL` gates nucleus's install and export rules, and defaults off
+  when nucleus is vendored.** A project that vendors nucleus and installs its own
+  executables no longer has to keep a vendored dependency's install rules on just
+  to satisfy an export set that dependency is not in. One shape still needs them
+  on: if your own export set holds a static library that links nucleus, the private
+  link survives in the exported interface and the identical export error moves one
+  level up. Configure with `-DNUCLEUS_INSTALL=ON` in that case.
 
 ## 0.4.1
 

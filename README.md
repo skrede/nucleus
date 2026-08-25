@@ -162,6 +162,12 @@ warnings to non-fatal locally, or `-DNUCLEUS_WERROR=ON` to opt in as a consumer.
 
 ## Consuming nucleus
 
+There are two CMake tiers. Building nucleus from source requires CMake 3.25 or
+newer. Consuming an installed nucleus package requires only CMake 3.21 or newer;
+that lower tier is a property of an installed package built by a supported CMake
+rather than of the source tree, because the export files a package carries are
+written by whichever CMake produced it.
+
 nucleus installs a standard CMake package. Build and install, then
 `find_package`:
 
@@ -172,9 +178,24 @@ cmake --install build --prefix /your/prefix
 ```
 
 ```cmake
-find_package(nucleus 0.4 REQUIRED)
-target_link_libraries(app PRIVATE nucleus::nucleus nucleus::xml)
+find_package(nucleus 0.4 REQUIRED CONFIG
+             COMPONENTS core runtime
+             OPTIONAL_COMPONENTS xml)
+target_link_libraries(app PRIVATE nucleus::nucleus nucleus::runtime)
 ```
+
+A name under `COMPONENTS` must be present in the installation or the call fails;
+a name under `OPTIONAL_COMPONENTS` only sets `nucleus_xml_FOUND`, which you branch
+on before linking `nucleus::xml`. One asymmetry is worth knowing before you write
+the link line: the core module's *component* name is `core`, but the *target* the
+installed export defines for it is `nucleus::nucleus`. Every other module's
+component name and target suffix agree.
+
+The exported targets are `nucleus::nucleus` (the core engine) and one per source
+module: `nucleus::xml` (compiled, built with `NUCLEUS_BUILD_SOURCE_XML=ON`, the
+default), and the header-only `nucleus::env`, `nucleus::argv`, and
+`nucleus::runtime`. Each module target links `nucleus::nucleus` transitively;
+link only the modules you use.
 
 Or vendor it directly with `FetchContent` (or `add_subdirectory`), which defines
 the same targets:
@@ -183,15 +204,20 @@ the same targets:
 include(FetchContent)
 FetchContent_Declare(nucleus
     GIT_REPOSITORY https://github.com/skrede/nucleus.git
-    GIT_TAG v0.4.1)
+    # the unreleased 0.4.2 line, pinned to the commit so a moved reference cannot
+    # change the build
+    GIT_TAG d840d03db0a12ef82bcd5b75f1ea303035c848c1)
 FetchContent_MakeAvailable(nucleus)
 ```
 
-The exported targets are `nucleus::nucleus` (the core engine) and one per source
-module: `nucleus::xml` (compiled, built with `NUCLEUS_BUILD_SOURCE_XML=ON`, the
-default), and the header-only `nucleus::env`, `nucleus::argv`, and
-`nucleus::runtime`. Each module target links `nucleus::nucleus` transitively;
-link only the modules you use.
+`NUCLEUS_INSTALL` generates nucleus's own install and export rules. It defaults on
+when nucleus is the top-level project and off when it is vendored, so a consumer
+that installs its own executables is not forced to keep a vendored dependency's
+install rules enabled just to satisfy an export set that dependency is not in.
+There is one shape it does not help: if your own export set contains a static
+library that links nucleus, that private link survives in the exported interface
+and the identical export error moves one level up. Such a consumer must configure
+with `-DNUCLEUS_INSTALL=ON`.
 
 ## Documentation
 
