@@ -1,4 +1,4 @@
-target_sources(facade_schema_test PRIVATE example_schema_contract_test.cpp)
+target_sources(schema_test PRIVATE example_schema_contract_test.cpp)
 if(TARGET typed_element_test)
     target_sources(typed_element_test PRIVATE example_typed_contract_test.cpp)
 endif()

@@ -47,7 +47,7 @@ run_checked(configure_output "configure" ${CMAKE_COMMAND}
 run_checked(build_output "build" ${CMAKE_COMMAND}
     --build "${build_dir}" --config "${NUCLEUS_CONFIG}" --parallel 2)
 
-set(focused_tests "^(facade_schema_test|recognizer_of_test|auto_gating_test|selector_combinator_test|pkey_tokenizer_test|typed_element_test|constraint_group_test|registration_policy_test)$")
+set(focused_tests "^(schema_test|recognizer_of_test|auto_gating_test|selector_combinator_test|pkey_tokenizer_test|typed_element_test|constraint_group_test|registration_policy_test)$")
 run_checked(focused_output "focused CTest" "${ctest_exe}"
     --test-dir "${build_dir}" -C "${NUCLEUS_CONFIG}"
     -R "${focused_tests}" --output-on-failure)
