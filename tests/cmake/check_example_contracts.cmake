@@ -128,8 +128,8 @@ set(size_files ${format_files}
 run_checked(size_output "local size gate" ${CMAKE_COMMAND}
     "-DNUCLEUS_SIZE_FILES=${size_files}" -P "${source_dir}/tests/cmake/check_local_size_growth.cmake")
 
-# One-sided on purpose: the exception ledger holds this unit's decomposition for the
-# test-tree reorganization, so a smaller manifest must not fail the gate.
+# The bound is one-sided on purpose: a manifest that has shrunk below the figure is the
+# outcome this ceiling wants, so only growth past it is refused.
 line_count("${source_dir}/tests/CMakeLists.txt" manifest_lines)
 if(manifest_lines GREATER 719)
     message(FATAL_ERROR

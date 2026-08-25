@@ -93,7 +93,7 @@ current working branch.
 | | Over the line ceiling | Over the function ceiling |
 |---|---|---|
 | Before the resolution-context and schema-registry decomposition | 46 units | 62 functions in 25 files |
-| Now | 49 units | 45 functions in 23 files |
+| Now | 48 units | 45 functions in 23 files |
 
 Two units left the register: `resolution_context.h` fell from 1890 lines to 196, and
 `schema_registry.h` from 534 to 178. The twenty-nine units split out of them are all inside both
@@ -110,10 +110,15 @@ A fourth has joined that is not a test. `examples/composition/plugin_spaces.cpp`
 when its one packed 245-character definition was broken into the multi-line form the rest of the
 file uses, and it is the first example the register carries.
 
+One unit has since left. The tests build script fell from 721 lines to 97 when the test tree was
+reorganized into one directory per subject and each directory took a build fragment of its own.
+None of the twenty-eight fragments is over the ceiling, so none joined in its place.
+
 The "before" figures needed a correction before they could be compared against. The earlier
 tables covered C++ files only, while the gate has always measured CMake units by name as well;
 the two CMake units over the ceiling were therefore absent from a register that claimed to be the
-whole list. They are counted in the 46 above and listed below.
+whole list. They are counted in the 46 above; one of the two is listed below still, and the other
+has since fallen back under the ceiling.
 
 Nothing else about the baseline was wrong. Re-running the commands above against the tree as it
 stood before the decomposition returned every C++ row the earlier tables recorded, values and per
@@ -140,9 +145,8 @@ the file. That is the kind of reason this accepts, and it is a reason a reviewer
 in the diff that takes the row. Packing lines wide to hold a file under its ceiling is not a remedy
 and never was — it is what produced the collision between this register and the formatter.
 
-The test-file table records line counts only. Those thirty-three units are carried debt awaiting a
-reorganization of the tree, and that table is expected to shrink rather than grow; where it has
-grown, the reason sits beside it.
+The test-file table records line counts only. Those thirty-three units are carried debt, and that
+table is expected to shrink rather than grow; where it has grown, the reason sits beside it.
 
 The test tree carries one exemption, and only the test tree. A Catch2 test-case body — the block a
 `TEST_CASE`, `SCENARIO`, `TEMPLATE_TEST_CASE` or `TEST_CASE_METHOD` macro introduces — is held to a
@@ -191,7 +195,7 @@ None.
 
 ## Carried — test files over the 200-line ceiling
 
-33 of 157 units. Test units are held to the same ceiling.
+33 of 158 units. Test units are held to the same ceiling.
 
 Two rows here rose to close the pathname expansion the generated bash completion performed
 over its own candidates, and one of the two rose again for the zsh description escaper.
@@ -259,20 +263,15 @@ is the price of the file being stable under both, and the row is the price of th
 
 ## Carried — CMake units over the 200-line ceiling
 
-2 of 29 units.
+1 of 54 units.
 
 | File | Lines |
 |---|---|
-| `tests/CMakeLists.txt` | 721 |
 | `lib/CMakeLists.txt` | 272 |
 
 A CMake unit carries the line ceiling only. The gate measures function spans by running ctags
 restricted to C++, which yields nothing for a CMake script, so there is no function column to
 fill. That is the intended behavior and not a gap in the gate.
-
-Decomposing `tests/CMakeLists.txt` is held back deliberately: it is entangled with a
-reorganization of the test tree into folders, and doing one without the other would move the same
-lines twice.
 
 ## Carried — example files over the 200-line ceiling
 
