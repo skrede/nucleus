@@ -68,6 +68,7 @@ nucleus_add_test(retrieval_error_test nucleus::runtime)
 if(NUCLEUS_BUILD_SOURCE_XML)
     nucleus_add_test(argv_source_test nucleus::argv nucleus::xml nucleus::runtime)
     nucleus_add_test(retrieval_addressing_test nucleus::runtime nucleus::xml nucleus::argv)
+    nucleus_add_test(strain_scope_policy_test nucleus::runtime nucleus::xml)
 endif()
 nucleus_add_test(schema_cli_bijection_test nucleus::argv)
 nucleus_add_test(multispace_argv_test nucleus::argv)
@@ -88,7 +89,6 @@ nucleus_add_test(completion_smoke_test)
 set_tests_properties(completion_smoke_test PROPERTIES SKIP_RETURN_CODE 4)
 nucleus_add_test(facade_completion_test)
 nucleus_add_test(completion_program_token_test)
-nucleus_add_test(strain_scope_policy_test nucleus::runtime nucleus::xml)
 nucleus_add_test(converter_registry_test nucleus::env)
 nucleus_add_test(builder_lifecycle_test)
 nucleus_add_test(expand_independence_test nucleus::env)
@@ -589,6 +589,42 @@ add_test(
         -P ${CMAKE_SOURCE_DIR}/scripts/expect_nested_consumer_werror_off.cmake
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
+
+# ---------------------------------------------------------------------------
+# Vendoring-consumer install gate: a project that vendors nucleus and installs
+# an executable of its own must not be forced to leave a transitive dependency's
+# install rules enabled to satisfy an export set that dependency is not in. A
+# bare "configure succeeds" check would be insufficient -- it must confirm the
+# SPECIFIC resolved cache value. Linux-only: the claim is about CMake option
+# resolution, and the entry costs a second nucleus configure plus a dependency
+# population no other platform's suite run should pay for.
+# ---------------------------------------------------------------------------
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # Reuse a dependency source the outer build already populated rather than
+    # cloning a second copy; with none on disk the script populates its own.
+    set(nucleus_fixture_deps ${CMAKE_BINARY_DIR}/_deps)
+    if(FETCHCONTENT_BASE_DIR)
+        set(nucleus_fixture_deps ${FETCHCONTENT_BASE_DIR})
+    endif()
+    set(nucleus_fixture_args)
+    if(EXISTS ${nucleus_fixture_deps}/pugixml-src)
+        set(nucleus_fixture_args
+            -DNUCLEUS_FIXTURE_PUGIXML_SOURCE_DIR=${nucleus_fixture_deps}/pugixml-src)
+    endif()
+    add_test(
+        NAME nested_consumer_install_default_off
+        COMMAND ${CMAKE_COMMAND}
+            -DNUCLEUS_FIXTURE_SOURCE_DIR=${CMAKE_SOURCE_DIR}/tests/install_consumer_fixture
+            -DNUCLEUS_FIXTURE_BINARY_DIR=${CMAKE_BINARY_DIR}/install_consumer_fixture_build
+            -DNUCLEUS_FIXTURE_PREFIX_DIR=${CMAKE_BINARY_DIR}/install_consumer_fixture_prefix
+            ${nucleus_fixture_args}
+            -P ${CMAKE_SOURCE_DIR}/scripts/expect_install_off.cmake
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    )
+    # A nested configure, a dependency population and a consumer build are not a
+    # unit test's budget, and a per-test TIMEOUT outranks ctest --timeout.
+    set_tests_properties(nested_consumer_install_default_off PROPERTIES TIMEOUT 1200)
+endif()
 
 # ---------------------------------------------------------------------------
 # Core-purity check: the core must carry no format/host vocabulary. Greps the

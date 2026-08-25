@@ -258,11 +258,11 @@ being stable under both, and the row is the price of the line.
 
 ## Carried — CMake units over the 200-line ceiling
 
-2 of 27 units.
+2 of 29 units.
 
 | File | Lines |
 |---|---|
-| `tests/CMakeLists.txt` | 683 |
+| `tests/CMakeLists.txt` | 719 |
 | `lib/CMakeLists.txt` | 272 |
 
 A CMake unit carries the line ceiling only. The gate measures function spans by running ctags

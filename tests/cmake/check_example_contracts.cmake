@@ -126,9 +126,9 @@ run_checked(size_output "local size gate" ${CMAKE_COMMAND}
 # One-sided on purpose: the exception ledger holds this unit's decomposition for the
 # test-tree reorganization, so a smaller manifest must not fail the gate.
 line_count("${source_dir}/tests/CMakeLists.txt" manifest_lines)
-if(manifest_lines GREATER 683)
+if(manifest_lines GREATER 719)
     message(FATAL_ERROR
-        "tests/CMakeLists.txt grew past its recorded ceiling: ${manifest_lines} lines, ceiling 683")
+        "tests/CMakeLists.txt grew past its recorded ceiling: ${manifest_lines} lines, ceiling 719")
 endif()
 
 file(GLOB_RECURSE test_files RELATIVE "${source_dir}" "${source_dir}/tests/*.h" "${source_dir}/tests/*.cpp")
