@@ -6,7 +6,7 @@
 // Repeated instances in numeric ordinal order (correct for N >= 11)
 
 #include "nucleus/config_node.h"
-#include "builder_result_test_support.h"
+#include "support/builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"

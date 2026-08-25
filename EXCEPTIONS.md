@@ -262,7 +262,7 @@ being stable under both, and the row is the price of the line.
 
 | File | Lines |
 |---|---|
-| `tests/CMakeLists.txt` | 719 |
+| `tests/CMakeLists.txt` | 753 |
 | `lib/CMakeLists.txt` | 272 |
 
 A CMake unit carries the line ceiling only. The gate measures function spans by running ctags

@@ -4,7 +4,7 @@
 // on the base behaves identically before and after deriving. There is NO shared
 // base pointer linking the two (the registries are value-copied).
 
-#include "builder_result_test_support.h"
+#include "support/builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"

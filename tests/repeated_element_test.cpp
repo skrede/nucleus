@@ -1,7 +1,7 @@
 // Repeated-values mode: schema flag, fold accumulation/replacement, get_all()
 // accessor, relay through keyed containers, capability gating, provenance.
 
-#include "builder_result_test_support.h"
+#include "support/builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"

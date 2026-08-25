@@ -1,7 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_TESTS_IDENTITY_ENVELOPE_TEST_SUPPORT_H
 #define HPP_GUARD_NUCLEUS_TESTS_IDENTITY_ENVELOPE_TEST_SUPPORT_H
 
-#include "builder_result_test_support.h"
+#include "support/builder_result_test_support.h"
 
 #include "nucleus/config_source/source_stack.h"
 

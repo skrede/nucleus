@@ -1,7 +1,7 @@
 #include "collection_shapes.h"
 
 #include "nucleus/config.h"
-#include "../builder_result_test_support.h"
+#include "support/builder_result_test_support.h"
 
 #include "nucleus/schema/schema_registry.h"
 

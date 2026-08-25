@@ -1,6 +1,6 @@
 #include "golden_runner.h"
 
-#include "../builder_result_test_support.h"
+#include "support/builder_result_test_support.h"
 
 #include <catch2/catch_test_macros.hpp>
 

@@ -3,7 +3,7 @@
 // mutating call on the spent builder is a LOUD state-machine error reported
 // through the value channel (never a silent no-op).
 
-#include "builder_result_test_support.h"
+#include "support/builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"

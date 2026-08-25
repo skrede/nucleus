@@ -1,5 +1,6 @@
 #include "xml_persist_test_support.h"
-#include "builder_result_test_support.h"
+
+#include "support/builder_result_test_support.h"
 
 #include "nucleus/xml/xml_emitter.h"
 

@@ -5,7 +5,7 @@
 //   - a per-element converter overrides the registry converter for the same element;
 //   - an element whose type has no registered converter is left unconverted (no error).
 
-#include "builder_result_test_support.h"
+#include "support/builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/converters.h"

@@ -1,5 +1,5 @@
 #include "nucleus/config_node.h"
-#include "builder_result_test_support.h"
+#include "support/builder_result_test_support.h"
 #include "nucleus/config.h"
 
 #include "nucleus/runtime/runtime_source.h"

@@ -2,7 +2,7 @@
 // (inheritance chain, strain selection, repeated across layers, scope policy,
 // access surface). Adds ONLY shapes not covered by typed_element_test.cpp.
 
-#include "builder_result_test_support.h"
+#include "support/builder_result_test_support.h"
 
 #include "nucleus/strain_scope.h"
 #include "nucleus/config.h"

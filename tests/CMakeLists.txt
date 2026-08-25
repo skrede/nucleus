@@ -18,20 +18,50 @@ else()
     find_package(Catch2 3 REQUIRED)
 endif()
 
-# Registers a Catch2 test executable built from a single source file, linked
-# against the core library and Catch2's bundled main, and wired into CTest. The
-# core's internal tree (lib/core/src) is on the include path so isolation tests
-# can construct the registries directly.
+# include() keeps one directory scope for the whole test tree, so a source path relative to the
+# including fragment would resolve against tests/ instead. Each fragment names its own folder in
+# nucleus_test_dir and unsets it at the end, so a fragment that forgets to set it trips the fatal
+# error below rather than silently inheriting its predecessor's folder.
+function(nucleus_test_sources out_var name)
+    if(NOT DEFINED nucleus_test_dir)
+        message(FATAL_ERROR "nucleus_add_test(${name}): the including fragment set no nucleus_test_dir")
+    endif()
+    set(sources "")
+    foreach(source IN LISTS ARGN)
+        list(APPEND sources ${nucleus_test_dir}/${source})
+    endforeach()
+    if(NOT sources)
+        set(sources ${nucleus_test_dir}/${name}.cpp)
+    endif()
+    set(${out_var} ${sources} PARENT_SCOPE)
+endfunction()
+
+# With no keyword present every trailing argument lands in arg_UNPARSED_ARGUMENTS, so the bare
+# form still means "link these libraries". The core's private tree and tests/ itself are on every
+# target's include path, so isolation tests can construct the registries directly and a quoted
+# include written as a path from tests/ resolves from any folder at any depth.
 function(nucleus_add_test name)
-    add_executable(${name} ${name}.cpp)
-    target_link_libraries(${name} PRIVATE nucleus::nucleus ${ARGN} Catch2::Catch2WithMain)
+    cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "SOURCES;LINK;INCLUDE;DEFINES;PROPERTIES")
+    nucleus_test_sources(sources ${name} ${arg_SOURCES})
+    add_executable(${name} ${sources})
+    target_link_libraries(${name} PRIVATE
+        nucleus::nucleus ${arg_LINK} ${arg_UNPARSED_ARGUMENTS} Catch2::Catch2WithMain)
     nucleus_enable_coverage(${name})
     nucleus_warnings(${name})
     target_include_directories(${name} PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${arg_INCLUDE})
+    if(arg_DEFINES)
+        target_compile_definitions(${name} PRIVATE ${arg_DEFINES})
+    endif()
     add_test(NAME ${name} COMMAND ${name})
+    if(arg_PROPERTIES)
+        set_tests_properties(${name} PROPERTIES ${arg_PROPERTIES})
+    endif()
 endfunction()
+
+set(nucleus_test_dir .)
 
 nucleus_add_test(version_test)
 target_compile_definitions(version_test PRIVATE
@@ -381,6 +411,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
     target_include_directories(inheritance_golden_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
+        ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/inheritance_golden
     )
     target_compile_definitions(inheritance_golden_test PRIVATE
@@ -424,6 +455,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
                 Catch2::Catch2WithMain)
     target_include_directories(collection_shapes_test PRIVATE
         ${CMAKE_SOURCE_DIR}/lib/core/src
+        ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/collection_shapes
     )
     target_compile_definitions(collection_shapes_test PRIVATE
@@ -489,6 +521,8 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_test(NAME system_round_trip_test COMMAND system_round_trip_test)
 
 endif()
+unset(nucleus_test_dir)
+
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/example_review_tests.cmake)
 # ---------------------------------------------------------------------------
 # Negative compile tests: registries that violate the flat-ownership invariant

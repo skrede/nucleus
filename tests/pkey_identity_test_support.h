@@ -1,7 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_TESTS_PKEY_IDENTITY_TEST_SUPPORT_H
 #define HPP_GUARD_NUCLEUS_TESTS_PKEY_IDENTITY_TEST_SUPPORT_H
 
-#include "builder_result_test_support.h"
+#include "support/builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"

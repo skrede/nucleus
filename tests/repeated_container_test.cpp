@@ -3,7 +3,7 @@
 // schema_enforcer normalizes indexed paths via canonical_text.
 // get_as() loud error for unindexed crossing; get_all_as() typed gather.
 
-#include "builder_result_test_support.h"
+#include "support/builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
