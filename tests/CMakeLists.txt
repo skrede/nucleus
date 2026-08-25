@@ -64,9 +64,7 @@ endfunction()
 set(nucleus_test_dir .)
 
 nucleus_add_test(expected_test)
-nucleus_add_test(format_test)
 nucleus_add_test(identity_test)
-nucleus_add_test(log_sink_test)
 nucleus_add_test(facade_test nucleus::env)
 nucleus_add_test(facade_schema_test nucleus::runtime)
 nucleus_add_test(registry_isolation_test)
@@ -105,7 +103,6 @@ nucleus_add_test(token_lexer_test)
 nucleus_add_test(token_resolution_test)
 nucleus_add_test(named_args_test)
 nucleus_add_test(token_cycle_test)
-nucleus_add_test(diagnostics_test)
 nucleus_add_test(completion_test)
 nucleus_add_test(completion_smoke_test)
 # Catch2 exits 4 when every selected test was skipped (here: no bash on PATH);
@@ -486,6 +483,7 @@ unset(nucleus_test_dir)
 
 include(resolve/tests.cmake)
 include(utility/tests.cmake)
+include(diagnostics/tests.cmake)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/example_review_tests.cmake)
 # ---------------------------------------------------------------------------
