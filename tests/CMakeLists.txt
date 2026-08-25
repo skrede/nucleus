@@ -63,13 +63,8 @@ endfunction()
 
 set(nucleus_test_dir .)
 
-nucleus_add_test(version_test)
-target_compile_definitions(version_test PRIVATE
-    NUCLEUS_CMAKE_PROJECT_VERSION="${nucleus_VERSION}")
 nucleus_add_test(expected_test)
-nucleus_add_test(type_info_test)
 nucleus_add_test(format_test)
-nucleus_add_test(escaped_text_test)
 nucleus_add_test(identity_test)
 nucleus_add_test(log_sink_test)
 nucleus_add_test(facade_test nucleus::env)
@@ -490,6 +485,7 @@ endif()
 unset(nucleus_test_dir)
 
 include(resolve/tests.cmake)
+include(utility/tests.cmake)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/example_review_tests.cmake)
 # ---------------------------------------------------------------------------
