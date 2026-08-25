@@ -20,15 +20,20 @@ namespace {
 
 key_path path_of(const char *text) { return key_path::parse(text).value(); }
 
-// The fixture schema the golden scripts below are pinned to: a value-constrained
-// enum element, a plain root element, and a nested plain element. surface() is
-// deterministically ordered, so the projection is reproducible byte-for-byte.
+// The fixture schema the golden scripts below are pinned to: a described,
+// value-constrained enum element, a plain root element, and a nested plain element.
+// surface() is deterministically ordered, so the projection is reproducible
+// byte-for-byte. The description carries a colon deliberately: that is the one mark
+// the zsh emitter escapes in ordinary prose, so the golden pins the schema-to-emitter
+// path for a description rather than copying the registered text back out.
 schema_registry fixture()
 {
     schema_registry reg;
     REQUIRE(reg.attach(nucleus::element("logging", anchor::root())));
-    REQUIRE(reg.attach(nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
-                                     {"debug", "info", "warn", "error"})));
+    REQUIRE(reg.attach(nucleus::described(
+        nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
+                              {"debug", "info", "warn", "error"}),
+        "set the level: info by default")));
     REQUIRE(reg.attach(nucleus::element("plexus", anchor::root())));
     REQUIRE(reg.attach(nucleus::element("port", anchor::keyspace(path_of("plexus")))));
     return reg;
@@ -74,6 +79,9 @@ const std::string expected_bash =
     "}\n"
     "complete -F _myapp_complete myapp\n";
 
+// The pinned zsh script for the fixture. It is a recorded projection: no zsh runs on
+// the machines this project builds on, so this pins the emitted text and not the
+// behavior a zsh would give it.
 const std::string expected_zsh =
     "#compdef myapp\n"
     "# zsh completion for myapp\n"
@@ -82,7 +90,8 @@ const std::string expected_zsh =
     "{\n"
     "    _arguments -s \\\n"
     "        '--logging[]' \\\n"
-    "        '--logging-level=[]:value:(debug info warn error)' \\\n"
+    "        '--logging-level=[set the level\\: info by default]"
+    ":value:(debug info warn error)' \\\n"
     "        '--plexus[]' \\\n"
     "        '--plexus-port[]'\n"
     "}\n"
@@ -164,6 +173,32 @@ TEST_CASE("adding an enum value changes the generated completion", "[completion]
     REQUIRE(after.find("'debug info trace'") != std::string::npos);
     REQUIRE(after_zsh != before_zsh);
     REQUIRE(after_zsh.find("(debug info trace)") != std::string::npos);
+}
+
+// The bash dialect renders no description at all, so the same schema change must move one
+// script and leave the other byte-identical. This fails both when a description stops
+// reaching the zsh emitter and when one starts leaking into the bash one.
+TEST_CASE("attaching a description moves the zsh script and not the bash one",
+          "[completion][drift]")
+{
+    schema_registry plain;
+    REQUIRE(plain.attach(nucleus::element("plexus", anchor::root())));
+    REQUIRE(plain.attach(nucleus::element("port", anchor::keyspace(path_of("plexus")))));
+
+    schema_registry described;
+    REQUIRE(described.attach(nucleus::element("plexus", anchor::root())));
+    REQUIRE(described.attach(nucleus::described(
+        nucleus::element("port", anchor::keyspace(path_of("plexus"))),
+        "listen here: an unprivileged port")));
+
+    const std::string before_zsh = generate_completion(shell::zsh, plain, "myapp").value();
+    const std::string after_zsh = generate_completion(shell::zsh, described, "myapp").value();
+    REQUIRE(after_zsh != before_zsh);
+    REQUIRE(before_zsh.find("listen here") == std::string::npos);
+    REQUIRE(after_zsh.find("[listen here\\: an unprivileged port]") != std::string::npos);
+
+    REQUIRE(generate_completion(shell::bash, described, "myapp").value()
+            == generate_completion(shell::bash, plain, "myapp").value());
 }
 
 TEST_CASE("a value containing a quote cannot break out of the bash literal",

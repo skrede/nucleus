@@ -239,10 +239,10 @@ being stable under both, and the row is the price of the line.
 | `tests/load_front_door_test.cpp` | 289 |
 | `tests/keyed_composition_test.cpp` | 286 |
 | `tests/resolution_test.cpp` | 278 |
+| `tests/completion_test.cpp` | 272 |
 | `tests/schema_enforcer_test.cpp` | 272 |
 | `tests/token_resolution_test.cpp` | 245 |
 | `tests/discovery_test.cpp` | 240 |
-| `tests/completion_test.cpp` | 237 |
 | `tests/keyed_selection_test.cpp` | 232 |
 | `tests/expected_test.cpp` | 227 |
 | `tests/pkey_tokenizer_test.cpp` | 226 |
