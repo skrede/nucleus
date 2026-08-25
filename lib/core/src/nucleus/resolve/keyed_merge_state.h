@@ -50,7 +50,7 @@ public:
     {
         for(const schema_element &el : schema.elements())
         {
-            if(!el.repeated || el.merge == merge_mode::wholesale_replace)
+            if(!el.repeated || el.merge == merge_mode::replace_by_ordinal)
                 continue;
             const std::string cpath = el.declared_path().str();
             const std::string field = merge_key_field(schema, cpath);

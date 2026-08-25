@@ -40,7 +40,7 @@ nucleus::config_space cluster_space()
 
 TEST_CASE("a layer supplying one node's nested collection leaves the sibling node's "
           "collection and scalars intact",
-          "[collection_shapes][wholesale_replace][nested]")
+          "[collection_shapes][replace_by_ordinal][nested]")
 {
     const nucleus::config_space space = cluster_space();
     const std::string dir = fixture_dir("nested_sibling_instances");
@@ -61,7 +61,7 @@ TEST_CASE("a layer supplying one node's nested collection leaves the sibling nod
 
 TEST_CASE("a runtime layer setting one instance's scalar leaves every sibling key "
           "with its value and its recorded origin",
-          "[collection_shapes][wholesale_replace][provenance]")
+          "[collection_shapes][replace_by_ordinal][provenance]")
 {
     const nucleus::config_space space = cluster_space();
 
@@ -96,7 +96,7 @@ TEST_CASE("a runtime layer setting one instance's scalar leaves every sibling ke
 
 TEST_CASE("a two-instance layer over a three-instance base resolves to three "
           "instances, the surplus surviving from the base",
-          "[collection_shapes][wholesale_replace]")
+          "[collection_shapes][replace_by_ordinal]")
 {
     const nucleus::config_space space = cluster_space();
 
@@ -142,7 +142,7 @@ TEST_CASE("two sibling repeated leaves inside one container instance resolve to 
 
 TEST_CASE("a repeated leaf outside any repeated container is still replaced as a "
           "whole value list by a higher layer",
-          "[collection_shapes][leaf][wholesale_replace]")
+          "[collection_shapes][leaf][replace_by_ordinal]")
 {
     const nucleus::config_space space = cluster_space();
 

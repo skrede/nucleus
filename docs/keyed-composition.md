@@ -13,7 +13,7 @@ Runnable example: [`examples/schema/keyed_composition.cpp`](../examples/schema/k
 ```cpp
 #include "nucleus/schema/schema.h"
 
-// Default — wholesale_replace — needs no annotation:
+// Default — replace_by_ordinal — needs no annotation:
 builder.register_element(repeated_element("output", anchor::keyspace("endpoints")));
 
 // unite / replace_by_key are set with merging(...):
@@ -23,11 +23,11 @@ builder.register_element(
 
 | Mode | Identifier only in lower | only in higher | same identifier in both layers |
 |------|--------------------------|----------------|--------------------------------|
-| `wholesale_replace` (default) | repeated container: kept unless the higher layer addresses its ordinal; repeated leaf: kept only when the higher layer omits the leaf | repeated container: kept; repeated leaf: the higher layer's whole list | repeated container: higher whole instance wins; repeated leaf: higher whole list wins |
+| `replace_by_ordinal` (default) | repeated container: kept unless the higher layer addresses its ordinal; repeated leaf: kept only when the higher layer omits the leaf | repeated container: kept; repeated leaf: the higher layer's whole list | repeated container: higher whole instance wins; repeated leaf: higher whole list wins |
 | `unite` | kept | kept | **loud error** (duplicate across layers; strict-additive, no override) |
 | `replace_by_key` | kept | kept | higher layer's **whole element** replaces the lower's |
 
-- **`wholesale_replace`** is the default. A repeated container composes by ordinal position:
+- **`replace_by_ordinal`** is the default. A repeated container composes by ordinal position:
   each instance the higher layer supplies replaces, whole, the lower layer's instance at that
   ordinal, and an instance the higher layer does not address stays in place. For a repeated leaf,
   the unit is the whole value list under one enclosing instance: a higher layer that supplies the

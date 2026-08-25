@@ -1,5 +1,5 @@
 // Unified fold: repeated containers and repeated leaves stored as indexed scalars
-// in m_values; wholesale-replace across layers; extend= guard; get_all numeric order.
+// in m_values; replace_by_ordinal across layers; extend= guard; get_all numeric order.
 // schema_enforcer normalizes indexed paths via canonical_text.
 // get_as() loud error for unindexed crossing; get_all_as() typed gather.
 
@@ -104,9 +104,9 @@ TEST_CASE("unified fold -- repeated leaf stored as indexed scalars",
     REQUIRE_FALSE(cfg.get("config/tags").has_value());
 }
 
-TEST_CASE("wholesale-replace -- a two-node layer over a three-node base replaces the "
+TEST_CASE("replace_by_ordinal -- a two-node layer over a three-node base replaces the "
           "two instances it addresses and leaves the third in place",
-          "[repeated_container][wholesale_replace]")
+          "[repeated_container][replace_by_ordinal]")
 {
     nucleus::config_space_builder engine;
     declare_cluster_node_schema(engine);
@@ -136,9 +136,9 @@ TEST_CASE("wholesale-replace -- a two-node layer over a three-node base replaces
     REQUIRE(cfg.get("cluster/node[2]/port") == "30");
 }
 
-TEST_CASE("wholesale-replace -- nested repeated-in-repeated sweep operates at "
+TEST_CASE("replace_by_ordinal -- nested repeated-in-repeated sweep operates at "
           "the innermost container, not the outer one",
-          "[repeated_container][wholesale_replace][nested]")
+          "[repeated_container][replace_by_ordinal][nested]")
 {
     // Schema: cluster -> node (repeated) -> label (leaf), tags (repeated) -> name.
     // "node" and "node/tags" are BOTH declared repeated containers, one nested
@@ -179,7 +179,7 @@ TEST_CASE("wholesale-replace -- nested repeated-in-repeated sweep operates at "
     // would wipe "label" as collateral damage even though layer 2 never
     // touched it; the innermost sweep must leave it untouched.
     REQUIRE(cfg.get("cluster/node[0]/label") == "keep");
-    // The nested "tags" container itself must still wholesale-replace: layer
+    // The nested "tags" container itself must still be replace_by_ordinal: layer
     // 2's single tag replaces layer 1's, not merges alongside it.
     REQUIRE(cfg.get("cluster/node[0]/tags[0]/name") == "z");
     REQUIRE_FALSE(cfg.get("cluster/node[0]/tags[1]/name").has_value());

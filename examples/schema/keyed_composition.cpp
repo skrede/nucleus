@@ -1,6 +1,6 @@
 // keyed_composition: cross-layer merge modes on a repeated/identified collection.
 //
-// Covers: wholesale_replace (default), unite (strict-additive union), replace_by_key
+// Covers: replace_by_ordinal (default), unite (strict-additive union), replace_by_key
 // (matching identifier replaces the whole element), and the loud duplicate-across-layers
 // error. Two stacked layers (the second overrides). Domain-neutral (endpoints/output[name]).
 
@@ -75,8 +75,8 @@ static runtime_source override_output(const char *name, const char *addr)
 int main()
 {
     // The override supplies output[0] alone, so {a} is replaced and {b} stays.
-    show("wholesale_replace (default): base {a,b} + override {c}",
-         merge_mode::wholesale_replace, false, base_outputs(),
+    show("replace_by_ordinal (default): base {a,b} + override {c}",
+         merge_mode::replace_by_ordinal, false, base_outputs(),
          override_output("c", "over-c"));
 
     // Layers union -> {a,b,c}.

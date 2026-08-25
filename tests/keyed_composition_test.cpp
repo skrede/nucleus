@@ -54,10 +54,10 @@ bool mentions(const error &e, const char *needle)
 
 }
 
-TEST_CASE("wholesale_replace (default) — higher layer replaces the instances it supplies",
+TEST_CASE("replace_by_ordinal (default) — higher layer replaces the instances it supplies",
           "[keyed]")
 {
-    auto space = make_space(merge_mode::wholesale_replace, /*with_identity=*/false);
+    auto space = make_space(merge_mode::replace_by_ordinal, /*with_identity=*/false);
 
     runtime_source base;
     base.set("endpoints/output[0]/name", "a").set("endpoints/output[1]/name", "b");

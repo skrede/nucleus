@@ -26,7 +26,7 @@ enum class merge_mode
 {
     // Default: a higher layer replaces, whole, each instance it supplies, and leaves
     // the lower layer's instances it does not address in place.
-    wholesale_replace,
+    replace_by_ordinal,
     // The union / strict-additive mode: layers union; a duplicate identifier across
     // layers is a loud error (additions only, never an accidental override).
     unite,
@@ -64,7 +64,7 @@ struct schema_element
 
     // Cross-layer combination mode for a repeated/identified collection. The default
     // replaces per ordinal instance; unite/replace_by_key key on an identity group's field.
-    merge_mode merge = merge_mode::wholesale_replace;
+    merge_mode merge = merge_mode::replace_by_ordinal;
 
     // When non-empty, this leaf is a keyref: its value names a target in the identity
     // group named here. A value matching no identifier in that namespace (within the

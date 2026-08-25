@@ -318,7 +318,7 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_test(NAME config_node_test COMMAND config_node_test)
 
     # Unified fold: repeated containers and repeated leaves stored as indexed scalars;
-    # wholesale-replace across layers; extend= guard; get_all numeric ordinal order.
+    # replace_by_ordinal across layers; extend= guard; get_all numeric ordinal order.
     add_executable(repeated_container_test repeated_container_test.cpp)
     nucleus_enable_coverage(repeated_container_test)
     nucleus_warnings(repeated_container_test)

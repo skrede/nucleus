@@ -26,7 +26,7 @@ namespace nucleus {
 // Drains the accumulator the divert filled, applying each collection's merge mode
 // by the identity-group key VALUE (never by ordinal), then re-indexing the
 // survivors onto contiguous ordinals and carrying provenance through every move.
-// wholesale_replace never arrives here -- it stays on the fold's sweep path. The
+// replace_by_ordinal never arrives here -- it stays on the fold's sweep path. The
 // keyspace, provenance and merge state are borrowed, and outlive this collaborator.
 class keyed_collection_merge
 {
