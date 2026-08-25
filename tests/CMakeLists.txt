@@ -63,8 +63,6 @@ endfunction()
 
 set(nucleus_test_dir .)
 
-nucleus_add_test(identity_test)
-
 # ---------------------------------------------------------------------------
 # Buffer-lifetime test: exercises the XML document source through the seam and
 # proves the copy-out severs every view from the document arena before it is
@@ -73,18 +71,6 @@ nucleus_add_test(identity_test)
 # use-after-free guard real.
 # ---------------------------------------------------------------------------
 if(NUCLEUS_BUILD_SOURCE_XML)
-    add_executable(identity_envelope_test
-        identity_envelope_test.cpp
-        identity_envelope_emit_test.cpp
-        identity_envelope_inheritance_test.cpp)
-    nucleus_enable_coverage(identity_envelope_test)
-    nucleus_warnings(identity_envelope_test)
-    target_link_libraries(identity_envelope_test
-        PRIVATE nucleus::nucleus nucleus::xml nucleus::argv Catch2::Catch2WithMain)
-    target_include_directories(identity_envelope_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
-    add_test(NAME identity_envelope_test COMMAND identity_envelope_test)
     include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/xml_emit_gap_tests.cmake)
 
     # Template emission lives in the xml module now (nucleus::xml::emit_template),
@@ -138,19 +124,6 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
     add_test(NAME keyed_selection_test COMMAND keyed_selection_test)
-
-    # pkey-identity-as-data acceptance suite.
-    add_executable(pkey_identity_test
-        pkey_identity_test.cpp
-        pkey_identity_read_test.cpp)
-    nucleus_enable_coverage(pkey_identity_test)
-    nucleus_warnings(pkey_identity_test)
-    target_link_libraries(pkey_identity_test
-        PRIVATE nucleus::nucleus nucleus::xml nucleus::runtime Catch2::Catch2WithMain)
-    target_include_directories(pkey_identity_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
-    add_test(NAME pkey_identity_test COMMAND pkey_identity_test)
 
     nucleus_add_test(xml_identity_contract_test nucleus::xml)
 
@@ -213,6 +186,7 @@ include(tokenizer/tests.cmake)
 include(schema/tests.cmake)
 include(emit/tests.cmake)
 include(keyspace/tests.cmake)
+include(identity/tests.cmake)
 
 if(NUCLEUS_BUILD_SOURCE_XML)
     include(system/tests.cmake)
