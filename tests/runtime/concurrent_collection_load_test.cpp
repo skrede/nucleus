@@ -2,7 +2,7 @@
 // strictly less. The latch and repeated loads give ThreadSanitizer overlapping
 // resolution windows through both collection routes.
 
-#include "concurrent_collection_load_test_support.h"
+#include "runtime/concurrent_collection_load_test_support.h"
 
 #include "support/builder_result_test_support.h"
 

@@ -94,9 +94,6 @@ nucleus_add_test(named_args_test)
 nucleus_add_test(token_cycle_test)
 nucleus_add_test(converter_registry_test nucleus::env)
 nucleus_add_test(builder_lifecycle_test)
-nucleus_add_test(concurrent_load_test nucleus::runtime)
-nucleus_add_test(concurrent_collection_load_test nucleus::runtime)
-nucleus_add_test(load_front_door_test nucleus::runtime)
 nucleus_add_test(reference_resolution_test nucleus::runtime)
 nucleus_add_test(reference_cycle_test nucleus::runtime)
 nucleus_add_test(reference_fallback_test nucleus::runtime)
@@ -116,12 +113,6 @@ nucleus_add_test(selector_schema_role_test nucleus::runtime)
 nucleus_add_test(selector_owner_test nucleus::runtime)
 nucleus_add_test(selector_strain_test nucleus::runtime)
 nucleus_add_test(selector_lifetime_test nucleus::runtime)
-
-# The concurrent-load guarantee tests spawn std::threads; link the platform's
-# threading library so the shared-const-read design is exercised under ASan.
-find_package(Threads REQUIRED)
-target_link_libraries(concurrent_load_test PRIVATE Threads::Threads)
-target_link_libraries(concurrent_collection_load_test PRIVATE Threads::Threads)
 
 # ---------------------------------------------------------------------------
 # Buffer-lifetime test: exercises the XML document source through the seam and
@@ -382,6 +373,7 @@ include(completion/tests.cmake)
 include(capability/tests.cmake)
 include(facade/tests.cmake)
 include(argv/tests.cmake)
+include(runtime/tests.cmake)
 
 if(NUCLEUS_BUILD_SOURCE_XML)
     include(system/tests.cmake)

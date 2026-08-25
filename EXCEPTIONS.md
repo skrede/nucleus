@@ -237,7 +237,7 @@ being stable under both, and the row is the price of the line.
 | `tests/completion/smoke_test.cpp` | 327 |
 | `tests/selector_test.cpp` | 315 |
 | `tests/constraint_group_test.cpp` | 305 |
-| `tests/load_front_door_test.cpp` | 289 |
+| `tests/runtime/load_front_door_test.cpp` | 289 |
 | `tests/keyed_composition_test.cpp` | 286 |
 | `tests/resolve/resolution_test.cpp` | 278 |
 | `tests/completion/completion_test.cpp` | 272 |
