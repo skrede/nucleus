@@ -112,15 +112,6 @@ jobs:
             exit 1
           fi
 
-      # Configure only: the point is that enabling examples does not drag in the
-      # optional XML module, which a build would not tell us any more clearly.
-      - name: Examples configure without the XML module
-        run: |
-          cmake . -B build-xml-off \
-            -DNUCLEUS_BUILD_TESTS=OFF \
-            -DNUCLEUS_BUILD_EXAMPLES=ON \
-            -DNUCLEUS_BUILD_SOURCE_XML=OFF
-
       # The size-gate job above proves its gate still refuses; this one had no
       # equivalent. Four controls, because four different edits can turn the
       # format step into a green that measured nothing: the check must reject a

@@ -243,3 +243,246 @@ jobs:
       # 32-bit toolchain into a failure rather than the usual skip.
       - name: Check ordinal width at 32 bits
         run: cmake --build build --target ordinal_32bit_check
+
+  xml-off-test:
+    runs-on: ubuntu-24.04
+    # Tests and examples are both on deliberately. Tests on is the only way a
+    # missing namespaced target gets reported at all -- it is a generate-time
+    # error raised by a test target, so a configure-only probe with tests off
+    # stops before the step that would name it. Examples on carries the separate
+    # claim that enabling examples does not drag the optional module back in.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: >-
+          cmake . -B build-xml-off
+          -DCMAKE_BUILD_TYPE=Release
+          -DNUCLEUS_BUILD_TESTS=ON
+          -DNUCLEUS_BUILD_EXAMPLES=ON
+          -DNUCLEUS_BUILD_SOURCE_XML=OFF
+
+      - name: Build
+        run: cmake --build build-xml-off
+
+      - name: Test
+        run: cd build-xml-off && ctest --output-on-failure --timeout 300
+
+      # Without this the job stays green on a tree whose option guard was dropped
+      # but whose target happens to exist for some other reason. The control links
+      # the module's namespaced target from outside every guard and requires the
+      # module-off generate to refuse it. It is written under a build directory
+      # name so the whole-tree listings in the gates workflow cannot reach it.
+      - name: Assert the module-off build still refuses an unguarded link
+        run: |
+          mkdir -p build-xmloff-control
+          printf 'int main() { return 0; }\n' > build-xmloff-control/control.cpp
+          cat > build-xmloff-control/CMakeLists.txt <<'CONTROL'
+          cmake_minimum_required(VERSION 3.25)
+          project(nucleus_unguarded_xml_link CXX)
+          add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/.. nucleus_build)
+          add_executable(unguarded_link control.cpp)
+          target_link_libraries(unguarded_link PRIVATE nucleus::xml)
+          CONTROL
+          if cmake -S build-xmloff-control -B build-xmloff-control-gen \
+              -DNUCLEUS_BUILD_TESTS=OFF \
+              -DNUCLEUS_BUILD_EXAMPLES=OFF \
+              -DNUCLEUS_BUILD_SOURCE_XML=OFF; then
+            echo "a link to the XML module's target generated cleanly with the module off; the module-disabled build has stopped noticing an unguarded link" >&2
+            exit 1
+          fi
+          rm -rf build-xmloff-control build-xmloff-control-gen
+
+  install-surface:
+    runs-on: ubuntu-24.04
+    # The fixture installs an executable of its own. A consumer whose export set
+    # holds a library linking nucleus hits a structurally identical export error
+    # one level up that nucleus's install gate cannot fix, so nothing below
+    # claims that shape works.
+    steps:
+      - uses: actions/checkout@v4
+
+      # Disabling find_package for pugixml alone forces that one declaration down
+      # its populate path, which is what makes the export-set error reachable at
+      # all: a pugixml that was discovered rather than populated never evaluates
+      # PUGIXML_INSTALL.
+      - name: Build and install the vendoring consumer
+        run: |
+          cmake -S tests/install_consumer_fixture -B build-fixture \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/build-fixture-prefix \
+            -DCMAKE_DISABLE_FIND_PACKAGE_pugixml=ON \
+            -DPUGIXML_INSTALL=OFF
+          cmake --build build-fixture
+          cmake --install build-fixture
+
+      - name: Assert the consumer's prefix carries only its own executable
+        run: |
+          if [ ! -x build-fixture-prefix/bin/install_consumer ]; then
+            echo "the consumer's own executable is missing from its prefix; the checks below are measuring a prefix nothing was installed into" >&2
+            exit 1
+          fi
+          if [ -d build-fixture-prefix/include/nucleus ]; then
+            echo "nucleus headers landed in a vendoring consumer's prefix" >&2
+            exit 1
+          fi
+          if [ -d build-fixture-prefix/lib/cmake/nucleus ]; then
+            echo "the nucleus package files landed in a vendoring consumer's prefix" >&2
+            exit 1
+          fi
+          if [ -n "$(find build-fixture-prefix -name 'pugixml*' -print -quit)" ]; then
+            echo "pugixml files landed in a vendoring consumer's prefix" >&2
+            exit 1
+          fi
+
+      # Every absence asserted above also holds of a prefix nothing reached, so
+      # each one has to be shown to depend on the gate rather than on the fixture.
+      # With the gate open and the dependency's own rules left alone, all three
+      # must stop holding.
+      - name: Assert the install gate still refuses
+        run: |
+          cmake -S tests/install_consumer_fixture -B build-fixture-control \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/build-fixture-control-prefix \
+            -DCMAKE_DISABLE_FIND_PACKAGE_pugixml=ON \
+            -DNUCLEUS_INSTALL=ON
+          cmake --build build-fixture-control
+          cmake --install build-fixture-control
+          if [ ! -d build-fixture-control-prefix/include/nucleus ]; then
+            echo "opening the install gate left the prefix without nucleus headers; the header check above no longer depends on the gate" >&2
+            exit 1
+          fi
+          if [ ! -d build-fixture-control-prefix/lib/cmake/nucleus ]; then
+            echo "opening the install gate left the prefix without the nucleus package files; the package check above no longer depends on the gate" >&2
+            exit 1
+          fi
+          if [ -z "$(find build-fixture-control-prefix -name 'pugixml*' -print -quit)" ]; then
+            echo "opening the install gate left the dependency's files out of the prefix; the pugixml check above no longer depends on the gate" >&2
+            exit 1
+          fi
+          rm -rf build-fixture-control build-fixture-control-prefix
+
+      - name: Build and install nucleus
+        run: |
+          cmake . -B build-backend \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/build-backend-prefix \
+            -DNUCLEUS_BUILD_TESTS=OFF \
+            -DNUCLEUS_BUILD_EXAMPLES=OFF \
+            -DNUCLEUS_BUILD_SOURCE_XML=ON
+          cmake --build build-backend
+          cmake --install build-backend
+
+      - name: Build and run the installed-package consumer
+        run: |
+          cmake -S tests/integration -B build-backend-consumer \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH=${{ github.workspace }}/build-backend-prefix \
+            -DNUCLEUS_INTEGRATION_WITH_XML=ON
+          cmake --build build-backend-consumer
+          ./build-backend-consumer/integration_test
+
+      # The answer has to come out of a consumer's own preprocessor, and through
+      # the public seam rather than the generated header, or the comparison below
+      # would be the installed file read twice. Reaching the seam and finding no
+      # declaration is itself the failure this exists to catch, so the reporter
+      # refuses to compile in that case rather than reporting a zero.
+      - name: Report the backend the consumer compiled under
+        run: |
+          mkdir -p build-backend-check
+          cat > build-backend-check/reporter.cpp <<'REPORTER'
+          #include "nucleus/format.h"
+
+          #include <cstdio>
+
+          #ifndef NUCLEUS_USE_STD_FORMAT
+          #error "the public formatting seam no longer declares the backend the installed package was built with"
+          #endif
+
+          int main()
+          {
+              std::printf("%d\n", NUCLEUS_USE_STD_FORMAT);
+              return 0;
+          }
+          REPORTER
+          cat > build-backend-check/CMakeLists.txt <<'REPORTER'
+          cmake_minimum_required(VERSION 3.25)
+          project(nucleus_backend_reporter CXX)
+          set(CMAKE_CXX_STANDARD 20)
+          set(CMAKE_CXX_STANDARD_REQUIRED ON)
+          find_package(nucleus REQUIRED CONFIG)
+          add_executable(backend_reporter reporter.cpp)
+          target_link_libraries(backend_reporter PRIVATE nucleus::nucleus)
+          REPORTER
+          cmake -S build-backend-check -B build-backend-reporter \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH=${{ github.workspace }}/build-backend-prefix
+          cmake --build build-backend-reporter
+          ./build-backend-reporter/backend_reporter > build-backend-check/compiled
+
+      # Two independent answers to one question: the backend the consumer compiled
+      # under, and the backend the installed header declares. They stop agreeing
+      # the moment the seam starts deciding the backend in the consumer's own
+      # preprocessor again, which is the branch the generated header replaced.
+      - name: Compare the consumer's backend against the installed declaration
+        run: |
+          cat > build-backend-check/compare.sh <<'COMPARE'
+          header=$1
+          compiled=$2
+          if [ ! -r "$header" ]; then
+            echo "the backend comparison cannot read $header, so it is not reading the header it claims to read" >&2
+            exit 1
+          fi
+          declared=$(sed -n 's/^#define NUCLEUS_USE_STD_FORMAT \([01]\)$/\1/p' "$header")
+          if [ -z "$declared" ]; then
+            echo "$header declares no backend, so the comparison extracted nothing and would have reported agreement" >&2
+            exit 1
+          fi
+          if [ -z "$compiled" ]; then
+            echo "the consumer reported no backend, so the comparison would have reported agreement" >&2
+            exit 1
+          fi
+          if [ "$declared" != "$compiled" ]; then
+            echo "the installed header declares NUCLEUS_USE_STD_FORMAT $declared while the consumer compiled under $compiled" >&2
+            exit 1
+          fi
+          COMPARE
+          sh build-backend-check/compare.sh \
+            build-backend-prefix/include/nucleus/detail/format_backend.h \
+            "$(cat build-backend-check/compiled)"
+
+      # A comparison can degrade into a green in more ways than its subject can
+      # fail: an unreadable header, a pattern that has stopped matching and an
+      # empty answer from the consumer all read as agreement unless each is made
+      # fatal, and the last control checks that the four above are not refusing
+      # everything indiscriminately. The doctored copies live under a build
+      # directory name and go away with it.
+      - name: Assert the backend comparison still refuses
+        run: |
+          header=build-backend-prefix/include/nucleus/detail/format_backend.h
+          compiled=$(cat build-backend-check/compiled)
+          awk '/^#define NUCLEUS_USE_STD_FORMAT 1$/ { print "#define NUCLEUS_USE_STD_FORMAT 0"; next }
+               /^#define NUCLEUS_USE_STD_FORMAT 0$/ { print "#define NUCLEUS_USE_STD_FORMAT 1"; next }
+               { print }' "$header" > build-backend-check/flipped.h
+          if sh build-backend-check/compare.sh build-backend-check/flipped.h "$compiled"; then
+            echo "the comparison accepted a header declaring the other backend; it has stopped reading the header it claims to read" >&2
+            exit 1
+          fi
+          if sh build-backend-check/compare.sh build-backend-check/absent.h "$compiled"; then
+            echo "the comparison accepted a header path that does not exist" >&2
+            exit 1
+          fi
+          grep -v '^#define NUCLEUS_USE_STD_FORMAT' "$header" > build-backend-check/silent.h
+          if sh build-backend-check/compare.sh build-backend-check/silent.h "$compiled"; then
+            echo "the comparison accepted a header carrying no backend declaration" >&2
+            exit 1
+          fi
+          if sh build-backend-check/compare.sh "$header" ""; then
+            echo "the comparison accepted an empty answer from the consumer" >&2
+            exit 1
+          fi
+          if ! sh build-backend-check/compare.sh "$header" "$compiled"; then
+            echo "the comparison refuses the real installed header, so every control above measured nothing" >&2
+            exit 1
+          fi
+          rm -rf build-backend-check build-backend-reporter
