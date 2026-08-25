@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(nucleus VERSION 0.4.1 LANGUAGES CXX)
+project(nucleus VERSION 0.4.2 LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
