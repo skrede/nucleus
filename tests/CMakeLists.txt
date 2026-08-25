@@ -81,12 +81,10 @@ nucleus_add_test(keyed_composition_test nucleus::runtime nucleus::argv nucleus::
 nucleus_add_test(keyref_test nucleus::runtime)
 nucleus_add_test(retrieval_error_test nucleus::runtime)
 if(NUCLEUS_BUILD_SOURCE_XML)
-    nucleus_add_test(argv_source_test nucleus::argv nucleus::xml nucleus::runtime)
     nucleus_add_test(retrieval_addressing_test nucleus::runtime nucleus::xml nucleus::argv)
     nucleus_add_test(strain_scope_policy_test nucleus::runtime nucleus::xml)
 endif()
 nucleus_add_test(schema_cli_bijection_test nucleus::argv)
-nucleus_add_test(multispace_argv_test nucleus::argv)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/emit_gap_tests.cmake)
 nucleus_add_test(flat_emit_round_trip_test nucleus::env nucleus::argv nucleus::runtime)
 nucleus_add_test(emitter_contract_test nucleus::env nucleus::argv)
@@ -103,7 +101,6 @@ nucleus_add_test(reference_resolution_test nucleus::runtime)
 nucleus_add_test(reference_cycle_test nucleus::runtime)
 nucleus_add_test(reference_fallback_test nucleus::runtime)
 nucleus_add_test(pkey_tokenizer_test nucleus::runtime)
-nucleus_add_test(recognizer_of_test nucleus::argv)
 nucleus_add_test(converter_edge_cases_test)
 # Forces the strtof/strtod fallback so it is exercised on every platform, not
 # only Apple libc++; the test switches the thread locale to a comma-decimal one.
@@ -453,6 +450,7 @@ include(config_node/tests.cmake)
 include(completion/tests.cmake)
 include(capability/tests.cmake)
 include(facade/tests.cmake)
+include(argv/tests.cmake)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/example_review_tests.cmake)
 # ---------------------------------------------------------------------------

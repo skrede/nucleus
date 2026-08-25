@@ -227,7 +227,7 @@ being stable under both, and the row is the price of the line.
 | `tests/repeated_container_test.cpp` | 815 |
 | `tests/typed_element_test.cpp` | 809 |
 | `tests/config_node/config_node_test.cpp` | 777 |
-| `tests/argv_source_test.cpp` | 615 |
+| `tests/argv/source_test.cpp` | 615 |
 | `tests/typed_shape_test.cpp` | 518 |
 | `tests/repeated_element_test.cpp` | 470 |
 | `tests/integration_shape_test.cpp` | 428 |
