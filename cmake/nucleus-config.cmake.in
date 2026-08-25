@@ -50,4 +50,20 @@ foreach(_nucleus_component runtime env argv xml)
 endforeach()
 unset(_nucleus_component)
 
+# CMake's own refusal names only the package, never the component that went missing.
+foreach(_nucleus_requested ${nucleus_FIND_COMPONENTS})
+    if(NOT nucleus_${_nucleus_requested}_FOUND AND nucleus_FIND_REQUIRED_${_nucleus_requested})
+        list(APPEND _nucleus_absent ${_nucleus_requested})
+    endif()
+endforeach()
+unset(_nucleus_requested)
+
+if(_nucleus_absent)
+    list(JOIN _nucleus_absent ", " _nucleus_absent_text)
+    set(nucleus_NOT_FOUND_MESSAGE
+        "these required modules are not part of this nucleus installation: ${_nucleus_absent_text}")
+    unset(_nucleus_absent_text)
+endif()
+unset(_nucleus_absent)
+
 check_required_components(nucleus)

@@ -14,11 +14,26 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # archive's link interface.
 option(NUCLEUS_INTEGRATION_WITH_XML "Also consume the installed xml module" OFF)
 
-find_package(nucleus REQUIRED CONFIG)
+find_package(nucleus REQUIRED CONFIG COMPONENTS core runtime OPTIONAL_COMPONENTS xml)
+
+if(NOT TARGET nucleus::nucleus)
+    message(FATAL_ERROR
+        "the installed export no longer defines nucleus::nucleus, the target the core component resolves to")
+endif()
+
+if(TARGET nucleus::core)
+    message(FATAL_ERROR
+        "the installed export now carries the core module's in-tree alias spelling, which no installed package has ever defined; adopters link nucleus::nucleus")
+endif()
 
 add_executable(integration_test integration_test.cpp)
 target_link_libraries(integration_test PRIVATE nucleus::nucleus nucleus::runtime)
+
 if(NUCLEUS_INTEGRATION_WITH_XML)
+    if(NOT nucleus_xml_FOUND)
+        message(FATAL_ERROR
+            "NUCLEUS_INTEGRATION_WITH_XML is on, but the package at ${nucleus_DIR} was installed without the xml module")
+    endif()
     target_link_libraries(integration_test PRIVATE nucleus::xml)
     target_compile_definitions(integration_test PRIVATE NUCLEUS_INTEGRATION_WITH_XML)
 endif()
