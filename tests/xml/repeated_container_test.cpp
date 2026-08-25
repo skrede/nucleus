@@ -1,4 +1,4 @@
-#include "xml_repeated_test_support.h"
+#include "xml/repeated_test_support.h"
 
 #include "nucleus/keyspace/entry.h"
 

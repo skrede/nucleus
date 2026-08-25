@@ -442,7 +442,7 @@ pattern for composing relative filesystem paths (e.g.
 `${dir.path}/certs/ca.pem`). The per-source binding is demonstrated in
 [`examples/references/tree_references.cpp`](../examples/references/tree_references.cpp) (see the
 `dir.path` note) and proved per-file in
-[`tests/location_token_wiring_test.cpp`](../tests/location_token_wiring_test.cpp).
+[`tests/xml/location_token_wiring_test.cpp`](../tests/xml/location_token_wiring_test.cpp).
 
 ---
 

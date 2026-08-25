@@ -3,7 +3,7 @@
 // merely unusual must produce loud, accurate errors -- or resolve correctly when
 // the document is valid but exotic (CDATA values).
 
-#include "chain_admissibility_test_support.h"
+#include "xml/chain_admissibility_test_support.h"
 
 #include "nucleus/config.h"
 #include "support/builder_result_test_support.h"

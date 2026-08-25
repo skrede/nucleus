@@ -61,113 +61,6 @@ function(nucleus_add_test name)
     endif()
 endfunction()
 
-set(nucleus_test_dir .)
-
-# ---------------------------------------------------------------------------
-# Buffer-lifetime test: exercises the XML document source through the seam and
-# proves the copy-out severs every view from the document arena before it is
-# dropped. Links the XML module (and thus pugixml, transitively) only here, never
-# in core. Built only when the XML module is. Run under the sanitizer to make the
-# use-after-free guard real.
-# ---------------------------------------------------------------------------
-if(NUCLEUS_BUILD_SOURCE_XML)
-    include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/xml_emit_gap_tests.cmake)
-
-    # Template emission lives in the xml module now (nucleus::xml::emit_template),
-    # so this test links the module; its header arrives via the nucleus::xml link.
-    add_executable(xml_template_test xml_template_test.cpp)
-    nucleus_enable_coverage(xml_template_test)
-    nucleus_warnings(xml_template_test)
-    target_link_libraries(xml_template_test
-        PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
-    target_include_directories(xml_template_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
-    add_test(NAME xml_template_test COMMAND xml_template_test)
-
-    add_executable(buffer_lifetime_test buffer_lifetime_test.cpp)
-    nucleus_enable_coverage(buffer_lifetime_test)
-    nucleus_warnings(buffer_lifetime_test)
-    target_link_libraries(buffer_lifetime_test
-        PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
-    target_include_directories(buffer_lifetime_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
-    add_test(NAME buffer_lifetime_test COMMAND buffer_lifetime_test)
-
-    add_executable(xml_robustness_test xml_robustness_test.cpp)
-    nucleus_enable_coverage(xml_robustness_test)
-    nucleus_warnings(xml_robustness_test)
-    target_link_libraries(xml_robustness_test
-        PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
-    add_test(NAME xml_robustness_test COMMAND xml_robustness_test)
-
-    # Keyed-projection test: the schema declares a container's primary key and the
-    # XML source must render repeated instances as distinct keyed subtrees instead
-    # of collapsing them last-wins. Links the XML module for a real document walk.
-    add_executable(keyed_projection_test keyed_projection_test.cpp)
-    nucleus_enable_coverage(keyed_projection_test)
-    nucleus_warnings(keyed_projection_test)
-    target_link_libraries(keyed_projection_test
-        PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
-    target_include_directories(keyed_projection_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
-    add_test(NAME keyed_projection_test COMMAND keyed_projection_test)
-
-    add_executable(keyed_selection_test keyed_selection_test.cpp)
-    nucleus_enable_coverage(keyed_selection_test)
-    nucleus_warnings(keyed_selection_test)
-    target_link_libraries(keyed_selection_test
-        PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
-    target_include_directories(keyed_selection_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
-    add_test(NAME keyed_selection_test COMMAND keyed_selection_test)
-
-    nucleus_add_test(xml_identity_contract_test nucleus::xml)
-
-    # Location-token wiring test: two XML files in different temp directories each resolve
-    # ${dir.path} to their own directory, proving per-source file-frame binding.
-    add_executable(location_token_wiring_test location_token_wiring_test.cpp)
-    nucleus_enable_coverage(location_token_wiring_test)
-    nucleus_warnings(location_token_wiring_test)
-    target_link_libraries(location_token_wiring_test
-        PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
-    target_include_directories(location_token_wiring_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
-    add_test(NAME location_token_wiring_test COMMAND location_token_wiring_test)
-
-    add_executable(xml_persist_test
-        xml_persist_test.cpp
-        xml_persist_render_test.cpp
-        xml_persist_value_test.cpp)
-    nucleus_enable_coverage(xml_persist_test)
-    nucleus_warnings(xml_persist_test)
-    target_link_libraries(xml_persist_test
-        PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
-    target_include_directories(xml_persist_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
-    add_test(NAME xml_persist_test COMMAND xml_persist_test)
-
-    add_executable(xml_repeated_container_test
-        xml_repeated_container_test.cpp
-        xml_repeated_round_trip_test.cpp
-        xml_repeated_contract_test.cpp
-        xml_repeated_value_test.cpp)
-    nucleus_enable_coverage(xml_repeated_container_test)
-    nucleus_warnings(xml_repeated_container_test)
-    target_link_libraries(xml_repeated_container_test
-        PRIVATE nucleus::nucleus nucleus::xml nucleus::runtime Catch2::Catch2WithMain)
-    target_include_directories(xml_repeated_container_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
-    add_test(NAME xml_repeated_container_test COMMAND xml_repeated_container_test)
-endif()
-unset(nucleus_test_dir)
-
 include(resolve/tests.cmake)
 include(utility/tests.cmake)
 include(diagnostics/tests.cmake)
@@ -191,6 +84,7 @@ include(identity/tests.cmake)
 if(NUCLEUS_BUILD_SOURCE_XML)
     include(system/tests.cmake)
     include(collection_shapes/tests.cmake)
+    include(xml/tests.cmake)
 endif()
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/example_review_tests.cmake)

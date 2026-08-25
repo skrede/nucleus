@@ -1,7 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_TESTS_XML_PERSIST_TEST_SUPPORT_H
 #define HPP_GUARD_NUCLEUS_TESTS_XML_PERSIST_TEST_SUPPORT_H
 
-#include "xml_persist_artifact.h"
+#include "xml/persist_artifact.h"
 
 #include "nucleus/config.h"
 #include "support/builder_result_test_support.h"

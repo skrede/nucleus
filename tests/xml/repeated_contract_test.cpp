@@ -1,4 +1,4 @@
-#include "xml_repeated_test_support.h"
+#include "xml/repeated_test_support.h"
 
 #include "nucleus/xml/xml_emitter.h"
 

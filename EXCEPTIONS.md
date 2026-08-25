@@ -232,7 +232,7 @@ being stable under both, and the row is the price of the line.
 | `tests/schema/repeated_element_test.cpp` | 470 |
 | `tests/system/integration_shape_test.cpp` | 428 |
 | `tests/keyspace/strain_scope_policy_test.cpp` | 401 |
-| `tests/keyed_projection_test.cpp` | 338 |
+| `tests/xml/keyed_projection_test.cpp` | 338 |
 | `tests/schema/registry_test.cpp` | 333 |
 | `tests/completion/smoke_test.cpp` | 327 |
 | `tests/query/selector_test.cpp` | 315 |
@@ -244,7 +244,7 @@ being stable under both, and the row is the price of the line.
 | `tests/schema/enforcer_test.cpp` | 272 |
 | `tests/tokenizer/token_resolution_test.cpp` | 245 |
 | `tests/config_source/discovery_test.cpp` | 240 |
-| `tests/keyed_selection_test.cpp` | 232 |
+| `tests/xml/keyed_selection_test.cpp` | 232 |
 | `tests/error/expected_test.cpp` | 227 |
 | `tests/tokenizer/pkey_tokenizer_test.cpp` | 226 |
 | `tests/config_source/source_stack_test.cpp` | 218 |
