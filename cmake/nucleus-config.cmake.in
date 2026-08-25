@@ -12,7 +12,7 @@ include(CMakeFindDependencyMacro)
 # this by having pugixml discoverable through find_package -- e.g. a system or
 # vcpkg/Conan package, or one installed from the same source.)
 if(@NUCLEUS_XML_INSTALLED@)
-    find_dependency(pugixml 1.15)
+    find_dependency(pugixml @NUCLEUS_PUGIXML_VERSION@)
 endif()
 
 # When the standard library lacks std::format the diagnostic seam falls back to
@@ -23,7 +23,7 @@ endif()
 # satisfies this by having fmt discoverable through find_package -- e.g. a system
 # or vcpkg/Conan package.)
 if(@NUCLEUS_FMT_REQUIRED@)
-    find_dependency(fmt 11)
+    find_dependency(fmt @NUCLEUS_FMT_VERSION@)
 endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/nucleus-targets.cmake")

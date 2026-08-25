@@ -214,9 +214,22 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         # SYSTEM: pugixml headers are third-party; consume them as system
         # includes so their internals never trip our curated -Weverything/-Werror.
         SYSTEM
-        FIND_PACKAGE_ARGS NAMES pugixml
+        FIND_PACKAGE_ARGS ${NUCLEUS_PUGIXML_VERSION} NAMES pugixml
     )
     FetchContent_MakeAvailable(pugixml)
+    # A discovered package leaves its version here; a populated subproject sets its own
+    # version only inside the directory it was added in, so recover it from there.
+    if(NOT pugixml_VERSION AND pugixml_SOURCE_DIR)
+        get_directory_property(pugixml_VERSION
+                               DIRECTORY ${pugixml_SOURCE_DIR} DEFINITION pugixml_VERSION)
+    endif()
+    if(NOT pugixml_VERSION)
+        message(FATAL_ERROR "the pugixml version in use could not be read; refusing to "
+                            "build against a dependency whose version went unchecked")
+    elseif(pugixml_VERSION VERSION_LESS NUCLEUS_PUGIXML_VERSION)
+        message(FATAL_ERROR "pugixml ${pugixml_VERSION} is below the required "
+                            "${NUCLEUS_PUGIXML_VERSION}")
+    endif()
 
     nucleus_add_module(xml
         TYPE STATIC

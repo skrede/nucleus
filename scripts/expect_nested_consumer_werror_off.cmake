@@ -10,6 +10,8 @@
 # Invoke: cmake -DNUCLEUS_FIXTURE_SOURCE_DIR=<dir> -DNUCLEUS_FIXTURE_BINARY_DIR=<dir>
 #               -P scripts/expect_nested_consumer_werror_off.cmake
 
+cmake_minimum_required(VERSION 3.25)
+
 foreach(required NUCLEUS_FIXTURE_SOURCE_DIR NUCLEUS_FIXTURE_BINARY_DIR)
     if(NOT DEFINED ${required})
         message(FATAL_ERROR "${required} must be defined")

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.25)
 project(nucleus VERSION 0.4.1 LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -64,6 +64,12 @@ check_cxx_source_compiles(
     NUCLEUS_HAVE_STD_FORMAT
 )
 
+# The lowest version of each dependency this build accepts. One number reaches both the
+# discovery call and the installed package config, so the build cannot accept a version the
+# generated config would then refuse.
+set(NUCLEUS_PUGIXML_VERSION 1.15)
+set(NUCLEUS_FMT_VERSION 11)
+
 # Whether {fmt} is part of the link interface. When the fallback is active, fmt
 # appears PUBLICly (the fallback lives in a public header), so the installed
 # package config must find_dependency(fmt) for the exported reference to resolve
@@ -80,9 +86,23 @@ if(NOT NUCLEUS_HAVE_STD_FORMAT)
         # SYSTEM: fmt headers are third-party; consume them as system includes so
         # their internals never trip our curated -Weverything/-Werror.
         SYSTEM
-        FIND_PACKAGE_ARGS NAMES fmt
+        FIND_PACKAGE_ARGS ${NUCLEUS_FMT_VERSION} NAMES fmt
     )
     FetchContent_MakeAvailable(fmt)
+    # A discovered package leaves its version here; a populated subproject sets its own
+    # version only inside the directory it was added in. fmt's project() is FMT and carries
+    # no VERSION, so the version it publishes is FMT_VERSION.
+    if(NOT fmt_VERSION AND fmt_SOURCE_DIR)
+        get_directory_property(fmt_VERSION
+                               DIRECTORY ${fmt_SOURCE_DIR} DEFINITION FMT_VERSION)
+    endif()
+    if(NOT fmt_VERSION)
+        message(FATAL_ERROR "the fmt version in use could not be read; refusing to build "
+                            "against a dependency whose version went unchecked")
+    elseif(fmt_VERSION VERSION_LESS NUCLEUS_FMT_VERSION)
+        message(FATAL_ERROR "fmt ${fmt_VERSION} is below the required "
+                            "${NUCLEUS_FMT_VERSION}")
+    endif()
     set(NUCLEUS_FMT_REQUIRED TRUE)
 endif()
 
