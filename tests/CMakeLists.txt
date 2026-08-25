@@ -100,13 +100,7 @@ nucleus_add_test(token_lexer_test)
 nucleus_add_test(token_resolution_test)
 nucleus_add_test(named_args_test)
 nucleus_add_test(token_cycle_test)
-nucleus_add_test(completion_test)
-nucleus_add_test(completion_smoke_test)
-# Catch2 exits 4 when every selected test was skipped (here: no bash on PATH);
-# tell CTest that is a skip, not a failure.
-set_tests_properties(completion_smoke_test PROPERTIES SKIP_RETURN_CODE 4)
 nucleus_add_test(facade_completion_test)
-nucleus_add_test(completion_program_token_test)
 nucleus_add_test(converter_registry_test nucleus::env)
 nucleus_add_test(builder_lifecycle_test)
 nucleus_add_test(concurrent_load_test nucleus::runtime)
@@ -463,6 +457,7 @@ include(registry/tests.cmake)
 include(env/tests.cmake)
 include(error/tests.cmake)
 include(config_node/tests.cmake)
+include(completion/tests.cmake)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/example_review_tests.cmake)
 # ---------------------------------------------------------------------------

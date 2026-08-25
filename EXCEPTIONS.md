@@ -195,16 +195,17 @@ None.
 
 Two rows here rose to close the pathname expansion the generated bash completion performed
 over its own candidates, and one of the two rose again for the zsh description escaper.
-`tests/completion_test.cpp` grew by the four emitted lines the pinned golden now carries, which
-is the whole point of pinning it: a change to the emitted script that does not move the golden
-is a change no reviewer sees. `tests/completion_smoke_test.cpp` grew by three cases that drive
-the generated script under a real shell with the working directory seeded to match a candidate,
-and then by one that pins the emitted `_arguments` spec construct by construct. The bash defect
-was invisible to every text assertion that file already held — the emitted text was correct and
-the shell rewrote it one stage later — so a shorter test there is one that proves nothing, and
-compressing a case means dropping the seeding that is the case. The zsh case is long because it
-is an enumeration: no zsh runs on the machine that wrote it, so each construct it claims to
-neutralize has to be named and asserted rather than covered by driving a shell once.
+`tests/completion/completion_test.cpp` grew by the four emitted lines the pinned golden now
+carries, which is the whole point of pinning it: a change to the emitted script that does not
+move the golden is a change no reviewer sees. `tests/completion/smoke_test.cpp` grew by three
+cases that drive the generated script under a real shell with the working directory seeded to
+match a candidate, and then by one that pins the emitted `_arguments` spec construct by
+construct. The bash defect was invisible to every text assertion that file already held — the
+emitted text was correct and the shell rewrote it one stage later — so a shorter test there is
+one that proves nothing, and compressing a case means dropping the seeding that is the case.
+The zsh case is long because it is an enumeration: no zsh runs on the machine that wrote it, so
+each construct it claims to neutralize has to be named and asserted rather than covered by
+driving a shell once.
 
 The three newest rows are contract tests that rename the example's entry point through the
 preprocessor so it cannot collide with the test runner's own. That rename leaves the renamed
@@ -233,13 +234,13 @@ being stable under both, and the row is the price of the line.
 | `tests/strain_scope_policy_test.cpp` | 401 |
 | `tests/keyed_projection_test.cpp` | 338 |
 | `tests/schema_registry_test.cpp` | 333 |
-| `tests/completion_smoke_test.cpp` | 327 |
+| `tests/completion/smoke_test.cpp` | 327 |
 | `tests/selector_test.cpp` | 315 |
 | `tests/constraint_group_test.cpp` | 305 |
 | `tests/load_front_door_test.cpp` | 289 |
 | `tests/keyed_composition_test.cpp` | 286 |
 | `tests/resolve/resolution_test.cpp` | 278 |
-| `tests/completion_test.cpp` | 272 |
+| `tests/completion/completion_test.cpp` | 272 |
 | `tests/schema_enforcer_test.cpp` | 272 |
 | `tests/token_resolution_test.cpp` | 245 |
 | `tests/discovery_test.cpp` | 240 |
