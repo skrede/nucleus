@@ -80,6 +80,7 @@ include(schema/tests.cmake)
 include(emit/tests.cmake)
 include(keyspace/tests.cmake)
 include(identity/tests.cmake)
+include(compile_refusal/tests.cmake)
 
 if(NUCLEUS_BUILD_SOURCE_XML)
     include(system/tests.cmake)
@@ -88,88 +89,6 @@ if(NUCLEUS_BUILD_SOURCE_XML)
 endif()
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/example_review_tests.cmake)
-# ---------------------------------------------------------------------------
-# Negative compile tests: registries that violate the flat-ownership invariant
-# must NOT compile. WILL_FAIL asserts the build of each fixture fails, making the
-# invariant executable rather than review-only. Two distinct vectors are covered:
-#   - a sibling REFERENCE member (breaks default-construction);
-#   - a default-constructible registry that still exposes a constructor taking a
-#     sibling by pointer (a construction-time hand-off the strengthened pin
-#     rejects even though the plain concept would pass it).
-# ---------------------------------------------------------------------------
-add_test(
-    NAME flat_ownership_negative_compile
-    COMMAND ${CMAKE_COMMAND} --build . --target sibling_member_fixture --config $<CONFIG>
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-)
-set_tests_properties(flat_ownership_negative_compile PROPERTIES WILL_FAIL TRUE RUN_SERIAL TRUE)
-
-add_executable(sibling_member_fixture EXCLUDE_FROM_ALL
-    isolation/sibling_member_fixture.cpp)
-target_link_libraries(sibling_member_fixture PRIVATE nucleus::nucleus)
-target_include_directories(sibling_member_fixture PRIVATE
-    ${CMAKE_SOURCE_DIR}/lib/core/src
-)
-
-add_test(
-    NAME flat_ownership_entangling_ctor_negative_compile
-    COMMAND ${CMAKE_COMMAND} --build . --target entangling_ctor_fixture --config $<CONFIG>
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-)
-set_tests_properties(flat_ownership_entangling_ctor_negative_compile PROPERTIES WILL_FAIL TRUE RUN_SERIAL TRUE)
-
-add_executable(entangling_ctor_fixture EXCLUDE_FROM_ALL
-    isolation/entangling_ctor_fixture.cpp)
-target_link_libraries(entangling_ctor_fixture PRIVATE nucleus::nucleus)
-target_include_directories(entangling_ctor_fixture PRIVATE
-    ${CMAKE_SOURCE_DIR}/lib/core/src
-)
-
-add_test(
-    NAME source_concept_unsatisfied_compile
-    COMMAND ${CMAKE_COMMAND} --build . --target source_concept_unsatisfied_fixture --config $<CONFIG>
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-)
-set_tests_properties(source_concept_unsatisfied_compile PROPERTIES WILL_FAIL TRUE RUN_SERIAL TRUE)
-
-add_executable(source_concept_unsatisfied_fixture EXCLUDE_FROM_ALL
-    isolation/source_concept_unsatisfied_fixture.cpp)
-target_link_libraries(source_concept_unsatisfied_fixture PRIVATE nucleus::nucleus)
-target_include_directories(source_concept_unsatisfied_fixture PRIVATE
-    ${CMAKE_SOURCE_DIR}/lib/core/src
-)
-
-# ---------------------------------------------------------------------------
-# Reintroduced-warning proof: a fixture that deliberately stores an unread
-# private field. Routing it through nucleus_warnings() puts it under the same
-# centralized -Werror a developer hits locally. Rather than a bare WILL_FAIL
-# (which any nonzero build exit satisfies), the compile is driven through a
-# wrapper that asserts the build both fails AND fails on the exact clang-only
-# diagnostic (-Wunused-private-field) that once slipped through non-fatally --
-# so an unrelated compile break cannot pass the test for the wrong reason.
-# Clang-gated: GCC has no such diagnostic, so there the fixture compiles clean.
-# ---------------------------------------------------------------------------
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    add_test(
-        NAME reintroduced_warning_negative_compile
-        COMMAND ${CMAKE_COMMAND}
-            -DNUCLEUS_BUILD_DIR=${CMAKE_BINARY_DIR}
-            -DNUCLEUS_TARGET=reintroduced_warning_fixture
-            -DNUCLEUS_CONFIG=$<CONFIG>
-            -DNUCLEUS_EXPECT=unused-private-field
-            -P ${CMAKE_SOURCE_DIR}/scripts/expect_warning_compile_failure.cmake
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    )
-    set_tests_properties(reintroduced_warning_negative_compile PROPERTIES RUN_SERIAL TRUE)
-
-    add_executable(reintroduced_warning_fixture EXCLUDE_FROM_ALL
-        isolation/reintroduced_warning_fixture.cpp)
-    nucleus_warnings(reintroduced_warning_fixture)
-    target_link_libraries(reintroduced_warning_fixture PRIVATE nucleus::nucleus)
-    target_include_directories(reintroduced_warning_fixture PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
-endif()
 
 # ---------------------------------------------------------------------------
 # NUCLEUS_WERROR top-level-only default: proves nucleus_IS_TOP_LEVEL-derived
