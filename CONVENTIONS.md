@@ -133,8 +133,8 @@ A comment that says what the next line already says is noise: delete it.
   - {another item if applicable}
   ```
 
-  Allowed prefixes: `Feature`, `Fix`, `Refactor`, `Docs`, `Examples`,
-  `Optimization`, `WIP`. Use `WIP` if the commit does not compile.
+  Allowed prefixes: `Feature`, `Fix`, `Refactor`, `Build`, `Docs`, `Examples`,
+  `Optimization`, `Test`, `WIP`. Use `WIP` if the commit does not compile.
   Single-item commits may omit the bullet list.
 * No issue-tracker IDs, project-management keys, or planning references in
   commits, code, comments, docs, or examples.

@@ -112,6 +112,9 @@ foreach(file IN LISTS cpp_files)
 endforeach()
 if(format_declined STREQUAL "")
     run_format_check("${format_exe}" format_files)
+    set(format_note "format verified against ${nucleus_format_package}")
+else()
+    set(format_note "FORMAT NOT VERIFIED (${format_declined})")
 endif()
 set(size_files ${format_files}
     "${source_dir}/examples/CMakeLists.txt"
@@ -169,7 +172,10 @@ if(NOT measured_count EQUAL 33 OR NOT recorded_count EQUAL 33 OR NOT "${measured
     message(FATAL_ERROR "test-file ledger differs: measured ${measured_count} rows, recorded ${recorded_count}")
 endif()
 run_checked(diff_output "git diff --check" "${git_exe}" -C "${source_dir}" diff --check)
-message(STATUS "example contracts passed: 8 focused tests, complete CTest suite, and 33 executables")
+# The success line names what actually ran. A skipped format step used to leave this
+# sentence unchanged, so a run that checked no formatting reported the same green as one
+# that did.
+message(STATUS "example contracts passed: 8 focused tests, complete CTest suite, 33 executables, and ${format_note}")
 if(NOT format_declined STREQUAL "")
     message(WARNING "the format step above was not verified: ${format_declined}")
 endif()

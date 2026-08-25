@@ -121,6 +121,56 @@ jobs:
             -DNUCLEUS_BUILD_EXAMPLES=ON \
             -DNUCLEUS_BUILD_SOURCE_XML=OFF
 
+      # The size-gate job above proves its gate still refuses; this one had no
+      # equivalent. Four controls, because four different edits can turn the
+      # format step into a green that measured nothing: the check must reject a
+      # misformatted unit, must refuse an empty file list rather than report
+      # success having read nothing, must treat a wrong formatter version as
+      # fatal on a CI run carrying no flags at all, and must still stay advisory
+      # off CI so a contributor on another distribution keeps the other twelve
+      # steps. The third is the one that matters most -- it is what makes this
+      # job's verdict independent of any -D a later edit might drop from the step
+      # below. The controls live under a build directory name so the gate's own
+      # whole-tree listings cannot reach them.
+      - name: Assert the format gate still refuses
+        run: |
+          mkdir -p build-format-control
+          printf 'int  main( ){return 0;}\n' > build-format-control/bad.cpp
+          cat > build-format-control/refuses.cmake <<'CONTROL'
+          include(tests/cmake/pinned_formatter.cmake)
+          resolve_pinned_formatter(exe declined)
+          set(files build-format-control/bad.cpp)
+          run_format_check("${exe}" files)
+          CONTROL
+          if cmake -DNUCLEUS_GATE_AUTHORITATIVE=ON -P build-format-control/refuses.cmake; then
+            echo "the format gate accepted a misformatted unit" >&2
+            exit 1
+          fi
+          cat > build-format-control/empty.cmake <<'CONTROL'
+          include(tests/cmake/pinned_formatter.cmake)
+          resolve_pinned_formatter(exe declined)
+          set(files)
+          run_format_check("${exe}" files)
+          CONTROL
+          if cmake -DNUCLEUS_GATE_AUTHORITATIVE=ON -P build-format-control/empty.cmake; then
+            echo "the format gate reported success having been given no files" >&2
+            exit 1
+          fi
+          cat > build-format-control/pin.cmake <<'CONTROL'
+          include(tests/cmake/pinned_formatter.cmake)
+          set(nucleus_format_major 99)
+          resolve_pinned_formatter(exe declined)
+          CONTROL
+          if cmake -P build-format-control/pin.cmake; then
+            echo "a wrong formatter version was tolerated on a CI run carrying no flags" >&2
+            exit 1
+          fi
+          if ! env -u CI cmake -P build-format-control/pin.cmake; then
+            echo "the advisory path outside CI became fatal; contributors are now blocked" >&2
+            exit 1
+          fi
+          rm -rf build-format-control
+
       # Its own job rather than a CTest entry: the checker runs the complete CTest
       # suite itself, so registering it there would recurse.
       - name: Example contract gate

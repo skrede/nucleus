@@ -208,8 +208,19 @@ neutralize has to be named and asserted rather than covered by driving a shell o
 
 The three newest rows are contract tests that rename the example's entry point through the
 preprocessor so it cannot collide with the test runner's own. That rename leaves the renamed
-function defined but never declared, which a missing-prototype diagnostic refuses; the declaration
-that makes it legal is the single line that carried each of the three past the ceiling.
+function defined but never declared, which a missing-prototype diagnostic refuses. For two of the
+three, the declaration that makes it legal is the single line that carried the unit past the
+ceiling.
+
+The third, `tests/example_plugin_spaces_contract_test.cpp`, was at 199 and the declaration alone
+left it at exactly 200, needing no row. It takes one because of a second line: a blank that ends
+an `AlignConsecutiveDeclarations` run so the declaration below it is not column-padded. That blank
+is load-bearing across formatter versions rather than cosmetic. Measured on the pinned tool and on
+the newer one the development host carries, the padded form this file held before is clean under
+clang-format 18 and rejected by 22, while the form with the blank is accepted by both. A unit only
+one version will leave alone is a unit that changes under whoever saves it next, which is the
+local-and-CI divergence this register exists to keep visible. The line is the price of the file
+being stable under both, and the row is the price of the line.
 
 | `tests/inherit_chain_test.cpp` | 1118 |
 | `tests/repeated_container_test.cpp` | 815 |
