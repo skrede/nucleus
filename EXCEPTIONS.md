@@ -244,7 +244,7 @@ being stable under both, and the row is the price of the line.
 | `tests/token_resolution_test.cpp` | 245 |
 | `tests/discovery_test.cpp` | 240 |
 | `tests/keyed_selection_test.cpp` | 232 |
-| `tests/expected_test.cpp` | 227 |
+| `tests/error/expected_test.cpp` | 227 |
 | `tests/pkey_tokenizer_test.cpp` | 226 |
 | `tests/source_stack_test.cpp` | 218 |
 | `tests/system_multi_source_test.cpp` | 214 |

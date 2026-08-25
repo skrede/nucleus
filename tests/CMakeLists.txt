@@ -63,7 +63,6 @@ endfunction()
 
 set(nucleus_test_dir .)
 
-nucleus_add_test(expected_test)
 nucleus_add_test(identity_test)
 nucleus_add_test(facade_test nucleus::env)
 nucleus_add_test(facade_schema_test nucleus::runtime)
@@ -97,7 +96,6 @@ nucleus_add_test(multispace_argv_test nucleus::argv)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/emit_gap_tests.cmake)
 nucleus_add_test(flat_emit_round_trip_test nucleus::env nucleus::argv nucleus::runtime)
 nucleus_add_test(emitter_contract_test nucleus::env nucleus::argv)
-nucleus_add_test(error_code_interop_test)
 nucleus_add_test(token_lexer_test)
 nucleus_add_test(token_resolution_test)
 nucleus_add_test(named_args_test)
@@ -293,15 +291,6 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     )
     add_test(NAME xml_repeated_container_test COMMAND xml_repeated_container_test)
 
-    # Typed error model: every public failure channel must carry the errc that
-    # names its pipeline stage. Links xml + runtime to drive each path for real.
-    add_executable(error_code_test error_code_test.cpp)
-    nucleus_enable_coverage(error_code_test)
-    nucleus_warnings(error_code_test)
-    target_link_libraries(error_code_test
-        PRIVATE nucleus::nucleus nucleus::xml nucleus::runtime Catch2::Catch2WithMain)
-    add_test(NAME error_code_test COMMAND error_code_test)
-
     add_executable(integration_shape_test integration_shape_test.cpp)
     nucleus_enable_coverage(integration_shape_test)
     nucleus_warnings(integration_shape_test)
@@ -484,6 +473,7 @@ include(utility/tests.cmake)
 include(diagnostics/tests.cmake)
 include(registry/tests.cmake)
 include(env/tests.cmake)
+include(error/tests.cmake)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/example_review_tests.cmake)
 # ---------------------------------------------------------------------------
