@@ -1,0 +1,13 @@
+set(nucleus_test_dir tokenizer)
+
+nucleus_add_test(token_lexer_test)
+nucleus_add_test(token_resolution_test)
+nucleus_add_test(named_args_test)
+nucleus_add_test(token_cycle_test)
+nucleus_add_test(builder_lifecycle_test)
+nucleus_add_test(reference_resolution_test LINK nucleus::runtime)
+nucleus_add_test(reference_cycle_test LINK nucleus::runtime)
+nucleus_add_test(reference_fallback_test LINK nucleus::runtime)
+nucleus_add_test(pkey_tokenizer_test LINK nucleus::runtime)
+
+unset(nucleus_test_dir)

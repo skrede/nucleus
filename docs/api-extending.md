@@ -492,7 +492,7 @@ behavior to the built-in one.
 
 See [`examples/tokens/pkey_tokenizer.cpp`](../examples/tokens/pkey_tokenizer.cpp) for a
 live side-by-side comparison and
-[`tests/pkey_tokenizer_test.cpp`](../tests/pkey_tokenizer_test.cpp) for the
+[`tests/tokenizer/pkey_tokenizer_test.cpp`](../tests/tokenizer/pkey_tokenizer_test.cpp) for the
 full acceptance suite.
 
 ### What happens to a resolver's output

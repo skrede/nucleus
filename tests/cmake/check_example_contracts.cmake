@@ -105,7 +105,8 @@ set(cpp_files
     tests/example_argv_recognizer_contract_test.cpp tests/example_capability_gating_contract_test.cpp
     tests/example_constraint_groups_contract_test.cpp tests/example_pkey_tokenizer_contract_test.cpp
     tests/example_plugin_spaces_contract_test.cpp tests/example_query_contract_test.cpp
-    tests/example_schema_contract_test.cpp tests/example_typed_contract_test.cpp tests/pkey_tokenizer_test.cpp)
+    tests/example_schema_contract_test.cpp tests/example_typed_contract_test.cpp
+    tests/tokenizer/pkey_tokenizer_test.cpp)
 set(format_files)
 foreach(file IN LISTS cpp_files)
     list(APPEND format_files "${source_dir}/${file}")
