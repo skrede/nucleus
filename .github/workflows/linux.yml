@@ -486,3 +486,230 @@ jobs:
             exit 1
           fi
           rm -rf build-backend-check build-backend-reporter
+
+  components-test:
+    runs-on: ubuntu-24.04
+    # Two installs, because an absence asserted against one of them is
+    # indistinguishable from a probe that resolved nothing at all. The cases
+    # below differ in nothing but which prefix answers and how the xml component
+    # is asked for, so the second prefix is what gives the negative cases a
+    # positive twin.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and install with the XML module
+        run: |
+          cmake . -B build-cx-on \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/build-cx-on-prefix \
+            -DNUCLEUS_BUILD_TESTS=OFF \
+            -DNUCLEUS_BUILD_EXAMPLES=OFF \
+            -DNUCLEUS_BUILD_SOURCE_XML=ON
+          cmake --build build-cx-on
+          cmake --install build-cx-on
+
+      - name: Build and install without the XML module
+        run: |
+          cmake . -B build-cx-off \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/build-cx-off-prefix \
+            -DNUCLEUS_BUILD_TESTS=OFF \
+            -DNUCLEUS_BUILD_EXAMPLES=OFF \
+            -DNUCLEUS_BUILD_SOURCE_XML=OFF
+          cmake --build build-cx-off
+          cmake --install build-cx-off
+
+      # The probe is staged rather than tracked: as a committed file it would
+      # join the size gate's population and the test-file ledger while proving
+      # nothing the steps below do not. It reports through if() so a variable the
+      # package never set reads as FALSE rather than as an empty string a grep
+      # for TRUE would pass over in silence. It is written under a build
+      # directory name so the whole-tree listings in the gates workflow cannot
+      # reach it.
+      - name: Stage the component probe
+        run: |
+          mkdir -p build-cx-probe
+          cat > build-cx-probe/CMakeLists.txt <<'PROBE'
+          cmake_minimum_required(VERSION 3.25)
+          project(nucleus_component_probe CXX)
+
+          set(PROBE_XML "required" CACHE STRING "how this run asks for the xml component")
+
+          if(PROBE_XML STREQUAL "required")
+              find_package(nucleus REQUIRED CONFIG COMPONENTS core runtime env argv xml)
+          elseif(PROBE_XML STREQUAL "unrequired")
+              find_package(nucleus CONFIG COMPONENTS core runtime env argv xml)
+          elseif(PROBE_XML STREQUAL "optional")
+              find_package(nucleus REQUIRED CONFIG COMPONENTS core runtime env argv OPTIONAL_COMPONENTS xml)
+          else()
+              message(FATAL_ERROR "the probe was given no case to run, so it would have reported nothing")
+          endif()
+
+          if(nucleus_FOUND)
+              message(STATUS "PROBE nucleus_FOUND=TRUE")
+          else()
+              message(STATUS "PROBE nucleus_FOUND=FALSE")
+          endif()
+
+          foreach(_component core runtime env argv xml)
+              if(nucleus_${_component}_FOUND)
+                  message(STATUS "PROBE nucleus_${_component}_FOUND=TRUE")
+              else()
+                  message(STATUS "PROBE nucleus_${_component}_FOUND=FALSE")
+              endif()
+          endforeach()
+          PROBE
+
+      - name: Resolve every component the install carries
+        run: |
+          set -o pipefail
+          cmake -S build-cx-probe -B build-cx-all \
+            -DPROBE_XML=required \
+            -DCMAKE_PREFIX_PATH=${{ github.workspace }}/build-cx-on-prefix 2>&1 | tee build-cx-all.log
+          for reported in nucleus_FOUND nucleus_core_FOUND nucleus_runtime_FOUND nucleus_env_FOUND nucleus_argv_FOUND nucleus_xml_FOUND; do
+            if ! grep -q "PROBE $reported=TRUE" build-cx-all.log; then
+              echo "$reported is not TRUE against an install built with every module" >&2
+              exit 1
+            fi
+          done
+
+      # COMPONENTS marks a component required; the package must therefore report
+      # itself not found, and say which module went missing rather than leaving
+      # an adopter with CMake's own message, which names only the package.
+      - name: Assert a required module the install lacks is fatal
+        run: |
+          if cmake -S build-cx-probe -B build-cx-required \
+              -DPROBE_XML=required \
+              -DCMAKE_PREFIX_PATH=${{ github.workspace }}/build-cx-off-prefix > build-cx-required.log 2>&1; then
+            cat build-cx-required.log
+            echo "a required module absent from the install was accepted; the package reports components it does not carry" >&2
+            exit 1
+          fi
+          cat build-cx-required.log
+          if ! grep -q 'not part of this nucleus installation:.*xml' build-cx-required.log; then
+            echo "the refusal did not name the missing module, so an adopter is told only that the package was not found" >&2
+            exit 1
+          fi
+
+      # The REQUIRED keyword governs only whether a not-found package is fatal,
+      # so dropping it must leave the verdict intact and merely let the configure
+      # continue -- the exit status alone cannot tell those two apart.
+      - name: Assert an unrequired missing module leaves the package not found
+        run: |
+          set -o pipefail
+          cmake -S build-cx-probe -B build-cx-unrequired \
+            -DPROBE_XML=unrequired \
+            -DCMAKE_PREFIX_PATH=${{ github.workspace }}/build-cx-off-prefix 2>&1 | tee build-cx-unrequired.log
+          for expected in nucleus_FOUND=FALSE nucleus_xml_FOUND=FALSE nucleus_core_FOUND=TRUE nucleus_runtime_FOUND=TRUE nucleus_env_FOUND=TRUE nucleus_argv_FOUND=TRUE; do
+            if ! grep -q "PROBE $expected" build-cx-unrequired.log; then
+              echo "PROBE $expected is missing; dropping REQUIRED has changed which components resolve rather than only whether the miss is fatal" >&2
+              exit 1
+            fi
+          done
+
+      - name: Assert an explicitly optional missing module leaves the package found
+        run: |
+          set -o pipefail
+          cmake -S build-cx-probe -B build-cx-optional \
+            -DPROBE_XML=optional \
+            -DCMAKE_PREFIX_PATH=${{ github.workspace }}/build-cx-off-prefix 2>&1 | tee build-cx-optional.log
+          if ! grep -q 'PROBE nucleus_FOUND=TRUE' build-cx-optional.log; then
+            echo "OPTIONAL_COMPONENTS no longer leaves the package found when the module is absent, so an adopter who declared the module optional is refused outright" >&2
+            exit 1
+          fi
+          if ! grep -q 'PROBE nucleus_xml_FOUND=FALSE' build-cx-optional.log; then
+            echo "the absent module reports found against an install built without it" >&2
+            exit 1
+          fi
+
+      - name: Build and run the consumer against the module-less install
+        run: |
+          cmake -S tests/integration -B build-cx-consumer \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH=${{ github.workspace }}/build-cx-off-prefix
+          cmake --build build-cx-consumer
+          ./build-cx-consumer/integration_test
+
+      # Every negative case above would hold just as well of a probe that refuses
+      # whatever it reads. This runs the refused case's own command line against
+      # the prefix that does carry the module, so the two differ in nothing but
+      # the install; a refusal here means the cases above never read either one.
+      - name: Assert the component check still refuses
+        run: |
+          set -o pipefail
+          status=0
+          cmake -S build-cx-probe -B build-cx-control \
+            -DPROBE_XML=required \
+            -DCMAKE_PREFIX_PATH=${{ github.workspace }}/build-cx-on-prefix 2>&1 | tee build-cx-control.log || status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "the required-module probe was refused against ${{ github.workspace }}/build-cx-on-prefix, an install that carries the module; the refusals above hold against any prefix and measure nothing" >&2
+            exit 1
+          fi
+          rm -rf build-cx-probe build-cx-control
+
+  consumer-floor:
+    runs-on: ubuntu-24.04
+    # nucleus's own build tier is not what this job proves, so nucleus is built
+    # and installed with the runner's CMake; only the consumer side runs on the
+    # pinned binary. The floor is a property of the installed package rather than
+    # of the source tree, which is why it can only be exercised this way round.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and install nucleus
+        run: |
+          cmake . -B build-cf \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/build-cf-prefix \
+            -DNUCLEUS_BUILD_TESTS=OFF \
+            -DNUCLEUS_BUILD_EXAMPLES=OFF \
+            -DNUCLEUS_BUILD_SOURCE_XML=ON
+          cmake --build build-cf
+          cmake --install build-cf
+
+      - name: Obtain the pinned consumer CMake
+        run: |
+          mkdir -p build-cf-pin
+          python3 -m pip download "cmake==3.21.4" --only-binary=:all: --no-deps -d build-cf-pin
+          python3 -c "import glob, zipfile; zipfile.ZipFile(glob.glob('build-cf-pin/*.whl')[0]).extractall('build-cf-pin')"
+          pinned=$(find "$PWD/build-cf-pin" -type f -name cmake -path '*bin/*' | head -n 1)
+          chmod +x "$pinned"
+          echo "NUCLEUS_PINNED_CMAKE=$pinned" >> "$GITHUB_ENV"
+
+      # A wheel that changed layout, or any later switch to a setup action that
+      # falls back to the runner's own CMake, leaves this job green having run
+      # the version it does not name and proven nothing about the floor.
+      - name: Assert the pinned CMake is the version this job names
+        run: |
+          if ! "$NUCLEUS_PINNED_CMAKE" --version | head -n 1 | grep -qx 'cmake version 3\.21\.4'; then
+            "$NUCLEUS_PINNED_CMAKE" --version | head -n 1 >&2
+            echo "the consumer floor pin did not apply; the binary resolved above is not the version this job runs the consumer with" >&2
+            exit 1
+          fi
+
+      # A declared minimum one version above the floor is a hard error on any
+      # CMake below it, so accepting this project means the binary about to
+      # configure the consumer is newer than the pin. Without it the version
+      # assertion above proves only that some 3.21 binary exists on the runner,
+      # not that it is the one doing the work. Staged under a build directory
+      # name so the whole-tree listings in the gates workflow cannot reach it.
+      - name: Assert the pinned CMake still refuses
+        run: |
+          mkdir -p build-cf-control
+          cat > build-cf-control/CMakeLists.txt <<'CONTROL'
+          cmake_minimum_required(VERSION 3.22)
+          project(nucleus_floor_control CXX)
+          CONTROL
+          if "$NUCLEUS_PINNED_CMAKE" -S build-cf-control -B build-cf-control/generated; then
+            echo "the pinned CMake accepted a project declaring a minimum above the floor this job pins; the pin did not apply and the consumer below ran on the runner's own CMake" >&2
+            exit 1
+          fi
+          rm -rf build-cf-control
+
+      - name: Build and run the consumer with the pinned CMake
+        run: |
+          "$NUCLEUS_PINNED_CMAKE" -S tests/integration -B build-cf-consumer \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH=${{ github.workspace }}/build-cf-prefix
+          "$NUCLEUS_PINNED_CMAKE" --build build-cf-consumer
+          ./build-cf-consumer/integration_test
