@@ -64,7 +64,7 @@ jobs:
 
       - name: Build consumer
         run: |
-          cmake tests/integration -B build-consumer -A x64 `
+          cmake tests/consumer_surface/integration -B build-consumer -A x64 `
             -DCMAKE_PREFIX_PATH="${{ github.workspace }}/install"
           cmake --build build-consumer --config Release
 

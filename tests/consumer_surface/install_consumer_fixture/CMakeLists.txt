@@ -10,7 +10,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # target is an executable deliberately: a consumer whose own export set holds a
 # library linking nucleus hits a structurally identical export error one level up,
 # which nucleus's install gate cannot fix.
-add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../.. nucleus_build)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../.. nucleus_build)
 
 add_executable(install_consumer consumer.cpp)
 target_link_libraries(install_consumer PRIVATE nucleus::nucleus nucleus::runtime)

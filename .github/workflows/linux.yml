@@ -213,7 +213,7 @@ jobs:
 
       - name: Build consumer
         run: |
-          cmake tests/integration -B build-consumer \
+          cmake tests/consumer_surface/integration -B build-consumer \
             -DCMAKE_PREFIX_PATH=${{ github.workspace }}/install \
             -DCMAKE_BUILD_TYPE=Release \
             -DNUCLEUS_INTEGRATION_WITH_XML=ON
@@ -308,7 +308,7 @@ jobs:
       # PUGIXML_INSTALL.
       - name: Build and install the vendoring consumer
         run: |
-          cmake -S tests/install_consumer_fixture -B build-fixture \
+          cmake -S tests/consumer_surface/install_consumer_fixture -B build-fixture \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/build-fixture-prefix \
             -DCMAKE_DISABLE_FIND_PACKAGE_pugixml=ON \
@@ -341,7 +341,7 @@ jobs:
       # must stop holding.
       - name: Assert the install gate still refuses
         run: |
-          cmake -S tests/install_consumer_fixture -B build-fixture-control \
+          cmake -S tests/consumer_surface/install_consumer_fixture -B build-fixture-control \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/build-fixture-control-prefix \
             -DCMAKE_DISABLE_FIND_PACKAGE_pugixml=ON \
@@ -375,7 +375,7 @@ jobs:
 
       - name: Build and run the installed-package consumer
         run: |
-          cmake -S tests/integration -B build-backend-consumer \
+          cmake -S tests/consumer_surface/integration -B build-backend-consumer \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH=${{ github.workspace }}/build-backend-prefix \
             -DNUCLEUS_INTEGRATION_WITH_XML=ON
@@ -624,7 +624,7 @@ jobs:
 
       - name: Build and run the consumer against the module-less install
         run: |
-          cmake -S tests/integration -B build-cx-consumer \
+          cmake -S tests/consumer_surface/integration -B build-cx-consumer \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH=${{ github.workspace }}/build-cx-off-prefix
           cmake --build build-cx-consumer
@@ -708,7 +708,7 @@ jobs:
 
       - name: Build and run the consumer with the pinned CMake
         run: |
-          "$NUCLEUS_PINNED_CMAKE" -S tests/integration -B build-cf-consumer \
+          "$NUCLEUS_PINNED_CMAKE" -S tests/consumer_surface/integration -B build-cf-consumer \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH=${{ github.workspace }}/build-cf-prefix
           "$NUCLEUS_PINNED_CMAKE" --build build-cf-consumer

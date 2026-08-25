@@ -10,4 +10,4 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # shape a real consumer uses. Configure-time evaluation of nucleus's own
 # option() declarations is enough to prove nucleus_IS_TOP_LEVEL (and therefore
 # NUCLEUS_WERROR's default) resolves to OFF/FALSE here; no target is needed.
-add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../.. nucleus_build)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../.. nucleus_build)
