@@ -81,6 +81,7 @@ include(emit/tests.cmake)
 include(keyspace/tests.cmake)
 include(identity/tests.cmake)
 include(compile_refusal/tests.cmake)
+include(sanitizer_proof/tests.cmake)
 
 if(NUCLEUS_BUILD_SOURCE_XML)
     include(system/tests.cmake)
@@ -153,52 +154,6 @@ add_test(
         -DNUCLEUS_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_SOURCE_DIR}/scripts/core_purity_check.cmake
 )
-
-# ---------------------------------------------------------------------------
-# Sanitizer trip tests: built and registered ONLY when the matching sanitizer is
-# enabled. Each deliberately commits the defect its sanitizer exists to catch
-# (a heap use-after-free; an unsynchronized cross-thread write), proving the
-# instrumentation is wired and tripping; neither is part of a normal run.
-# ---------------------------------------------------------------------------
-if(NUCLEUS_BUILD_SANITIZER AND NUCLEUS_SANITIZER STREQUAL "address")
-    add_executable(asan_trip_test asan_trip_test.cpp)
-    target_link_libraries(asan_trip_test PRIVATE nucleus::nucleus)
-    add_test(NAME asan_trip_test COMMAND asan_trip_test)
-    set_tests_properties(asan_trip_test PROPERTIES
-        PASS_REGULAR_EXPRESSION "heap-use-after-free|AddressSanitizer")
-endif()
-
-if(NUCLEUS_BUILD_SANITIZER AND NUCLEUS_SANITIZER STREQUAL "thread")
-    add_executable(tsan_trip_test tsan_trip_test.cpp)
-    target_link_libraries(tsan_trip_test PRIVATE nucleus::nucleus)
-    add_test(NAME tsan_trip_test COMMAND tsan_trip_test)
-    set_tests_properties(tsan_trip_test PROPERTIES
-        PASS_REGULAR_EXPRESSION "data race|ThreadSanitizer")
-endif()
-
-# UBSan is present in BOTH the dedicated "undefined" flavor and the composed
-# "address" flavor (-fsanitize=address,undefined), so the trip test is gated to
-# both. Beyond the PASS regex (the diagnostic fired) this asserts a
-# FAIL_REGULAR_EXPRESSION on the post-overflow sentinel: because UBSan is built
-# non-recovering, the process must abort before the sentinel prints. Without
-# -fno-sanitize-recover=undefined the sentinel would print and this test would
-# fail -- that FAIL clause is what proves the vacuous-pass hole is closed.
-if(NUCLEUS_BUILD_SANITIZER AND
-   (NUCLEUS_SANITIZER STREQUAL "undefined" OR NUCLEUS_SANITIZER STREQUAL "address"))
-    add_executable(ubsan_trip_test ubsan_trip_test.cpp)
-    target_link_libraries(ubsan_trip_test PRIVATE nucleus::nucleus)
-    add_test(NAME ubsan_trip_test COMMAND ubsan_trip_test)
-    # abort_on_error=0 makes UBSan halt via _exit(non-zero) instead of a raising
-    # SIGABRT (the Darwin default): a signal death is reported by CTest as an
-    # exception that overrides PASS_REGULAR_EXPRESSION, so the regex assertions
-    # below would never be consulted. halt_on_error=1 keeps it non-recovering
-    # (belt-and-braces with the compile-time -fno-sanitize-recover=undefined),
-    # so the process still stops at the overflow and the sentinel never prints.
-    set_tests_properties(ubsan_trip_test PROPERTIES
-        ENVIRONMENT "UBSAN_OPTIONS=abort_on_error=0:halt_on_error=1:print_stacktrace=1"
-        PASS_REGULAR_EXPRESSION "runtime error:|UndefinedBehaviorSanitizer"
-        FAIL_REGULAR_EXPRESSION "unreachable-under-ubsan")
-endif()
 
 # ---------------------------------------------------------------------------
 # Public-surface gate: a generated TU includes EVERY public header and compiles
