@@ -230,7 +230,7 @@ being stable under both, and the row is the price of the line.
 | `tests/argv/source_test.cpp` | 615 |
 | `tests/typed_shape_test.cpp` | 518 |
 | `tests/repeated_element_test.cpp` | 470 |
-| `tests/integration_shape_test.cpp` | 428 |
+| `tests/system/integration_shape_test.cpp` | 428 |
 | `tests/strain_scope_policy_test.cpp` | 401 |
 | `tests/keyed_projection_test.cpp` | 338 |
 | `tests/schema_registry_test.cpp` | 333 |
@@ -248,7 +248,7 @@ being stable under both, and the row is the price of the line.
 | `tests/error/expected_test.cpp` | 227 |
 | `tests/pkey_tokenizer_test.cpp` | 226 |
 | `tests/source_stack_test.cpp` | 218 |
-| `tests/system_multi_source_test.cpp` | 214 |
+| `tests/system/multi_source_test.cpp` | 214 |
 | `tests/collection_shapes/identity_pool_scope_test.cpp` | 208 |
 | `tests/source_handle_test.cpp` | 204 |
 | `tests/instance_addressing_test.cpp` | 202 |
