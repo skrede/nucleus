@@ -72,10 +72,7 @@ nucleus_add_test(schema_enforcer_test)
 nucleus_add_test(constraint_group_test nucleus::runtime)
 nucleus_add_test(identity_group_test nucleus::runtime)
 nucleus_add_test(keyed_composition_test nucleus::runtime nucleus::argv nucleus::env)
-nucleus_add_test(keyref_test nucleus::runtime)
-nucleus_add_test(retrieval_error_test nucleus::runtime)
 if(NUCLEUS_BUILD_SOURCE_XML)
-    nucleus_add_test(retrieval_addressing_test nucleus::runtime nucleus::xml nucleus::argv)
     nucleus_add_test(strain_scope_policy_test nucleus::runtime nucleus::xml)
 endif()
 nucleus_add_test(schema_cli_bijection_test nucleus::argv)
@@ -101,12 +98,6 @@ target_compile_definitions(converter_locale_test PRIVATE
 # Catch2 exits 4 when every test skips (here: no comma-decimal locale installed);
 # tell CTest that is a skip, not a failure.
 set_tests_properties(converter_locale_test PROPERTIES SKIP_RETURN_CODE 4)
-nucleus_add_test(selector_test nucleus::runtime)
-nucleus_add_test(selector_combinator_test nucleus::runtime)
-nucleus_add_test(selector_schema_role_test nucleus::runtime)
-nucleus_add_test(selector_owner_test nucleus::runtime)
-nucleus_add_test(selector_strain_test nucleus::runtime)
-nucleus_add_test(selector_lifetime_test nucleus::runtime)
 
 # ---------------------------------------------------------------------------
 # Buffer-lifetime test: exercises the XML document source through the seam and
@@ -116,7 +107,6 @@ nucleus_add_test(selector_lifetime_test nucleus::runtime)
 # use-after-free guard real.
 # ---------------------------------------------------------------------------
 if(NUCLEUS_BUILD_SOURCE_XML)
-    nucleus_add_test(instance_addressing_test nucleus::runtime nucleus::xml nucleus::argv)
     add_executable(identity_envelope_test
         identity_envelope_test.cpp
         identity_envelope_emit_test.cpp
@@ -359,6 +349,7 @@ include(facade/tests.cmake)
 include(argv/tests.cmake)
 include(runtime/tests.cmake)
 include(config_source/tests.cmake)
+include(query/tests.cmake)
 
 if(NUCLEUS_BUILD_SOURCE_XML)
     include(system/tests.cmake)

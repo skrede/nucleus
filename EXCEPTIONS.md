@@ -235,7 +235,7 @@ being stable under both, and the row is the price of the line.
 | `tests/keyed_projection_test.cpp` | 338 |
 | `tests/schema_registry_test.cpp` | 333 |
 | `tests/completion/smoke_test.cpp` | 327 |
-| `tests/selector_test.cpp` | 315 |
+| `tests/query/selector_test.cpp` | 315 |
 | `tests/constraint_group_test.cpp` | 305 |
 | `tests/runtime/load_front_door_test.cpp` | 289 |
 | `tests/keyed_composition_test.cpp` | 286 |
@@ -251,7 +251,7 @@ being stable under both, and the row is the price of the line.
 | `tests/system/multi_source_test.cpp` | 214 |
 | `tests/collection_shapes/identity_pool_scope_test.cpp` | 208 |
 | `tests/config_source/source_handle_test.cpp` | 204 |
-| `tests/instance_addressing_test.cpp` | 202 |
+| `tests/query/instance_addressing_test.cpp` | 202 |
 | `tests/token_cycle_test.cpp` | 202 |
 | `tests/example_constraint_groups_contract_test.cpp` | 201 |
 | `tests/example_pkey_tokenizer_contract_test.cpp` | 201 |
