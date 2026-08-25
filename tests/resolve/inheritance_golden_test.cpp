@@ -1,4 +1,4 @@
-#include "golden_runner.h"
+#include "resolve/golden_runner.h"
 
 #include "support/builder_result_test_support.h"
 

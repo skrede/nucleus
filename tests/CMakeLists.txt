@@ -110,7 +110,6 @@ nucleus_add_test(token_lexer_test)
 nucleus_add_test(token_resolution_test)
 nucleus_add_test(named_args_test)
 nucleus_add_test(token_cycle_test)
-nucleus_add_test(resolution_test nucleus::env nucleus::argv nucleus::runtime)
 nucleus_add_test(diagnostics_test)
 nucleus_add_test(completion_test)
 nucleus_add_test(completion_smoke_test)
@@ -216,19 +215,6 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     target_link_libraries(xml_robustness_test
         PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
     add_test(NAME xml_robustness_test COMMAND xml_robustness_test)
-
-    # Convergence buffer-drop checkpoint: drives the full facade resolve() with an
-    # XML document source in the precedence stack, drops every buffer, then reads
-    # every value back. The single most valuable test in the project under ASan.
-    add_executable(resolve_buffer_drop_test resolve_buffer_drop_test.cpp)
-    nucleus_enable_coverage(resolve_buffer_drop_test)
-    nucleus_warnings(resolve_buffer_drop_test)
-    target_link_libraries(resolve_buffer_drop_test
-        PRIVATE nucleus::nucleus nucleus::xml nucleus::env Catch2::Catch2WithMain)
-    target_include_directories(resolve_buffer_drop_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
-    add_test(NAME resolve_buffer_drop_test COMMAND resolve_buffer_drop_test)
 
     # Keyed-projection test: the schema declares a container's primary key and the
     # XML source must render repeated instances as distinct keyed subtrees instead
@@ -398,26 +384,6 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     )
     add_test(NAME typed_shape_test COMMAND typed_shape_test)
 
-    # Inheritance golden harness: drives real fixture documents through the public
-    # load() surface and diffs the serialized resolved keyspace against
-    # pre-committed goldens derived from nucleus's own semantics. Cases are discovered
-    # by directory scan under the fixture dir, so new topology fixtures are added as
-    # data files with no source/CMake edit. Runs in the default ctest set (this
-    # XML-module block), making it the merge-blocking resolution gate.
-    add_executable(inheritance_golden_test inheritance_golden/inheritance_golden_test.cpp)
-    nucleus_enable_coverage(inheritance_golden_test)
-    nucleus_warnings(inheritance_golden_test)
-    target_link_libraries(inheritance_golden_test
-        PRIVATE nucleus::nucleus nucleus::xml Catch2::Catch2WithMain)
-    target_include_directories(inheritance_golden_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR}/inheritance_golden
-    )
-    target_compile_definitions(inheritance_golden_test PRIVATE
-        NUCLEUS_GOLDEN_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/inheritance_golden/fixtures")
-    add_test(NAME inheritance_golden_test COMMAND inheritance_golden_test)
-
     # Collection shapes: nested repetition under sibling outer instances, repeated
     # leaves inside and outside a repeated container, and layered sources over a
     # single document -- asserting both the resolved values and the provenance the
@@ -522,6 +488,8 @@ if(NUCLEUS_BUILD_SOURCE_XML)
 
 endif()
 unset(nucleus_test_dir)
+
+include(resolve/tests.cmake)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/example_review_tests.cmake)
 # ---------------------------------------------------------------------------

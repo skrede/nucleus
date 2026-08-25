@@ -238,7 +238,7 @@ being stable under both, and the row is the price of the line.
 | `tests/constraint_group_test.cpp` | 305 |
 | `tests/load_front_door_test.cpp` | 289 |
 | `tests/keyed_composition_test.cpp` | 286 |
-| `tests/resolution_test.cpp` | 278 |
+| `tests/resolve/resolution_test.cpp` | 278 |
 | `tests/completion_test.cpp` | 272 |
 | `tests/schema_enforcer_test.cpp` | 272 |
 | `tests/token_resolution_test.cpp` | 245 |
@@ -262,7 +262,7 @@ being stable under both, and the row is the price of the line.
 
 | File | Lines |
 |---|---|
-| `tests/CMakeLists.txt` | 753 |
+| `tests/CMakeLists.txt` | 721 |
 | `lib/CMakeLists.txt` | 272 |
 
 A CMake unit carries the line ceiling only. The gate measures function spans by running ctags

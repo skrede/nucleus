@@ -401,7 +401,7 @@ behavior (fixpoint recursion, inner-first nesting) is shown in
 [`examples/tokens/tokens.cpp`](../examples/tokens/tokens.cpp); the named-argument surface is
 shown in [`examples/tokens/time_tokenizer.cpp`](../examples/tokens/time_tokenizer.cpp); the
 install path is exercised in
-[`tests/resolution_test.cpp`](../tests/resolution_test.cpp).
+[`tests/resolve/resolution_test.cpp`](../tests/resolve/resolution_test.cpp).
 
 ---
 
