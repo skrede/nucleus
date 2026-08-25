@@ -104,7 +104,7 @@ auto make = [](const std::string &path) -> nucleus::source_handle {
 
 See [`examples/xml/xml.cpp`](../examples/xml/xml.cpp),
 [`examples/schema/strains.cpp`](../examples/schema/strains.cpp), and
-[`tests/inherit_chain_test.cpp`](../tests/inherit_chain_test.cpp).
+[`tests/config_source/inherit_chain_test.cpp`](../tests/config_source/inherit_chain_test.cpp).
 
 ### Well-formedness and discovery stances
 

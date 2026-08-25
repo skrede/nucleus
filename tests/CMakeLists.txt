@@ -64,13 +64,7 @@ endfunction()
 set(nucleus_test_dir .)
 
 nucleus_add_test(identity_test)
-nucleus_add_test(source_seam_test)
-nucleus_add_test(source_handle_test)
-nucleus_add_test(source_concept_test)
-nucleus_add_test(source_stack_test)
-nucleus_add_test(discovery_test)
 nucleus_add_test(key_path_test)
-nucleus_add_test(path_text_test)
 nucleus_add_test(keyspace_test)
 nucleus_add_test(config_storage_shape_test nucleus::runtime)
 nucleus_add_test(schema_registry_test)
@@ -215,16 +209,6 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     add_test(NAME pkey_identity_test COMMAND pkey_identity_test)
 
     nucleus_add_test(xml_identity_contract_test nucleus::xml)
-
-    add_executable(inherit_chain_test inherit_chain_test.cpp)
-    nucleus_enable_coverage(inherit_chain_test)
-    nucleus_warnings(inherit_chain_test)
-    target_link_libraries(inherit_chain_test
-        PRIVATE nucleus::nucleus nucleus::xml nucleus::env Catch2::Catch2WithMain)
-    target_include_directories(inherit_chain_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/lib/core/src
-    )
-    add_test(NAME inherit_chain_test COMMAND inherit_chain_test)
 
     # Location-token wiring test: two XML files in different temp directories each resolve
     # ${dir.path} to their own directory, proving per-source file-frame binding.
@@ -374,6 +358,7 @@ include(capability/tests.cmake)
 include(facade/tests.cmake)
 include(argv/tests.cmake)
 include(runtime/tests.cmake)
+include(config_source/tests.cmake)
 
 if(NUCLEUS_BUILD_SOURCE_XML)
     include(system/tests.cmake)

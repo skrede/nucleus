@@ -223,7 +223,7 @@ one version will leave alone is a unit that changes under whoever saves it next,
 local-and-CI divergence this register exists to keep visible. The line is the price of the file
 being stable under both, and the row is the price of the line.
 
-| `tests/inherit_chain_test.cpp` | 1118 |
+| `tests/config_source/inherit_chain_test.cpp` | 1118 |
 | `tests/repeated_container_test.cpp` | 815 |
 | `tests/typed_element_test.cpp` | 809 |
 | `tests/config_node/config_node_test.cpp` | 777 |
@@ -243,14 +243,14 @@ being stable under both, and the row is the price of the line.
 | `tests/completion/completion_test.cpp` | 272 |
 | `tests/schema_enforcer_test.cpp` | 272 |
 | `tests/token_resolution_test.cpp` | 245 |
-| `tests/discovery_test.cpp` | 240 |
+| `tests/config_source/discovery_test.cpp` | 240 |
 | `tests/keyed_selection_test.cpp` | 232 |
 | `tests/error/expected_test.cpp` | 227 |
 | `tests/pkey_tokenizer_test.cpp` | 226 |
-| `tests/source_stack_test.cpp` | 218 |
+| `tests/config_source/source_stack_test.cpp` | 218 |
 | `tests/system/multi_source_test.cpp` | 214 |
 | `tests/collection_shapes/identity_pool_scope_test.cpp` | 208 |
-| `tests/source_handle_test.cpp` | 204 |
+| `tests/config_source/source_handle_test.cpp` | 204 |
 | `tests/instance_addressing_test.cpp` | 202 |
 | `tests/token_cycle_test.cpp` | 202 |
 | `tests/example_constraint_groups_contract_test.cpp` | 201 |

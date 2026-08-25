@@ -339,7 +339,7 @@ upstream instance by name collision alone.
 
 The shipped XML grammar for all three (`inherit=` / `extend=` attributes) is in
 [Shipped implementations](api-implementations.md#xml_source); the chain test
-suite is [`tests/inherit_chain_test.cpp`](../tests/inherit_chain_test.cpp).
+suite is [`tests/config_source/inherit_chain_test.cpp`](../tests/config_source/inherit_chain_test.cpp).
 
 ---
 
