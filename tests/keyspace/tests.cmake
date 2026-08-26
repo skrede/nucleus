@@ -1,5 +1,3 @@
-set(nucleus_test_dir keyspace)
-
 nucleus_add_test(key_path_test)
 nucleus_add_test(keyspace_test)
 nucleus_add_test(config_storage_shape_test LINK nucleus::runtime)
@@ -82,5 +80,3 @@ endif()
 set_tests_properties(ordinal_32bit_unavailable_normal_test
     PROPERTIES SKIP_RETURN_CODE 77)
 set_tests_properties(ordinal_32bit_unavailable_strict_test PROPERTIES WILL_FAIL TRUE)
-
-unset(nucleus_test_dir)

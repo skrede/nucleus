@@ -1,5 +1,3 @@
-set(nucleus_test_dir config_source)
-
 nucleus_add_test(source_seam_test)
 nucleus_add_test(source_handle_test)
 nucleus_add_test(source_concept_test)
@@ -12,5 +10,3 @@ nucleus_add_test(path_text_test)
 if(NUCLEUS_BUILD_SOURCE_XML)
     nucleus_add_test(inherit_chain_test LINK nucleus::xml nucleus::env)
 endif()
-
-unset(nucleus_test_dir)

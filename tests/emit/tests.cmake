@@ -1,5 +1,3 @@
-set(nucleus_test_dir emit)
-
 # The ordinal-boundary and flat-record regressions assert the same emit contract as the flat-emit
 # surface and must fail with it, so they compile into that target rather than taking their own.
 nucleus_add_test(flat_emit_test
@@ -12,5 +10,3 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     # The seam proof builds all three emitters from one space, so it links all three modules.
     nucleus_add_test(seam_test LINK nucleus::xml nucleus::env nucleus::argv)
 endif()
-
-unset(nucleus_test_dir)

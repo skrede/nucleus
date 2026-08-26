@@ -19,13 +19,16 @@ else()
 endif()
 
 # include() keeps one directory scope for the whole test tree, so a source path relative to the
-# including fragment would resolve against tests/ instead. Each fragment names its own folder in
-# nucleus_test_dir and unsets it at the end, so a fragment that forgets to set it trips the fatal
-# error below rather than silently inheriting its predecessor's folder.
+# including fragment would resolve against tests/ instead. Bracketing every include is what makes
+# the folder name reliable: a fragment cannot forget to set it and cannot leave a stale one behind
+# for its successor, because neither is the fragment's job.
+macro(nucleus_test_fragment folder)
+    set(nucleus_test_dir ${folder})
+    include(${folder}/tests.cmake)
+    unset(nucleus_test_dir)
+endmacro()
+
 function(nucleus_test_sources out_var name)
-    if(NOT DEFINED nucleus_test_dir)
-        message(FATAL_ERROR "nucleus_add_test(${name}): the including fragment set no nucleus_test_dir")
-    endif()
     set(sources "")
     foreach(source IN LISTS ARGN)
         list(APPEND sources ${nucleus_test_dir}/${source})
@@ -36,16 +39,31 @@ function(nucleus_test_sources out_var name)
     set(${out_var} ${sources} PARENT_SCOPE)
 endfunction()
 
-# With no keyword present every trailing argument lands in arg_UNPARSED_ARGUMENTS, so the bare
-# form still means "link these libraries". The core's private tree and tests/ itself are on every
-# target's include path, so isolation tests can construct the registries directly and a quoted
-# include written as a path from tests/ resolves from any folder at any depth.
+# A keyword written with no values after it parses as absent, which would silently substitute the
+# single-source default for SOURCES and drop PROPERTIES altogether; a misspelled keyword parses as
+# a trailing argument and would be discarded just as quietly.
+function(nucleus_reject_bad_test_arguments name missing unparsed)
+    if(NOT DEFINED nucleus_test_dir)
+        message(FATAL_ERROR "nucleus_add_test(${name}): called outside nucleus_test_fragment()")
+    endif()
+    if(missing)
+        message(FATAL_ERROR "nucleus_add_test(${name}): keyword(s) given no value: ${missing}")
+    endif()
+    if(unparsed)
+        message(FATAL_ERROR "nucleus_add_test(${name}): unrecognized argument(s): ${unparsed}")
+    endif()
+endfunction()
+
+# The core's private tree and tests/ itself are on every target's include path, so isolation tests
+# can construct the registries directly and a quoted include written as a path from tests/ resolves
+# from any folder at any depth.
 function(nucleus_add_test name)
     cmake_parse_arguments(PARSE_ARGV 1 arg "" "" "SOURCES;LINK;INCLUDE;DEFINES;PROPERTIES")
+    nucleus_reject_bad_test_arguments(${name}
+        "${arg_KEYWORDS_MISSING_VALUES}" "${arg_UNPARSED_ARGUMENTS}")
     nucleus_test_sources(sources ${name} ${arg_SOURCES})
     add_executable(${name} ${sources})
-    target_link_libraries(${name} PRIVATE
-        nucleus::nucleus ${arg_LINK} ${arg_UNPARSED_ARGUMENTS} Catch2::Catch2WithMain)
+    target_link_libraries(${name} PRIVATE nucleus::nucleus ${arg_LINK} Catch2::Catch2WithMain)
     nucleus_enable_coverage(${name})
     nucleus_warnings(${name})
     target_include_directories(${name} PRIVATE
@@ -61,37 +79,36 @@ function(nucleus_add_test name)
     endif()
 endfunction()
 
-include(resolve/tests.cmake)
-include(utility/tests.cmake)
-include(diagnostics/tests.cmake)
-include(registry/tests.cmake)
-include(env/tests.cmake)
-include(error/tests.cmake)
-include(config_node/tests.cmake)
-include(completion/tests.cmake)
-include(capability/tests.cmake)
-include(facade/tests.cmake)
-include(argv/tests.cmake)
-include(runtime/tests.cmake)
-include(config_source/tests.cmake)
-include(query/tests.cmake)
-include(tokenizer/tests.cmake)
-include(schema/tests.cmake)
-include(emit/tests.cmake)
-include(keyspace/tests.cmake)
-include(identity/tests.cmake)
-include(compile_refusal/tests.cmake)
-include(sanitizer_proof/tests.cmake)
-include(core_purity/tests.cmake)
-include(public_surface/tests.cmake)
-include(consumer_surface/tests.cmake)
+nucleus_test_fragment(resolve)
+nucleus_test_fragment(utility)
+nucleus_test_fragment(diagnostics)
+nucleus_test_fragment(registry)
+nucleus_test_fragment(env)
+nucleus_test_fragment(error)
+nucleus_test_fragment(config_node)
+nucleus_test_fragment(completion)
+nucleus_test_fragment(capability)
+nucleus_test_fragment(facade)
+nucleus_test_fragment(argv)
+nucleus_test_fragment(runtime)
+nucleus_test_fragment(config_source)
+nucleus_test_fragment(query)
+nucleus_test_fragment(tokenizer)
+nucleus_test_fragment(schema)
+nucleus_test_fragment(emit)
+nucleus_test_fragment(keyspace)
+nucleus_test_fragment(identity)
+nucleus_test_fragment(compile_refusal)
+nucleus_test_fragment(sanitizer_proof)
+nucleus_test_fragment(core_purity)
+nucleus_test_fragment(public_surface)
+nucleus_test_fragment(consumer_surface)
 
 if(NUCLEUS_BUILD_SOURCE_XML)
-    include(system/tests.cmake)
-    include(collection_shapes/tests.cmake)
-    include(xml/tests.cmake)
+    nucleus_test_fragment(system)
+    nucleus_test_fragment(collection_shapes)
+    nucleus_test_fragment(xml)
 endif()
 
-# Last on purpose: every statement in this fragment names a target an earlier fragment
-# registered, and one of them is guarded by a target-existence test that fails silently.
-include(example_contracts/tests.cmake)
+# Last on purpose: every statement in this fragment names a target an earlier fragment registered.
+nucleus_test_fragment(example_contracts)

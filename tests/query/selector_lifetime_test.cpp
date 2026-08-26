@@ -53,7 +53,7 @@ config make_config(const config_space &space)
 //
 // The test deliberately reads through a dangling config_node after the config
 // has been destroyed, mirroring the buffer_drop pattern from
-// tests/system_stack_buffer_drop_test.cpp.
+// tests/system/stack_buffer_drop_test.cpp.
 // -------------------------------------------------------------------------
 
 // NOLINTNEXTLINE(cert-err58-cpp): expected UB — ASan trip test

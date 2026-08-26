@@ -48,11 +48,15 @@ run_checked(build_output "build" ${CMAKE_COMMAND}
     --build "${build_dir}" --config "${NUCLEUS_CONFIG}" --parallel 2)
 
 set(focused_tests "^(schema_test|recognizer_of_test|auto_gating_test|selector_combinator_test|pkey_tokenizer_test|typed_element_test|constraint_group_test|registration_policy_test)$")
+# ctest reports a filter that matched nothing as success, so a test renamed out from under the
+# regex above would leave every contract below unrun with the gate still green. --no-tests=error
+# refuses the empty match and the count assertion refuses a partial one.
 run_checked(focused_output "focused CTest" "${ctest_exe}"
     --test-dir "${build_dir}" -C "${NUCLEUS_CONFIG}"
-    -R "${focused_tests}" --output-on-failure)
+    -R "${focused_tests}" --no-tests=error --output-on-failure)
+assert_contains("${focused_output}" "tests passed out of 8" "focused CTest coverage")
 run_checked(complete_output "complete CTest" "${ctest_exe}"
-    --test-dir "${build_dir}" -C "${NUCLEUS_CONFIG}" --output-on-failure)
+    --test-dir "${build_dir}" -C "${NUCLEUS_CONFIG}" --no-tests=error --output-on-failure)
 
 set(expected_targets
     diagnostics logging quickstart argv argv_delimiter argv_recognizer cli_help completion
@@ -124,17 +128,10 @@ endif()
 set(size_files ${format_files}
     "${source_dir}/examples/CMakeLists.txt"
     "${source_dir}/tests/cmake/check_example_contracts.cmake"
-    "${source_dir}/tests/cmake/pinned_formatter.cmake")
+    "${source_dir}/tests/cmake/pinned_formatter.cmake"
+    "${source_dir}/tests/CMakeLists.txt")
 run_checked(size_output "local size gate" ${CMAKE_COMMAND}
     "-DNUCLEUS_SIZE_FILES=${size_files}" -P "${source_dir}/tests/cmake/check_local_size_growth.cmake")
-
-# The bound is one-sided on purpose: a manifest that has shrunk below the figure is the
-# outcome this ceiling wants, so only growth past it is refused.
-line_count("${source_dir}/tests/CMakeLists.txt" manifest_lines)
-if(manifest_lines GREATER 719)
-    message(FATAL_ERROR
-        "tests/CMakeLists.txt grew past its recorded ceiling: ${manifest_lines} lines, ceiling 719")
-endif()
 
 file(GLOB_RECURSE test_files RELATIVE "${source_dir}" "${source_dir}/tests/*.h" "${source_dir}/tests/*.cpp")
 set(measured_rows)

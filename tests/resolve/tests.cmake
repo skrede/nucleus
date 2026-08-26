@@ -1,6 +1,4 @@
-set(nucleus_test_dir resolve)
-
-nucleus_add_test(resolution_test nucleus::env nucleus::argv nucleus::runtime)
+nucleus_add_test(resolution_test LINK nucleus::env nucleus::argv nucleus::runtime)
 
 if(NUCLEUS_BUILD_SOURCE_XML)
     # Drives a full facade resolve with an XML document source in the precedence stack, then
@@ -16,5 +14,3 @@ if(NUCLEUS_BUILD_SOURCE_XML)
         LINK nucleus::xml
         DEFINES NUCLEUS_GOLDEN_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resolve/fixtures")
 endif()
-
-unset(nucleus_test_dir)

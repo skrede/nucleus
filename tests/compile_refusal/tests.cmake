@@ -1,5 +1,3 @@
-set(nucleus_test_dir compile_refusal)
-
 # These registries must not compile, and inverting each build's result is what makes the
 # flat-ownership invariant executable rather than review-only. Two distinct vectors are covered: a
 # sibling REFERENCE member, which breaks default construction; and a default-constructible registry
@@ -75,5 +73,3 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         ${CMAKE_SOURCE_DIR}/lib/core/src
     )
 endif()
-
-unset(nucleus_test_dir)

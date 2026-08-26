@@ -1,5 +1,3 @@
-set(nucleus_test_dir schema)
-
 nucleus_add_test(registry_test)
 nucleus_add_test(enforcer_test)
 nucleus_add_test(cli_bijection_test LINK nucleus::argv)
@@ -22,5 +20,3 @@ if(NUCLEUS_BUILD_SOURCE_XML)
     nucleus_add_test(typed_element_test LINK nucleus::xml)
     nucleus_add_test(typed_shape_test LINK nucleus::xml nucleus::env)
 endif()
-
-unset(nucleus_test_dir)

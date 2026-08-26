@@ -1,5 +1,3 @@
-set(nucleus_test_dir system)
-
 # Each registration links the real shipped modules its path exercises, so the linker verifies
 # the module boundaries instead of a test-only stand-in.
 
@@ -25,5 +23,3 @@ nucleus_add_test(system_round_trip_test
     LINK nucleus::xml nucleus::runtime nucleus::env)
 
 nucleus_add_test(integration_shape_test LINK nucleus::xml nucleus::env)
-
-unset(nucleus_test_dir)

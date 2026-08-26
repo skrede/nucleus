@@ -1,5 +1,3 @@
-set(nucleus_test_dir xml)
-
 # The character-grammar regressions assert the same emit contract as the rest of the xml surface, so
 # they compile into that target; the include entry reaches the grammar header in the private tree.
 nucleus_add_test(xml_emit_contract_test
@@ -27,5 +25,3 @@ nucleus_add_test(xml_repeated_container_test
     SOURCES repeated_container_test.cpp repeated_round_trip_test.cpp
             repeated_contract_test.cpp repeated_value_test.cpp
     LINK nucleus::xml nucleus::runtime)
-
-unset(nucleus_test_dir)

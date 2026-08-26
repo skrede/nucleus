@@ -1,5 +1,3 @@
-set(nucleus_test_dir sanitizer_proof)
-
 # Each of these deliberately commits the defect its sanitizer exists to catch -- a heap
 # use-after-free, an unsynchronized cross-thread write, a signed overflow -- so a green run proves
 # the instrumentation is wired and tripping rather than merely present. None is part of a normal
@@ -37,5 +35,3 @@ if(NUCLEUS_BUILD_SANITIZER AND
         PASS_REGULAR_EXPRESSION "runtime error:|UndefinedBehaviorSanitizer"
         FAIL_REGULAR_EXPRESSION "unreachable-under-ubsan")
 endif()
-
-unset(nucleus_test_dir)

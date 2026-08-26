@@ -1,5 +1,3 @@
-set(nucleus_test_dir collection_shapes)
-
 # The folder include entry is what lets the nineteen sources reach collection_shapes.h by its
 # bare name; the fixture documents the define points at live beside them.
 nucleus_add_test(collection_shapes_test
@@ -25,5 +23,3 @@ nucleus_add_test(collection_shapes_test
     LINK nucleus::argv nucleus::xml nucleus::runtime
     INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/collection_shapes
     DEFINES NUCLEUS_COLLECTION_SHAPES_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/collection_shapes/fixtures")
-
-unset(nucleus_test_dir)
