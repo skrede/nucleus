@@ -54,7 +54,10 @@ set(focused_tests "^(schema_test|recognizer_of_test|auto_gating_test|selector_co
 run_checked(focused_output "focused CTest" "${ctest_exe}"
     --test-dir "${build_dir}" -C "${NUCLEUS_CONFIG}"
     -R "${focused_tests}" --no-tests=error --output-on-failure)
-assert_contains("${focused_output}" "tests passed out of 8" "focused CTest coverage")
+string(REGEX MATCH "tests passed(, 0 tests failed)? out of 8\n" focused_summary "${focused_output}")
+if(focused_summary STREQUAL "")
+    message(FATAL_ERROR "focused CTest coverage did not report 8 tests:\n${focused_output}")
+endif()
 run_checked(complete_output "complete CTest" "${ctest_exe}"
     --test-dir "${build_dir}" -C "${NUCLEUS_CONFIG}" --no-tests=error --output-on-failure)
 
