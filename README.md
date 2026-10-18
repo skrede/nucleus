@@ -207,7 +207,7 @@ FetchContent_Declare(nucleus
     GIT_REPOSITORY https://github.com/skrede/nucleus.git
     # the unreleased 0.4.2 line, pinned to the commit so a moved reference cannot
     # change the build
-    GIT_TAG d840d03db0a12ef82bcd5b75f1ea303035c848c1)
+    GIT_TAG 438c7ce8435b84c6a97334ee7562fad48598ed5e)
 FetchContent_MakeAvailable(nucleus)
 ```
 
