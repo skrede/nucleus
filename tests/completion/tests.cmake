@@ -5,3 +5,5 @@ nucleus_add_test(completion_test)
 nucleus_add_test(smoke_test PROPERTIES SKIP_RETURN_CODE 4)
 
 nucleus_add_test(program_token_test)
+
+nucleus_add_test(zsh_spec_test)

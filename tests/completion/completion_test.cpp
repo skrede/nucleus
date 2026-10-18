@@ -250,7 +250,7 @@ TEST_CASE("completion wildcard entry appears in zsh script for repeated containe
     const std::string zsh = generate_completion(shell::zsh, reg, "myapp").value();
 
     REQUIRE(zsh.find("--cluster-node-endpoint-port") != std::string::npos);
-    REQUIRE(zsh.find("--cluster-node-*-endpoint-port") != std::string::npos);
+    REQUIRE(zsh.find("--cluster-node-\\*-endpoint-port") != std::string::npos);
 }
 
 TEST_CASE("completion wildcard does not appear for non-repeated schema",

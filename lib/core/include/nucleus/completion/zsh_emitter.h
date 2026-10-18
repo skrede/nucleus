@@ -4,6 +4,8 @@
 #include "nucleus/completion/shell_emitter.h"
 #include "nucleus/completion/completion_model.h"
 
+#include "nucleus/utility/escaped_text.h"
+
 #include <string>
 #include <vector>
 #include <cstddef>
@@ -51,10 +53,9 @@ private:
     // a `(...)` value group; without, it is a bare presence flag.
     static std::string spec_for(const completion_option &opt)
     {
-        const std::string flag = word(opt.flag);
         const std::string desc = brackets(opt.description);
         if(opt.values.empty())
-            return flag + "[" + desc + "]";
+            return presence_word(opt.flag) + "[" + desc + "]";
 
         std::string group;
         for(std::size_t i = 0; i < opt.values.size(); ++i)
@@ -63,7 +64,7 @@ private:
                 group.push_back(' ');
             group += word(opt.values[i]);
         }
-        return flag + "=[" + desc + "]:value:(" + group + ")";
+        return word(opt.flag) + "=[" + desc + "]:value:(" + group + ")";
     }
 
     // A description is prose, so the word list's byte allowlist cannot be reused here -- it would
@@ -72,22 +73,48 @@ private:
     // which is the field `_arguments` evaluates; everything else is inert because the whole spec
     // is a single-quoted word. A non-printable byte is substituted with its caret rendering rather
     // than passed through or dropped, so a newline cannot break the spec across the script's lines
-    // and an escape sequence cannot reach the terminal that draws the menu.
+    // and an escape sequence cannot reach the terminal that draws the menu. The bidirectional
+    // controls of CVE-2021-42574 are printable to zsh and reorder the menu's text, so they take
+    // escaped_text's rendering.
     static std::string brackets(const std::string &text)
     {
         std::string out;
-        for(char const c : text)
+        const std::string_view view = text;
+        for(std::size_t i = 0; i < view.size(); ++i)
         {
-            const auto byte = static_cast<std::uint8_t>(c);
-            if(byte < 0x20 || byte == 0x7f)
+            if(is_bidi_control(view.substr(i, 3)))
             {
-                out.push_back('^');
-                append_escaped(out, static_cast<char>(byte ^ 0x40));
+                for(char const c : escaped_text(view.substr(i, 3)))
+                    append_escaped(out, c);
+                i += 2;
             }
             else
-                append_escaped(out, c);
+                append_displayed(out, view[i]);
         }
         return out;
+    }
+
+    // U+202A-U+202E and U+2066-U+2069 in UTF-8, compared by byte because misc-misleading-bidirectional
+    // refuses a string literal that holds them.
+    static bool is_bidi_control(std::string_view bytes)
+    {
+        if(bytes.size() != 3 || static_cast<std::uint8_t>(bytes[0]) != 0xe2)
+            return false;
+        const auto second = static_cast<std::uint8_t>(bytes[1]);
+        const auto third  = static_cast<std::uint8_t>(bytes[2]);
+        return (second == 0x80 && third >= 0xaa && third <= 0xae) || (second == 0x81 && third >= 0xa6 && third <= 0xa9);
+    }
+
+    static void append_displayed(std::string &out, char c)
+    {
+        const auto byte = static_cast<std::uint8_t>(c);
+        if(byte < 0x20 || byte == 0x7f)
+        {
+            out.push_back('^');
+            append_escaped(out, static_cast<char>(byte ^ 0x40));
+        }
+        else
+            append_escaped(out, c);
     }
 
     static void append_escaped(std::string &out, char c)
@@ -103,13 +130,15 @@ private:
     // dangerous characters: a byte survives unescaped only by being in the safe set, and
     // every other byte is backslashed. That covers the spec-grammar delimiters, the
     // whitespace separating members, and the expansions zsh runs over a word once it reads
-    // it back out of the spec, without any of them having been thought of first. The safe
-    // set is the bash emitter's without `:`, which separates the fields of an `_arguments`
-    // spec. The escape is unconditional; what a registration rule refuses is not this
-    // file's business, and assuming otherwise is what left the word list a code channel.
+    // it back out of the spec, without any of them having been thought of first. Each byte
+    // in the safe set was measured inert under zsh 5.9: `_arguments` evals a value group
+    // under `extendedglob nullglob`, so `*` is filename generation and a leading `=` is
+    // EQUALS expansion, and neither is in it. The escape is unconditional; what a
+    // registration rule refuses is not this file's business, and assuming otherwise is
+    // what left the word list a code channel.
     static std::string word(const std::string &text)
     {
-        static constexpr std::string_view safe_punctuation = "-_./=+,@%*";
+        static constexpr std::string_view safe_punctuation = "-_./+,@%";
         std::string out;
         for(char const c : text)
         {
@@ -121,6 +150,16 @@ private:
                 out.push_back('\\');
             out.push_back(c);
         }
+        return out;
+    }
+
+    // A `-` or `+` ending a presence flag is spec grammar, not part of the name: `--x-[d]`
+    // declares `--x` taking an argument in the same word.
+    static std::string presence_word(const std::string &text)
+    {
+        std::string out = word(text);
+        if(out.ends_with('-') || out.ends_with('+'))
+            out.insert(out.size() - 1, 1, '\\');
         return out;
     }
 
