@@ -60,13 +60,13 @@ TEST_CASE("the generated bash script actually completes under real bash",
         REQUIRE(out.find("--logging-level") != std::string::npos);
     }
 
-    // Case 2: the COMP_WORDBREAKS value case. bash splits "--logging-level=" into
-    // the words [--logging-level][=][""], so the function must reconstruct the
-    // flag and complete the value tail.
+    // Case 2: the COMP_WORDBREAKS value case. bash 4 and later split "--logging-level="
+    // into the words [--logging-level][=], so `=` is the current word and the function
+    // must rebuild the flag from the word before it.
     {
         const std::string script = completion +
-            "\nCOMP_WORDS=(myapp --logging-level = \"\")\nCOMP_CWORD=3\n"
-            "_myapp_complete\necho \"${COMPREPLY[@]}\"\n";
+                "\nCOMP_WORDS=(myapp --logging-level =)\nCOMP_CWORD=2\n"
+                "_myapp_complete\necho \"${COMPREPLY[@]}\"\n";
         const std::string out = run_bash(script);
         REQUIRE(out.find("debug") != std::string::npos);
         REQUIRE(out.find("info") != std::string::npos);
@@ -101,8 +101,8 @@ TEST_CASE("an allowed value containing a space completes as one candidate",
         return;
 
     const std::string script = completion +
-        "\nCOMP_WORDS=(myapp --region-zone = us)\nCOMP_CWORD=3\n"
-        "_myapp_complete\nprintf '%s\\n' \"${#COMPREPLY[@]}\" \"${COMPREPLY[0]}\"\n";
+            "\nCOMP_WORDS=(myapp --region-zone = us)\nCOMP_CWORD=3\n"
+            "_myapp_complete\nprintf '%s\\n' \"${#COMPREPLY[@]}\"; eval \"printf '%s\\n' ${COMPREPLY[0]}\"\n";
     const std::string out = run_bash(script);
     REQUIRE(out == "1\nus east\n");
 }
@@ -155,12 +155,12 @@ TEST_CASE("no shell construct in a word list fires or corrupts the candidate",
         return;
 
     fs::remove(sentinel);
-    const std::string script = nucleus::bash_emitter{}.emit(model)
-        + "\nCOMP_WORDS=(myapp -)\nCOMP_CWORD=1\n_myapp_complete\n"
-          "printf '%s\\n' \"${COMPREPLY[@]}\"\n"
-          "COMP_WORDS=(myapp --v = \"\")\nCOMP_CWORD=3\n_myapp_complete\n"
-          "printf '%s\\n' \"${COMPREPLY[@]}\"\n";
-    const std::string out = run_bash(script);
+    const std::string script = nucleus::bash_emitter{}.emit(model);
+    const std::string drive  = "\nCOMP_WORDS=(myapp -)\nCOMP_CWORD=1\n_myapp_complete\n"
+                               "for c in \"${COMPREPLY[@]}\"; do eval \"printf '%s\\n' $c\"; done\n"
+                               "COMP_WORDS=(myapp --v =)\nCOMP_CWORD=2\n_myapp_complete\n"
+                               "for c in \"${COMPREPLY[@]}\"; do eval \"printf '%s\\n' $c\"; done\n";
+    const std::string out    = run_bash(script + drive);
     REQUIRE_FALSE(fs::exists(sentinel));
     for(const std::string &payload : payloads)
         expected += payload + "\n";
@@ -180,10 +180,10 @@ TEST_CASE("a directory holding the ordinal wildcard's matches cannot replace it"
     REQUIRE(reg.attach(nucleus::element("port", anchor::keyspace(path_of("node")))));
 
     const std::string out = run_seeded(
-        generate_completion(shell::bash, reg, "myapp").value(),
-        "\nCOMP_WORDS=(myapp --node)\nCOMP_CWORD=1\n_myapp_complete\n"
-        "printf '%s\\n' \"${COMPREPLY[@]}\"\n",
-        {"--node-7-port", "--node-9-port"});
+            generate_completion(shell::bash, reg, "myapp").value(),
+            "\nCOMP_WORDS=(myapp --node)\nCOMP_CWORD=1\n_myapp_complete\n"
+            "for c in \"${COMPREPLY[@]}\"; do eval \"printf '%s\\n' $c\"; done\n",
+            {"--node-7-port", "--node-9-port"});
     REQUIRE(out == "--node\n--node-port\n--node-*-port\n");
 }
 
@@ -198,10 +198,10 @@ TEST_CASE("an allowed value carrying a glob is offered literally", "[completion]
                                      {"*", "us-east"})));
 
     const std::string out = run_seeded(
-        generate_completion(shell::bash, reg, "myapp").value(),
-        "\nCOMP_WORDS=(myapp --region-zone = \"\")\nCOMP_CWORD=3\n_myapp_complete\n"
-        "printf '%s\\n' \"${COMPREPLY[@]}\"\n",
-        {"all", "any"});
+            generate_completion(shell::bash, reg, "myapp").value(),
+            "\nCOMP_WORDS=(myapp --region-zone =)\nCOMP_CWORD=2\n_myapp_complete\n"
+            "for c in \"${COMPREPLY[@]}\"; do eval \"printf '%s\\n' $c\"; done\n",
+            {"all", "any"});
     REQUIRE(out == "*\nus-east\n");
 }
 
@@ -215,9 +215,9 @@ TEST_CASE("driving the completion leaves the caller's glob setting as it found i
 
     const std::string completion = generate_completion(shell::bash, fixture(), "myapp").value();
     const std::string drive =
-        "\nbefore=$-\nCOMP_WORDS=(myapp --log)\nCOMP_CWORD=1\n_myapp_complete\n"
-        "COMP_WORDS=(myapp --logging-level = \"\")\nCOMP_CWORD=3\n_myapp_complete\n"
-        "if [ \"$-\" = \"$before\" ]; then echo kept; else echo \"$before -> $-\"; fi\n";
+            "\nbefore=$-\nCOMP_WORDS=(myapp --log)\nCOMP_CWORD=1\n_myapp_complete\n"
+            "COMP_WORDS=(myapp --logging-level =)\nCOMP_CWORD=2\n_myapp_complete\n"
+            "if [ \"$-\" = \"$before\" ]; then echo kept; else echo \"$before -> $-\"; fi\n";
     REQUIRE(run_bash("set +f\n" + completion + drive) == "kept\n");
     REQUIRE(run_bash("set -f\n" + completion + drive) == "kept\n");
 }

@@ -9,10 +9,10 @@
 
 namespace nucleus::detail {
 
-// The walker matches the typed word against an option's literal pieces, never its flag text, so a
-// `*` a delimiter carries is never a slot, and it builds the completed word from those pieces and
-// the typed digit runs alone, reporting it through the caller's `ordinal_name` with no construct
-// above bash 3.2 (no `+=`, `=~`, `local -`, `compopt` or `mapfile`).
+// The walker matches the typed word against an option's literal pieces in line form, never its flag
+// text, so a `*` a delimiter carries is never a slot, and it builds the completed word from those
+// pieces, the typed digit runs and `\*` alone, reporting it through the caller's `ordinal_name` with
+// no construct above bash 3.2 (no `+=`, `=~`, `local -`, `compopt` or `mapfile`).
 inline constexpr std::string_view bash_ordinal_walker = R"({
     local rest="$1" name="" digits filled=0
     shift
@@ -28,7 +28,7 @@ inline constexpr std::string_view bash_ordinal_walker = R"({
         if [ -n "$digits" ]; then
             name="$name$digits"; rest="${rest#"$digits"}"; filled=$((filled + 1))
         elif [ -z "$rest" ]; then
-            name="$name*"
+            name="$name\*"
         else
             return 1
         fi
@@ -43,7 +43,7 @@ inline std::string bash_ordinal_call(const std::string &ident, const std::string
 {
     std::string out = "_" + ident + "_ordinal \"" + word + "\"";
     for(const std::string &piece : ordinal_pieces(option))
-        out += " " + bash_single_quote(piece);
+        out += " " + bash_single_quote(bash_line_word(piece));
     return out;
 }
 
@@ -59,7 +59,7 @@ inline std::string bash_ordinal_functions(const std::string &ident, const comple
     return out + "}\n";
 }
 
-inline std::string bash_ordinal_dispatch(const std::string &ident, const completion_model &model)
+inline std::string bash_ordinal_dispatch(const std::string &ident, const completion_model &model, const std::string &line)
 {
     std::string out;
     for(const completion_option &option : model.options)
@@ -67,7 +67,7 @@ inline std::string bash_ordinal_dispatch(const std::string &ident, const complet
         if(option.ordinal_slots.empty() || option.values.empty())
             continue;
         out += "        if " + bash_ordinal_call(ident, "$flag", option) + " && [ \"$ordinal_name\" = \"$flag\" ]; then\n";
-        out += bash_value_reply("            ", option);
+        out += bash_value_reply("            ", option, line);
         out += "        fi\n";
     }
     return out;

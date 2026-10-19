@@ -89,18 +89,21 @@ TEST_CASE("a typed ordinal completes the repeated-container flag under real bash
     const std::vector<completion_row> rows{
             {port, "--cluster-node-2-", "--cluster-node-2-port\n"},
             {port, "--cluster-node-2", "--cluster-node-2-port\n"},
-            {port, "--cluster-node-", "--cluster-node-port\n--cluster-node-*-port\n"},
+            {port, "--cluster-node-", "--cluster-node-port\n--cluster-node-\\*-port\n"},
             {port, "--cluster-node-2x-", ""},
             {port, "--cluster-node-2-portx", ""},
-            {level, "--cluster-node-2-level = \"\"", "debug\ninfo\n"},
+            {level, "--cluster-node-2-level =", "debug\ninfo\n"},
+            {level, "--cluster-node-2-level=", "debug\ninfo\n"},
             {level, "--cluster-node-2-level = d", "debug\n"},
-            {level, "--cluster-node-level = \"\"", "debug\ninfo\n"},
-            {level, "--cluster-node-2-lev = \"\"", ""},
-            {level, "--cluster-node-x-level = \"\"", ""},
+            {level, "--cluster-node-2-level=d", "debug\n"},
+            {level, "--cluster-node-level =", "debug\ninfo\n"},
+            {level, "--cluster-node-level=", "debug\ninfo\n"},
+            {level, "--cluster-node-2-lev =", ""},
+            {level, "--cluster-node-x-level =", ""},
             {route, "--cluster-node-0-route-2-", "--cluster-node-0-route-2-port\n"},
-            {route, "--cluster-node-0-r", "--cluster-node-0-route\n--cluster-node-0-route-*-port\n"},
+            {route, "--cluster-node-0-r", "--cluster-node-0-route\n--cluster-node-0-route-\\*-port\n"},
             {anchored, "--0-", "--0-level\n--0-port\n"},
-            {anchored, "--", "--level\n--*-level\n--port\n--*-port\n"},
+            {anchored, "--", "--level\n--\\*-level\n--port\n--\\*-port\n"},
     };
     for(const completion_row &row : rows)
     {
@@ -123,7 +126,7 @@ TEST_CASE("an ordinal candidate keeps its wildcard beside files it would match",
             script(route_registry()),
             drive("--cluster-node-2-route-") + "set -- --cluster-node-2-route-*-port; echo \"$#\"\n",
             {"--cluster-node-2-route-7-port", "--cluster-node-2-route-9-port"});
-    REQUIRE(out == "--cluster-node-2-route-*-port\n2\n");
+    REQUIRE(out == "--cluster-node-2-route-\\*-port\n2\n");
 }
 
 TEST_CASE("an ordinal completion leaves the caller's glob setting as it found it",
@@ -135,7 +138,7 @@ TEST_CASE("an ordinal completion leaves the caller's glob setting as it found it
     const std::string completion = script(level_registry());
     const std::string expected   = "--cluster-node-2-level\n--cluster-node-2-port\ndebug\ninfo\nkept\n";
 
-    std::string probe = "\nbefore=$-\n" + drive("--cluster-node-2-") + drive("--cluster-node-2-level = \"\"");
+    std::string probe = "\nbefore=$-\n" + drive("--cluster-node-2-") + drive("--cluster-node-2-level =");
     probe += "if [ \"$-\" = \"$before\" ]; then echo kept; else echo \"$before -> $-\"; fi\n";
     REQUIRE(run_bash("set +f\n" + completion + probe) == expected);
     REQUIRE(run_bash("set -f\n" + completion + probe) == expected);
