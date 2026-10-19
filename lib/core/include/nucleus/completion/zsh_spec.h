@@ -99,13 +99,18 @@ inline std::string zsh_spec_tail(const completion_option &option)
     return "=" + description + ":value:(" + group + ")";
 }
 
+// A slotted option's values are offered through the walker's spec for the typed ordinal, so the
+// literal wildcard flag, which the CLI does not accept, is declared without them.
 inline std::string zsh_spec(const completion_option &option)
 {
-    const std::vector<std::string> pieces = zsh_name_pieces(option);
+    completion_option shown = option;
+    if(has_ordinal_slots(option))
+        shown.values.clear();
+    const std::vector<std::string> pieces = zsh_name_pieces(shown);
     std::string                    spec   = pieces.front();
     for(std::size_t i = 1; i < pieces.size(); ++i)
         spec += "\\*" + pieces[i];
-    return spec + zsh_spec_tail(option);
+    return spec + zsh_spec_tail(shown);
 }
 
 }

@@ -32,6 +32,10 @@ schema_registry node_registry()
     return reg;
 }
 
+const std::string max_ordinal = std::to_string(key_path::max_ordinal);
+const std::string max_digits  = std::to_string(max_ordinal.size());
+const std::string bound_check = "            [ ${#digits} -le " + max_digits + " ] && [ \"$digits\" -le " + max_ordinal + " ] || return 1\n";
+
 // The pinned bash script for a schema crossing one repeated container. A drift here is
 // intentional and must be reviewed -- it means the projection or the bash emitter changed.
 const std::string expected_bash = R"bash(# bash completion for myapp
@@ -58,7 +62,8 @@ _myapp_ordinal()
         [ $# -gt 0 ] || break
         digits="${rest%%[!0123456789]*}"
         if [ -n "$digits" ]; then
-            name="$name$digits"; rest="${rest#"$digits"}"; filled=$((filled + 1))
+)bash" + bound_check +
+        R"bash(            name="$name$digits"; rest="${rest#"$digits"}"; filled=$((filled + 1))
         elif [ -z "$rest" ]; then
             name="$name\*"
         else

@@ -35,6 +35,7 @@ struct walker_row
 const std::vector<walker_row> walker_rows{
         {{"--cluster-node-*-x-", "xm", {}, {15}}, "'[xm]' '--cluster-node-' '--cluster-node-' '-x-' '-x\\-'\n"},
         {{"--cluster-node-*-y-", "xv", {"v"}, {15}}, "'=[xv]:value:(v)' '--cluster-node-' '--cluster-node-' '-y-' '-y-'\n"},
+        {{"--cluster-node-*-level", "lvl", {"debug", "info"}, {15}}, "'=[lvl]:value:(debug info)' '--cluster-node-' '--cluster-node-' '-level' '-level'\n"},
         {{"--cluster-node-*-port", "a\xc2\x9bz", {}, {15}}, "'[a\\\\xc2\\\\x9bz]' '--cluster-node-'"},
         {{"--cluster-node-*-route-*-port", "rp", {}, {15, 23}}, "'[rp]' '--cluster-node-' '--cluster-node-' '-route-' '-route-' '-port' '-port'\n"},
         {{"--a$(x)-*-port", "d", {}, {8}}, "'[d]' '--a$(x)-' '--a\\$\\(x\\)-' '-port' '-port'\n"},
@@ -50,6 +51,10 @@ schema_registry node_registry()
                                              {"debug", "info"})));
     return reg;
 }
+
+const std::string max_ordinal = std::to_string(key_path::max_ordinal);
+const std::string max_digits  = std::to_string(max_ordinal.size());
+const std::string bound_check = "            (( ${#digits} <= " + max_digits + " )) && (( 10#$digits <= " + max_ordinal + " )) || return 1\n";
 
 // The pinned zsh script for a schema crossing one repeated container. A drift here is
 // intentional and must be reviewed -- it means the projection or the zsh emitter changed.
@@ -74,7 +79,8 @@ _myapp_ordinal()
         (( $# )) || break
         digits=${rest%%[!0123456789]*}
         if [[ -n $digits ]]; then
-            name+=$digits; rest=${rest#"$digits"}; filled+=1
+)zsh" + bound_check +
+        R"zsh(            name+=$digits; rest=${rest#"$digits"}; filled+=1
         elif [[ -z $rest ]]; then
             name+='\*'
         else
@@ -93,13 +99,12 @@ _myapp()
         '--cluster[]' \
         '--cluster-node[]' \
         '--cluster-node-level=[]:value:(debug info)' \
-        '--cluster-node-\*-level=[]:value:(debug info)' \
+        '--cluster-node-\*-level[]' \
         '--cluster-node-port[]' \
         '--cluster-node-\*-port[]'
 }
 _myapp "$@"
 )zsh";
-
 }
 
 TEST_CASE("the zsh script for a repeated container matches the golden projection byte-for-byte",
@@ -117,6 +122,23 @@ TEST_CASE("the walker receives the static spec's tail and each raw piece beside 
         {
             const std::string zsh = nucleus::zsh_emitter{}.emit({"myapp", {row.option}});
             REQUIRE(zsh.find("    _myapp_ordinal \"$ordinal_word\" " + row.arguments) != std::string::npos);
+        }
+    }
+}
+
+// A typed ordinal reaches its values through the walker's spec, so the literal wildcard flag the
+// static spec names, which the CLI does not accept, is offered no value.
+TEST_CASE("the static spec of a slotted option takes no value", "[completion][ordinal]")
+{
+    const std::vector<walker_row> rows{
+            {{"--cluster-node-*-level", "lvl", {"debug", "info"}, {15}}, "        '--cluster-node-\\*-level[lvl]'\n"},
+            {{"--cluster-node-*-y-", "xv", {"v"}, {15}}, "        '--cluster-node-\\*-y\\-[xv]'\n"},
+    };
+    for(const walker_row &row : rows)
+    {
+        DYNAMIC_SECTION(row.option.flag)
+        {
+            REQUIRE(nucleus::zsh_emitter{}.emit({"myapp", {row.option}}).ends_with(row.arguments + "}\n_myapp \"$@\"\n"));
         }
     }
 }

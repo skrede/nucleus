@@ -4,6 +4,8 @@
 #include "nucleus/completion/zsh_spec.h"
 #include "nucleus/completion/completion_model.h"
 
+#include "nucleus/keyspace/key_path.h"
+
 #include <string>
 #include <vector>
 #include <cstddef>
@@ -11,11 +13,7 @@
 
 namespace nucleus::detail {
 
-// `_arguments` matches option names literally, so the walker builds a spec for the word being
-// completed: each raw piece is only compared with the typed word, as a quoted pattern, and the
-// spec is the escaped pieces, the typed digit runs (`\*` for a slot not yet reached) and the static
-// spec's own tail.
-inline constexpr std::string_view zsh_ordinal_walker = R"({
+inline constexpr std::string_view zsh_walker_head = R"({
     local rest=$1 tail=$2 name= digits
     local -i filled=0
     shift 2
@@ -32,7 +30,9 @@ inline constexpr std::string_view zsh_ordinal_walker = R"({
         (( $# )) || break
         digits=${rest%%[!0123456789]*}
         if [[ -n $digits ]]; then
-            name+=$digits; rest=${rest#"$digits"}; filled+=1
+)";
+
+inline constexpr std::string_view zsh_walker_tail = R"(            name+=$digits; rest=${rest#"$digits"}; filled+=1
         elif [[ -z $rest ]]; then
             name+='\*'
         else
@@ -43,9 +43,21 @@ inline constexpr std::string_view zsh_ordinal_walker = R"({
 }
 )";
 
+// `_arguments` matches option names literally, so the walker builds a spec for the word being
+// completed: each raw piece is only compared with the typed word, as a quoted pattern, and the
+// spec is the escaped pieces, the typed digit runs (`\*` for a slot not yet reached) and the static
+// spec's own tail. A digit run fills a slot only inside the CLI's ordinal domain, read in base 10
+// whatever `octalzeroes` says, so the walker accepts exactly the flags the CLI does.
+inline std::string zsh_ordinal_walker()
+{
+    const std::string bound = std::to_string(key_path::max_ordinal);
+    const std::string check = "(( ${#digits} <= " + std::to_string(bound.size()) + " )) && (( 10#$digits <= " + bound + " ))";
+    return std::string(zsh_walker_head) + "            " + check + " || return 1\n" + std::string(zsh_walker_tail);
+}
+
 inline std::string zsh_ordinal_function(const std::string &ident)
 {
-    return "_" + ident + "_ordinal()\n" + std::string(zsh_ordinal_walker);
+    return "_" + ident + "_ordinal()\n" + zsh_ordinal_walker();
 }
 
 inline std::string zsh_ordinal_call(const std::string &ident, const completion_option &option)
@@ -64,7 +76,7 @@ inline std::string zsh_ordinal_calls(const std::string &ident, const completion_
     std::string out = "    local -a ordinal_specs\n    local ordinal_word=${PREFIX%%=*}\n";
     for(const completion_option &option : model.options)
     {
-        if(!option.ordinal_slots.empty())
+        if(has_ordinal_slots(option))
             out += zsh_ordinal_call(ident, option);
     }
     return out;
