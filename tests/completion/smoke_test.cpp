@@ -1,3 +1,5 @@
+#include "completion/bash_test_support.h"
+
 #include "nucleus/completion/zsh_emitter.h"
 #include "nucleus/completion/bash_emitter.h"
 #include "nucleus/completion/completion_generator.h"
@@ -10,27 +12,18 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <array>
-#include <vector>
-#include <cstdio>
 #include <string>
-#include <cstdlib>
-#include <fstream>
+#include <vector>
 #include <filesystem>
 
-using nucleus::shell;
 using nucleus::anchor;
+using nucleus::generate_completion;
 using nucleus::key_path;
 using nucleus::schema_registry;
-using nucleus::generate_completion;
-
-// MSVC spells the POSIX popen/pclose pair with leading underscores; map them so
-// the harness compiles everywhere even though the test only RUNS where the
-// bash_available() probe below says so.
-#ifdef _MSC_VER
-    #define popen _popen
-    #define pclose _pclose
-#endif
+using nucleus::shell;
+using nucleus::bash_test::bash_available;
+using nucleus::bash_test::run_bash;
+using nucleus::bash_test::run_seeded;
 
 namespace {
 
@@ -44,44 +37,6 @@ schema_registry fixture()
                                      {"debug", "info", "warn", "error"})));
     return reg;
 }
-
-// Whether a real bash interpreter is on PATH. The smoke test only runs when one
-// is; on a box without bash it skips cleanly rather than failing. Windows skips
-// deterministically: a Git-Bash may well be installed, but handing it a native
-// temp-file path crosses an unverified path-translation boundary -- the bash
-// completion contract this smoke test exercises is a POSIX one.
-bool bash_available()
-{
-#ifdef _WIN32
-    return false;
-#else
-    return std::system("bash -c \"exit 0\" >/dev/null 2>&1") == 0;
-#endif
-}
-
-// Runs a bash script and returns its stdout. The script is written to a temp file
-// and executed; the harness captures the single line of output via popen.
-std::string run_bash(const std::string &script)
-{
-    namespace fs = std::filesystem;
-    const fs::path file = fs::temp_directory_path() / "nucleus_completion_smoke.sh";
-    {
-        std::ofstream out(file);
-        out << script;
-    }
-    const std::string cmd = "bash " + file.string() + " 2>/dev/null";
-    std::string captured;
-    if(FILE *pipe = popen(cmd.c_str(), "r"))
-    {
-        std::array<char, 256> buf{};
-        while(std::fgets(buf.data(), static_cast<int>(buf.size()), pipe))
-            captured += buf.data();
-        pclose(pipe);
-    }
-    fs::remove(file);
-    return captured;
-}
-
 }
 
 TEST_CASE("the generated bash script actually completes under real bash",
@@ -210,26 +165,6 @@ TEST_CASE("no shell construct in a word list fires or corrupts the candidate",
     for(const std::string &payload : payloads)
         expected += payload + "\n";
     REQUIRE(out == expected);
-}
-
-namespace {
-
-// Drives the generated completer with the working directory set to a scratch tree holding
-// `decoys`, so a candidate the shell would glob has something in reach to be replaced by.
-std::string run_seeded(const std::string &completion, const std::string &drive,
-                       const std::vector<std::string> &decoys)
-{
-    namespace fs = std::filesystem;
-    const fs::path dir = fs::temp_directory_path() / "nucleus_completion_glob";
-    fs::remove_all(dir);
-    fs::create_directories(dir);
-    for(const std::string &decoy : decoys)
-        std::ofstream(dir / decoy);
-    const std::string out = run_bash("cd '" + dir.string() + "' || exit 1\n" + completion + drive);
-    fs::remove_all(dir);
-    return out;
-}
-
 }
 
 // The ordinal wildcard needs no host cooperation to be glob-expanded: it is the emitter's own

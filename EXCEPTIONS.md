@@ -210,7 +210,8 @@ emitted text was correct and the shell rewrote it one stage later — so a short
 one that proves nothing, and compressing a case means dropping the seeding that is the case.
 The zsh case is long because it is an enumeration: no zsh runs on the machine that wrote it, so
 each construct it claims to neutralize has to be named and asserted rather than covered by
-driving a shell once.
+driving a shell once. `tests/completion/smoke_test.cpp` has since given its shell-driving helpers
+to a support header shared with the ordinal completion test, and fell to 262.
 
 The three newest rows are contract tests that rename the example's entry point through the
 preprocessor so it cannot collide with the test runner's own. That rename leaves the renamed
@@ -239,7 +240,6 @@ is the price of the file being stable under both, and the row is the price of th
 | `tests/keyspace/strain_scope_policy_test.cpp` | 401 |
 | `tests/xml/keyed_projection_test.cpp` | 338 |
 | `tests/schema/registry_test.cpp` | 333 |
-| `tests/completion/smoke_test.cpp` | 327 |
 | `tests/query/selector_test.cpp` | 315 |
 | `tests/schema/constraint_group_test.cpp` | 305 |
 | `tests/runtime/load_front_door_test.cpp` | 289 |
@@ -247,6 +247,7 @@ is the price of the file being stable under both, and the row is the price of th
 | `tests/resolve/resolution_test.cpp` | 278 |
 | `tests/completion/completion_test.cpp` | 272 |
 | `tests/schema/enforcer_test.cpp` | 272 |
+| `tests/completion/smoke_test.cpp` | 262 |
 | `tests/tokenizer/token_resolution_test.cpp` | 245 |
 | `tests/config_source/discovery_test.cpp` | 240 |
 | `tests/xml/keyed_selection_test.cpp` | 232 |

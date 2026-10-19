@@ -9,3 +9,7 @@ nucleus_add_test(program_token_test)
 nucleus_add_test(zsh_spec_test)
 
 nucleus_add_test(completion_projection_test)
+
+nucleus_add_test(bash_ordinal_test)
+
+nucleus_add_test(bash_ordinal_smoke_test PROPERTIES SKIP_RETURN_CODE 4)
