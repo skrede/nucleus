@@ -83,7 +83,8 @@ error rather than a silent first-match win.
 Adding a row is therefore the only way past a ceiling, which is to say it is also a bypass. It is
 accepted as one because it cannot be done quietly: the row is a diff a reviewer reads, arguing for
 the exception in the same change that takes it. Growing past a figure already recorded needs the
-row edited, which is the same diff again.
+row edited, which is the same diff again. The same diff is the only check on a figure raised above
+what its unit measures: the gate reports that slack but does not refuse it, an accepted risk.
 
 The measurements below were taken with Universal Ctags 6.2.1 and jq 1.8.2 at the head of the
 current working branch.
