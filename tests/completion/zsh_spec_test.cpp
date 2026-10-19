@@ -73,6 +73,20 @@ TEST_CASE("every bidirectional control in a zsh description is rendered, not pas
     REQUIRE(emitted("--f", "safe\xe2\x80\xaexes", {}).find("[safe\\\\xe2\\\\x80\\\\xaexes]") != std::string::npos);
 }
 
+TEST_CASE("every implicit bidirectional mark in a zsh description is rendered, not passed", "[completion]")
+{
+    const std::vector<std::pair<std::string, std::string>> marks{{"\xd8\x9c", R"([a\\xd8\\x9cz])"},
+                                                                 {"\xe2\x80\x8e", R"([a\\xe2\\x80\\x8ez])"},
+                                                                 {"\xe2\x80\x8f", R"([a\\xe2\\x80\\x8fz])"}};
+    for(const auto &[mark, rendered] : marks)
+    {
+        const std::string spec = emitted("--f", "a" + mark + "z", {});
+        CAPTURE(spec);
+        REQUIRE(spec.find(rendered) != std::string::npos);
+        REQUIRE(spec.find(mark) == std::string::npos);
+    }
+}
+
 TEST_CASE("non-ASCII prose that is no bidi control survives a zsh description", "[completion]")
 {
     const std::vector<std::string> prose{"caf\xc3\xa9 \xe2\x80\xa9", "\xe2\x9b\x80", "\xf0\x9f\x98\x80", "a\xc2\xa0z"};

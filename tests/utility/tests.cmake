@@ -2,3 +2,4 @@ nucleus_add_test(version_test
     DEFINES NUCLEUS_CMAKE_PROJECT_VERSION="${nucleus_VERSION}")
 nucleus_add_test(type_info_test)
 nucleus_add_test(escaped_text_test)
+nucleus_add_test(display_controls_test)
