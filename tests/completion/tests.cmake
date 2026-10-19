@@ -13,3 +13,5 @@ nucleus_add_test(completion_projection_test)
 nucleus_add_test(bash_ordinal_test)
 
 nucleus_add_test(bash_ordinal_smoke_test PROPERTIES SKIP_RETURN_CODE 4)
+
+nucleus_add_test(zsh_ordinal_test)
