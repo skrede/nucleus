@@ -50,7 +50,9 @@ size-gate-base-*
 # Agent and planning state (never committed to the code repository)
 .claude/
 .gemini/
+.gsd/
 .planning/
+AGENTS.md
 CLAUDE.md
 GEMINI.md
 
