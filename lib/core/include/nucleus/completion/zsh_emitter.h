@@ -2,9 +2,8 @@
 #define HPP_GUARD_NUCLEUS_COMPLETION_ZSH_EMITTER_H
 
 #include "nucleus/completion/shell_emitter.h"
+#include "nucleus/completion/zsh_description.h"
 #include "nucleus/completion/completion_model.h"
-
-#include "nucleus/utility/escaped_text.h"
 
 #include <string>
 #include <vector>
@@ -23,8 +22,8 @@ namespace nucleus {
 // zsh parses `--flag=` natively and drives the value menu from the `(...)` group,
 // so there is no COMP_WORDBREAKS handling here at all -- that whole class of bash
 // edge case simply does not exist in this dialect. The flags WITHOUT a value set
-// emit a bare `'--flag[desc]'` spec. All zsh-spec quoting (escaping `:`, `[`, `]`,
-// `(`, `)` and the single-quote that wraps each spec) is confined to this file.
+// emit a bare `'--flag[desc]'` spec. The word escape and the single quote that wraps
+// each spec are applied here; a description is rendered by zsh_description.h.
 class zsh_emitter final : public shell_emitter
 {
 public:
@@ -53,7 +52,7 @@ private:
     // a `(...)` value group; without, it is a bare presence flag.
     static std::string spec_for(const completion_option &opt)
     {
-        const std::string desc = brackets(opt.description);
+        const std::string desc = detail::zsh_description(opt.description);
         if(opt.values.empty())
             return presence_word(opt.flag) + "[" + desc + "]";
 
@@ -65,64 +64,6 @@ private:
             group += word(opt.values[i]);
         }
         return word(opt.flag) + "=[" + desc + "]:value:(" + group + ")";
-    }
-
-    // A description is prose, so the word list's byte allowlist cannot be reused here -- it would
-    // backslash every space. `\ [ ] :` are what an `_arguments` spec reads as structure around a
-    // description, and an unescaped `]` is the only route out of one and into the spec's action,
-    // which is the field `_arguments` evaluates; everything else is inert because the whole spec
-    // is a single-quoted word. A non-printable byte is substituted with its caret rendering rather
-    // than passed through or dropped, so a newline cannot break the spec across the script's lines
-    // and an escape sequence cannot reach the terminal that draws the menu. The bidirectional
-    // controls of CVE-2021-42574 are printable to zsh and reorder the menu's text, so they take
-    // escaped_text's rendering.
-    static std::string brackets(const std::string &text)
-    {
-        std::string out;
-        const std::string_view view = text;
-        for(std::size_t i = 0; i < view.size(); ++i)
-        {
-            if(is_bidi_control(view.substr(i, 3)))
-            {
-                for(char const c : escaped_text(view.substr(i, 3)))
-                    append_escaped(out, c);
-                i += 2;
-            }
-            else
-                append_displayed(out, view[i]);
-        }
-        return out;
-    }
-
-    // U+202A-U+202E and U+2066-U+2069 in UTF-8, compared by byte because misc-misleading-bidirectional
-    // refuses a string literal that holds them.
-    static bool is_bidi_control(std::string_view bytes)
-    {
-        if(bytes.size() != 3 || static_cast<std::uint8_t>(bytes[0]) != 0xe2)
-            return false;
-        const auto second = static_cast<std::uint8_t>(bytes[1]);
-        const auto third  = static_cast<std::uint8_t>(bytes[2]);
-        return (second == 0x80 && third >= 0xaa && third <= 0xae) || (second == 0x81 && third >= 0xa6 && third <= 0xa9);
-    }
-
-    static void append_displayed(std::string &out, char c)
-    {
-        const auto byte = static_cast<std::uint8_t>(c);
-        if(byte < 0x20 || byte == 0x7f)
-        {
-            out.push_back('^');
-            append_escaped(out, static_cast<char>(byte ^ 0x40));
-        }
-        else
-            append_escaped(out, c);
-    }
-
-    static void append_escaped(std::string &out, char c)
-    {
-        static constexpr std::string_view structural = "\\[]:";
-        if(structural.find(c) != std::string_view::npos)
-            out.push_back('\\');
-        out.push_back(c);
     }
 
     // Every string the spec carries as a WORD -- a flag at its head, a member of a
