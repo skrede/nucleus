@@ -1,5 +1,8 @@
 #include "nucleus/completion/completion_model.h"
+#include "nucleus/completion/completion_generator.h"
 #include "nucleus/completion/completion_projection.h"
+
+#include "nucleus/error.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -14,6 +17,7 @@
 #include <vector>
 #include <cstddef>
 #include <algorithm>
+#include <string_view>
 
 using nucleus::anchor;
 using nucleus::completion_model;
@@ -70,13 +74,13 @@ schema_registry plain_registry()
     return reg;
 }
 
-key_path optional_path(const char *text) { return *text ? path_of(text) : key_path{}; }
+key_path optional_path(std::string_view text) { return text.empty() ? key_path{} : key_path::parse(text).value(); }
 
 struct ordinal_row
 {
-    const char              *anchor;
-    const char              *space;
-    const char              *delimiter;
+    std::string_view         anchor_text;
+    std::string_view         space;
+    std::string_view         delimiter;
     std::string              flag;
     std::vector<std::size_t> slots;
     std::vector<std::string> pieces;
@@ -98,7 +102,7 @@ void check_rows(const schema_registry &reg, const std::vector<ordinal_row> &rows
             const auto delimiter = nucleus::cli_delimiter::parse(row.delimiter);
             REQUIRE(delimiter.has_value());
             const completion_model model = nucleus::detail::completion_projection(
-                    reg, "myapp", *delimiter, optional_path(row.anchor), optional_path(row.space));
+                    reg, "myapp", *delimiter, optional_path(row.anchor_text), optional_path(row.space));
             const completion_option ordinal = option_named(model, row.flag);
             REQUIRE(ordinal.ordinal_slots == row.slots);
             REQUIRE(nucleus::ordinal_pieces(ordinal) == row.pieces);
@@ -163,4 +167,32 @@ TEST_CASE("an anchor below the only crossing projects no ordinal option", "[comp
     const completion_model model = nucleus::detail::completion_projection(
             single_crossing_registry(), "myapp", {}, path_of("cluster/node/endpoint"), {});
     REQUIRE_FALSE(nucleus::has_ordinal_options(model));
+}
+
+TEST_CASE("a concrete repeated anchor completes its subtree with the fixed ordinal removed", "[completion][projection]")
+{
+    const schema_registry  reg   = cluster_node_registry();
+    const completion_model model = nucleus::detail::completion_projection(reg, "myapp", {}, path_of("cluster/node[1]"), {});
+    REQUIRE(model.options.size() == 1);
+    REQUIRE(model.options.front().flag == "--port");
+    REQUIRE_FALSE(nucleus::has_ordinal_options(model));
+
+    const auto script = nucleus::generate_completion(nucleus::shell::bash, reg, "myapp", {}, path_of("cluster/node[1]"));
+    REQUIRE(script.has_value());
+    REQUIRE(script->find("local flags='--port'") != std::string::npos);
+}
+
+TEST_CASE("a concrete anchor keeps the slot of every further crossing", "[completion][projection]")
+{
+    check_rows(nested_registry(),
+               {{"cluster/node[1]", "", "-", "--route-*-port", {8}, {"--route-", "-port"}},
+                {"cluster/node[1]/route", "", "-", "--*-port", {2}, {"--", "-port"}}});
+}
+
+TEST_CASE("an ordinal on a segment that is not a repeated container is refused", "[completion][projection]")
+{
+    const auto refused = nucleus::generate_completion(nucleus::shell::bash, plain_registry(), "myapp", {}, path_of("plexus[0]"));
+    REQUIRE_FALSE(refused.has_value());
+    REQUIRE(refused.error().code == nucleus::errc::malformed_source);
+    REQUIRE(refused.error().message.find("plexus[0]") != std::string::npos);
 }

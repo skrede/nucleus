@@ -57,6 +57,9 @@ Each line carries the flag, its description, its allowed-values list, and a
 `(required)` marker &mdash; each part appended only when present. Lines are grouped
 by the first path segment (the top-level keyspace), and the groups are emitted in a
 stable order so the text is reproducible.
+A control character in a description, an allowed value or a name, the program name
+included, is printed as an escape such as `\x1b`, so the help text cannot drive the
+terminal that shows it.
 
 Only the returned string crosses the boundary: nucleus ships no `--help`
 subcommand. The host owns how the text is surfaced &mdash; printed on `--help`,

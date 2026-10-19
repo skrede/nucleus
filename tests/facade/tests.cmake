@@ -6,3 +6,4 @@ nucleus_add_test(registration_policy_test)
 # completion folder's own test already registers, and CMake target names and CTest names are
 # each a single global namespace.
 nucleus_add_test(facade_completion_test)
+nucleus_add_test(help_text_test)
