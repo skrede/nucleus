@@ -213,9 +213,9 @@ TEST_CASE("a value containing a quote cannot break out of the bash literal",
     REQUIRE(bash.find("'a\\'\\''b'") != std::string::npos);
 }
 
-// project() emits a wildcard entry for paths that cross a repeated container.
-// The wildcard flag substitutes a '*' at the repeated-container position so the bash
-// and zsh completion scripts can complete after any typed ordinal (e.g. --cluster-node-2-).
+// A path crossing a repeated container also projects a wildcard entry carrying '*' at each
+// ordinal position; the bash and zsh scripts complete the concrete flag when an ordinal is
+// typed there (--cluster-node-2- completes --cluster-node-2-port).
 namespace {
 
 schema_registry repeated_cluster_registry()
