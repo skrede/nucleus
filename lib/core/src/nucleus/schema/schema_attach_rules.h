@@ -62,7 +62,7 @@ inline schema_attach_result check_single_primary_key(const schema_element &el,
             "schema element '{}' cannot be a primary key: '{}' is "
             "already the config space's primary key, and a "
             "space has exactly one",
-            escaped_text(el.name), existing->declared_path().str()));
+            escaped_text(el.name), escaped_text(existing->declared_path().str())));
 }
 
 inline schema_attach_result check_not_repeated_primary_key(const schema_element &el)
@@ -101,10 +101,10 @@ inline schema_attach_result check_no_repeated_ancestor(const schema_element &el,
             });
         if(ancestor != declared.end())
             return unexpected(nucleus::format(
-                "schema element '{}' is a primary key under repeated "
-                "ancestor '{}': keyed selection has no clean per-instance "
-                "meaning inside a repeated container (v1 restriction)",
-                el.name, a.str()));
+                    "schema element '{}' is a primary key under repeated "
+                    "ancestor '{}': keyed selection has no clean per-instance "
+                    "meaning inside a repeated container (v1 restriction)",
+                    escaped_text(el.name), escaped_text(a.str())));
     }
     return {};
 }
@@ -139,9 +139,9 @@ check_keyref_target_registered(const schema_element &el,
     if(known)
         return {};
     return unexpected(nucleus::format(
-        "keyref '{}' references identity namespace '{}', which is not a "
-        "registered identity group",
-        el.name, el.keyref_into));
+            "keyref '{}' references identity namespace '{}', which is not a "
+            "registered identity group",
+            escaped_text(el.name), escaped_text(el.keyref_into)));
 }
 
 // An element path may be declared once. Re-declaring it would let a later element
@@ -161,8 +161,8 @@ inline schema_attach_result check_path_not_redeclared(const schema_element &el,
     if(!duplicate)
         return {};
     return unexpected(nucleus::format(
-        "schema element '{}' re-declares already-declared path '{}'",
-        el.name, el.declared_path().str()));
+            "schema element '{}' re-declares already-declared path '{}'",
+            escaped_text(el.name), escaped_text(el.declared_path().str())));
 }
 
 }

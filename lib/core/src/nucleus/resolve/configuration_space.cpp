@@ -347,8 +347,8 @@ registration_result config_space_builder::register_identity_group(identity_group
     // reserved tree-tokenizer category or the engine's own 'nucleus' prefix) is
     // rejected so host identifiers can never shadow a builtin.
     if(is_reserved_tree_tokenizer_name(group.name) || group.name.starts_with("nucleus"))
-        return unexpected(error{errc::rejected_registration, nucleus::format(
-            "identity group namespace '{}' collides with a reserved name", group.name)});
+        return unexpected(error{errc::rejected_registration,
+                                nucleus::format("identity group namespace '{}' collides with a reserved name", escaped_text(group.name))});
     if(auto attached = m_impl->schema.attach_identity_group(std::move(group)); !attached)
         return unexpected(error{errc::rejected_registration, std::move(attached).error()});
     return registration_ok();

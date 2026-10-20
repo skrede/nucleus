@@ -28,9 +28,9 @@ inline schema_attach_result check_group_member_declared(const constraint_group &
     if(defined.contains_text(member_path))
         return {};
     return unexpected(nucleus::format(
-        "constraint group '{}' member '{}' is not a declared "
-        "element under '{}'",
-        group.name, member, container.str()));
+            "constraint group '{}' member '{}' is not a declared "
+            "element under '{}'",
+            escaped_text(group.name), escaped_text(member), escaped_text(container.str())));
 }
 
 // A member declaring a bundle stands for every path in the bundle; a bare member
@@ -41,7 +41,7 @@ inline schema_attach_result check_group_members_declared(const constraint_group 
     const key_path container = group.container();
     if(group.members.empty())
         return unexpected(nucleus::format(
-            "constraint group '{}' declares no members", group.name));
+                "constraint group '{}' declares no members", escaped_text(group.name)));
     for(const group_member &m : group.members)
     {
         const std::vector<std::string> names =
@@ -66,8 +66,8 @@ inline schema_attach_result check_constraint_group(const constraint_group &group
     const key_path container = group.container();
     if(!container.empty() && !defined.contains_node(container))
         return unexpected(nucleus::format(
-            "constraint group '{}' cannot anchor under undefined keyspace '{}'",
-            group.name, container.str()));
+                "constraint group '{}' cannot anchor under undefined keyspace '{}'",
+                escaped_text(group.name), escaped_text(container.str())));
     if(group.validator)
         return {};
     return check_group_members_declared(group, defined);
@@ -83,9 +83,9 @@ inline schema_attach_result check_identity_members_declared(const identity_group
             + m + key_path::separator + group.field;
         if(!defined.contains_text(field_path))
             return unexpected(nucleus::format(
-                "identity group '{}' member '{}' has no declared identifier "
-                "field '{}'",
-                group.name, m, group.field));
+                    "identity group '{}' member '{}' has no declared identifier "
+                    "field '{}'",
+                    escaped_text(group.name), escaped_text(m), escaped_text(group.field)));
     }
     return {};
 }
@@ -129,14 +129,14 @@ inline schema_attach_result check_identity_group(const identity_group_spec &grou
     const key_path container = group.container();
     if(!container.empty() && !defined.contains_node(container))
         return unexpected(nucleus::format(
-            "identity group '{}' cannot anchor under undefined keyspace '{}'",
-            group.name, container.str()));
+                "identity group '{}' cannot anchor under undefined keyspace '{}'",
+                escaped_text(group.name), escaped_text(container.str())));
     if(group.members.empty())
         return unexpected(nucleus::format(
-            "identity group '{}' declares no members", group.name));
+                "identity group '{}' declares no members", escaped_text(group.name)));
     if(group.field.empty())
         return unexpected(nucleus::format(
-            "identity group '{}' declares no identifier field", group.name));
+                "identity group '{}' declares no identifier field", escaped_text(group.name)));
     if(auto r = check_identity_members_distinct(group); !r)
         return r;
     return check_identity_members_declared(group, defined);

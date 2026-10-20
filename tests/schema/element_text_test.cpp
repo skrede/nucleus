@@ -1,3 +1,4 @@
+#include "support/escaped_echo_test_support.h"
 #include "support/builder_result_test_support.h"
 
 #include "nucleus/completion/completion.h"
@@ -6,44 +7,29 @@
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/schema_registry.h"
 
-#include "nucleus/keyspace/key_path.h"
-
 #include "nucleus/utility/escaped_text.h"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
 #include <vector>
-#include <cstdint>
 #include <utility>
 #include <algorithm>
 
 namespace {
 
-nucleus::anchor under(const char *text)
-{
-    auto parsed = nucleus::key_path::parse(text);
-    REQUIRE(parsed);
-    return nucleus::anchor::keyspace(parsed.value());
-}
-
-std::uint8_t byte_of(char c) { return static_cast<std::uint8_t>(c); }
-
-bool printable_ascii(const std::string &text)
-{
-    return std::ranges::all_of(text, [](char c)
-                               { return byte_of(c) >= 0x20 && byte_of(c) < 0x7f; });
-}
+using nucleus::escaped_echo_test::byte_of;
+using nucleus::escaped_echo_test::framed;
+using nucleus::escaped_echo_test::printable_ascii;
+using nucleus::escaped_echo_test::require_escaped_echo;
+using nucleus::escaped_echo_test::terminal_controls;
+using nucleus::escaped_echo_test::under;
 
 bool holds_c1_range_byte(const std::string &text)
 {
     return std::ranges::any_of(text, [](char c)
                                { return byte_of(c) >= 0x80 && byte_of(c) <= 0x9f; });
 }
-
-std::string framed(const std::string &control) { return "x" + control + "y"; }
-
-const std::vector<std::string> terminal_controls{"\x1b]0;pwn\x07", "\xe2\x80\xae"};
 
 nucleus::schema_element repeated(nucleus::schema_element el)
 {
@@ -70,13 +56,6 @@ std::string attach_refusal(nucleus::schema_element refused)
     auto                     attached = registry.attach(std::move(refused));
     REQUIRE_FALSE(attached);
     return attached.error();
-}
-
-void require_escaped_echo(const std::string &message, const char *rule, const std::string &echoed)
-{
-    REQUIRE(message.find(rule) != std::string::npos);
-    REQUIRE(message.find(nucleus::escaped_text(echoed)) != std::string::npos);
-    REQUIRE(printable_ascii(message));
 }
 
 std::string without_name(std::string script, const std::string &name)
@@ -175,7 +154,7 @@ TEST_CASE("an allowed value of spaces, shell metacharacters or prose still regis
             nucleus::enum_element("level", under("logging"), {"has space", "x;y", "*", "größe", "~root"})));
 }
 
-TEST_CASE("a refusal ahead of the name rules echoes a control-carrying name or anchor escaped", "[schema][registration]")
+TEST_CASE("a registration refusal echoes the control-carrying text it refuses escaped", "[schema][registration]")
 {
     for(const std::string &control : terminal_controls)
     {
@@ -195,5 +174,6 @@ TEST_CASE("a refusal ahead of the name rules echoes a control-carrying name or a
                              "already the config space's primary key", name);
         require_escaped_echo(refused_message({}, repeated(nucleus::identity_element(name, logging))), "both repeated and a primary key", name);
         require_escaped_echo(refused_message({}, repeated(nucleus::unique_element(name, logging))), "both repeated and unique", name);
+        require_escaped_echo(refused_message({}, nucleus::keyref_element("ref", logging, "g" + control)), "references identity namespace", "g" + control);
     }
 }
