@@ -49,7 +49,8 @@ public:
 private:
     // The completion is registered only on bash 5.0 or later, the floor the replies are built for, so an older
     // bash completes nothing. The check guards the registration rather than returning early, which holds whether
-    // the script is sourced, eval'd or executed, and it stays in syntax any bash parses.
+    // the script is sourced, eval'd or executed, and bash reaches it only if everything above it also parses on
+    // bash 3.2.
     static constexpr std::string_view registration_gate = R"(if [ "${BASH_VERSINFO[0]}" -ge 5 ]; then )";
 
     static std::string opening(const std::string &ident, const completion_model &model)
