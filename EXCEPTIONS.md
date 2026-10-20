@@ -186,11 +186,11 @@ None.
 
 ## Carried — library files over the 200-line ceiling
 
-12 of 168 units.
+12 of 169 units.
 
 | File | Lines |
 |---|---|
-| `lib/core/src/nucleus/resolve/configuration_space.cpp` | 652 |
+| `lib/core/src/nucleus/resolve/configuration_space.cpp` | 651 |
 | `lib/xml/src/nucleus/xml/xml_source.cpp` | 630 |
 | `lib/core/include/nucleus/detail/expected.h` | 543 |
 | `lib/core/include/nucleus/config.h` | 495 |
@@ -205,7 +205,7 @@ None.
 
 ## Carried — test files over the 200-line ceiling
 
-33 of 170 units. Test units are held to the same ceiling.
+33 of 171 units. Test units are held to the same ceiling.
 
 Two rows here rose to close the pathname expansion the generated bash completion performed
 over its own candidates, and one of the two rose again for the zsh description escaper.
