@@ -1,6 +1,5 @@
 #include "support/escaped_echo_test_support.h"
 
-#include "nucleus/error.h"
 #include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
@@ -17,6 +16,7 @@
 namespace {
 
 using nucleus::escaped_echo_test::framed;
+using nucleus::escaped_echo_test::registration_refusal;
 using nucleus::escaped_echo_test::require_escaped_echo;
 using nucleus::escaped_echo_test::terminal_controls;
 using nucleus::escaped_echo_test::under;
@@ -29,24 +29,17 @@ nucleus::config_space_builder logging_with_leaf()
     return engine;
 }
 
-std::string refusal_message(const nucleus::registration_result &result)
-{
-    REQUIRE_FALSE(result);
-    REQUIRE(result.error().code == nucleus::errc::rejected_registration);
-    return result.error().message;
-}
-
 std::string constraint_refusal(std::string name, nucleus::anchor at, std::vector<std::string> members)
 {
     nucleus::config_space_builder engine = logging_with_leaf();
-    return refusal_message(engine.register_constraint_group(
+    return registration_refusal(engine.register_constraint_group(
             nucleus::exclusion_group(std::move(name), std::move(at)).members(std::move(members)).at_most(1)));
 }
 
 std::string identity_refusal(std::string name, nucleus::anchor at, std::vector<std::string> members, std::string field)
 {
     nucleus::config_space_builder engine = logging_with_leaf();
-    return refusal_message(engine.register_identity_group(
+    return registration_refusal(engine.register_identity_group(
             nucleus::identity_group(std::move(name), std::move(at)).members(std::move(members)).field(std::move(field))));
 }
 

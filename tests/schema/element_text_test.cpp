@@ -194,6 +194,7 @@ TEST_CASE("a schema path is refused unless each of its segments is a well-formed
     for(const std::string &text : {nucleus::completion_result_test::script_of(space.generate_completion(nucleus::shell::bash, "mytool")), nucleus::completion_result_test::script_of(space.generate_completion(nucleus::shell::zsh, "mytool")), space.generate_help("mytool")})
     {
         REQUIRE(text.find("--logging-level") != std::string::npos);
+        REQUIRE(text.find("--log_level.2-a-b") != std::string::npos);
         REQUIRE(text.find_first_of("\x1b\xe2\x80\xae") == std::string::npos);
     }
 }
