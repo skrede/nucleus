@@ -132,23 +132,6 @@ TEST_CASE("an inserted `!` survives the history expansion of the line it is type
     }
 }
 
-TEST_CASE("the tracker reports the text a reopened quote keeps, and the trim drops it from every reply", "[completion][smoke]")
-{
-    if(!bash_available())
-        SKIP("no bash 5.0 or later on PATH");
-
-    const std::string drive = R"bash(
-show() { local typed="$1" quote kept; shift; _myapp_quote "$typed"; COMPREPLY=("$@"); _myapp_trim "$typed" "$kept"; printf '[%s]' "$quote" "$kept" "${COMPREPLY[@]}"; echo; }
-show "'it'\''s" "it'\''s" "it'\''d"
-show '"a"\!"b' 'a"\!"b' 'a"\!"c'
-show "'i" "it'\''s" "it'\''d"
-)bash";
-    REQUIRE(run_bash(shared_script() + drive) == R"(['][it'\''][s][d]
-["][a"\!"][b][c]
-['][][it'\''s][it'\''d]
-)");
-}
-
 TEST_CASE("a value shared through a reopened quote completes on the first TAB and offers nothing past the reopened quote", "[completion][smoke]")
 {
     if(!bash_available())
@@ -161,6 +144,8 @@ TEST_CASE("a value shared through a reopened quote completes on the first TAB an
     check_rows({
             {app, {"--app-mode", "=", "'it'\\''s"}, "--app-mode='it'\\''", "'", ""},
             {app, {"--app-mode", "=", "\"a\"\\!\"b"}, "--app-mode=\"a\"\\!\"", "\"", ""},
+            {app, {"--app-mode", "=", "'it'\"'\"'s"}, "--app-mode='it'\"'\"'", "'", ""},
+            {app, {"--app-mode", "=", "\"it'\"'s"}, "--app-mode=\"it'\"'", "'", ""},
     });
 }
 

@@ -104,34 +104,32 @@ TEST_CASE("every inserted bash candidate parses back to its own text", "[complet
     check_rows(rows);
 }
 
-TEST_CASE("a value typed past a word-break byte completes to its own text where bash keeps it one word", "[completion][smoke]")
+TEST_CASE("a value typed past a word-break byte is never inserted twice", "[completion][smoke]")
 {
     if(!bash_available())
         SKIP("no bash 5.0 or later on PATH");
 
-    const std::string          values = script(values_registry());
-    const std::string          breaks = script(breaks_registry());
-    const std::string          flag   = "--cluster-node-level";
-    std::vector<insertion_row> rows{
-            {values, {flag + "=co:"}, flag + "=co:", "", "<" + flag + "=co:lon>\n"},
-            {values, {flag + "=co:l"}, flag + "=co:", "", "<" + flag + "=co:lon>\n"},
-            {values, {"--cluster-node-2-level=co:"}, "--cluster-node-2-level=co:", "", "<--cluster-node-2-level=co:lon>\n"},
-            {values, {flag, "=", "'co:"}, flag + "='", "'", "<" + flag + "=co:lon>\n"},
-            {breaks, {"--app-mode=user@h"}, "--app-mode=user", "", "<--app-mode=user@host>\n"},
-    };
-    for(const auto &[typed, value] : std::vector<std::pair<std::string, std::string>>{
-                {"a#b:", "a#b:c"}, {"a\\#b:", "a#b:c"}, {"~r:", "~r:x"}, {"u^v:", "u^v:w"}, {"k=", "k=v"}})
-        rows.push_back({breaks, {"--app-mode=" + typed}, "--app-mode=" + typed, "", "<--app-mode=" + value + ">\n"});
-    const std::string plain = nucleus::bash_emitter{}.emit({"myapp", {{"--v", "d", {"co:lon", "k=v"}, {}}}});
+    const std::string values = script(values_registry());
+    const std::string breaks = script(breaks_registry());
+    const std::string flag   = "--cluster-node-level";
+    const std::string plain  = nucleus::bash_emitter{}.emit({"myapp", {{"--v", "d", {"co:lon", "k=v"}, {}}}});
     REQUIRE(plain.find("_myapp_line") == std::string::npos);
-    rows.push_back({plain, {"--v=k="}, "--v=k=", "", "<--v=k=v>\n"});
+    // bash splits the value at an unquoted break byte and nothing re-joins it, so no value is offered.
+    std::vector<insertion_row> rows{
+            {values, {flag, "=", "co", ":"}, flag + "=co", "", ""},
+            {values, {flag, "=", "co", ":", "l"}, flag + "=co:", "", ""},
+            {values, {"--cluster-node-2-level", "=", "co", ":"}, "--cluster-node-2-level=co", "", ""},
+            {values, {flag, "=", "'co:"}, flag + "='", "'", "<" + flag + "=co:lon>\n"},
+            {breaks, {"--app-mode", "=", "user", "@", "h"}, "--app-mode=user@", "", ""},
+            {breaks, {"--app-mode", "=", "k", "="}, "--app-mode=k", "", ""},
+            {plain, {"--v", "=", "k", "="}, "--v=k", "", ""},
+    };
+    for(const std::string typed : {"a#b", "a\\#b", "~r", "u^v"})
+        rows.push_back({breaks, {"--app-mode", "=", typed, ":"}, "--app-mode=" + typed, "", ""});
     check_rows(rows);
-    const std::string untrimmed = "COMP_WORDBREAKS=${COMP_WORDBREAKS//:/}\n" + insert_and_parse({flag + "=co:"}, flag + "=", "");
-    REQUIRE(run_seeded(values, untrimmed, {}) == "<" + flag + "=co:lon>\n");
-    // bash splits the value at the break byte and nothing re-joins it, so no value is offered.
-    REQUIRE(run_seeded(values, insert_and_parse({flag, "=", "co", ":"}, flag + "=co:", ""), {}).empty());
-    REQUIRE(run_seeded(breaks, insert_and_parse({"--app-mode", "=", "user", "@", "h"}, "--app-mode=user@", ""), {}).empty());
-    REQUIRE(run_seeded(breaks, insert_and_parse({"--app-mode", "=", "k", "="}, "--app-mode=k=", ""), {}).empty());
+    const std::string unbroken = "COMP_WORDBREAKS=${COMP_WORDBREAKS//:/}\n";
+    REQUIRE(run_seeded(values, unbroken + insert_and_parse({flag, "=", "co:"}, flag + "=", ""), {}) == "<" + flag + "=co:lon>\n");
+    REQUIRE(run_seeded(breaks, unbroken + insert_and_parse({"--app-mode", "=", "a#b:"}, "--app-mode=", ""), {}) == "<--app-mode=a#b:c>\n");
 }
 
 TEST_CASE("every byte but a newline round-trips through the inserted line", "[completion][smoke]")

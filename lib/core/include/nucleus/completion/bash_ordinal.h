@@ -80,7 +80,7 @@ inline std::string bash_ordinal_dispatch(const std::string &ident, const complet
         if(!has_ordinal_slots(option) || option.values.empty())
             continue;
         out += "        if " + bash_ordinal_call(ident, "$flag", option) + " && [ \"$ordinal_name\" = \"$flag\" ]; then\n";
-        out += bash_value_reply("            ", option, ident, prefix);
+        out += bash_value_reply("            ", option, prefix);
         out += "        fi\n";
     }
     return out;

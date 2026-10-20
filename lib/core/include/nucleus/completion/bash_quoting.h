@@ -1,7 +1,6 @@
 #ifndef HPP_GUARD_NUCLEUS_COMPLETION_BASH_QUOTING_H
 #define HPP_GUARD_NUCLEUS_COMPLETION_BASH_QUOTING_H
 
-#include "nucleus/completion/bash_typed_word.h"
 #include "nucleus/completion/completion_model.h"
 
 #include <string>
@@ -92,30 +91,27 @@ inline std::string bash_join_values(const std::vector<std::string> &values)
 // assignment narrows IFS to a newline for the second while restoring the default inside the
 // substitution, where compgen still needs it. That same unquoted substitution also GLOBS what
 // it produces, which nothing escaped at the emitter can reach because compgen has already
-// consumed the backslash -- so the assignment runs with globbing suppressed and puts the
-// caller's setting back. `also` runs inside the same substitution.
+// consumed the backslash -- so the assignment runs with globbing suppressed, and the `local -`
+// the completion function opens with restores the caller's setting when it returns. `also`
+// runs inside the same substitution.
 // A non-empty `prefix` names the emitted `_quote` and `_line` helpers, and each compgen match is piped through
-// `_line` with the quote the typed word leaves open.
+// `_line` with the quote the typed word leaves open, or with none when a quote byte or backslash lies right of the
+// cursor.
 inline std::string bash_reply_assignment(const std::string &pad, const std::string &words, const std::string &current,
                                          const std::string &prefix, const std::string &also)
 {
-    std::string out = pad + "local noglob=0; case $- in *f*) noglob=1 ;; esac; set -f\n";
+    std::string out = pad + "set -f\n";
     if(!prefix.empty())
-        out += pad + "local quote kept; " + prefix + "_quote \"" + current + "\"\n";
+        out += pad + "local quote; " + prefix + "_quote \"" + current + "\"\n";
     out += pad + R"(local IFS=$'\n'; COMPREPLY=( $(IFS=$' \t\n'; compgen -W )" + words + " -- \"" + current + "\"";
     out += prefix.empty() ? std::string() : " | while IFS= read -r w; do " + prefix + R"(_line "$quote" "$w"; done)";
-    out += (also.empty() ? std::string() : "; " + also) + ") )\n";
-    return out + pad + "if [ \"$noglob\" = 0 ]; then set +f; fi\n";
+    return out + (also.empty() ? std::string() : "; " + also) + ") )\n";
 }
 
-inline std::string bash_value_reply(const std::string &pad, const completion_option &option, const std::string &ident,
-                                    const std::string &prefix)
+inline std::string bash_value_reply(const std::string &pad, const completion_option &option, const std::string &prefix)
 {
     const std::string words = bash_single_quote(bash_join_values(option.values));
-    std::string       out   = bash_reply_assignment(pad, words, "$val", prefix, {});
-    if(bash_needs_trim(option))
-        out += pad + "_" + ident + "_trim \"$val\"" + (prefix.empty() ? "" : " \"$kept\"") + "\n";
-    return out + pad + "return 0\n";
+    return bash_reply_assignment(pad, words, "$val", prefix, {}) + pad + "return 0\n";
 }
 
 }
