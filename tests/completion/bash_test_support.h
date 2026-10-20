@@ -186,7 +186,6 @@ inline void check_rows(const std::vector<insertion_row> &rows)
         }
     }
 }
-
 }
 
 #endif

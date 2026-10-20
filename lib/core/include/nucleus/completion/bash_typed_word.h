@@ -32,7 +32,8 @@ inline constexpr std::string_view bash_quote_tracker = R"({
 // readline keeps the typed text through its last unescaped word-break byte (up to it for `@`, a prefix readline
 // leaves in the text it replaces) and replaces the rest, so each reply drops as many of its own unescaped break
 // bytes as the typed value holds. Counting, rather than matching text, is what lets a prefix typed in another
-// spelling still be dropped.
+// spelling still be dropped. Every strip runs element by element because bash 3.2 joins the result of a pattern
+// removal over the whole array into one word under the reply's newline IFS.
 inline constexpr std::string_view bash_trim_body = R"({
     local i=${#COMPREPLY[@]} k=0 rest="$1" c r n
     if [ -n "$2" ]; then

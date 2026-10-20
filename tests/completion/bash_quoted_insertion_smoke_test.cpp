@@ -76,7 +76,6 @@ std::string raw_replies(const std::vector<std::string> &words)
         out += " " + shell_quoted(word);
     return out + ")\nCOMP_CWORD=$((${#COMP_WORDS[@]} - 1))\n_myapp_complete\nprintf '[%s]' \"${COMPREPLY[@]}\"\necho\n";
 }
-
 }
 
 TEST_CASE("a value typed after an opening quote inserts as its own text", "[completion][smoke]")

@@ -65,7 +65,6 @@ schema_registry values_registry()
                                              {"has space", "x;y", "in$(touch${IFS}PWN_VAL)fo", "*", "~root", "co:lon"})));
     return reg;
 }
-
 }
 
 TEST_CASE("every inserted bash candidate parses back to its own text", "[completion][smoke]")
