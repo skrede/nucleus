@@ -64,7 +64,7 @@ tracked() { _myapp_quote "${COMP_WORDS[COMP_CWORD]}"; printf '[%s]\n' "$quote"; 
 TEST_CASE("a value typed inside a closed quote completes in the spelling of no open quote", "[completion][smoke]")
 {
     if(!bash_available())
-        SKIP("bash not found on PATH -- driving the generated script needs it");
+        SKIP("no bash 5.0 or later on PATH");
 
     const std::string app  = hostile_script();
     const std::string semi = "<--app-mode=x;touch PWN_SEMI>\n";
@@ -78,7 +78,7 @@ TEST_CASE("a value typed inside a closed quote completes in the spelling of no o
 TEST_CASE("a value completes in the spelling of the quote the typed word leaves open", "[completion][smoke]")
 {
     if(!bash_available())
-        SKIP("bash not found on PATH -- driving the generated script needs it");
+        SKIP("no bash 5.0 or later on PATH");
 
     const std::string app = hostile_script();
     check_rows({
@@ -90,7 +90,7 @@ TEST_CASE("a value completes in the spelling of the quote the typed word leaves 
 TEST_CASE("a flag typed inside closed quotes completes in the bare spelling of a hostile delimiter", "[completion][smoke]")
 {
     if(!bash_available())
-        SKIP("bash not found on PATH -- driving the generated script needs it");
+        SKIP("no bash 5.0 or later on PATH");
 
     const auto delimiter = nucleus::cli_delimiter::parse("$(touch PWN_DELIM)");
     REQUIRE(delimiter);
@@ -107,7 +107,7 @@ TEST_CASE("a flag typed inside closed quotes completes in the bare spelling of a
 TEST_CASE("a value typed after an ANSI-C or locale quote takes the bare spelling, inert there", "[completion][smoke]")
 {
     if(!bash_available())
-        SKIP("bash not found on PATH -- driving the generated script needs it");
+        SKIP("no bash 5.0 or later on PATH");
 
     const std::string app = hostile_script();
     check_rows({
@@ -119,7 +119,7 @@ TEST_CASE("a value typed after an ANSI-C or locale quote takes the bare spelling
 TEST_CASE("an inserted `!` survives the history expansion of the line it is typed into", "[completion][smoke]")
 {
     if(!bash_available())
-        SKIP("bash not found on PATH -- driving the generated script needs it");
+        SKIP("no bash 5.0 or later on PATH");
 
     const std::string app = hostile_script();
     for(const auto &[typed, value] : {std::pair<std::string, std::string>{"\"a", "a!b"}, {"\"b!", "b!"}})
@@ -135,7 +135,7 @@ TEST_CASE("an inserted `!` survives the history expansion of the line it is type
 TEST_CASE("the tracker reports the text a reopened quote keeps, and the trim drops it from every reply", "[completion][smoke]")
 {
     if(!bash_available())
-        SKIP("bash not found on PATH -- driving the generated script needs it");
+        SKIP("no bash 5.0 or later on PATH");
 
     const std::string drive = R"bash(
 show() { local typed="$1" quote kept; shift; _myapp_quote "$typed"; COMPREPLY=("$@"); _myapp_trim "$typed" "$kept"; printf '[%s]' "$quote" "$kept" "${COMPREPLY[@]}"; echo; }
@@ -152,12 +152,12 @@ show "'i" "it'\''s" "it'\''d"
 TEST_CASE("a value shared through a reopened quote completes on the first TAB and offers nothing past the reopened quote", "[completion][smoke]")
 {
     if(!bash_available())
-        SKIP("bash not found on PATH -- driving the generated script needs it");
+        SKIP("no bash 5.0 or later on PATH");
 
     const std::string app       = shared_script();
     const std::string first_tab = "COMP_WORDS=(myapp --app-mode = \"'i\")\nCOMP_CWORD=3\n_myapp_complete\nprintf '[%s]' \"${COMPREPLY[@]}\"; echo\n";
     REQUIRE(run_bash(app + first_tab) == "[it'\\''s][it'\\''d]\n");
-    // bash 4 and later match nothing for a word that closes and reopens a quote, so they offer no value there.
+    // bash matches nothing for a word that closes and reopens a quote, so no value is offered there.
     check_rows({
             {app, {"--app-mode", "=", "'it'\\''s"}, "--app-mode='it'\\''", "'", ""},
             {app, {"--app-mode", "=", "\"a\"\\!\"b"}, "--app-mode=\"a\"\\!\"", "\"", ""},
@@ -167,7 +167,7 @@ TEST_CASE("a value shared through a reopened quote completes on the first TAB an
 TEST_CASE("a reply typed with a quote or backslash right of the cursor takes the bare spelling", "[completion][smoke]")
 {
     if(!bash_available())
-        SKIP("bash not found on PATH -- driving the generated script needs it");
+        SKIP("no bash 5.0 or later on PATH");
 
     const auto delimiter = nucleus::cli_delimiter::parse("$(touch PWN_DELIM)");
     REQUIRE(delimiter);

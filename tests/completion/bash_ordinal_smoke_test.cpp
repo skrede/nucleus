@@ -82,7 +82,7 @@ TEST_CASE("a typed ordinal completes the repeated-container flag under real bash
           "[completion][smoke][ordinal]")
 {
     if(!bash_available())
-        SKIP("bash not found on PATH -- driving the generated script needs it");
+        SKIP("no bash 5.0 or later on PATH");
 
     const std::string port     = script(port_registry());
     const std::string level    = script(level_registry());
@@ -123,7 +123,7 @@ TEST_CASE("an ordinal candidate keeps its wildcard beside files it would match",
           "[completion][smoke][ordinal]")
 {
     if(!bash_available())
-        SKIP("bash not found on PATH -- driving the generated script needs it");
+        SKIP("no bash 5.0 or later on PATH");
 
     const std::string out = run_seeded(
             script(route_registry()),
@@ -136,7 +136,7 @@ TEST_CASE("an ordinal completion leaves the caller's glob setting as it found it
           "[completion][smoke][ordinal]")
 {
     if(!bash_available())
-        SKIP("bash not found on PATH -- driving the generated script needs it");
+        SKIP("no bash 5.0 or later on PATH");
 
     const std::string completion = script(level_registry());
     const std::string expected   = "--cluster-node-2-level\n--cluster-node-2-port\ndebug\ninfo\nkept\n";

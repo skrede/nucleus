@@ -56,6 +56,12 @@ jobs:
         if: matrix.coverage
         run: pip install gcovr
 
+      # The bash smoke tests skip below bash 5.0, the version the generated completion script
+      # registers on, so a runner whose bash fell below it would pass them unexercised.
+      - name: Assert a supported bash
+        run: |
+          bash -c 'echo "$BASH_VERSION"; ((BASH_VERSINFO[0] >= 5))'
+
       - name: Configure
         env:
           CC: ${{ matrix.cc }}
@@ -137,6 +143,12 @@ jobs:
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
     steps:
       - uses: actions/checkout@v4
+
+      # The bash smoke tests skip below bash 5.0, the version the generated completion script
+      # registers on, so a runner whose bash fell below it would pass them unexercised.
+      - name: Assert a supported bash
+        run: |
+          bash -c 'echo "$BASH_VERSION"; ((BASH_VERSINFO[0] >= 5))'
 
       - name: Configure
         run: >-
@@ -253,6 +265,12 @@ jobs:
     # claim that enabling examples does not drag the optional module back in.
     steps:
       - uses: actions/checkout@v4
+
+      # The bash smoke tests skip below bash 5.0, the version the generated completion script
+      # registers on, so a runner whose bash fell below it would pass them unexercised.
+      - name: Assert a supported bash
+        run: |
+          bash -c 'echo "$BASH_VERSION"; ((BASH_VERSINFO[0] >= 5))'
 
       - name: Configure
         run: >-

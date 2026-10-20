@@ -15,7 +15,10 @@ using nucleus::completion_model;
 using nucleus::completion_option;
 using nucleus::zsh_emitter;
 using nucleus::bash_test::bash_available;
+using nucleus::bash_test::payload_check;
+using nucleus::bash_test::run_bash;
 using nucleus::bash_test::run_seeded;
+using nucleus::bash_test::shell_quoted;
 
 namespace {
 
@@ -80,9 +83,19 @@ TEST_CASE("a hostile program name reaches the bash script only as inert text", "
     REQUIRE(bash.ends_with(" x\\$\\(touch\\ PWN_PROG\\)\\;y\\\ntouch\\ PWN_LINE; fi\n"));
 
     if(!bash_available())
-        SKIP("bash not found on PATH -- sourcing the generated script needs it");
-    const std::string drive = "\nfor f in PWN_*; do [ -e \"$f\" ] && echo \"PAYLOAD $f\"; done\necho sourced\n";
-    REQUIRE(run_seeded(bash, drive, {}) == "sourced\n");
+        SKIP("no bash 5.0 or later on PATH");
+    // The probe reads the status because bash 5.0 and 5.1 print the registered name bare and 5.2 quotes it. The
+    // emitter writes the newline as a line continuation, so the name bash registers has none.
+    const std::string probe = "\ncomplete -p " + shell_quoted("x$(touch PWN_PROG);ytouch PWN_LINE") + " >/dev/null && echo registered\n";
+    REQUIRE(run_seeded(bash, probe + std::string(payload_check) + "echo sourced\n", {}) == "registered\nsourced\n");
+}
+
+TEST_CASE("the generated bash script registers its completion on a supported bash", "[completion][model][smoke]")
+{
+    if(!bash_available())
+        SKIP("no bash 5.0 or later on PATH");
+    const std::string bash = bash_emitter{}.emit(model_of({"--w", "", {}, {}}));
+    REQUIRE(run_bash(bash + "complete -p myapp\n") == "complete -F _myapp_complete myapp\n");
 }
 
 TEST_CASE("a hostile program name reaches the zsh script only as inert text", "[completion][model]")
@@ -92,4 +105,12 @@ TEST_CASE("a hostile program name reaches the zsh script only as inert text", "[
     const std::string shown = "x$(touch PWN_PROG);y\\ntouch PWN_LINE\n";
     REQUIRE(zsh.starts_with("#compdef " + shown + "# zsh completion for " + shown + "#"));
     REQUIRE(std::ranges::count(zsh, '\n') == std::ranges::count(plain, '\n'));
+}
+
+// Passes only while run_bash fails a drive on its exit status: the stdout matches, so nothing else can fail it.
+TEST_CASE("a drive whose bash exits non-zero fails whatever it printed", "[completion][smoke][!shouldfail]")
+{
+    if(!bash_available())
+        SKIP("no bash 5.0 or later on PATH");
+    REQUIRE(run_bash("echo printed\nexit 3\n") == "printed\n");
 }

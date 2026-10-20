@@ -47,7 +47,7 @@ TEST_CASE("the generated bash script actually completes under real bash",
           "[completion][smoke]")
 {
     if(!bash_available())
-        SKIP("bash not found on PATH -- the real-bash smoke test needs it");
+        SKIP("no bash 5.0 or later on PATH");
 
     const std::string completion = script_of(generate_completion(shell::bash, fixture(), "myapp"));
 
@@ -60,7 +60,7 @@ TEST_CASE("the generated bash script actually completes under real bash",
         REQUIRE(out.find("--logging-level") != std::string::npos);
     }
 
-    // bash 4 and later split "--logging-level=" into the words [--logging-level][=], so `=` is
+    // bash splits "--logging-level=" into the words [--logging-level][=], so `=` is
     // the current word and the function must rebuild the flag from the word before it.
     {
         const std::string script = completion +
@@ -173,7 +173,7 @@ TEST_CASE("a directory holding the ordinal wildcard's matches cannot replace it"
           "[completion][smoke]")
 {
     if(!bash_available())
-        SKIP("bash not found on PATH -- driving the generated script needs it");
+        SKIP("no bash 5.0 or later on PATH");
 
     schema_registry reg;
     REQUIRE(reg.attach(nucleus::repeated_element("node", anchor::root())));
@@ -190,7 +190,7 @@ TEST_CASE("a directory holding the ordinal wildcard's matches cannot replace it"
 TEST_CASE("an allowed value carrying a glob is offered literally", "[completion][smoke]")
 {
     if(!bash_available())
-        SKIP("bash not found on PATH -- driving the generated script needs it");
+        SKIP("no bash 5.0 or later on PATH");
 
     schema_registry reg;
     REQUIRE(reg.attach(nucleus::element("region", anchor::root())));
@@ -211,7 +211,7 @@ TEST_CASE("driving the completion leaves the caller's glob setting as it found i
           "[completion][smoke]")
 {
     if(!bash_available())
-        SKIP("bash not found on PATH -- driving the generated script needs it");
+        SKIP("no bash 5.0 or later on PATH");
 
     const std::string completion = script_of(generate_completion(shell::bash, fixture(), "myapp"));
     const std::string drive =

@@ -15,6 +15,7 @@
 #include <random>
 #include <string>
 #include <vector>
+#include <cstdint>
 #include <cstdlib>
 #include <fstream>
 #include <filesystem>
@@ -22,17 +23,15 @@
 
 namespace nucleus::bash_test {
 
-// Whether a real bash interpreter is on PATH. The smoke tests only run when one
-// is; on a box without bash they skip cleanly rather than failing. Windows skips
-// deterministically: a Git-Bash may well be installed, but handing it a native
-// temp-file path crosses an unverified path-translation boundary -- the bash
-// completion contract these smoke tests exercise is a POSIX one.
+// The smoke tests run only when the bash first on PATH is 5.0 or later, the version the generated script
+// registers its completion on; below it they would drive functions bash never registers. Windows skips:
+// handing a Git-Bash a native temp-file path crosses an unverified path-translation boundary.
 inline bool bash_available()
 {
 #ifdef _WIN32
     return false;
 #else
-    return std::system("bash -c \"exit 0\" >/dev/null 2>&1") == 0;
+    return std::system("bash -c '((BASH_VERSINFO[0] >= 5))' >/dev/null 2>&1") == 0;
 #endif
 }
 
@@ -62,12 +61,12 @@ inline std::string shell_quoted(const std::string &text)
     return quoted + "'";
 }
 
-inline void close_pipe(std::FILE *pipe)
+inline std::int32_t close_pipe(std::FILE *pipe)
 {
 #ifdef _MSC_VER
-    _pclose(pipe);
+    return _pclose(pipe);
 #else
-    pclose(pipe);
+    return pclose(pipe);
 #endif
 }
 
@@ -87,19 +86,23 @@ inline std::string run_bash(const std::string &script)
     const std::filesystem::path scratch = scratch_directory("nucleus_completion_smoke");
     const std::filesystem::path file    = scratch / "script.sh";
     std::ofstream(file) << script;
-    std::string captured;
-    if(const pipe_handle pipe = opened_pipe("bash " + shell_quoted(file.string()) + " 2>/dev/null"))
+    std::string  captured;
+    std::int32_t status = -1;
+    if(pipe_handle pipe = opened_pipe("bash " + shell_quoted(file.string()) + " 2>/dev/null"))
     {
         std::array<char, 256> buf{};
         while(std::fgets(buf.data(), static_cast<int>(buf.size()), pipe.get()))
             captured += buf.data();
+        status = close_pipe(pipe.release());
     }
     std::filesystem::remove_all(scratch);
+    INFO(captured);
+    REQUIRE(status == 0);
     return captured;
 }
 
 inline constexpr std::string_view argv_printer  = "myapp() { for a in \"$@\"; do printf '<%s>' \"$a\"; done; echo; }\n";
-inline constexpr std::string_view payload_check = "for f in PWN_*; do [ -e \"$f\" ] && echo \"PAYLOAD $f\"; done\n";
+inline constexpr std::string_view payload_check = "for f in PWN_*; do if [ -e \"$f\" ]; then echo \"PAYLOAD $f\"; fi; done\n";
 
 // Opens a loop holding each line readline builds from a reply: `prefix`, the reply verbatim, then `open`
 // -- the quote open at the cursor, named by the caller and never read off the typed word -- unless the

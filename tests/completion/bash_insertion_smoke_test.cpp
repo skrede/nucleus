@@ -70,7 +70,7 @@ schema_registry values_registry()
 TEST_CASE("every inserted bash candidate parses back to its own text", "[completion][smoke]")
 {
     if(!bash_available())
-        SKIP("bash not found on PATH -- driving the generated script needs it");
+        SKIP("no bash 5.0 or later on PATH");
 
     const auto        delimiter = nucleus::cli_delimiter::parse("$(touch PWN_DELIM)");
     const std::string logging   = script(logging_registry());
@@ -107,7 +107,7 @@ TEST_CASE("every inserted bash candidate parses back to its own text", "[complet
 TEST_CASE("a value typed past a word-break byte completes to its own text where bash keeps it one word", "[completion][smoke]")
 {
     if(!bash_available())
-        SKIP("bash not found on PATH -- driving the generated script needs it");
+        SKIP("no bash 5.0 or later on PATH");
 
     const std::string          values = script(values_registry());
     const std::string          breaks = script(breaks_registry());
@@ -128,7 +128,7 @@ TEST_CASE("a value typed past a word-break byte completes to its own text where 
     check_rows(rows);
     const std::string untrimmed = "COMP_WORDBREAKS=${COMP_WORDBREAKS//:/}\n" + insert_and_parse({flag + "=co:"}, flag + "=", "");
     REQUIRE(run_seeded(values, untrimmed, {}) == "<" + flag + "=co:lon>\n");
-    // bash 4 and later split the value at the break byte and nothing re-joins it, so no value is offered.
+    // bash splits the value at the break byte and nothing re-joins it, so no value is offered.
     REQUIRE(run_seeded(values, insert_and_parse({flag, "=", "co", ":"}, flag + "=co:", ""), {}).empty());
     REQUIRE(run_seeded(breaks, insert_and_parse({"--app-mode", "=", "user", "@", "h"}, "--app-mode=user@", ""), {}).empty());
     REQUIRE(run_seeded(breaks, insert_and_parse({"--app-mode", "=", "k", "="}, "--app-mode=k=", ""), {}).empty());
@@ -137,7 +137,7 @@ TEST_CASE("a value typed past a word-break byte completes to its own text where 
 TEST_CASE("every byte but a newline round-trips through the inserted line", "[completion][smoke]")
 {
     if(!bash_available())
-        SKIP("bash not found on PATH -- driving the generated script needs it");
+        SKIP("no bash 5.0 or later on PATH");
 
     nucleus::completion_model model{"myapp", {{"--v", "d", {}}}};
     std::string               expected;

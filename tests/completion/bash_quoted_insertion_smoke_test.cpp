@@ -81,7 +81,7 @@ std::string raw_replies(const std::vector<std::string> &words)
 TEST_CASE("a value typed after an opening quote inserts as its own text", "[completion][smoke]")
 {
     if(!bash_available())
-        SKIP("bash not found on PATH -- driving the generated script needs it");
+        SKIP("no bash 5.0 or later on PATH");
 
     const std::string                                      app = script(quoted_registry());
     const std::vector<std::pair<std::string, std::string>> typed{
@@ -110,7 +110,7 @@ TEST_CASE("a value typed after an opening quote inserts as its own text", "[comp
 TEST_CASE("a quoted prefix shared by several candidates is left as typed", "[completion][smoke]")
 {
     if(!bash_available())
-        SKIP("bash not found on PATH -- driving the generated script needs it");
+        SKIP("no bash 5.0 or later on PATH");
 
     const std::string app = script(quoted_registry());
     for(const std::string quote : {"'", "\""})
@@ -124,7 +124,7 @@ TEST_CASE("a quoted prefix shared by several candidates is left as typed", "[com
 TEST_CASE("ordinal and static flags and flag replies complete after either quote", "[completion][smoke]")
 {
     if(!bash_available())
-        SKIP("bash not found on PATH -- driving the generated script needs it");
+        SKIP("no bash 5.0 or later on PATH");
 
     const auto delimiter = nucleus::cli_delimiter::parse("$(touch PWN_DELIM)");
     REQUIRE(delimiter);
@@ -151,7 +151,7 @@ TEST_CASE("ordinal and static flags and flag replies complete after either quote
 TEST_CASE("every byte but a newline round-trips through a quoted inserted line", "[completion][smoke]")
 {
     if(!bash_available())
-        SKIP("bash not found on PATH -- driving the generated script needs it");
+        SKIP("no bash 5.0 or later on PATH");
 
     nucleus::completion_model model{"myapp", {{"--v", "d", {}}}};
     std::string               expected;
