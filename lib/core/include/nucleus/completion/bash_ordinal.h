@@ -1,6 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_COMPLETION_BASH_ORDINAL_H
 #define HPP_GUARD_NUCLEUS_COMPLETION_BASH_ORDINAL_H
 
+#include "nucleus/completion/bash_quoting.h"
 #include "nucleus/completion/bash_line_form.h"
 #include "nucleus/completion/completion_model.h"
 
@@ -71,7 +72,7 @@ inline std::string bash_ordinal_functions(const std::string &ident, const comple
     return out + "}\n";
 }
 
-inline std::string bash_ordinal_dispatch(const std::string &ident, const completion_model &model, const std::string &line)
+inline std::string bash_ordinal_dispatch(const std::string &ident, const completion_model &model, const std::string &prefix)
 {
     std::string out;
     for(const completion_option &option : model.options)
@@ -79,7 +80,7 @@ inline std::string bash_ordinal_dispatch(const std::string &ident, const complet
         if(!has_ordinal_slots(option) || option.values.empty())
             continue;
         out += "        if " + bash_ordinal_call(ident, "$flag", option) + " && [ \"$ordinal_name\" = \"$flag\" ]; then\n";
-        out += bash_value_reply("            ", option, line);
+        out += bash_value_reply("            ", option, prefix);
         out += "        fi\n";
     }
     return out;

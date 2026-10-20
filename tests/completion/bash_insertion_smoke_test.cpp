@@ -23,7 +23,10 @@ using nucleus::key_path;
 using nucleus::schema_registry;
 using nucleus::shell;
 using nucleus::bash_test::bash_available;
+using nucleus::bash_test::check_rows;
+using nucleus::bash_test::delimiter_registry;
 using nucleus::bash_test::insert_and_parse;
+using nucleus::bash_test::insertion_row;
 using nucleus::bash_test::run_seeded;
 
 namespace {
@@ -55,24 +58,6 @@ schema_registry values_registry()
     return reg;
 }
 
-schema_registry delimiter_registry()
-{
-    schema_registry reg;
-    REQUIRE(reg.attach(nucleus::element("cluster", anchor::root())));
-    REQUIRE(reg.attach(nucleus::element("port", anchor::keyspace(path_of("cluster")))));
-    REQUIRE(reg.attach(nucleus::repeated_element("node", anchor::keyspace(path_of("cluster")))));
-    REQUIRE(reg.attach(nucleus::element("port", anchor::keyspace(path_of("cluster/node")))));
-    return reg;
-}
-
-struct insertion_row
-{
-    std::string              script;
-    std::vector<std::string> words;
-    std::string              prefix;
-    std::string              expected;
-};
-
 }
 
 TEST_CASE("every inserted bash candidate parses back to its own text", "[completion][smoke]")
@@ -89,10 +74,10 @@ TEST_CASE("every inserted bash candidate parses back to its own text", "[complet
     const std::string node      = "--cluster" + d + "node";
 
     std::vector<insertion_row> rows{
-            {logging, {"--logging-level", "=", "h"}, "--logging-level=", "<--logging-level=has space>\n"},
-            {values, {"--cluster-node-"}, "", "<--cluster-node-level>\n<--cluster-node-*-level>\n"},
-            {delimited, {"--cluster\\$"}, "", "<" + node + ">\n<" + node + d + "port>\n<" + node + d + "*" + d + "port>\n<--cluster" + d + "port>\n"},
-            {delimited, {"--cluster\\$\\(touch\\ PWN_DELIM\\)node\\$\\(touch\\ PWN_DELIM\\)3"}, "", "<" + node + d + "3" + d + "port>\n"},
+            {logging, {"--logging-level", "=", "h"}, "--logging-level=", "", "<--logging-level=has space>\n"},
+            {values, {"--cluster-node-"}, "", "", "<--cluster-node-level>\n<--cluster-node-*-level>\n"},
+            {delimited, {"--cluster\\$"}, "", "", "<" + node + ">\n<" + node + d + "port>\n<" + node + d + "*" + d + "port>\n<--cluster" + d + "port>\n"},
+            {delimited, {"--cluster\\$\\(touch\\ PWN_DELIM\\)node\\$\\(touch\\ PWN_DELIM\\)3"}, "", "", "<" + node + d + "3" + d + "port>\n"},
     };
     const std::vector<std::pair<std::string, std::string>> typed{
             {"h", "has space"},
@@ -107,15 +92,9 @@ TEST_CASE("every inserted bash candidate parses back to its own text", "[complet
     for(const std::string flag : {"--cluster-node-level", "--cluster-node-2-level"})
     {
         for(const auto &[prefix, value] : typed)
-            rows.push_back({values, {flag, "=", prefix}, flag + "=", "<" + flag + "=" + value + ">\n"});
+            rows.push_back({values, {flag, "=", prefix}, flag + "=", "", "<" + flag + "=" + value + ">\n"});
     }
-    for(const insertion_row &row : rows)
-    {
-        DYNAMIC_SECTION(row.prefix << row.words.back())
-        {
-            REQUIRE(run_seeded(row.script, insert_and_parse(row.words, row.prefix), {"--cluster-node-7-level"}) == row.expected);
-        }
-    }
+    check_rows(rows);
 }
 
 TEST_CASE("a value typed past a colon completes to its own text where bash keeps it one word", "[completion][smoke]")
@@ -126,22 +105,16 @@ TEST_CASE("a value typed past a colon completes to its own text where bash keeps
     const std::string          values = script(values_registry());
     const std::string          flag   = "--cluster-node-level";
     std::vector<insertion_row> rows{
-            {values, {flag + "=co:"}, flag + "=co:", "<" + flag + "=co:lon>\n"},
-            {values, {flag + "=co:l"}, flag + "=co:", "<" + flag + "=co:lon>\n"},
-            {values, {"--cluster-node-2-level=co:"}, "--cluster-node-2-level=co:", "<--cluster-node-2-level=co:lon>\n"},
-            {values, {flag, "=", "'co:"}, flag + "='", "<" + flag + "=co:lon>\n"},
+            {values, {flag + "=co:"}, flag + "=co:", "", "<" + flag + "=co:lon>\n"},
+            {values, {flag + "=co:l"}, flag + "=co:", "", "<" + flag + "=co:lon>\n"},
+            {values, {"--cluster-node-2-level=co:"}, "--cluster-node-2-level=co:", "", "<--cluster-node-2-level=co:lon>\n"},
+            {values, {flag, "=", "'co:"}, flag + "='", "'", "<" + flag + "=co:lon>\n"},
     };
-    for(const insertion_row &row : rows)
-    {
-        DYNAMIC_SECTION(row.words.back())
-        {
-            REQUIRE(run_seeded(row.script, insert_and_parse(row.words, row.prefix), {}) == row.expected);
-        }
-    }
-    const std::string untrimmed = "COMP_WORDBREAKS=${COMP_WORDBREAKS//:/}\n" + insert_and_parse({flag + "=co:"}, flag + "=");
+    check_rows(rows);
+    const std::string untrimmed = "COMP_WORDBREAKS=${COMP_WORDBREAKS//:/}\n" + insert_and_parse({flag + "=co:"}, flag + "=", "");
     REQUIRE(run_seeded(values, untrimmed, {}) == "<" + flag + "=co:lon>\n");
     // bash 4 and later split the value at the colon and nothing re-joins it, so no value is offered.
-    REQUIRE(run_seeded(values, insert_and_parse({flag, "=", "co", ":"}, flag + "=co:"), {}).empty());
+    REQUIRE(run_seeded(values, insert_and_parse({flag, "=", "co", ":"}, flag + "=co:", ""), {}).empty());
 }
 
 TEST_CASE("every byte but a newline round-trips through the inserted line", "[completion][smoke]")
@@ -160,7 +133,7 @@ TEST_CASE("every byte but a newline round-trips through the inserted line", "[co
         expected += "<--v=" + value + ">\n";
     }
     const std::string completion = nucleus::bash_emitter{}.emit(model);
-    const std::string drive      = insert_and_parse({"--v", "="}, "--v=");
+    const std::string drive      = insert_and_parse({"--v", "="}, "--v=", "");
     REQUIRE(run_seeded(completion, drive, {}) == expected);
     REQUIRE(run_seeded("export LC_ALL=C\n" + completion, drive, {}) == expected);
 }

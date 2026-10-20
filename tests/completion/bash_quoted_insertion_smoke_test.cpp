@@ -25,7 +25,10 @@ using nucleus::key_path;
 using nucleus::schema_registry;
 using nucleus::shell;
 using nucleus::bash_test::bash_available;
+using nucleus::bash_test::check_rows;
+using nucleus::bash_test::delimiter_registry;
 using nucleus::bash_test::insert_and_parse;
+using nucleus::bash_test::insertion_row;
 using nucleus::bash_test::run_seeded;
 using nucleus::bash_test::shell_quoted;
 using nucleus::completion_result_test::script_of;
@@ -58,16 +61,6 @@ schema_registry level_registry()
     return reg;
 }
 
-schema_registry delimiter_registry()
-{
-    schema_registry reg;
-    REQUIRE(reg.attach(nucleus::element("cluster", anchor::root())));
-    REQUIRE(reg.attach(nucleus::element("port", anchor::keyspace(path_of("cluster")))));
-    REQUIRE(reg.attach(nucleus::repeated_element("node", anchor::keyspace(path_of("cluster")))));
-    REQUIRE(reg.attach(nucleus::element("port", anchor::keyspace(path_of("cluster/node")))));
-    return reg;
-}
-
 schema_registry logging_registry()
 {
     schema_registry reg;
@@ -82,25 +75,6 @@ std::string raw_replies(const std::vector<std::string> &words)
     for(const std::string &word : words)
         out += " " + shell_quoted(word);
     return out + ")\nCOMP_CWORD=$((${#COMP_WORDS[@]} - 1))\n_myapp_complete\nprintf '[%s]' \"${COMPREPLY[@]}\"\necho\n";
-}
-
-struct insertion_row
-{
-    std::string              script;
-    std::vector<std::string> words;
-    std::string              prefix;
-    std::string              expected;
-};
-
-void check_rows(const std::vector<insertion_row> &rows)
-{
-    for(const insertion_row &row : rows)
-    {
-        DYNAMIC_SECTION(row.prefix << row.words.back())
-        {
-            REQUIRE(run_seeded(row.script, insert_and_parse(row.words, row.prefix), {"--cluster-node-7-level"}) == row.expected);
-        }
-    }
 }
 
 }
@@ -129,7 +103,7 @@ TEST_CASE("a value typed after an opening quote inserts as its own text", "[comp
     for(const std::string quote : {"'", "\""})
     {
         for(const auto &[prefix, value] : typed)
-            rows.push_back({app, {"--app-mode", "=", quote + prefix}, "--app-mode=" + quote, "<--app-mode=" + value + ">\n"});
+            rows.push_back({app, {"--app-mode", "=", quote + prefix}, "--app-mode=" + quote, quote, "<--app-mode=" + value + ">\n"});
     }
     check_rows(rows);
 }
@@ -144,7 +118,7 @@ TEST_CASE("a quoted prefix shared by several candidates is left as typed", "[com
     {
         const std::vector<std::string> words{"--app-mode", "=", quote + "has sp"};
         REQUIRE(run_seeded(app, raw_replies(words), {}) == "[has space][has spice]\n");
-        REQUIRE(run_seeded(app, insert_and_parse(words, "--app-mode=" + quote), {}) == "<--app-mode=has space>\n<--app-mode=has spice>\n");
+        REQUIRE(run_seeded(app, insert_and_parse(words, "--app-mode=" + quote, quote), {}) == "<--app-mode=has space>\n<--app-mode=has spice>\n");
     }
 }
 
@@ -159,17 +133,17 @@ TEST_CASE("ordinal and static flags and flag replies complete after either quote
     const std::string          delimited = script(delimiter_registry(), *delimiter);
     const std::string          port      = "--cluster$(touch PWN_DELIM)port";
     std::vector<insertion_row> rows{
-            {script(logging_registry()), {"--logging-level", "=", "'h"}, "--logging-level='", "<--logging-level=has space>\n"},
-            {delimited, {"'--cluster$(touch PWN_DELIM)p"}, "'", "<" + port + ">\n"},
-            {delimited, {"\"--cluster\\$(touch PWN_DELIM)p"}, "\"", "<" + port + ">\n"},
+            {script(logging_registry()), {"--logging-level", "=", "'h"}, "--logging-level='", "'", "<--logging-level=has space>\n"},
+            {delimited, {"'--cluster$(touch PWN_DELIM)p"}, "'", "'", "<" + port + ">\n"},
+            {delimited, {"\"--cluster\\$(touch PWN_DELIM)p"}, "\"", "\"", "<" + port + ">\n"},
     };
     for(const std::string quote : {"'", "\""})
     {
-        rows.push_back({levels, {quote + "--cluster-node-*-l"}, quote, "<--cluster-node-*-level>\n"});
+        rows.push_back({levels, {quote + "--cluster-node-*-l"}, quote, quote, "<--cluster-node-*-level>\n"});
         for(const std::string flag : {"--cluster-node-2-level", "--cluster-node-level"})
         {
-            rows.push_back({levels, {flag, "=", quote + "h"}, flag + "=" + quote, "<" + flag + "=has space>\n"});
-            rows.push_back({levels, {flag, "=", quote + "in"}, flag + "=" + quote, "<" + flag + "=in$(touch${IFS}PWN_VAL)fo>\n"});
+            rows.push_back({levels, {flag, "=", quote + "h"}, flag + "=" + quote, quote, "<" + flag + "=has space>\n"});
+            rows.push_back({levels, {flag, "=", quote + "in"}, flag + "=" + quote, quote, "<" + flag + "=in$(touch${IFS}PWN_VAL)fo>\n"});
         }
     }
     check_rows(rows);
@@ -193,7 +167,7 @@ TEST_CASE("every byte but a newline round-trips through a quoted inserted line",
     const std::string completion = nucleus::bash_emitter{}.emit(model);
     for(const std::string quote : {"'", "\""})
     {
-        const std::string drive = insert_and_parse({"--v", "=", quote}, "--v=" + quote);
+        const std::string drive = insert_and_parse({"--v", "=", quote}, "--v=" + quote, quote);
         REQUIRE(run_seeded(completion, drive, {}) == expected);
         REQUIRE(run_seeded("export LC_ALL=C\n" + completion, drive, {}) == expected);
     }

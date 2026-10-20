@@ -20,4 +20,6 @@ nucleus_add_test(bash_insertion_smoke_test PROPERTIES SKIP_RETURN_CODE 4)
 
 nucleus_add_test(bash_quoted_insertion_smoke_test PROPERTIES SKIP_RETURN_CODE 4)
 
+nucleus_add_test(bash_quote_state_smoke_test PROPERTIES SKIP_RETURN_CODE 4)
+
 nucleus_add_test(emitter_model_test PROPERTIES SKIP_RETURN_CODE 4)

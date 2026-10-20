@@ -94,14 +94,16 @@ inline std::string bash_join_values(const std::vector<std::string> &values)
 // consumed the backslash -- so the assignment runs with globbing suppressed and puts the
 // caller's setting back. `case $-` reads that setting portably, where `local -` would need
 // bash 4.4 -- above the floor this script supports. `also` runs inside the same substitution.
-// A non-empty `line` names the lookup each compgen match is piped through with the typed word, whose
-// opening quote, if any, picks the form the match is spelled in.
+// A non-empty `prefix` names the emitted `_quote` and `_line` helpers, and each compgen match is piped through
+// `_line` with the quote the typed word leaves open.
 inline std::string bash_reply_assignment(const std::string &pad, const std::string &words, const std::string &current,
-                                         const std::string &line, const std::string &also)
+                                         const std::string &prefix, const std::string &also)
 {
     std::string out = pad + "local noglob=0; case $- in *f*) noglob=1 ;; esac; set -f\n";
+    if(!prefix.empty())
+        out += pad + "local quote; " + prefix + "_quote \"" + current + "\"\n";
     out += pad + R"(local IFS=$'\n'; COMPREPLY=( $(IFS=$' \t\n'; compgen -W )" + words + " -- \"" + current + "\"";
-    out += line.empty() ? std::string() : " | while IFS= read -r w; do " + line + " \"" + current + R"(" "$w"; done)";
+    out += prefix.empty() ? std::string() : " | while IFS= read -r w; do " + prefix + R"(_line "$quote" "$w"; done)";
     out += (also.empty() ? std::string() : "; " + also) + ") )\n";
     return out + pad + "if [ \"$noglob\" = 0 ]; then set +f; fi\n";
 }
@@ -112,10 +114,10 @@ inline std::string bash_reply_assignment(const std::string &pad, const std::stri
 inline constexpr std::string_view bash_colon_trim = R"(case "$COMP_WORDBREAKS" in *:*) local colon="${val%"${val##*:}"}" i=${#COMPREPLY[@]}; while [ "$i" -gt 0 ]; do i=$((i - 1)); COMPREPLY[i]="${COMPREPLY[i]#"$colon"}"; done ;; esac
 )";
 
-inline std::string bash_value_reply(const std::string &pad, const completion_option &option, const std::string &line)
+inline std::string bash_value_reply(const std::string &pad, const completion_option &option, const std::string &prefix)
 {
     const std::string words = bash_single_quote(bash_join_values(option.values));
-    std::string       out   = bash_reply_assignment(pad, words, "$val", line, {});
+    std::string       out   = bash_reply_assignment(pad, words, "$val", prefix, {});
     out += pad;
     out += bash_colon_trim;
     return out + pad + "return 0\n";

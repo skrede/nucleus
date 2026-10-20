@@ -1,6 +1,14 @@
 #ifndef HPP_GUARD_NUCLEUS_TESTS_COMPLETION_BASH_TEST_SUPPORT_H
 #define HPP_GUARD_NUCLEUS_TESTS_COMPLETION_BASH_TEST_SUPPORT_H
 
+#include "nucleus/schema/anchor.h"
+#include "nucleus/schema/schema.h"
+#include "nucleus/schema/schema_registry.h"
+
+#include "nucleus/keyspace/key_path.h"
+
+#include <catch2/catch_test_macros.hpp>
+
 #include <array>
 #include <cstdio>
 #include <memory>
@@ -10,6 +18,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <filesystem>
+#include <string_view>
 
 namespace nucleus::bash_test {
 
@@ -89,19 +98,31 @@ inline std::string run_bash(const std::string &script)
     return captured;
 }
 
-// Pressing Enter parses the line readline built. readline inserts each reply verbatim after the
-// typed word's opening quote, if any, and closes that quote unless the reply already ends with it.
-inline std::string insert_and_parse(const std::vector<std::string> &words, const std::string &prefix)
+inline constexpr std::string_view argv_printer  = "myapp() { for a in \"$@\"; do printf '<%s>' \"$a\"; done; echo; }\n";
+inline constexpr std::string_view payload_check = "for f in PWN_*; do [ -e \"$f\" ] && echo \"PAYLOAD $f\"; done\n";
+
+// Opens a loop holding each line readline builds from a reply: `prefix`, the reply verbatim, then `open`
+// -- the quote open at the cursor, named by the caller and never read off the typed word -- unless the
+// reply already ends with it.
+inline std::string inserted_lines(const std::vector<std::string> &words, const std::string &prefix, const std::string &open)
 {
-    const char        opening = words.empty() || words.back().empty() ? '\0' : words.back().front();
-    const std::string quote   = opening == '\'' || opening == '"' ? std::string(1, opening) : std::string();
-    std::string       out     = "\nmyapp() { for a in \"$@\"; do printf '<%s>' \"$a\"; done; echo; }\nCOMP_WORDS=(myapp";
+    std::string out = "\nCOMP_WORDS=(myapp";
     for(const std::string &word : words)
         out += " " + shell_quoted(word);
     out += ")\nCOMP_CWORD=$((${#COMP_WORDS[@]} - 1))\n_myapp_complete\n";
-    out += "p=" + shell_quoted(prefix) + "; q=" + shell_quoted(quote) + "\n";
-    out += "for c in \"${COMPREPLY[@]}\"; do case \"$c\" in *\"$q\") l=\"$c\" ;; *) l=\"$c$q\" ;; esac; eval \"myapp $p$l\"; done\n";
-    return out + "for f in PWN_*; do [ -e \"$f\" ] && echo \"PAYLOAD $f\"; done\n";
+    out += "p=" + shell_quoted(prefix) + "; q=" + shell_quoted(open) + "\n";
+    return out + R"(for c in "${COMPREPLY[@]}"; do case "$c" in *"$q") l="$p$c" ;; *) l="$p$c$q" ;; esac; )";
+}
+
+inline std::string insert_and_parse(const std::vector<std::string> &words, const std::string &prefix, const std::string &open)
+{
+    const std::string parse = "eval \"myapp $l\"; done\n";
+    return "\n" + std::string(argv_printer) + inserted_lines(words, prefix, open) + parse + std::string(payload_check);
+}
+
+inline std::string print_inserted(const std::vector<std::string> &words, const std::string &prefix, const std::string &open)
+{
+    return inserted_lines(words, prefix, open) + "printf 'myapp %s\\n' \"$l\"; done\n";
 }
 
 // Drives the generated completer with the working directory set to a scratch tree holding
@@ -115,6 +136,49 @@ inline std::string run_seeded(const std::string &completion, const std::string &
     const std::string out = run_bash("cd " + shell_quoted(dir.string()) + " || exit 1\n" + completion + drive);
     std::filesystem::remove_all(dir);
     return out;
+}
+
+// An interactive shell history-expands each line it reads before parsing it, and so does a script once it
+// turns history on; `eval` never does, so the lines are run as script input.
+inline std::string run_history_expanded(const std::string &lines)
+{
+    const std::filesystem::path dir    = scratch_directory("nucleus_completion_history");
+    const std::string           script = "set -o history -H\ncd " + shell_quoted(dir.string()) + " || exit 1\n";
+    const std::string           out    = run_bash(script + std::string(argv_printer) + lines + std::string(payload_check));
+    std::filesystem::remove_all(dir);
+    return out;
+}
+
+inline schema_registry delimiter_registry()
+{
+    const anchor    cluster = anchor::keyspace(key_path::parse("cluster").value());
+    const anchor    node    = anchor::keyspace(key_path::parse("cluster/node").value());
+    schema_registry reg;
+    REQUIRE(reg.attach(element("cluster", anchor::root())));
+    REQUIRE(reg.attach(element("port", cluster)));
+    REQUIRE(reg.attach(repeated_element("node", cluster)));
+    REQUIRE(reg.attach(element("port", node)));
+    return reg;
+}
+
+struct insertion_row
+{
+    std::string              script;
+    std::vector<std::string> words;
+    std::string              prefix;
+    std::string              open;
+    std::string              expected;
+};
+
+inline void check_rows(const std::vector<insertion_row> &rows)
+{
+    for(const insertion_row &row : rows)
+    {
+        DYNAMIC_SECTION(row.prefix << row.words.back())
+        {
+            REQUIRE(run_seeded(row.script, insert_and_parse(row.words, row.prefix, row.open), {"--cluster-node-7-level"}) == row.expected);
+        }
+    }
 }
 
 }
