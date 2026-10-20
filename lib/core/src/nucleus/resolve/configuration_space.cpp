@@ -109,7 +109,6 @@ struct space_core
     std::map<std::string, conflict_report> m_conflicts;
 };
 
-// The mutable builder's state: the shared core plus the spent flag.
 class config_space_builder::impl : public space_core
 {
 public:
@@ -286,8 +285,10 @@ registration_result config_space_builder::register_schema(std::string key_path, 
         return guard;
     if(auto verdict = m_impl->review(registration_kind::schema, owner); !verdict)
         return verdict;
-    m_impl->note_claim(key_path, registration_kind::schema, owner);
-    m_impl->schema.add(schema_spec{std::move(key_path)}, std::move(owner));
+    if(auto added = m_impl->schema.add(schema_spec{std::move(key_path)}, std::move(owner)); !added)
+        return unexpected(error{errc::rejected_registration, std::move(added).error()});
+    const registration<schema_spec> &stored = m_impl->schema.entries().back();
+    m_impl->note_claim(stored.spec.key_path, registration_kind::schema, stored.owner);
     return registration_ok();
 }
 
@@ -313,7 +314,6 @@ registration_result config_space_builder::register_element(schema_element elemen
     // The element's declared path is the key it claims; record it for conflict
     // surfacing before attach consumes the element.
     const std::string claimed = element.declared_path().str();
-    // attach() enforces referential integrity; surface its rejection verbatim.
     if(auto attached = m_impl->schema.attach(std::move(element)); !attached)
         return unexpected(error{errc::rejected_registration, std::move(attached).error()});
     m_impl->note_claim(claimed, registration_kind::schema, owner);

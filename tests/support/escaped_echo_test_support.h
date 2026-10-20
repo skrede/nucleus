@@ -1,6 +1,9 @@
 #ifndef HPP_GUARD_NUCLEUS_TESTS_SUPPORT_ESCAPED_ECHO_TEST_SUPPORT_H
 #define HPP_GUARD_NUCLEUS_TESTS_SUPPORT_ESCAPED_ECHO_TEST_SUPPORT_H
 
+#include "nucleus/error.h"
+#include "nucleus/expected.h"
+
 #include "nucleus/schema/anchor.h"
 
 #include "nucleus/keyspace/key_path.h"
@@ -40,6 +43,13 @@ inline anchor under(const char *text)
     auto parsed = key_path::parse(text);
     REQUIRE(parsed);
     return anchor::keyspace(parsed.value());
+}
+
+inline std::string registration_refusal(const expected<void, error> &result, errc code = errc::rejected_registration)
+{
+    REQUIRE_FALSE(result);
+    REQUIRE(result.error().code == code);
+    return result.error().message;
 }
 
 inline void require_escaped_echo(const std::string &message, const char *rule, const std::string &echoed)

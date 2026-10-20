@@ -57,12 +57,13 @@ Each line carries the flag, its description, its allowed-values list, and a
 `(required)` marker &mdash; each part appended only when present. Lines are grouped
 by the first path segment (the top-level keyspace), and the groups are emitted in a
 stable order so the text is reproducible.
-A control character in a description or in the program name is printed as an escape
-such as `\x1b`, so the help text cannot drive the terminal that shows it. Element
-names, allowed values and the delimiter never carry one: registration refuses a name
-or an allowed value that does (see [Declaring a schema](api-using.md#schema)), and
-`cli_delimiter::parse` refuses such a delimiter (see
-[Delimiter grammar](cli-grammar.md#delimiter-grammar)).
+Help prints every host string it renders &mdash; flags, descriptions, allowed values,
+group headers and the program name &mdash; with each control character written as an
+escape such as `\x1b`, so the help text cannot drive the terminal that shows it.
+Registration also refuses a control character in an element name, a `register_schema`
+path and an allowed value (see [Declaring a schema](api-using.md#schema) and
+[the builder](api-using.md#builder)), and `cli_delimiter::parse` refuses one in a
+delimiter (see [Delimiter grammar](cli-grammar.md#delimiter-grammar)).
 
 Only the returned string crosses the boundary: nucleus ships no `--help`
 subcommand. The host owns how the text is surfaced &mdash; printed on `--help`,

@@ -88,6 +88,13 @@ expected<config_space, error> build();   // seals; the builder is spent afterwar
   failure the code is `errc::rejected_registration` (the registration policy's
   reason, verbatim, in `message`) or `errc::sealed_builder`.
 - Check each registration result: `if(!builder.register_element(...)) ...`.
+- `register_schema` refuses a path that is not one or more non-empty segments
+  joined by `/`, or that holds a segment breaking the
+  [element-name rule](#schema) &mdash; a digit-led segment, a space, any of
+  `` !"#$%&'()*:;<>?[\]`{|}~ ``, or a control character (a C0 byte, DEL, C1
+  control or Unicode Bidi_Control code point) &mdash; with
+  `errc::rejected_registration`, quoting the refused path and segment with every
+  byte outside printable ASCII written as an escape such as `\x1b`.
 - Every registration carries an opaque `owner_token` and is first offered to the
   [registration policy](api-extending.md#registration_policy).
 - After `build()`, every `register_*` / `install_*` call is a loud state-machine

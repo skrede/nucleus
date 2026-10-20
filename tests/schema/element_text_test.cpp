@@ -1,5 +1,6 @@
 #include "support/escaped_echo_test_support.h"
 #include "support/builder_result_test_support.h"
+#include "support/completion_result_test_support.h"
 
 #include "nucleus/completion/completion.h"
 
@@ -21,6 +22,7 @@ namespace {
 using nucleus::escaped_echo_test::byte_of;
 using nucleus::escaped_echo_test::framed;
 using nucleus::escaped_echo_test::printable_ascii;
+using nucleus::escaped_echo_test::registration_refusal;
 using nucleus::escaped_echo_test::require_escaped_echo;
 using nucleus::escaped_echo_test::terminal_controls;
 using nucleus::escaped_echo_test::under;
@@ -44,10 +46,7 @@ std::string refused_message(std::vector<nucleus::schema_element> prior, nucleus:
     REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
     for(nucleus::schema_element &el : prior)
         REQUIRE(engine.register_element(std::move(el)));
-    auto result = engine.register_element(std::move(refused));
-    REQUIRE_FALSE(result);
-    REQUIRE(result.error().code == code);
-    return result.error().message;
+    return registration_refusal(engine.register_element(std::move(refused)), code);
 }
 
 std::string attach_refusal(nucleus::schema_element refused)
@@ -175,5 +174,26 @@ TEST_CASE("a registration refusal echoes the control-carrying text it refuses es
         require_escaped_echo(refused_message({}, repeated(nucleus::identity_element(name, logging))), "both repeated and a primary key", name);
         require_escaped_echo(refused_message({}, repeated(nucleus::unique_element(name, logging))), "both repeated and unique", name);
         require_escaped_echo(refused_message({}, nucleus::keyref_element("ref", logging, "g" + control)), "references identity namespace", "g" + control);
+    }
+}
+
+TEST_CASE("a schema path is refused unless each of its segments is a well-formed element name", "[schema][registration][completion]")
+{
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_schema("logging/level"));
+    std::vector<std::string> refused{"", "a//b", "v1/2fa", "my flag", "a;b", "node[0]"};
+    for(const std::string &control : terminal_controls)
+        refused.insert(refused.end(), {"x" + control, "logging/x" + control + "y"});
+    for(const std::string &path : refused)
+        require_escaped_echo(registration_refusal(engine.register_schema(path)), "schema path", path);
+    REQUIRE(engine.schema_count() == 1);
+    for(const std::string &control : terminal_controls)
+        require_escaped_echo(registration_refusal(engine.register_element(nucleus::element("y", nucleus::anchor::keyspace("x" + control)))), "undefined keyspace", "x" + control);
+    REQUIRE(engine.register_schema("log_level.2/a-b"));
+    const nucleus::config_space space = nucleus::builder_result_test::built(engine);
+    for(const std::string &text : {nucleus::completion_result_test::script_of(space.generate_completion(nucleus::shell::bash, "mytool")), nucleus::completion_result_test::script_of(space.generate_completion(nucleus::shell::zsh, "mytool")), space.generate_help("mytool")})
+    {
+        REQUIRE(text.find("--logging-level") != std::string::npos);
+        REQUIRE(text.find_first_of("\x1b\xe2\x80\xae") == std::string::npos);
     }
 }

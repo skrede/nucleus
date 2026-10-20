@@ -57,16 +57,18 @@ class schema_registry
 public:
     schema_registry() = default;
 
-    void add(schema_spec spec, owner_token owner)
+    // A path-tagged registration also defines that path as a recognized
+    // target, so the schema-as-authority surface (recognizes / CLI gating)
+    // honors paths registered through the facade, not only those attached as
+    // typed elements. A path that fails the schema path rule is neither stored
+    // nor defined.
+    schema_attach_result add(schema_spec spec, owner_token owner)
     {
-        // A path-tagged registration also defines that path as a recognized
-        // target, so the schema-as-authority surface (recognizes / CLI gating)
-        // honors paths registered through the facade, not only those attached as
-        // typed elements. A malformed path is still stored as a registration but
-        // contributes no recognized node.
-        if(key_path::parse(spec.key_path))
-            m_defined.insert(spec.key_path);
+        if(auto rejected = check_schema_path(spec.key_path); !rejected)
+            return rejected;
+        m_defined.insert(spec.key_path);
         m_entries.push_back(make_registration(std::move(spec), std::move(owner)));
+        return {};
     }
 
     std::size_t size() const noexcept { return m_entries.size(); }
