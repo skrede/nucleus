@@ -1,4 +1,5 @@
 #include "support/builder_result_test_support.h"
+#include "support/completion_result_test_support.h"
 
 #include "nucleus/completion/completion.h"
 
@@ -17,6 +18,8 @@
 // register_element/enum_element and calls config_space::generate_completion,
 // never touching the internal schema registry. This proves the host-reachable path
 // is wired end-to-end -- the gap that the free generator alone left open.
+
+using nucleus::completion_result_test::script_of;
 
 namespace {
 
@@ -37,7 +40,7 @@ TEST_CASE("the facade generates a bash completion script from the registered sch
         nucleus::element("port", nucleus::anchor::keyspace(path_of("plexus")))));
     nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
-    const std::string bash = space.generate_completion(nucleus::shell::bash, "mytool").value();
+    const std::string bash = script_of(space.generate_completion(nucleus::shell::bash, "mytool"));
 
     REQUIRE(bash.find("complete -F _mytool_complete mytool") != std::string::npos);
     REQUIRE(bash.find("--logging") != std::string::npos);
@@ -58,7 +61,7 @@ TEST_CASE("the facade generates a zsh completion script from the registered sche
         {"debug", "info", "warn", "error"})));
     nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
-    const std::string zsh = space.generate_completion(nucleus::shell::zsh, "mytool").value();
+    const std::string zsh = script_of(space.generate_completion(nucleus::shell::zsh, "mytool"));
 
     REQUIRE(zsh.find("#compdef mytool") != std::string::npos);
     REQUIRE(zsh.find("_arguments -s") != std::string::npos);
@@ -110,7 +113,7 @@ TEST_CASE("the facade --help lists a bare path-tagged flag alongside typed eleme
     nucleus::config_space space = nucleus::builder_result_test::built(engine);
 
     const std::string help = space.generate_help("mytool");
-    const std::string completion = space.generate_completion(nucleus::shell::bash, "mytool").value();
+    const std::string completion = script_of(space.generate_completion(nucleus::shell::bash, "mytool"));
 
     REQUIRE(help.find("--logging") != std::string::npos);
     REQUIRE(help.find("--logging-verbose") != std::string::npos);

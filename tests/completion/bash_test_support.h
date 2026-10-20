@@ -3,20 +3,13 @@
 
 #include <array>
 #include <cstdio>
+#include <memory>
 #include <random>
 #include <string>
 #include <vector>
 #include <cstdlib>
 #include <fstream>
 #include <filesystem>
-
-// MSVC spells the POSIX popen/pclose pair with leading underscores; map them so
-// the harness compiles everywhere even though the tests only RUN where the
-// bash_available() probe says so.
-#ifdef _MSC_VER
-    #define popen _popen
-    #define pclose _pclose
-#endif
 
 namespace nucleus::bash_test {
 
@@ -34,32 +27,65 @@ inline bool bash_available()
 #endif
 }
 
-// Two executables drive bash at once under a parallel CTest, so each scratch name is unique to
-// its call and neither can overwrite or remove the other's.
-inline std::filesystem::path scratch_path(const std::string &stem)
+// Two executables drive bash at once under a parallel CTest, so each scratch directory is created
+// exclusively under a name unique to its call, and neither can overwrite or remove the other's.
+inline std::filesystem::path scratch_directory(const std::string &stem)
 {
-    return std::filesystem::temp_directory_path() / (stem + "_" + std::to_string(std::random_device{}()));
+    std::random_device random;
+    for(;;)
+    {
+        std::filesystem::path dir = std::filesystem::temp_directory_path() / (stem + "_" + std::to_string(random()));
+        if(std::filesystem::create_directory(dir))
+            return dir;
+    }
 }
 
-// Runs a bash script and returns its stdout. The script is written to a temp file
-// and executed; the harness captures its output via popen.
+inline std::string shell_quoted(const std::string &text)
+{
+    std::string quoted = "'";
+    for(const char c : text)
+    {
+        if(c == '\'')
+            quoted += "'\\''";
+        else
+            quoted += c;
+    }
+    return quoted + "'";
+}
+
+inline void close_pipe(std::FILE *pipe)
+{
+#ifdef _MSC_VER
+    _pclose(pipe);
+#else
+    pclose(pipe);
+#endif
+}
+
+using pipe_handle = std::unique_ptr<std::FILE, decltype(&close_pipe)>;
+
+inline pipe_handle opened_pipe(const std::string &command)
+{
+#ifdef _MSC_VER
+    return pipe_handle(_popen(command.c_str(), "r"), &close_pipe);
+#else
+    return pipe_handle(popen(command.c_str(), "r"), &close_pipe);
+#endif
+}
+
 inline std::string run_bash(const std::string &script)
 {
-    const std::filesystem::path file = scratch_path("nucleus_completion_smoke") += ".sh";
-    {
-        std::ofstream out(file);
-        out << script;
-    }
-    const std::string cmd = "bash " + file.string() + " 2>/dev/null";
-    std::string       captured;
-    if(FILE *pipe = popen(cmd.c_str(), "r"))
+    const std::filesystem::path scratch = scratch_directory("nucleus_completion_smoke");
+    const std::filesystem::path file    = scratch / "script.sh";
+    std::ofstream(file) << script;
+    std::string captured;
+    if(const pipe_handle pipe = opened_pipe("bash " + shell_quoted(file.string()) + " 2>/dev/null"))
     {
         std::array<char, 256> buf{};
-        while(std::fgets(buf.data(), static_cast<int>(buf.size()), pipe))
+        while(std::fgets(buf.data(), static_cast<int>(buf.size()), pipe.get()))
             captured += buf.data();
-        pclose(pipe);
     }
-    std::filesystem::remove(file);
+    std::filesystem::remove_all(scratch);
     return captured;
 }
 
@@ -68,12 +94,10 @@ inline std::string run_bash(const std::string &script)
 inline std::string run_seeded(const std::string &completion, const std::string &drive,
                               const std::vector<std::string> &decoys)
 {
-    const std::filesystem::path dir = scratch_path("nucleus_completion_glob");
-    std::filesystem::remove_all(dir);
-    std::filesystem::create_directories(dir);
+    const std::filesystem::path dir = scratch_directory("nucleus_completion_glob");
     for(const std::string &decoy : decoys)
         std::ofstream(dir / decoy);
-    const std::string out = run_bash("cd '" + dir.string() + "' || exit 1\n" + completion + drive);
+    const std::string out = run_bash("cd " + shell_quoted(dir.string()) + " || exit 1\n" + completion + drive);
     std::filesystem::remove_all(dir);
     return out;
 }

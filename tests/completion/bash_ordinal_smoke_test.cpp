@@ -8,6 +8,8 @@
 
 #include "nucleus/keyspace/key_path.h"
 
+#include "support/completion_result_test_support.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
@@ -21,6 +23,7 @@ using nucleus::shell;
 using nucleus::bash_test::bash_available;
 using nucleus::bash_test::run_bash;
 using nucleus::bash_test::run_seeded;
+using nucleus::completion_result_test::script_of;
 
 namespace {
 
@@ -55,7 +58,7 @@ schema_registry route_registry()
 
 std::string script(const schema_registry &reg, const key_path &at = {})
 {
-    return generate_completion(shell::bash, reg, "myapp", {}, at).value();
+    return script_of(generate_completion(shell::bash, reg, "myapp", {}, at));
 }
 
 // Completes the last of `words` the way bash does, one candidate per line and nothing at all

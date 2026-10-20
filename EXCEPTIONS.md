@@ -94,7 +94,7 @@ current working branch.
 | | Over the line ceiling | Over the function ceiling |
 |---|---|---|
 | Before the resolution-context and schema-registry decomposition | 46 units | 62 functions in 25 files |
-| Now | 47 units | 43 functions in 22 files |
+| Now | 47 units | 42 functions in 21 files |
 
 Two units left the register: `resolution_context.h` fell from 1890 lines to 196, and
 `schema_registry.h` from 534 to 178. The twenty-nine units split out of them are all inside both
@@ -121,6 +121,9 @@ the function table, with one over-ceiling function of 39 lines where it had two 
 60. The bash emitter's script assembly was decomposed, which took `bash_emitter.h`'s one
 over-ceiling function, 51 lines, out of the function table. The six library headers the
 completion work added are all inside both ceilings, so none joined.
+
+`completion.cpp` has since left the function table too. Help generation was decomposed into
+helpers inside the ceiling, and its longest function now measures 21 lines.
 
 The "before" figures needed a correction before they could be compared against. The earlier
 tables covered C++ files only, while the gate has always measured CMake units by name as well;
@@ -183,7 +186,7 @@ None.
 
 ## Carried — library files over the 200-line ceiling
 
-12 of 166 units.
+12 of 168 units.
 
 | File | Lines |
 |---|---|
@@ -202,7 +205,7 @@ None.
 
 ## Carried — test files over the 200-line ceiling
 
-33 of 164 units. Test units are held to the same ceiling.
+33 of 170 units. Test units are held to the same ceiling.
 
 Two rows here rose to close the pathname expansion the generated bash completion performed
 over its own candidates, and one of the two rose again for the zsh description escaper.
@@ -299,7 +302,7 @@ example's output, so a shorter walkthrough would mean editing the gate that chec
 
 ## Carried — library functions over the 25-line ceiling
 
-43 functions across 22 files. Listed per file, since a file's largest function is the one that
+42 functions across 21 files. Listed per file, since a file's largest function is the one that
 sets the decomposition problem.
 
 | File | Functions over ceiling | Longest |
@@ -319,7 +322,6 @@ sets the decomposition problem.
 | `lib/core/include/nucleus/config_source/feature_gate.h` | 2 | 47 |
 | `lib/argv/include/nucleus/argv/argv_source.h` | 1 | 42 |
 | `lib/core/src/nucleus/resolve/configuration_space.cpp` | 5 | 41 |
-| `lib/core/src/nucleus/completion/completion.cpp` | 1 | 39 |
 | `lib/core/include/nucleus/diagnostics/key_suggester.h` | 2 | 33 |
 | `lib/core/src/nucleus/query/query.cpp` | 1 | 33 |
 | `lib/core/include/nucleus/config_source/extension_registry.h` | 1 | 32 |

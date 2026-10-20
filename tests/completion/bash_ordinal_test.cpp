@@ -7,6 +7,8 @@
 
 #include "nucleus/keyspace/key_path.h"
 
+#include "support/completion_result_test_support.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
@@ -16,6 +18,7 @@ using nucleus::generate_completion;
 using nucleus::key_path;
 using nucleus::schema_registry;
 using nucleus::shell;
+using nucleus::completion_result_test::script_of;
 
 namespace {
 
@@ -129,7 +132,7 @@ complete -F _myapp_complete myapp
 TEST_CASE("the bash script for a repeated container matches the golden projection byte-for-byte",
           "[completion][ordinal]")
 {
-    REQUIRE(generate_completion(shell::bash, node_registry(), "myapp").value() == expected_bash);
+    REQUIRE(script_of(generate_completion(shell::bash, node_registry(), "myapp")) == expected_bash);
 }
 
 // The delimiter carries the placeholder byte, so only the recorded slot may split the flag: the
@@ -139,7 +142,7 @@ TEST_CASE("a delimiter carrying the placeholder byte reaches the walker as liter
 {
     const nucleus::cli_delimiter star = nucleus::cli_delimiter::parse("*").value();
 
-    const std::string bash = generate_completion(shell::bash, node_registry(), "myapp", star).value();
+    const std::string bash = script_of(generate_completion(shell::bash, node_registry(), "myapp", star));
     const std::string call = "_myapp_ordinal \"$flag\" '--cluster\\*node\\*' '\\*level'";
     REQUIRE(bash.find("        if " + call + " && [ \"$ordinal_name\" = \"$flag\" ]; then\n") != std::string::npos);
     REQUIRE(bash.find("    _myapp_ordinal \"$1\" '--cluster\\*node\\*' '\\*port' && printf") != std::string::npos);

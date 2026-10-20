@@ -6,15 +6,18 @@
 
 #include "nucleus/keyspace/key_path.h"
 
+#include "support/completion_result_test_support.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
 
-using nucleus::shell;
 using nucleus::anchor;
+using nucleus::generate_completion;
 using nucleus::key_path;
 using nucleus::schema_registry;
-using nucleus::generate_completion;
+using nucleus::shell;
+using nucleus::completion_result_test::script_of;
 
 namespace {
 
@@ -103,26 +106,25 @@ const std::string expected_zsh =
 
 TEST_CASE("the bash script matches the golden projection byte-for-byte", "[completion]")
 {
-    REQUIRE(generate_completion(shell::bash, fixture(), "myapp").value() == expected_bash);
+    REQUIRE(script_of(generate_completion(shell::bash, fixture(), "myapp")) == expected_bash);
 }
 
 TEST_CASE("the zsh script matches the golden projection byte-for-byte", "[completion]")
 {
-    REQUIRE(generate_completion(shell::zsh, fixture(), "myapp").value() == expected_zsh);
+    REQUIRE(script_of(generate_completion(shell::zsh, fixture(), "myapp")) == expected_zsh);
 }
 
 TEST_CASE("completion renders flags under the host-chosen delimiter", "[completion][delimiter]")
 {
     const auto delim = nucleus::cli_delimiter::parse("__").value();
-    const std::string bash = generate_completion(shell::bash, fixture(), "myapp", delim).value();
+    const std::string bash  = script_of(generate_completion(shell::bash, fixture(), "myapp", delim));
     REQUIRE(bash.find("--logging__level") != std::string::npos);
     REQUIRE(bash.find("--logging-level") == std::string::npos);
 }
 
 TEST_CASE("anchored completion offers only the anchor's subtree, relative", "[completion][anchor]")
 {
-    const std::string bash = generate_completion(shell::bash, fixture(), "myapp", {},
-                                                 path_of("logging")).value();
+    const std::string bash = script_of(generate_completion(shell::bash, fixture(), "myapp", {}, path_of("logging")));
     // Under the anchor: the leaf completes by its relative flag, values intact.
     REQUIRE(bash.find("'--level'") != std::string::npos);
     REQUIRE(bash.find("debug info warn error") != std::string::npos);
@@ -133,10 +135,9 @@ TEST_CASE("anchored completion offers only the anchor's subtree, relative", "[co
 
 TEST_CASE("zsh uses its own _arguments model, not reused bash quoting", "[completion]")
 {
-    const std::string zsh = generate_completion(shell::zsh, fixture(), "myapp").value();
+    const std::string zsh = script_of(generate_completion(shell::zsh, fixture(), "myapp"));
     REQUIRE(zsh.find("#compdef myapp") != std::string::npos);
     REQUIRE(zsh.find("_arguments -s") != std::string::npos);
-    // The bash-only machinery must NOT appear in the zsh dialect.
     REQUIRE(zsh.find("compgen") == std::string::npos);
     REQUIRE(zsh.find("COMPREPLY") == std::string::npos);
 }
@@ -144,10 +145,10 @@ TEST_CASE("zsh uses its own _arguments model, not reused bash quoting", "[comple
 TEST_CASE("adding a flag changes the generated completion", "[completion][drift]")
 {
     schema_registry reg = fixture();
-    const std::string before = generate_completion(shell::bash, reg, "myapp").value();
+    const std::string before = script_of(generate_completion(shell::bash, reg, "myapp"));
 
     REQUIRE(reg.attach(nucleus::element("verbose", anchor::root())));
-    const std::string after = generate_completion(shell::bash, reg, "myapp").value();
+    const std::string after = script_of(generate_completion(shell::bash, reg, "myapp"));
 
     REQUIRE(after != before);
     REQUIRE(before.find("--verbose") == std::string::npos);
@@ -160,15 +161,15 @@ TEST_CASE("adding an enum value changes the generated completion", "[completion]
     REQUIRE(base.attach(nucleus::element("logging", anchor::root())));
     REQUIRE(base.attach(nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
                                       {"debug", "info"})));
-    const std::string before = generate_completion(shell::bash, base, "myapp").value();
-    const std::string before_zsh = generate_completion(shell::zsh, base, "myapp").value();
+    const std::string before     = script_of(generate_completion(shell::bash, base, "myapp"));
+    const std::string before_zsh = script_of(generate_completion(shell::zsh, base, "myapp"));
 
     schema_registry grown;
     REQUIRE(grown.attach(nucleus::element("logging", anchor::root())));
     REQUIRE(grown.attach(nucleus::enum_element("level", anchor::keyspace(path_of("logging")),
                                        {"debug", "info", "trace"})));
-    const std::string after = generate_completion(shell::bash, grown, "myapp").value();
-    const std::string after_zsh = generate_completion(shell::zsh, grown, "myapp").value();
+    const std::string after     = script_of(generate_completion(shell::bash, grown, "myapp"));
+    const std::string after_zsh = script_of(generate_completion(shell::zsh, grown, "myapp"));
 
     REQUIRE(after != before);
     REQUIRE(before.find("trace") == std::string::npos);
@@ -193,14 +194,14 @@ TEST_CASE("attaching a description moves the zsh script and not the bash one",
         nucleus::element("port", anchor::keyspace(path_of("plexus"))),
         "listen here: an unprivileged port")));
 
-    const std::string before_zsh = generate_completion(shell::zsh, plain, "myapp").value();
-    const std::string after_zsh = generate_completion(shell::zsh, described, "myapp").value();
+    const std::string before_zsh = script_of(generate_completion(shell::zsh, plain, "myapp"));
+    const std::string after_zsh  = script_of(generate_completion(shell::zsh, described, "myapp"));
     REQUIRE(after_zsh != before_zsh);
     REQUIRE(before_zsh.find("listen here") == std::string::npos);
     REQUIRE(after_zsh.find("[listen here\\: an unprivileged port]") != std::string::npos);
 
-    REQUIRE(generate_completion(shell::bash, described, "myapp").value()
-            == generate_completion(shell::bash, plain, "myapp").value());
+    const std::string bash = script_of(generate_completion(shell::bash, described, "myapp"));
+    REQUIRE(bash == script_of(generate_completion(shell::bash, plain, "myapp")));
 }
 
 TEST_CASE("a value containing a quote cannot break out of the bash literal",
@@ -210,7 +211,7 @@ TEST_CASE("a value containing a quote cannot break out of the bash literal",
     REQUIRE(reg.attach(nucleus::element("mode", anchor::root())));
     REQUIRE(reg.attach(nucleus::enum_element("kind", anchor::keyspace(path_of("mode")),
                                      {"a'b"})));
-    const std::string bash = generate_completion(shell::bash, reg, "myapp").value();
+    const std::string bash = script_of(generate_completion(shell::bash, reg, "myapp"));
     // Escaped once for the word-list expansion, then again out of the script literal.
     REQUIRE(bash.find("'a\\'\\''b'") != std::string::npos);
 }
@@ -236,7 +237,7 @@ TEST_CASE("completion emits wildcard flag for path crossing a repeated container
           "[completion][repeated_container]")
 {
     const schema_registry reg = repeated_cluster_registry();
-    const std::string bash = generate_completion(shell::bash, reg, "myapp").value();
+    const std::string     bash = script_of(generate_completion(shell::bash, reg, "myapp"));
 
     REQUIRE(bash.find("--cluster-node-endpoint-port") != std::string::npos);
 
@@ -247,7 +248,7 @@ TEST_CASE("completion wildcard entry appears in zsh script for repeated containe
           "[completion][repeated_container]")
 {
     const schema_registry reg = repeated_cluster_registry();
-    const std::string zsh = generate_completion(shell::zsh, reg, "myapp").value();
+    const std::string     zsh = script_of(generate_completion(shell::zsh, reg, "myapp"));
 
     REQUIRE(zsh.find("--cluster-node-endpoint-port") != std::string::npos);
     REQUIRE(zsh.find("--cluster-node-\\*-endpoint-port") != std::string::npos);
@@ -256,8 +257,7 @@ TEST_CASE("completion wildcard entry appears in zsh script for repeated containe
 TEST_CASE("completion wildcard does not appear for non-repeated schema",
           "[completion][repeated_container]")
 {
-    const std::string bash = generate_completion(shell::bash, fixture(), "myapp").value();
-    // fixture() has no repeated container -- no wildcard should be present.
+    const std::string bash = script_of(generate_completion(shell::bash, fixture(), "myapp"));
     REQUIRE(bash.find("-*-") == std::string::npos);
 }
 
@@ -266,7 +266,7 @@ TEST_CASE("completion wildcard does not appear for non-repeated schema",
 TEST_CASE("an anchor below the repeated container emits no duplicate flag",
           "[completion][repeated_container]")
 {
-    const std::string bash = generate_completion(shell::bash, repeated_cluster_registry(), "myapp",
-                                                 {}, path_of("cluster/node/endpoint")).value();
+    const std::string bash = script_of(generate_completion(shell::bash, repeated_cluster_registry(), "myapp",
+                                                           {}, path_of("cluster/node/endpoint")));
     REQUIRE(bash.find("local flags='--port'\n") != std::string::npos);
 }

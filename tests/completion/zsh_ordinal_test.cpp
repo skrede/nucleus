@@ -9,6 +9,8 @@
 
 #include "nucleus/keyspace/key_path.h"
 
+#include "support/completion_result_test_support.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
@@ -20,6 +22,7 @@ using nucleus::generate_completion;
 using nucleus::key_path;
 using nucleus::schema_registry;
 using nucleus::shell;
+using nucleus::completion_result_test::script_of;
 
 namespace {
 
@@ -110,7 +113,7 @@ _myapp "$@"
 TEST_CASE("the zsh script for a repeated container matches the golden projection byte-for-byte",
           "[completion][ordinal]")
 {
-    REQUIRE(generate_completion(shell::zsh, node_registry(), "myapp").value() == expected_zsh);
+    REQUIRE(script_of(generate_completion(shell::zsh, node_registry(), "myapp")) == expected_zsh);
 }
 
 TEST_CASE("the walker receives the static spec's tail and each raw piece beside its escaped form",
@@ -150,7 +153,7 @@ TEST_CASE("a delimiter carrying the placeholder byte reaches the zsh walker as l
 {
     const nucleus::cli_delimiter star = nucleus::cli_delimiter::parse("*").value();
 
-    const std::string zsh = generate_completion(shell::zsh, node_registry(), "myapp", star).value();
+    const std::string zsh = script_of(generate_completion(shell::zsh, node_registry(), "myapp", star));
     REQUIRE(zsh.find("'--cluster*node*' '--cluster\\*node\\*' '*level' '\\*level'\n") != std::string::npos);
     REQUIRE(zsh.find("'--cluster*node*' '--cluster\\*node\\*' '*port' '\\*port'\n") != std::string::npos);
 }

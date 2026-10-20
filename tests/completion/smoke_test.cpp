@@ -10,6 +10,8 @@
 
 #include "nucleus/keyspace/key_path.h"
 
+#include "support/completion_result_test_support.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
@@ -24,6 +26,8 @@ using nucleus::shell;
 using nucleus::bash_test::bash_available;
 using nucleus::bash_test::run_bash;
 using nucleus::bash_test::run_seeded;
+using nucleus::bash_test::scratch_directory;
+using nucleus::completion_result_test::script_of;
 
 namespace {
 
@@ -45,12 +49,8 @@ TEST_CASE("the generated bash script actually completes under real bash",
     if(!bash_available())
         SKIP("bash not found on PATH -- the real-bash smoke test needs it");
 
-    const std::string completion = generate_completion(shell::bash, fixture(), "myapp").value();
+    const std::string completion = script_of(generate_completion(shell::bash, fixture(), "myapp"));
 
-    // Drive the sourced function the way bash itself would: set COMP_WORDS /
-    // COMP_CWORD and invoke the completer, then print COMPREPLY.
-
-    // Case 1: flag-name completion for a "--log" partial.
     {
         const std::string script = completion +
             "\nCOMP_WORDS=(myapp --log)\nCOMP_CWORD=1\n_myapp_complete\n"
@@ -60,9 +60,8 @@ TEST_CASE("the generated bash script actually completes under real bash",
         REQUIRE(out.find("--logging-level") != std::string::npos);
     }
 
-    // Case 2: the COMP_WORDBREAKS value case. bash 4 and later split "--logging-level="
-    // into the words [--logging-level][=], so `=` is the current word and the function
-    // must rebuild the flag from the word before it.
+    // bash 4 and later split "--logging-level=" into the words [--logging-level][=], so `=` is
+    // the current word and the function must rebuild the flag from the word before it.
     {
         const std::string script = completion +
                 "\nCOMP_WORDS=(myapp --logging-level =)\nCOMP_CWORD=2\n"
@@ -74,7 +73,6 @@ TEST_CASE("the generated bash script actually completes under real bash",
         REQUIRE(out.find("error") != std::string::npos);
     }
 
-    // Case 3: a partial value filters the candidate set.
     {
         const std::string script = completion +
             "\nCOMP_WORDS=(myapp --logging-level = w)\nCOMP_CWORD=3\n"
@@ -92,7 +90,7 @@ TEST_CASE("an allowed value containing a space completes as one candidate",
     REQUIRE(reg.attach(nucleus::element("region", anchor::root())));
     REQUIRE(reg.attach(nucleus::enum_element("zone", anchor::keyspace(path_of("region")),
                                      {"us east", "other"})));
-    const std::string completion = generate_completion(shell::bash, reg, "myapp").value();
+    const std::string completion = script_of(generate_completion(shell::bash, reg, "myapp"));
 
     // The separator inside the value is escaped; the one between the two values is not.
     REQUIRE(completion.find("'us\\ east other'") != std::string::npos);
@@ -114,15 +112,15 @@ TEST_CASE("a space name places the ordinal wildcard on the segment the path reac
     REQUIRE(reg.attach(nucleus::repeated_element("node", anchor::root())));
     REQUIRE(reg.attach(nucleus::element("port", anchor::keyspace(path_of("node")))));
 
-    const std::string two = generate_completion(shell::bash, reg, "myapp", {}, {}, "a/b").value();
+    const std::string two = script_of(generate_completion(shell::bash, reg, "myapp", {}, {}, "a/b"));
     REQUIRE(two.find("--a-b-node-*-port") != std::string::npos);
     REQUIRE(two.find("--a-b-*-node-port") == std::string::npos);
 
     // The one- and zero-segment shapes are what the replaced ternary already got right; they
     // are asserted here so widening the count cannot move them.
-    const std::string one = generate_completion(shell::bash, reg, "myapp", {}, {}, "a").value();
+    const std::string one = script_of(generate_completion(shell::bash, reg, "myapp", {}, {}, "a"));
     REQUIRE(one.find("--a-node-*-port") != std::string::npos);
-    const std::string none = generate_completion(shell::bash, reg, "myapp").value();
+    const std::string none = script_of(generate_completion(shell::bash, reg, "myapp"));
     REQUIRE(none.find("--node-*-port") != std::string::npos);
 }
 
@@ -135,8 +133,8 @@ TEST_CASE("no shell construct in a word list fires or corrupts the candidate",
           "[completion][smoke]")
 {
     namespace fs = std::filesystem;
-    const fs::path sentinel = fs::temp_directory_path() / "nucleus_completion_sentinel";
-    const std::string s = sentinel.string();
+    const fs::path                 dir = scratch_directory("nucleus_completion_word_list");
+    const std::string              s   = (dir / "sentinel").string();
     const std::vector<std::string> payloads{
         "a<(:>" + s + ")b",     // process substitution
         "a$(touch " + s + ")b", // command substitution
@@ -152,16 +150,18 @@ TEST_CASE("no shell construct in a word list fires or corrupts the candidate",
     // No zsh interpreter is assumed to exist here, so the zsh half is pinned by text alone.
     REQUIRE(nucleus::zsh_emitter{}.emit(model).find("a<(") == std::string::npos);
     if(!bash_available())
+    {
+        fs::remove_all(dir);
         return;
-
-    fs::remove(sentinel);
+    }
     const std::string script = nucleus::bash_emitter{}.emit(model);
     const std::string drive  = "\nCOMP_WORDS=(myapp -)\nCOMP_CWORD=1\n_myapp_complete\n"
                                "for c in \"${COMPREPLY[@]}\"; do eval \"printf '%s\\n' $c\"; done\n"
                                "COMP_WORDS=(myapp --v =)\nCOMP_CWORD=2\n_myapp_complete\n"
                                "for c in \"${COMPREPLY[@]}\"; do eval \"printf '%s\\n' $c\"; done\n";
     const std::string out    = run_bash(script + drive);
-    REQUIRE_FALSE(fs::exists(sentinel));
+    REQUIRE(fs::is_empty(dir));
+    fs::remove_all(dir);
     for(const std::string &payload : payloads)
         expected += payload + "\n";
     REQUIRE(out == expected);
@@ -180,7 +180,7 @@ TEST_CASE("a directory holding the ordinal wildcard's matches cannot replace it"
     REQUIRE(reg.attach(nucleus::element("port", anchor::keyspace(path_of("node")))));
 
     const std::string out = run_seeded(
-            generate_completion(shell::bash, reg, "myapp").value(),
+            script_of(generate_completion(shell::bash, reg, "myapp")),
             "\nCOMP_WORDS=(myapp --node)\nCOMP_CWORD=1\n_myapp_complete\n"
             "for c in \"${COMPREPLY[@]}\"; do eval \"printf '%s\\n' $c\"; done\n",
             {"--node-7-port", "--node-9-port"});
@@ -198,7 +198,7 @@ TEST_CASE("an allowed value carrying a glob is offered literally", "[completion]
                                      {"*", "us-east"})));
 
     const std::string out = run_seeded(
-            generate_completion(shell::bash, reg, "myapp").value(),
+            script_of(generate_completion(shell::bash, reg, "myapp")),
             "\nCOMP_WORDS=(myapp --region-zone =)\nCOMP_CWORD=2\n_myapp_complete\n"
             "for c in \"${COMPREPLY[@]}\"; do eval \"printf '%s\\n' $c\"; done\n",
             {"all", "any"});
@@ -213,7 +213,7 @@ TEST_CASE("driving the completion leaves the caller's glob setting as it found i
     if(!bash_available())
         SKIP("bash not found on PATH -- driving the generated script needs it");
 
-    const std::string completion = generate_completion(shell::bash, fixture(), "myapp").value();
+    const std::string completion = script_of(generate_completion(shell::bash, fixture(), "myapp"));
     const std::string drive =
             "\nbefore=$-\nCOMP_WORDS=(myapp --log)\nCOMP_CWORD=1\n_myapp_complete\n"
             "COMP_WORDS=(myapp --logging-level =)\nCOMP_CWORD=2\n_myapp_complete\n"
