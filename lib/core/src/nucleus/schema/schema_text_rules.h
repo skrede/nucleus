@@ -27,7 +27,7 @@ inline schema_attach_result check_name_not_digit_led(const schema_element &el)
     return unexpected(nucleus::format(
             "schema element '{}' has a digit-led name: element names must not "
             "start with a digit (CLI flag disambiguation requires this)",
-            el.name));
+            escaped_text(el.name)));
 }
 
 // The declared path pushes this name onto the parent path unparsed, and the CLI surface pushes it into

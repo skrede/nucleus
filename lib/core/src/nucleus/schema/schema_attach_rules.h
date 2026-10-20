@@ -27,8 +27,8 @@ inline schema_attach_result check_anchor_wellformed(const schema_element &el)
     if(!el.at.is_invalid())
         return {};
     return unexpected(nucleus::format(
-        "schema element '{}' has a malformed keyspace anchor '{}'",
-        el.name, el.at.invalid_path()));
+            "schema element '{}' has a malformed keyspace anchor '{}'",
+            escaped_text(el.name), escaped_text(el.at.invalid_path())));
 }
 
 inline schema_attach_result check_anchor_defined(const schema_element &el,
@@ -40,8 +40,8 @@ inline schema_attach_result check_anchor_defined(const schema_element &el,
     if(defined.contains_node(under))
         return {};
     return unexpected(nucleus::format(
-        "schema element '{}' cannot attach under undefined keyspace '{}'",
-        el.name, under.str()));
+            "schema element '{}' cannot attach under undefined keyspace '{}'",
+            escaped_text(el.name), escaped_text(under.str())));
 }
 
 // A config space has exactly ONE primary key: it is the single slice selector for
@@ -59,10 +59,10 @@ inline schema_attach_result check_single_primary_key(const schema_element &el,
     if(existing == declared.end())
         return {};
     return unexpected(nucleus::format(
-        "schema element '{}' cannot be a primary key: '{}' is "
-        "already the config space's primary key, and a "
-        "space has exactly one",
-        el.name, existing->declared_path().str()));
+            "schema element '{}' cannot be a primary key: '{}' is "
+            "already the config space's primary key, and a "
+            "space has exactly one",
+            escaped_text(el.name), existing->declared_path().str()));
 }
 
 inline schema_attach_result check_not_repeated_primary_key(const schema_element &el)
@@ -70,9 +70,9 @@ inline schema_attach_result check_not_repeated_primary_key(const schema_element 
     if(!el.repeated || !el.identity)
         return {};
     return unexpected(nucleus::format(
-        "schema element '{}' cannot be both repeated and a primary key: "
-        "a primary key must be a unique scalar, not a collection",
-        el.name));
+            "schema element '{}' cannot be both repeated and a primary key: "
+            "a primary key must be a unique scalar, not a collection",
+            escaped_text(el.name)));
 }
 
 inline schema_attach_result check_not_repeated_unique(const schema_element &el)
@@ -80,9 +80,9 @@ inline schema_attach_result check_not_repeated_unique(const schema_element &el)
     if(!el.repeated || !el.unique)
         return {};
     return unexpected(nucleus::format(
-        "schema element '{}' cannot be both repeated and unique: "
-        "uniqueness requires a single comparable value, not a collection",
-        el.name));
+            "schema element '{}' cannot be both repeated and unique: "
+            "uniqueness requires a single comparable value, not a collection",
+            escaped_text(el.name)));
 }
 
 // A primary key under ANY repeated ancestor is ambiguous -- each ordinal instance

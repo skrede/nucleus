@@ -4,6 +4,7 @@
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
+#include "nucleus/schema/schema_registry.h"
 
 #include "nucleus/keyspace/key_path.h"
 
@@ -41,6 +42,42 @@ bool holds_c1_range_byte(const std::string &text)
 }
 
 std::string framed(const std::string &control) { return "x" + control + "y"; }
+
+const std::vector<std::string> terminal_controls{"\x1b]0;pwn\x07", "\xe2\x80\xae"};
+
+nucleus::schema_element repeated(nucleus::schema_element el)
+{
+    el.repeated = true;
+    return el;
+}
+
+std::string refused_message(std::vector<nucleus::schema_element> prior, nucleus::schema_element refused,
+                            nucleus::errc code = nucleus::errc::rejected_registration)
+{
+    nucleus::config_space_builder engine;
+    REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
+    for(nucleus::schema_element &el : prior)
+        REQUIRE(engine.register_element(std::move(el)));
+    auto result = engine.register_element(std::move(refused));
+    REQUIRE_FALSE(result);
+    REQUIRE(result.error().code == code);
+    return result.error().message;
+}
+
+std::string attach_refusal(nucleus::schema_element refused)
+{
+    nucleus::schema_registry registry;
+    auto                     attached = registry.attach(std::move(refused));
+    REQUIRE_FALSE(attached);
+    return attached.error();
+}
+
+void require_escaped_echo(const std::string &message, const char *rule, const std::string &echoed)
+{
+    REQUIRE(message.find(rule) != std::string::npos);
+    REQUIRE(message.find(nucleus::escaped_text(echoed)) != std::string::npos);
+    REQUIRE(printable_ascii(message));
+}
 
 std::string without_name(std::string script, const std::string &name)
 {
@@ -136,4 +173,27 @@ TEST_CASE("an allowed value of spaces, shell metacharacters or prose still regis
     REQUIRE(engine.register_element(nucleus::element("logging", nucleus::anchor::root())));
     REQUIRE(engine.register_element(
             nucleus::enum_element("level", under("logging"), {"has space", "x;y", "*", "größe", "~root"})));
+}
+
+TEST_CASE("a refusal ahead of the name rules echoes a control-carrying name or anchor escaped", "[schema][registration]")
+{
+    for(const std::string &control : terminal_controls)
+    {
+        const std::string             name        = framed(control);
+        const std::string             digit_led   = "1" + control + "x";
+        const std::string             bad_anchor  = "a//" + control;
+        const std::string             undefined   = "nowhere" + control;
+        const nucleus::anchor         logging     = under("logging");
+        const nucleus::schema_element misanchored = nucleus::element("x", nucleus::anchor::keyspace(bad_anchor));
+        require_escaped_echo(refused_message({}, nucleus::element(digit_led, logging)), "digit-led", digit_led);
+        require_escaped_echo(attach_refusal(nucleus::element(name, nucleus::anchor::keyspace(std::string("a//b")))), "malformed keyspace anchor", name);
+        require_escaped_echo(attach_refusal(misanchored), "malformed keyspace anchor", bad_anchor);
+        require_escaped_echo(refused_message({}, misanchored, nucleus::errc::malformed_source), "is malformed", bad_anchor);
+        require_escaped_echo(refused_message({}, nucleus::element(name, under("nowhere"))), "undefined keyspace", name);
+        require_escaped_echo(refused_message({}, nucleus::element("x", nucleus::anchor::keyspace(undefined))), "undefined keyspace", undefined);
+        require_escaped_echo(refused_message({nucleus::identity_element("id", logging)}, nucleus::identity_element(name, logging)),
+                             "already the config space's primary key", name);
+        require_escaped_echo(refused_message({}, repeated(nucleus::identity_element(name, logging))), "both repeated and a primary key", name);
+        require_escaped_echo(refused_message({}, repeated(nucleus::unique_element(name, logging))), "both repeated and unique", name);
+    }
 }

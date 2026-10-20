@@ -216,10 +216,10 @@ public:
     // Key-path collisions recorded during the originating builder's registrations.
     std::vector<conflict_report> conflicts() const;
 
-    // Generates a completion script for `which` from the sealed schema, bound to `prog`. Flags
-    // render under `delimiter` and relative to `anchor`, which must match the argv_source grammar;
-    // a non-empty space_name prefixes every entry, matching multispace_argv_source. A `prog` outside
-    // the bare-command-token grammar (letters, digits, '.', '_', '-') is refused, emitting no script.
+    // Generates a completion script for `which` from the sealed schema, bound to `prog`. Flags render under `delimiter` and
+    // relative to `anchor`, matching argv_source; a non-empty space_name prefixes every entry, matching multispace_argv_source.
+    // Refused with errc::malformed_source, emitting no script: a `prog` outside the bare-command-token grammar (letters, digits,
+    // '.', '_', '-'), a space_name that is not a path of such tokens, and an `anchor` ordinal on a segment naming no repeated container.
     expected<std::string, error> generate_completion(shell which, std::string_view prog,
                                                   const cli_delimiter &delimiter = {},
                                                   const key_path &anchor = {},

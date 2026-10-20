@@ -162,8 +162,7 @@ inline bool is_reserved_tree_tokenizer_name(std::string_view name) noexcept
 registration_result reject_if_invalid_anchor(const anchor &at, std::string_view what)
 {
     if(at.is_invalid())
-        return unexpected(error{errc::malformed_source, nucleus::format(
-            "{}: anchor path '{}' is malformed", what, at.invalid_path())});
+        return unexpected(error{errc::malformed_source, nucleus::format("{}: anchor path '{}' is malformed", what, escaped_text(at.invalid_path()))});
     return registration_ok();
 }
 

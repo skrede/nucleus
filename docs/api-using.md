@@ -144,6 +144,15 @@ struct schema_element {
 };
 ```
 
+An element name is one path segment — non-empty, with no `/` — that does
+not open with a digit and carries no space, none of `` !"#$%&'()*:;<>?[\]`{|}~ ``, and
+no control character: no C0 byte, DEL, C1 control or Unicode Bidi_Control code point.
+An allowed value carries no control character of those classes either, newline, tab
+and NUL included, but may hold spaces, shell metacharacters and non-ASCII prose.
+`register_element` refuses an element that breaks either rule with
+`errc::rejected_registration`, quoting the refused name or value with every byte
+outside printable ASCII written as an escape such as `\x1b`.
+
 ### `anchor` — where an element attaches
 
 `anchor::root()` introduces a top-level node; `anchor::keyspace(path)` attaches
