@@ -1,6 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_COMPLETION_BASH_QUOTING_H
 #define HPP_GUARD_NUCLEUS_COMPLETION_BASH_QUOTING_H
 
+#include "nucleus/completion/bash_typed_word.h"
 #include "nucleus/completion/completion_model.h"
 
 #include <string>
@@ -101,25 +102,20 @@ inline std::string bash_reply_assignment(const std::string &pad, const std::stri
 {
     std::string out = pad + "local noglob=0; case $- in *f*) noglob=1 ;; esac; set -f\n";
     if(!prefix.empty())
-        out += pad + "local quote; " + prefix + "_quote \"" + current + "\"\n";
+        out += pad + "local quote kept; " + prefix + "_quote \"" + current + "\"\n";
     out += pad + R"(local IFS=$'\n'; COMPREPLY=( $(IFS=$' \t\n'; compgen -W )" + words + " -- \"" + current + "\"";
     out += prefix.empty() ? std::string() : " | while IFS= read -r w; do " + prefix + R"(_line "$quote" "$w"; done)";
     out += (also.empty() ? std::string() : "; " + also) + ") )\n";
     return out + pad + "if [ \"$noglob\" = 0 ]; then set +f; fi\n";
 }
 
-// readline keeps the typed text through its last word-breaking colon and replaces only what follows,
-// so each reply drops that text. The loop strips element by element because bash 3.2 joins the
-// result of a pattern removal over the whole array into one word under the reply's newline IFS.
-inline constexpr std::string_view bash_colon_trim = R"(case "$COMP_WORDBREAKS" in *:*) local colon="${val%"${val##*:}"}" i=${#COMPREPLY[@]}; while [ "$i" -gt 0 ]; do i=$((i - 1)); COMPREPLY[i]="${COMPREPLY[i]#"$colon"}"; done ;; esac
-)";
-
-inline std::string bash_value_reply(const std::string &pad, const completion_option &option, const std::string &prefix)
+inline std::string bash_value_reply(const std::string &pad, const completion_option &option, const std::string &ident,
+                                    const std::string &prefix)
 {
     const std::string words = bash_single_quote(bash_join_values(option.values));
     std::string       out   = bash_reply_assignment(pad, words, "$val", prefix, {});
-    out += pad;
-    out += bash_colon_trim;
+    if(bash_needs_trim(option))
+        out += pad + "_" + ident + "_trim \"$val\"" + (prefix.empty() ? "" : " \"$kept\"") + "\n";
     return out + pad + "return 0\n";
 }
 

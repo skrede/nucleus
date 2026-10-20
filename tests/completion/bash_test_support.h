@@ -15,6 +15,7 @@
 #include <random>
 #include <string>
 #include <vector>
+#include <cstdint>
 #include <cstdlib>
 #include <fstream>
 #include <filesystem>
@@ -96,6 +97,11 @@ inline std::string run_bash(const std::string &script)
     }
     std::filesystem::remove_all(scratch);
     return captured;
+}
+
+inline std::int32_t bash_major_version()
+{
+    return static_cast<std::int32_t>(std::strtol(run_bash("echo \"${BASH_VERSINFO[0]}\"\n").c_str(), nullptr, 10));
 }
 
 inline constexpr std::string_view argv_printer  = "myapp() { for a in \"$@\"; do printf '<%s>' \"$a\"; done; echo; }\n";

@@ -48,6 +48,14 @@ schema_registry logging_registry()
     return reg;
 }
 
+schema_registry breaks_registry()
+{
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::element("app", anchor::root())));
+    REQUIRE(reg.attach(nucleus::enum_element("mode", anchor::keyspace(path_of("app")), {"a#b:c", "~r:x", "u^v:w", "user@host", "k=v"})));
+    return reg;
+}
+
 schema_registry values_registry()
 {
     schema_registry reg;
@@ -97,24 +105,34 @@ TEST_CASE("every inserted bash candidate parses back to its own text", "[complet
     check_rows(rows);
 }
 
-TEST_CASE("a value typed past a colon completes to its own text where bash keeps it one word", "[completion][smoke]")
+TEST_CASE("a value typed past a word-break byte completes to its own text where bash keeps it one word", "[completion][smoke]")
 {
     if(!bash_available())
         SKIP("bash not found on PATH -- driving the generated script needs it");
 
     const std::string          values = script(values_registry());
+    const std::string          breaks = script(breaks_registry());
     const std::string          flag   = "--cluster-node-level";
     std::vector<insertion_row> rows{
             {values, {flag + "=co:"}, flag + "=co:", "", "<" + flag + "=co:lon>\n"},
             {values, {flag + "=co:l"}, flag + "=co:", "", "<" + flag + "=co:lon>\n"},
             {values, {"--cluster-node-2-level=co:"}, "--cluster-node-2-level=co:", "", "<--cluster-node-2-level=co:lon>\n"},
             {values, {flag, "=", "'co:"}, flag + "='", "'", "<" + flag + "=co:lon>\n"},
+            {breaks, {"--app-mode=user@h"}, "--app-mode=user", "", "<--app-mode=user@host>\n"},
     };
+    for(const auto &[typed, value] : std::vector<std::pair<std::string, std::string>>{
+                {"a#b:", "a#b:c"}, {"a\\#b:", "a#b:c"}, {"~r:", "~r:x"}, {"u^v:", "u^v:w"}, {"k=", "k=v"}})
+        rows.push_back({breaks, {"--app-mode=" + typed}, "--app-mode=" + typed, "", "<--app-mode=" + value + ">\n"});
+    const std::string plain = nucleus::bash_emitter{}.emit({"myapp", {{"--v", "d", {"co:lon", "k=v"}, {}}}});
+    REQUIRE(plain.find("_myapp_line") == std::string::npos);
+    rows.push_back({plain, {"--v=k="}, "--v=k=", "", "<--v=k=v>\n"});
     check_rows(rows);
     const std::string untrimmed = "COMP_WORDBREAKS=${COMP_WORDBREAKS//:/}\n" + insert_and_parse({flag + "=co:"}, flag + "=", "");
     REQUIRE(run_seeded(values, untrimmed, {}) == "<" + flag + "=co:lon>\n");
-    // bash 4 and later split the value at the colon and nothing re-joins it, so no value is offered.
+    // bash 4 and later split the value at the break byte and nothing re-joins it, so no value is offered.
     REQUIRE(run_seeded(values, insert_and_parse({flag, "=", "co", ":"}, flag + "=co:", ""), {}).empty());
+    REQUIRE(run_seeded(breaks, insert_and_parse({"--app-mode", "=", "user", "@", "h"}, "--app-mode=user@", ""), {}).empty());
+    REQUIRE(run_seeded(breaks, insert_and_parse({"--app-mode", "=", "k", "="}, "--app-mode=k=", ""), {}).empty());
 }
 
 TEST_CASE("every byte but a newline round-trips through the inserted line", "[completion][smoke]")

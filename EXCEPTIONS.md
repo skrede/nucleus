@@ -254,8 +254,8 @@ is the price of the file being stable under both, and the row is the price of th
 | `tests/runtime/load_front_door_test.cpp` | 289 |
 | `tests/schema/keyed_composition_test.cpp` | 286 |
 | `tests/resolve/resolution_test.cpp` | 278 |
-| `tests/completion/completion_test.cpp` | 272 |
 | `tests/schema/enforcer_test.cpp` | 272 |
+| `tests/completion/completion_test.cpp` | 271 |
 | `tests/completion/smoke_test.cpp` | 262 |
 | `tests/tokenizer/token_resolution_test.cpp` | 245 |
 | `tests/config_source/discovery_test.cpp` | 240 |

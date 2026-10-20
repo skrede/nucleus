@@ -69,7 +69,6 @@ const std::string expected_bash =
         "            local noglob=0; case $- in *f*) noglob=1 ;; esac; set -f\n"
         "            local IFS=$'\\n'; COMPREPLY=( $(IFS=$' \\t\\n'; compgen -W 'debug info warn error' -- \"$val\") )\n"
         "            if [ \"$noglob\" = 0 ]; then set +f; fi\n"
-        "            case \"$COMP_WORDBREAKS\" in *:*) local colon=\"${val%\"${val##*:}\"}\" i=${#COMPREPLY[@]}; while [ \"$i\" -gt 0 ]; do i=$((i - 1)); COMPREPLY[i]=\"${COMPREPLY[i]#\"$colon\"}\"; done ;; esac\n"
         "            return 0\n"
         "            ;;\n"
         "        esac\n"
