@@ -603,7 +603,10 @@ into an aggregate `vec3` converter.
 
 The seam through which a host pre-validates or refuses a registration before it
 commits. The default policy accepts everything — the core imposes no reservation
-or namespacing rules of its own.
+or namespacing rules of its own. The policy is consulted before the engine's own
+registration rules, so a registration it accepts can still be refused by them: a
+schema path whose segment is not a well-formed element name, for example, is
+refused with `errc::rejected_registration` after the policy has accepted it.
 
 ```cpp
 enum class registration_kind : std::uint8_t { schema, tokenizer, config_source, converter };

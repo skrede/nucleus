@@ -1131,6 +1131,9 @@ The bash script requires bash 5.0 or later. On older bash, including the bash 3.
 macOS ships as `/bin/bash` and the bash 4.4 of RHEL 8 and its rebuilds, the script
 installs no completion.
 
+In zsh, load the zsh script: the bash script loaded through `bashcompinit`
+registers nothing, since zsh has no `BASH_VERSINFO`.
+
 `prog` reaches shell command position unquoted in the generated script, so it must
 be a bare command token: it opens with a letter, a digit or `_`, and carries only
 letters, digits, `.`, `_` and `-`. A name carrying a path separator, whitespace, a

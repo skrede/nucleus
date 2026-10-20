@@ -13,8 +13,9 @@ name, a collapsed instance ordinal &mdash; the emitter now reports before produc
 any output. Every entry below can turn a previously clean emit into a failure. One
 entry narrows what a document may contain at all; read that one first.
 
-Two groups after the emitter ones do not concern emission at all: the schema API
-carries one breaking rename, and what nucleus requires to build and what an
+Three groups after the emitter ones do not concern emission at all: generated shell
+completion now requires bash 5.0 and refuses a malformed program name, the schema
+API carries one breaking rename, and what nucleus requires to build and what an
 installed package hands a consumer both changed. An upgrader who does not emit
 still wants those.
 
@@ -65,6 +66,32 @@ still wants those.
   emitter never flushes: success means the stream buffer accepted every byte, and a
   later flush, close or persistence failure is the caller's and lies outside the
   emitter result. A short write's accepted prefix is not rolled back.
+
+### Shell completion
+
+- **The generated bash completion now requires bash 5.0.** On bash 3.2, the macOS
+  `/bin/bash`, and on any 4.x, including the 4.4 of RHEL 8 and its rebuilds, the
+  script still sources cleanly but registers nothing, and says nothing: the source
+  exits 0 and `complete -p` is simply empty. A bash script loaded into zsh through
+  `bashcompinit` registers nothing either, since zsh has no `BASH_VERSINFO`; load
+  the zsh script there.
+- **The script's last line now guards the registration.** It reads
+  `if [ "${BASH_VERSINFO[0]}" -ge 5 ]; then complete -F _<prog>_complete <prog>; fi`
+  where it used to be a bare `complete -F` line. A host that rewrote that line
+  &mdash; to append aliases, or to strip it and register further names &mdash;
+  must adjust to the new shape.
+- **A program name that is not a bare command token is refused.**
+  `config_space::generate_completion` now returns `expected<std::string, error>`
+  rather than `std::string`, so a caller that used the result as a string no
+  longer compiles. The name reaches shell command position unquoted, so a `prog`
+  that opens with anything but a letter, a digit or `_`, or that carries anything
+  but letters, digits, `.`, `_` and `-`, is refused with `errc::malformed_source`
+  before any script text exists. Each segment of a non-empty `space_name` is held
+  to the same grammar, since it lands in the script's word list beside every flag.
+- **The text of the generated scripts changed throughout this release.** Beyond the
+  last line, the bash and zsh scripts differ from 0.4.1's in many places. Treat
+  them as opaque output to install as written; a host that post-processes either
+  script must re-check its edits against the new text.
 
 ### Schema API
 

@@ -67,10 +67,11 @@ private:
     std::string m_reason;
 };
 
-// The registration-policy seam: a host pre-validates / intercepts a registration
-// before it commits. The default policy accepts everything (mechanism in core,
-// policy in host). The core never imposes reservation or namespacing rules of
-// its own beyond this hook.
+// The registration-policy seam: a host pre-validates or intercepts a registration
+// before it commits, and the default accepts everything (mechanism in core, policy in
+// host), since the core imposes no reservation or namespacing rules beyond this hook.
+// The policy is consulted before the engine's own registration rules, so a
+// registration it accepts can still be refused by them.
 class registration_policy
 {
 public:
