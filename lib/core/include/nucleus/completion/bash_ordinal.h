@@ -1,7 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_COMPLETION_BASH_ORDINAL_H
 #define HPP_GUARD_NUCLEUS_COMPLETION_BASH_ORDINAL_H
 
-#include "nucleus/completion/bash_quoting.h"
+#include "nucleus/completion/bash_line_form.h"
 #include "nucleus/completion/completion_model.h"
 
 #include "nucleus/keyspace/key_path.h"

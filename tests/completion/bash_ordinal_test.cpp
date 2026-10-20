@@ -46,9 +46,17 @@ const std::string expected_bash = R"bash(# bash completion for myapp
 _myapp_line()
 {
     case "$1" in
-    '--cluster-node-*-level') printf '%s\n' '--cluster-node-\*-level' ;;
-    '--cluster-node-*-port') printf '%s\n' '--cluster-node-\*-port' ;;
-    *) printf '%s\n' "$1" ;;
+    \'*) case "$2" in
+        *) printf '%s\n' "$2" ;;
+        esac ;;
+    \"*) case "$2" in
+        *) printf '%s\n' "$2" ;;
+        esac ;;
+    *) case "$2" in
+        '--cluster-node-*-level') printf '%s\n' '--cluster-node-\*-level' ;;
+        '--cluster-node-*-port') printf '%s\n' '--cluster-node-\*-port' ;;
+        *) printf '%s\n' "$2" ;;
+        esac ;;
     esac
 }
 _myapp_ordinal()
@@ -103,24 +111,24 @@ _myapp_complete()
         case "$flag" in
         '--cluster-node-level')
             local noglob=0; case $- in *f*) noglob=1 ;; esac; set -f
-            local IFS=$'\n'; COMPREPLY=( $(IFS=$' \t\n'; compgen -W 'debug info' -- "$val" | while IFS= read -r w; do _myapp_line "$w"; done) )
+            local IFS=$'\n'; COMPREPLY=( $(IFS=$' \t\n'; compgen -W 'debug info' -- "$val" | while IFS= read -r w; do _myapp_line "$val" "$w"; done) )
             if [ "$noglob" = 0 ]; then set +f; fi
-            __ltrim_colon_completions "$cur" 2>/dev/null
+            case "$COMP_WORDBREAKS" in *:*) local colon="${val%"${val##*:}"}" i=${#COMPREPLY[@]}; while [ "$i" -gt 0 ]; do i=$((i - 1)); COMPREPLY[i]="${COMPREPLY[i]#"$colon"}"; done ;; esac
             return 0
             ;;
         esac
         if _myapp_ordinal "$flag" '--cluster-node-' '-level' && [ "$ordinal_name" = "$flag" ]; then
             local noglob=0; case $- in *f*) noglob=1 ;; esac; set -f
-            local IFS=$'\n'; COMPREPLY=( $(IFS=$' \t\n'; compgen -W 'debug info' -- "$val" | while IFS= read -r w; do _myapp_line "$w"; done) )
+            local IFS=$'\n'; COMPREPLY=( $(IFS=$' \t\n'; compgen -W 'debug info' -- "$val" | while IFS= read -r w; do _myapp_line "$val" "$w"; done) )
             if [ "$noglob" = 0 ]; then set +f; fi
-            __ltrim_colon_completions "$cur" 2>/dev/null
+            case "$COMP_WORDBREAKS" in *:*) local colon="${val%"${val##*:}"}" i=${#COMPREPLY[@]}; while [ "$i" -gt 0 ]; do i=$((i - 1)); COMPREPLY[i]="${COMPREPLY[i]#"$colon"}"; done ;; esac
             return 0
         fi
         return 0
     fi
 
     local noglob=0; case $- in *f*) noglob=1 ;; esac; set -f
-    local IFS=$'\n'; COMPREPLY=( $(IFS=$' \t\n'; compgen -W "$flags" -- "$cur" | while IFS= read -r w; do _myapp_line "$w"; done; _myapp_ordinals "$cur") )
+    local IFS=$'\n'; COMPREPLY=( $(IFS=$' \t\n'; compgen -W "$flags" -- "$cur" | while IFS= read -r w; do _myapp_line "$cur" "$w"; done; _myapp_ordinals "$cur") )
     if [ "$noglob" = 0 ]; then set +f; fi
     __ltrim_colon_completions "$cur" 2>/dev/null
     return 0
@@ -146,6 +154,6 @@ TEST_CASE("a delimiter carrying the placeholder byte reaches the walker as liter
     const std::string call = "_myapp_ordinal \"$flag\" '--cluster\\*node\\*' '\\*level'";
     REQUIRE(bash.find("        if " + call + " && [ \"$ordinal_name\" = \"$flag\" ]; then\n") != std::string::npos);
     REQUIRE(bash.find("    _myapp_ordinal \"$1\" '--cluster\\*node\\*' '\\*port' && printf") != std::string::npos);
-    REQUIRE(bash.find("    '--cluster*node***level') printf '%s\\n' '--cluster\\*node\\*\\*\\*level' ;;\n") != std::string::npos);
+    REQUIRE(bash.find("        '--cluster*node***level') printf '%s\\n' '--cluster\\*node\\*\\*\\*level' ;;\n") != std::string::npos);
     REQUIRE(bash.find("        '--cluster\\*node\\*\\*\\*level')\n") == std::string::npos);
 }

@@ -7,7 +7,6 @@
 #include <vector>
 #include <cstddef>
 #include <cstdint>
-#include <algorithm>
 #include <string_view>
 
 namespace nucleus::detail {
@@ -62,20 +61,6 @@ inline std::string bash_word(const std::string &text)
     return out;
 }
 
-// readline inserts a reply verbatim, so a reply holds its candidate as the line must spell it;
-// `*` is escaped here because the line globs where compgen does not.
-inline std::string bash_line_word(const std::string &text)
-{
-    std::string out;
-    for(char const c : text)
-    {
-        if(static_cast<std::uint8_t>(c) < 0x80 && (c == '*' || !bash_bare_byte(c)))
-            out.push_back('\\');
-        out.push_back(c);
-    }
-    return out;
-}
-
 inline std::string bash_join_flags(const std::vector<completion_option> &options)
 {
     std::string out;
@@ -100,31 +85,6 @@ inline std::string bash_join_values(const std::vector<std::string> &values)
     return out;
 }
 
-inline std::string bash_line_arm(const std::string &raw, std::vector<std::string> &seen)
-{
-    const std::string line = bash_line_word(raw);
-    if(line == raw || std::ranges::find(seen, raw) != seen.end())
-        return {};
-    seen.push_back(raw);
-    return "    " + bash_single_quote(raw) + ") printf '%s\\n' " + bash_single_quote(line) + " ;;\n";
-}
-
-inline std::string bash_line_lookup(const std::string &ident, const completion_model &model)
-{
-    std::vector<std::string> seen;
-    std::string              arms;
-    for(const completion_option &option : model.options)
-    {
-        arms += bash_line_arm(option.flag, seen);
-        for(const std::string &value : option.values)
-            arms += bash_line_arm(value, seen);
-    }
-    if(arms.empty())
-        return {};
-    const std::string out = "_" + ident + "_line()\n{\n    case \"$1\" in\n" + arms;
-    return out + "    *) printf '%s\\n' \"$1\" ;;\n    esac\n}\n";
-}
-
 // `compgen -W` splits its word list on IFS, and the unquoted command substitution that fills
 // COMPREPLY splits again on the same characters -- so a value carrying a separator has to
 // survive both. Each value backslash-escapes its own separators for the first split, and the
@@ -134,22 +94,30 @@ inline std::string bash_line_lookup(const std::string &ident, const completion_m
 // consumed the backslash -- so the assignment runs with globbing suppressed and puts the
 // caller's setting back. `case $-` reads that setting portably, where `local -` would need
 // bash 4.4 -- above the floor this script supports. `also` runs inside the same substitution.
-// A non-empty `line` names the lookup each compgen match is piped through to reach its line form.
+// A non-empty `line` names the lookup each compgen match is piped through with the typed word, whose
+// opening quote, if any, picks the form the match is spelled in.
 inline std::string bash_reply_assignment(const std::string &pad, const std::string &words, const std::string &current,
                                          const std::string &line, const std::string &also)
 {
     std::string out = pad + "local noglob=0; case $- in *f*) noglob=1 ;; esac; set -f\n";
     out += pad + R"(local IFS=$'\n'; COMPREPLY=( $(IFS=$' \t\n'; compgen -W )" + words + " -- \"" + current + "\"";
-    out += line.empty() ? std::string() : " | while IFS= read -r w; do " + line + " \"$w\"; done";
+    out += line.empty() ? std::string() : " | while IFS= read -r w; do " + line + " \"" + current + R"(" "$w"; done)";
     out += (also.empty() ? std::string() : "; " + also) + ") )\n";
     return out + pad + "if [ \"$noglob\" = 0 ]; then set +f; fi\n";
 }
+
+// readline keeps the typed text through its last word-breaking colon and replaces only what follows,
+// so each reply drops that text. The loop strips element by element because bash 3.2 joins the
+// result of a pattern removal over the whole array into one word under the reply's newline IFS.
+inline constexpr std::string_view bash_colon_trim = R"(case "$COMP_WORDBREAKS" in *:*) local colon="${val%"${val##*:}"}" i=${#COMPREPLY[@]}; while [ "$i" -gt 0 ]; do i=$((i - 1)); COMPREPLY[i]="${COMPREPLY[i]#"$colon"}"; done ;; esac
+)";
 
 inline std::string bash_value_reply(const std::string &pad, const completion_option &option, const std::string &line)
 {
     const std::string words = bash_single_quote(bash_join_values(option.values));
     std::string       out   = bash_reply_assignment(pad, words, "$val", line, {});
-    out += pad + "__ltrim_colon_completions \"$cur\" 2>/dev/null\n";
+    out += pad;
+    out += bash_colon_trim;
     return out + pad + "return 0\n";
 }
 

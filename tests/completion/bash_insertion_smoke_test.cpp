@@ -23,6 +23,7 @@ using nucleus::key_path;
 using nucleus::schema_registry;
 using nucleus::shell;
 using nucleus::bash_test::bash_available;
+using nucleus::bash_test::insert_and_parse;
 using nucleus::bash_test::run_seeded;
 
 namespace {
@@ -62,18 +63,6 @@ schema_registry delimiter_registry()
     REQUIRE(reg.attach(nucleus::repeated_element("node", anchor::keyspace(path_of("cluster")))));
     REQUIRE(reg.attach(nucleus::element("port", anchor::keyspace(path_of("cluster/node")))));
     return reg;
-}
-
-// Pressing Enter parses the line readline built, and readline inserts each reply verbatim, so
-// `myapp <prefix><reply>` parsed by the shell is what the user's command receives.
-std::string insert_and_parse(const std::vector<std::string> &words, const std::string &prefix)
-{
-    std::string out = "\nmyapp() { for a in \"$@\"; do printf '<%s>' \"$a\"; done; echo; }\nCOMP_WORDS=(myapp";
-    for(const std::string &word : words)
-        out += " '" + word + "'";
-    out += ")\nCOMP_CWORD=$((${#COMP_WORDS[@]} - 1))\n_myapp_complete\n";
-    out += "for c in \"${COMPREPLY[@]}\"; do eval \"myapp " + prefix + "$c\"; done\n";
-    return out + "for f in PWN_*; do [ -e \"$f\" ] && echo \"PAYLOAD $f\"; done\n";
 }
 
 struct insertion_row
@@ -127,6 +116,32 @@ TEST_CASE("every inserted bash candidate parses back to its own text", "[complet
             REQUIRE(run_seeded(row.script, insert_and_parse(row.words, row.prefix), {"--cluster-node-7-level"}) == row.expected);
         }
     }
+}
+
+TEST_CASE("a value typed past a colon completes to its own text where bash keeps it one word", "[completion][smoke]")
+{
+    if(!bash_available())
+        SKIP("bash not found on PATH -- driving the generated script needs it");
+
+    const std::string          values = script(values_registry());
+    const std::string          flag   = "--cluster-node-level";
+    std::vector<insertion_row> rows{
+            {values, {flag + "=co:"}, flag + "=co:", "<" + flag + "=co:lon>\n"},
+            {values, {flag + "=co:l"}, flag + "=co:", "<" + flag + "=co:lon>\n"},
+            {values, {"--cluster-node-2-level=co:"}, "--cluster-node-2-level=co:", "<--cluster-node-2-level=co:lon>\n"},
+            {values, {flag, "=", "'co:"}, flag + "='", "<" + flag + "=co:lon>\n"},
+    };
+    for(const insertion_row &row : rows)
+    {
+        DYNAMIC_SECTION(row.words.back())
+        {
+            REQUIRE(run_seeded(row.script, insert_and_parse(row.words, row.prefix), {}) == row.expected);
+        }
+    }
+    const std::string untrimmed = "COMP_WORDBREAKS=${COMP_WORDBREAKS//:/}\n" + insert_and_parse({flag + "=co:"}, flag + "=");
+    REQUIRE(run_seeded(values, untrimmed, {}) == "<" + flag + "=co:lon>\n");
+    // bash 4 and later split the value at the colon and nothing re-joins it, so no value is offered.
+    REQUIRE(run_seeded(values, insert_and_parse({flag, "=", "co", ":"}, flag + "=co:"), {}).empty());
 }
 
 TEST_CASE("every byte but a newline round-trips through the inserted line", "[completion][smoke]")

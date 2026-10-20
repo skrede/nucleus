@@ -3,6 +3,7 @@
 
 #include "nucleus/completion/bash_ordinal.h"
 #include "nucleus/completion/bash_quoting.h"
+#include "nucleus/completion/bash_line_form.h"
 #include "nucleus/completion/shell_emitter.h"
 #include "nucleus/completion/completion_model.h"
 
@@ -13,14 +14,15 @@
 namespace nucleus {
 
 // The bash emitter. It renders a `complete -F` function bound to the program. All
-// of bash's sharp edges are confined to it and to bash_quoting.h and bash_ordinal.h:
+// of bash's sharp edges are confined to it and to bash_quoting.h, bash_line_form.h and bash_ordinal.h:
 //
 //   * COMP_WORDBREAKS. bash 4 and later split `=` into a word of its own and 3.2 does not, so
 //     the value branch rebuilds `--flag=value` from the word before `=`, or from the previous
 //     word when `=` is itself the current word, then completes only the value tail.
-//   * The `:` word-break (e.g. a value containing a colon) is healed by a guarded
-//     `__ltrim_colon_completions`, which is present in bash-completion but may be
-//     absent; the call is guarded so the script degrades cleanly without it.
+//   * `:` breaks words too. bash 3.2 keeps the value one word, and each value reply drops the
+//     typed text through its last colon, which readline leaves on the line; bash 4 and later
+//     split the value at the colon and nothing re-joins it, so they offer no value past one.
+//     With `:` absent from COMP_WORDBREAKS neither version splits and nothing is dropped.
 //
 // None of this leaks back into the generator or the model.
 class bash_emitter final : public shell_emitter

@@ -89,6 +89,21 @@ inline std::string run_bash(const std::string &script)
     return captured;
 }
 
+// Pressing Enter parses the line readline built. readline inserts each reply verbatim after the
+// typed word's opening quote, if any, and closes that quote unless the reply already ends with it.
+inline std::string insert_and_parse(const std::vector<std::string> &words, const std::string &prefix)
+{
+    const char        opening = words.empty() || words.back().empty() ? '\0' : words.back().front();
+    const std::string quote   = opening == '\'' || opening == '"' ? std::string(1, opening) : std::string();
+    std::string       out     = "\nmyapp() { for a in \"$@\"; do printf '<%s>' \"$a\"; done; echo; }\nCOMP_WORDS=(myapp";
+    for(const std::string &word : words)
+        out += " " + shell_quoted(word);
+    out += ")\nCOMP_CWORD=$((${#COMP_WORDS[@]} - 1))\n_myapp_complete\n";
+    out += "p=" + shell_quoted(prefix) + "; q=" + shell_quoted(quote) + "\n";
+    out += "for c in \"${COMPREPLY[@]}\"; do case \"$c\" in *\"$q\") l=\"$c\" ;; *) l=\"$c$q\" ;; esac; eval \"myapp $p$l\"; done\n";
+    return out + "for f in PWN_*; do [ -e \"$f\" ] && echo \"PAYLOAD $f\"; done\n";
+}
+
 // Drives the generated completer with the working directory set to a scratch tree holding
 // `decoys`, so a candidate the shell would glob has something in reach to be replaced by.
 inline std::string run_seeded(const std::string &completion, const std::string &drive,
