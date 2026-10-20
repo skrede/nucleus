@@ -5,6 +5,9 @@
 
 #include "nucleus/keyspace/key_path.h"
 
+#include "nucleus/utility/escaped_text.h"
+#include "nucleus/utility/display_controls.h"
+
 #include <string>
 #include <utility>
 #include <string_view>
@@ -14,9 +17,11 @@ namespace nucleus {
 // The flag-side separator of the CLI bijection: the string standing in for the
 // keyspace separator `/` inside a flag (`--a-b-c` <-> `a/b/c`). A validated value
 // type, so a held delimiter is always usable: never empty, never containing `=`
-// or a line break (the key/value split and the record boundary would move), and
-// never containing `/` unless it IS `/` (the identity mapping). Multi-character
-// delimiters such as `__` are legal.
+// or a line break (the key/value split and the record boundary would move), never
+// containing any other control character (it is drawn into every flag a completion
+// menu or the help text shows), never containing `[` or `]` or opening with a digit
+// (it would read as an ordinal), and never containing `/` unless it IS `/` (the
+// identity mapping). Multi-character delimiters such as `__` are legal.
 //
 // Invertibility stays the host's contract: no schema segment may contain the
 // chosen delimiter as a substring, exactly as segments may not contain `-` under
@@ -31,8 +36,7 @@ public:
         const std::string reason = rejection_of(text);
         if(reason.empty())
             return cli_delimiter(std::string(text));
-        return unexpected(std::string("CLI delimiter '") + std::string(text)
-                    + "' " + reason);
+        return unexpected(std::string("CLI delimiter '") + escaped_text(text) + "' " + reason);
     }
 
     const std::string &str() const noexcept { return m_text; }
@@ -56,14 +60,6 @@ private:
 
     std::string m_text = "-";
 
-    static bool is_all_digits(std::string_view text) noexcept
-    {
-        for(const char c : text)
-            if(c < '0' || c > '9')
-                return false;
-        return true;
-    }
-
     // Empty when `text` is a usable delimiter, else why it is not.
     static std::string rejection_of(std::string_view text)
     {
@@ -74,13 +70,15 @@ private:
         if(text.find('\n') != std::string_view::npos
                 || text.find('\r') != std::string_view::npos)
             return "must not contain a newline or a carriage return";
+        if(detail::has_display_control(text))
+            return "must not contain a control character";
         if(text.size() > 1 && text.find(key_path::separator) != std::string_view::npos)
             return "must not contain the keyspace separator '/'";
         if(text.find('[') != std::string_view::npos
                 || text.find(']') != std::string_view::npos)
             return "must not contain '[' or ']' (ordinal-index notation)";
-        if(is_all_digits(text))
-            return "must not be all digits (ordinal-index notation)";
+        if(text.front() >= '0' && text.front() <= '9')
+            return "must not be all digits or open with a digit (ordinal-index notation)";
         return {};
     }
 };

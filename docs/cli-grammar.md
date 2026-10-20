@@ -23,9 +23,12 @@ repaired.
   record would end early. The flat renderers reject those same two bytes, and
   `=`, anywhere in a rendered key, and `config::from_values` rejects them in a
   submitted key.
+- It carries no other control character either: no C0 byte, DEL, C1 control or
+  Unicode Bidi_Control code point. The delimiter is drawn into every flag the
+  completion menus and the help text show.
 - It does not contain `[` or `]`, which spell the ordinal index.
-- It is not all ASCII digits, which would be indistinguishable from an ordinal
-  segment.
+- It is neither all ASCII digits nor opening with one — either would be
+  indistinguishable from an ordinal segment while the flag is being typed.
 - A multi-character delimiter must not contain `/`. The single-character `/`
   form is accepted, and is the one delimiter that is itself the keyspace
   separator: the flag body and the key path are then the same string.

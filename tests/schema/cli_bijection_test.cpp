@@ -11,11 +11,14 @@
 
 #include "nucleus/argv/argv_source.h"
 
+#include "nucleus/utility/escaped_text.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <string_view>
 
 using nucleus::anchor;
 using nucleus::keyspace;
@@ -39,6 +42,14 @@ schema_registry build_schema()
     return reg;
 }
 
+std::string refusal_of(std::string_view text)
+{
+    const auto parsed = cli_delimiter::parse(text);
+    REQUIRE_FALSE(parsed);
+    return parsed.error();
+}
+
+bool mentions(const std::string &reason, std::string_view part) { return reason.find(part) != std::string::npos; }
 }
 
 // One model: the SAME schema drives both the CLI surface a flag is validated
@@ -86,8 +97,43 @@ TEST_CASE("an undeclared flag is rejected by the schema authority", "[bijection]
 // as `=` and `/` and are rejected at parse time.
 TEST_CASE("a digit delimiter is rejected", "[bijection]")
 {
-    REQUIRE_FALSE(cli_delimiter::parse("0"));
-    REQUIRE_FALSE(cli_delimiter::parse("42"));
+    REQUIRE(mentions(refusal_of("0"), "all digits"));
+    REQUIRE(mentions(refusal_of("42"), "all digits"));
+}
+
+// Under `0x` a partly typed `--cluster0xnode0x30` is both ordinal 30 and ordinal 3 followed by
+// the delimiter's leading `0`, so only a digit as the delimiter's first byte is ambiguous.
+TEST_CASE("a digit-led delimiter is rejected and a trailing digit is not", "[bijection]")
+{
+    for(const char *text : {"0x", "1-", "9_"})
+    {
+        const std::string reason = refusal_of(text);
+        REQUIRE(mentions(reason, "ordinal-index notation"));
+        REQUIRE(mentions(reason, std::string("'") + text + "'"));
+    }
+    for(const char *text : {"x0", "a1b", "-", "__", ".", "/", "*"})
+        REQUIRE(cli_delimiter::parse(text));
+}
+
+TEST_CASE("a refused delimiter is quoted escaped in its reason", "[bijection]")
+{
+    const std::string reason = refusal_of("a\nb");
+    REQUIRE(mentions(reason, "'a\\nb'"));
+    REQUIRE_FALSE(mentions(reason, "\n"));
+}
+
+TEST_CASE("a delimiter carrying a display control is rejected", "[bijection]")
+{
+    for(const std::string_view text : {"\t", "\x1b", "a\302\233b", "\xe2\x80\xae", "a\177b"})
+    {
+        const std::string reason = refusal_of(text);
+        REQUIRE(mentions(reason, "must not contain a control character"));
+        REQUIRE(mentions(reason, "'" + nucleus::escaped_text(text) + "'"));
+    }
+    REQUIRE(mentions(refusal_of("\n"), "newline or a carriage return"));
+    REQUIRE(mentions(refusal_of("\r"), "newline or a carriage return"));
+    for(const char *text : {"$(x)", "::", "gr\303\266\303\237e"})
+        REQUIRE(cli_delimiter::parse(text));
 }
 
 TEST_CASE("a bracket-containing delimiter is rejected", "[bijection]")
