@@ -41,9 +41,9 @@ inline constexpr std::string_view bash_walker_tail = R"(            name="$name$
 
 // The walker matches the typed word against an option's literal pieces in line form, never its flag
 // text, so a `*` a delimiter carries is never a slot, and it builds the completed word from those
-// pieces, the typed digit runs and `\*` alone, reporting it through the caller's `ordinal_name` with
-// no construct above bash 3.2 (no `+=`, `=~`, `local -`, `compopt` or `mapfile`). A digit run fills
-// a slot only inside the CLI's ordinal domain, so the walker accepts exactly the flags the CLI does.
+// pieces, the typed digit runs and `\*` alone, reporting it through the caller's `ordinal_name`. A
+// digit run fills a slot only inside the CLI's ordinal domain, so the walker accepts exactly the flags
+// the CLI does.
 inline std::string bash_ordinal_walker()
 {
     const std::string bound = std::to_string(key_path::max_ordinal);

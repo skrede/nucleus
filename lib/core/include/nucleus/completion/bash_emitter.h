@@ -12,6 +12,7 @@
 
 #include <string>
 #include <algorithm>
+#include <string_view>
 
 namespace nucleus {
 
@@ -20,14 +21,13 @@ namespace nucleus {
 //
 //   * Quote context. readline inserts a reply under the quote open at the cursor, so each reply is
 //     spelled for the quote the whole typed word leaves open, never for the word's first byte.
-//   * COMP_WORDBREAKS. bash 4 and later split `=` into a word of its own and 3.2 does not, so
-//     the value branch rebuilds `--flag=value` from the word before `=`, or from the previous
-//     word when `=` is itself the current word, then completes only the value tail.
+//   * COMP_WORDBREAKS. bash splits `=` into a word of its own, so the value branch rebuilds
+//     `--flag=value` from the word before `=`, or from the previous word when `=` is itself the
+//     current word, then completes only the value tail.
 //   * What readline keeps. It keeps the typed text through its last unescaped word-break byte (`:`, `=`;
 //     up to `@`), or through a quote the word closed and reopened, and each value reply drops that text.
-//     bash 3.2 keeps the value one word, so it completes past the break and continues the reopened quote;
-//     bash 4 and later split the word at the break byte and compgen matches nothing for a reopened quote,
-//     so they offer no value there. A byte absent from COMP_WORDBREAKS is neither split at nor dropped.
+//     bash splits the word at the break byte and compgen matches nothing for a reopened quote, so no
+//     value is offered there. A byte absent from COMP_WORDBREAKS is neither split at nor dropped.
 //
 // None of this leaks back into the generator or the model.
 class bash_emitter final : public shell_emitter
@@ -45,11 +45,17 @@ public:
         if(has_ordinal_options(model))
             out += detail::bash_ordinal_functions(ident, model);
         out += opening(ident, model) + value_section(ident, model, prefix) + flag_section(ident, model, prefix);
-        out += "complete -F _" + ident + "_complete " + detail::bash_line_word(model.prog) + "\n";
+        out += std::string(registration_gate) + "complete -F _" + ident + "_complete ";
+        out += detail::bash_line_word(model.prog) + "; fi\n";
         return out;
     }
 
 private:
+    // The completion is registered only on bash 5.0 or later, the floor the replies are built for, so an older
+    // bash completes nothing. The check guards the registration rather than returning early, which holds whether
+    // the script is sourced, eval'd or executed, and it stays in syntax any bash parses.
+    static constexpr std::string_view registration_gate = R"(if [ "${BASH_VERSINFO[0]}" -ge 5 ]; then )";
+
     static std::string opening(const std::string &ident, const completion_model &model)
     {
         std::string out = "_" + ident + "_complete()\n{\n";

@@ -353,7 +353,7 @@ _mytool_complete()
     esac
     ...
 }
-complete -F _mytool_complete mytool
+if [ "${BASH_VERSINFO[0]}" -ge 5 ]; then complete -F _mytool_complete mytool; fi
 ```
 
 The enum element's declared value set (`debug info warn error`) becomes that
@@ -370,7 +370,9 @@ The scope is still deliberately narrow.
   module ships.
 * **Completion** is static, for **bash and zsh** only. There is no dynamic
   (runtime) completion and no fish support; both are future single-file additions
-  through the same emission seam.
+  through the same emission seam. The generated bash script requires bash 5.0 or
+  later; on older bash, including the bash 3.2 macOS ships as `/bin/bash` and the
+  bash 4.4 of RHEL 8 and its rebuilds, the script installs no completion.
 * **No mutation or merge** of a resolved `config`. The resolved value is
   read-only (it can be emitted back out as XML, env, or argv text); producing a
   new configuration as a value (clone, transfer, diff) is future work.

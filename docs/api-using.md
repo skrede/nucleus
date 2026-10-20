@@ -1127,6 +1127,10 @@ An `enum_element`'s value set becomes that flag's completion candidates. A pure
 read of the sealed schema. nucleus is a library, not a CLI — it returns the
 script and the host decides how to surface it.
 
+The bash script requires bash 5.0 or later. On older bash, including the bash 3.2
+macOS ships as `/bin/bash` and the bash 4.4 of RHEL 8 and its rebuilds, the script
+installs no completion.
+
 `prog` reaches shell command position unquoted in the generated script, so it must
 be a bare command token: it opens with a letter, a digit or `_`, and carries only
 letters, digits, `.`, `_` and `-`. A name carrying a path separator, whitespace, a

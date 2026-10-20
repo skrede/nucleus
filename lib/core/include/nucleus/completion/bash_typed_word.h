@@ -10,19 +10,12 @@ namespace nucleus::detail {
 
 // The tracker spells a reply for the quote bash's quoting of the typed word leaves open, not for its first byte. That
 // word runs past the cursor, so a quote byte or backslash right of the cursor takes the bare spelling, inert under any
-// quote; COMP_POINT counts bytes before bash 4.3 and characters from it, so only the older read is forced to bytes.
-// `$'` and `$"` report no quote and so take the bare spelling, inert there though not always the typed value. `kept`
-// is what readline keeps after a quote the word closed and reopened, so the next reply can drop it.
+// quote. `$'` and `$"` report no quote and so take the bare spelling, inert there though not always the typed value.
+// `kept` is what readline keeps after a quote the word closed and reopened, so the next reply can drop it.
 inline constexpr std::string_view bash_quote_tracker = R"({
     local rest="$1" c i=0 at=0
     quote=""; kept=""
-    local after
-    if [ "${BASH_VERSINFO[0]}" -gt 4 ] || { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -ge 3 ]; }; then
-        after="${COMP_LINE:COMP_POINT}"
-    else
-        after=$(LC_ALL=C; printf %s "${COMP_LINE:COMP_POINT}")
-    fi
-    case "$after" in *\'* | *\"* | *\\*) return 0 ;; esac
+    case "${COMP_LINE:COMP_POINT}" in *\'* | *\"* | *\\*) return 0 ;; esac
     while [ -n "$rest" ]; do
         c="${rest%"${rest#?}"}"; rest="${rest#?}"; i=$((i + 1))
         case "$quote$c" in
@@ -40,12 +33,11 @@ inline constexpr std::string_view bash_quote_tracker = R"({
 // readline keeps the typed text through its last unescaped word-break byte (up to it for `@`, a prefix readline
 // leaves in the text it replaces) and replaces the rest, so each reply drops as many of its own unescaped break
 // bytes as the typed value holds. Counting, rather than matching text, is what lets a prefix typed in another
-// spelling still be dropped. Every strip runs element by element because bash 3.2 joins the result of a pattern
-// removal over the whole array into one word under the reply's newline IFS.
+// spelling still be dropped.
 inline constexpr std::string_view bash_trim_body = R"({
     local i=${#COMPREPLY[@]} k=0 rest="$1" c r n
     if [ -n "$2" ]; then
-        while [ "$i" -gt 0 ]; do i=$((i - 1)); COMPREPLY[i]="${COMPREPLY[i]#"$2"}"; done
+        COMPREPLY=("${COMPREPLY[@]#"$2"}")
         return 0
     fi
     case "$1" in *[\'\"]*) return 0 ;; esac

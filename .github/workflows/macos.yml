@@ -52,6 +52,13 @@ jobs:
             echo "__cpp_lib_format undefined: std::format absent, {fmt} fallback ACTIVE"
           fi
 
+      # macOS ships bash 3.2, below the 5.0 the generated completion script needs,
+      # and the bash smoke tests drive whichever bash is first on PATH.
+      - name: Install a supported bash
+        run: |
+          brew install bash
+          bash -c 'echo "$BASH_VERSION"; ((BASH_VERSINFO[0] >= 5))'
+
       - name: Configure
         run: |
           cmake . -B build -DCMAKE_BUILD_TYPE=Release \
@@ -113,6 +120,13 @@ jobs:
       ASAN_OPTIONS: detect_leaks=0:abort_on_error=0
     steps:
       - uses: actions/checkout@v4
+
+      # macOS ships bash 3.2, below the 5.0 the generated completion script needs,
+      # and the bash smoke tests drive whichever bash is first on PATH.
+      - name: Install a supported bash
+        run: |
+          brew install bash
+          bash -c 'echo "$BASH_VERSION"; ((BASH_VERSINFO[0] >= 5))'
 
       - name: Configure
         run: >-

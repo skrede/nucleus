@@ -25,7 +25,6 @@ using nucleus::key_path;
 using nucleus::schema_registry;
 using nucleus::shell;
 using nucleus::bash_test::bash_available;
-using nucleus::bash_test::bash_major_version;
 using nucleus::bash_test::check_rows;
 using nucleus::bash_test::delimiter_registry;
 using nucleus::bash_test::print_inserted;
@@ -56,9 +55,7 @@ std::string hostile_script()
     return script_of(generate_completion(shell::bash, reg, "myapp"));
 }
 
-// COMP_POINT is set in the unit readline reports it in: characters from bash 4.3, bytes before it.
 const std::string cursor_drive = R"(at_cursor() { COMP_LINE="$2$3"; COMP_POINT=${#2}; local probe="$1"
-    [ "${BASH_VERSINFO[0]}" -gt 4 ] || { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -ge 3 ]; } || COMP_POINT=$(LC_ALL=C; echo ${#2})
     shift 3; COMP_WORDS=(myapp "$@"); COMP_CWORD=$#; "$probe"; }
 replied() { _myapp_complete; printf '[%s]' "${COMPREPLY[@]}"; echo; }
 tracked() { _myapp_quote "${COMP_WORDS[COMP_CWORD]}"; printf '[%s]\n' "$quote"; })";
@@ -152,7 +149,7 @@ show "'i" "it'\''s" "it'\''d"
 )");
 }
 
-TEST_CASE("a value shared through a reopened quote completes past it where bash keeps it one word", "[completion][smoke]")
+TEST_CASE("a value shared through a reopened quote completes on the first TAB and offers nothing past the reopened quote", "[completion][smoke]")
 {
     if(!bash_available())
         SKIP("bash not found on PATH -- driving the generated script needs it");
@@ -161,10 +158,9 @@ TEST_CASE("a value shared through a reopened quote completes past it where bash 
     const std::string first_tab = "COMP_WORDS=(myapp --app-mode = \"'i\")\nCOMP_CWORD=3\n_myapp_complete\nprintf '[%s]' \"${COMPREPLY[@]}\"; echo\n";
     REQUIRE(run_bash(app + first_tab) == "[it'\\''s][it'\\''d]\n");
     // bash 4 and later match nothing for a word that closes and reopens a quote, so they offer no value there.
-    const bool one_word = bash_major_version() < 4;
     check_rows({
-            {app, {"--app-mode", "=", "'it'\\''s"}, "--app-mode='it'\\''", "'", one_word ? "<--app-mode=it's>\n" : ""},
-            {app, {"--app-mode", "=", "\"a\"\\!\"b"}, "--app-mode=\"a\"\\!\"", "\"", one_word ? "<--app-mode=a!b>\n" : ""},
+            {app, {"--app-mode", "=", "'it'\\''s"}, "--app-mode='it'\\''", "'", ""},
+            {app, {"--app-mode", "=", "\"a\"\\!\"b"}, "--app-mode=\"a\"\\!\"", "\"", ""},
     });
 }
 

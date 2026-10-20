@@ -169,7 +169,7 @@ TEST_CASE("a plain program name still yields a script for both shells",
     REQUIRE(bash);
     // The last line is shell command position -- where an unquoted token that was
     // not a bare word would open a statement of its own.
-    REQUIRE(bash.value().ends_with("complete -F _my_tool_v2_complete my-tool.v2\n"));
+    REQUIRE(bash.value().ends_with("complete -F _my_tool_v2_complete my-tool.v2; fi\n"));
     REQUIRE(bash.value().find("--logging") != std::string::npos);
     REQUIRE(zsh);
     REQUIRE(zsh.value().starts_with("#compdef my-tool.v2\n"));

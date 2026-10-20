@@ -77,7 +77,7 @@ TEST_CASE("a hostile program name reaches the bash script only as inert text", "
 {
     const std::string bash = bash_emitter{}.emit(model_of({"--w", "", {}, {}}, hostile_prog));
     REQUIRE(bash.starts_with("# bash completion for x$(touch PWN_PROG);y\\ntouch PWN_LINE\n#"));
-    REQUIRE(bash.ends_with(" x\\$\\(touch\\ PWN_PROG\\)\\;y\\\ntouch\\ PWN_LINE\n"));
+    REQUIRE(bash.ends_with(" x\\$\\(touch\\ PWN_PROG\\)\\;y\\\ntouch\\ PWN_LINE; fi\n"));
 
     if(!bash_available())
         SKIP("bash not found on PATH -- sourcing the generated script needs it");

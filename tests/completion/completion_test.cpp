@@ -81,7 +81,7 @@ const std::string expected_bash =
         "    __ltrim_colon_completions \"$cur\" 2>/dev/null\n"
         "    return 0\n"
         "}\n"
-        "complete -F _myapp_complete myapp\n";
+        "if [ \"${BASH_VERSINFO[0]}\" -ge 5 ]; then complete -F _myapp_complete myapp; fi\n";
 
 // The pinned zsh script for the fixture. It is a recorded projection: no zsh runs on
 // the machines this project builds on, so this pins the emitted text and not the

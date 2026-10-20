@@ -93,8 +93,7 @@ inline std::string bash_join_values(const std::vector<std::string> &values)
 // substitution, where compgen still needs it. That same unquoted substitution also GLOBS what
 // it produces, which nothing escaped at the emitter can reach because compgen has already
 // consumed the backslash -- so the assignment runs with globbing suppressed and puts the
-// caller's setting back. `case $-` reads that setting portably, where `local -` would need
-// bash 4.4 -- above the floor this script supports. `also` runs inside the same substitution.
+// caller's setting back. `also` runs inside the same substitution.
 // A non-empty `prefix` names the emitted `_quote` and `_line` helpers, and each compgen match is piped through
 // `_line` with the quote the typed word leaves open.
 inline std::string bash_reply_assignment(const std::string &pad, const std::string &words, const std::string &current,
