@@ -122,11 +122,14 @@ TEST_CASE("template keys and allowed-value annotations obey the record grammar",
     REQUIRE(valid);
     REQUIRE(valid.value() == "--cluster-port= # allowed: fast|slow\n");
 
+    // A line break in an allowed value is refused at registration, so no template ever meets one.
     for(const char *broken : {"a\rb", "a\nb"})
     {
-        const auto rejected = nucleus::argv::render_template(annotated_space({"fast", broken}));
-        REQUIRE_FALSE(rejected);
-        REQUIRE(rejected.error().code == nucleus::errc::malformed_source);
+        nucleus::config_space_builder builder;
+        REQUIRE(builder.register_element(nucleus::element("cluster", nucleus::anchor::root())));
+        const auto refused = builder.register_element(nucleus::enum_element("port", nucleus::anchor::keyspace("cluster"), {"fast", broken}));
+        REQUIRE_FALSE(refused);
+        REQUIRE(refused.error().code == nucleus::errc::rejected_registration);
     }
 
     const auto unspellable = nucleus::env::render_template(space_beside(declarable));

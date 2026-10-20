@@ -75,13 +75,16 @@ TEST_CASE("XML templates check the wrapper, every declared path and every annota
     SECTION("a later allowed value is reached too")
     {
         const auto rendered = nucleus::xml::render_template(
-                space_with("field", {"ok", "bad\x01"}));
+                space_with("field", {"ok", "bad\xC3"}));
         REQUIRE_FALSE(rendered);
         CHECK(rendered.error().message.find("allowed value") != std::string::npos);
     }
-    SECTION("line breaks stay valid annotation text")
+    SECTION("a line break in an allowed value never reaches a template")
     {
-        CHECK(nucleus::xml::render_template(space_with("field", {"a\r\nb"})));
+        nucleus::config_space_builder builder;
+        REQUIRE(builder.register_element(nucleus::element("root", nucleus::anchor::root())));
+        CHECK_FALSE(builder.register_element(
+                nucleus::enum_element("field", nucleus::anchor::keyspace("root"), {"a\r\nb"})));
     }
 }
 

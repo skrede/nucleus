@@ -11,6 +11,7 @@
 #include "nucleus/schema/identity_group.h"
 #include "nucleus/schema/constraint_group.h"
 #include "nucleus/schema/schema_containers.h"
+#include "nucleus/schema/schema_text_rules.h"
 #include "nucleus/schema/schema_group_rules.h"
 #include "nucleus/schema/schema_attach_rules.h"
 #include "nucleus/schema/schema_defined_nodes.h"
@@ -165,9 +166,9 @@ private:
             return r;
         if(auto r = check_not_repeated_unique(el); !r)
             return r;
-        if(auto r = check_name_not_digit_led(el); !r)
+        if(auto r = check_element_name(el); !r)
             return r;
-        if(auto r = check_name_wellformed(el); !r)
+        if(auto r = check_allowed_values(el); !r)
             return r;
         if(auto r = check_no_repeated_ancestor(el, m_elements); !r)
             return r;
