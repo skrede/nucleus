@@ -8,13 +8,21 @@
 
 namespace nucleus::detail {
 
-// readline inserts a reply under the quote open at the cursor, which bash's own quoting of the whole typed word
-// decides, so the tracker follows that quoting rather than the word's first byte. `$'` and `$"` report no quote
-// and so take the bare spelling, inert there though not always the typed value. `kept` is what readline keeps after
-// a quote the word closed and reopened, so the next reply can drop it.
+// The tracker spells a reply for the quote bash's quoting of the typed word leaves open, not for its first byte. That
+// word runs past the cursor, so a quote byte or backslash right of the cursor takes the bare spelling, inert under any
+// quote; COMP_POINT counts bytes before bash 4.3 and characters from it, so only the older read is forced to bytes.
+// `$'` and `$"` report no quote and so take the bare spelling, inert there though not always the typed value. `kept`
+// is what readline keeps after a quote the word closed and reopened, so the next reply can drop it.
 inline constexpr std::string_view bash_quote_tracker = R"({
     local rest="$1" c i=0 at=0
     quote=""; kept=""
+    local after
+    if [ "${BASH_VERSINFO[0]}" -gt 4 ] || { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -ge 3 ]; }; then
+        after="${COMP_LINE:COMP_POINT}"
+    else
+        after=$(LC_ALL=C; printf %s "${COMP_LINE:COMP_POINT}")
+    fi
+    case "$after" in *\'* | *\"* | *\\*) return 0 ;; esac
     while [ -n "$rest" ]; do
         c="${rest%"${rest#?}"}"; rest="${rest#?}"; i=$((i + 1))
         case "$quote$c" in

@@ -47,6 +47,13 @@ _myapp_quote()
 {
     local rest="$1" c i=0 at=0
     quote=""; kept=""
+    local after
+    if [ "${BASH_VERSINFO[0]}" -gt 4 ] || { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -ge 3 ]; }; then
+        after="${COMP_LINE:COMP_POINT}"
+    else
+        after=$(LC_ALL=C; printf %s "${COMP_LINE:COMP_POINT}")
+    fi
+    case "$after" in *\'* | *\"* | *\\*) return 0 ;; esac
     while [ -n "$rest" ]; do
         c="${rest%"${rest#?}"}"; rest="${rest#?}"; i=$((i + 1))
         case "$quote$c" in

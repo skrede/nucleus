@@ -1,5 +1,6 @@
 #include "completion/bash_test_support.h"
 
+#include "nucleus/completion/bash_line_form.h"
 #include "nucleus/completion/completion_generator.h"
 
 #include "nucleus/schema/anchor.h"
@@ -13,6 +14,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <tuple>
 #include <string>
 #include <vector>
 #include <utility>
@@ -30,7 +32,10 @@ using nucleus::bash_test::print_inserted;
 using nucleus::bash_test::run_bash;
 using nucleus::bash_test::run_history_expanded;
 using nucleus::bash_test::run_seeded;
+using nucleus::bash_test::shell_quoted;
 using nucleus::completion_result_test::script_of;
+using nucleus::detail::bash_line_word;
+using nucleus::detail::bash_single_quoted_line_word;
 
 namespace {
 
@@ -42,17 +47,21 @@ std::string shared_script()
     return script_of(generate_completion(shell::bash, reg, "myapp"));
 }
 
-schema_registry hostile_registry()
+std::string hostile_script()
 {
     schema_registry reg;
     REQUIRE(reg.attach(nucleus::element("app", anchor::root())));
     REQUIRE(reg.attach(nucleus::enum_element("mode", anchor::keyspace(key_path::parse("app").value()),
-                                             {"x;touch PWN_SEMI", "w\"$(touch PWN_DQ)\"y", "q\"", "$(touch PWN_A)", "a!b", "b!"})));
-    return reg;
+                                             {"x;touch PWN_SEMI", "w\"$(touch PWN_DQ)\"y", "q\"", "$(touch PWN_A)", "a!b", "b!", "m;touch MARK_MID #", "\xc3\xa9;touch MARK_MB #", "only one"})));
+    return script_of(generate_completion(shell::bash, reg, "myapp"));
 }
 
-std::string hostile_script() { return script_of(generate_completion(shell::bash, hostile_registry(), "myapp")); }
-
+// COMP_POINT is set in the unit readline reports it in: characters from bash 4.3, bytes before it.
+const std::string cursor_drive = R"(at_cursor() { COMP_LINE="$2$3"; COMP_POINT=${#2}; local probe="$1"
+    [ "${BASH_VERSINFO[0]}" -gt 4 ] || { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -ge 3 ]; } || COMP_POINT=$(LC_ALL=C; echo ${#2})
+    shift 3; COMP_WORDS=(myapp "$@"); COMP_CWORD=$#; "$probe"; }
+replied() { _myapp_complete; printf '[%s]' "${COMPREPLY[@]}"; echo; }
+tracked() { _myapp_quote "${COMP_WORDS[COMP_CWORD]}"; printf '[%s]\n' "$quote"; })";
 }
 
 TEST_CASE("a value typed inside a closed quote completes in the spelling of no open quote", "[completion][smoke]")
@@ -157,4 +166,35 @@ TEST_CASE("a value shared through a reopened quote completes past it where bash 
             {app, {"--app-mode", "=", "'it'\\''s"}, "--app-mode='it'\\''", "'", one_word ? "<--app-mode=it's>\n" : ""},
             {app, {"--app-mode", "=", "\"a\"\\!\"b"}, "--app-mode=\"a\"\\!\"", "\"", one_word ? "<--app-mode=a!b>\n" : ""},
     });
+}
+
+TEST_CASE("a reply typed with a quote or backslash right of the cursor takes the bare spelling", "[completion][smoke]")
+{
+    if(!bash_available())
+        SKIP("bash not found on PATH -- driving the generated script needs it");
+
+    const auto delimiter = nucleus::cli_delimiter::parse("$(touch PWN_DELIM)");
+    REQUIRE(delimiter);
+    const std::string delimited = script_of(generate_completion(shell::bash, delimiter_registry(), "myapp", *delimiter));
+    const std::string app = hostile_script(), d = "$(touch PWN_DELIM)", mid = "m;touch MARK_MID #";
+    const std::string e = "\xc3\xa9", k13 = e + e + e + e + e + e + e + e + e + e + e + e + e, wide = "myapp " + k13 + " --app-mode=";
+
+    const std::vector<std::tuple<std::string, std::string, std::vector<std::string>>> rows = {
+            {app, "[" + bash_line_word(mid) + "]\n", {"replied", "myapp --app-mode=m", "'", "--app-mode", "=", "m'"}},
+            {app, "[" + bash_single_quoted_line_word(mid) + "]\n", {"replied", "myapp --app-mode=m'", "", "--app-mode", "=", "m'"}},
+            {app, "[" + bash_line_word(mid) + "]\n", {"replied", wide + "m", "'", k13, "--app-mode", "=", "m'"}},
+            {app, "[" + bash_single_quoted_line_word("only one") + "]\n", {"replied", wide + "'o", "", k13, "--app-mode", "=", "'o"}},
+            {app, "[" + bash_line_word(e + ";touch MARK_MB #") + "]\n", {"replied", "myapp --app-mode=" + e, "'", "--app-mode", "=", e + "'"}},
+            {delimited, "[" + bash_line_word("--cluster" + d + "port") + "]\n", {"replied", "myapp --cluster" + d + "p", "'", "--cluster" + d + "p'"}},
+            {app, "[]\n", {"tracked", "myapp --app-mode=m", " x'", "--app-mode", "=", "m", "x'"}},
+            {app, "[']\n", {"tracked", "myapp --app-mode='o", " and more", "--app-mode", "=", "'o and more"}},
+    };
+    for(const auto &[script, expected, call] : rows)
+    {
+        std::string drive = script + cursor_drive + "\nat_cursor";
+        for(const std::string &arg : call)
+            drive += " " + shell_quoted(arg);
+        CAPTURE(call[1], call[2]);
+        CHECK(run_bash(drive + "\n") == expected);
+    }
 }
