@@ -14,6 +14,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
+#include <vector>
+#include <cstdint>
 #include <utility>
 
 using nucleus::anchor;
@@ -50,11 +52,21 @@ std::string hostile_script()
     return script_of(generate_completion(shell::bash, reg, "myapp"));
 }
 
-std::string reply_before_closing_quote(const std::string &word)
+struct cursor_reply_row
 {
-    const std::string words = "COMP_WORDS=(myapp --app-mode = " + shell_quoted(word) + ")\nCOMP_CWORD=3\n";
-    const std::string line  = "COMP_LINE=" + shell_quoted("myapp --app-mode=" + word) + "\nCOMP_POINT=$((${#COMP_LINE} - 1))\n";
-    return words + line + "_myapp_complete\nprintf '[%s]' \"${COMPREPLY[@]}\"; echo\n";
+    std::string  word;
+    std::int32_t right;
+    std::string  expected;
+};
+
+std::string reply_and_status(const std::string &word, std::int32_t right)
+{
+    const std::string words  = "COMP_WORDS=(myapp --app-mode = " + shell_quoted(word) + ")\nCOMP_CWORD=3\n";
+    const std::string line   = "COMP_LINE=" + shell_quoted("myapp --app-mode=" + word) + "\n";
+    const std::string point  = "COMP_POINT=$((${#COMP_LINE} - " + std::to_string(right) + "))\n";
+    const std::string reply  = "_myapp_complete\nprintf '[%s]' \"${COMPREPLY[@]}\"\n";
+    const std::string status = "_myapp_quote \"${COMP_WORDS[3]}\"; echo \" $?\"\n";
+    return words + line + point + reply + status;
 }
 }
 
@@ -153,20 +165,30 @@ TEST_CASE("a value shared through a reopened quote completes on the first TAB an
     });
 }
 
-TEST_CASE("a word that reopened a quote is offered nothing with the cursor before its closing quote", "[completion][smoke]")
+TEST_CASE("a word that reopened a quote is offered nothing with a quote byte or backslash right of the cursor", "[completion][smoke]")
 {
     if(!bash_available())
         SKIP("no bash 5.0 or later on PATH");
 
-    const std::string app = shared_script();
-    for(const auto &[word, expected] : {std::pair<std::string, std::string>{"'h''as spa'", "[]\n"},
-                                        {"\"h\"\"as spa\"", "[]\n"},
-                                        {"'has spa'", "[has\\ space]\n"},
-                                        {"\"has spa\"", "[has\\ space]\n"}})
+    const std::string                   app = shared_script();
+    const std::vector<cursor_reply_row> rows{
+            {"'h''as spa'", 1, "[] 1\n"},
+            {"\"h\"\"as spa\"", 1, "[] 1\n"},
+            {"'h''as spa'", 9, "[] 1\n"},
+            {"'h'$'as spa'", 1, "[] 1\n"},
+            {"h'a''s'\\", 1, "[] 1\n"},
+            {"ha\\", 1, "[has\\ space] 0\n"},
+            // These pin the accepted cost of a quote right of the cursor: readline inserts the bare spelling inside the
+            // open quote and keeps its backslash, so the value is not the candidate.
+            {"'has spa'", 1, "[has\\ space] 0\n"},
+            {"\"has spa\"", 1, "[has\\ space] 0\n"},
+            {"'has spa'", 4, "[has\\ space] 0\n"},
+    };
+    for(const auto &row : rows)
     {
-        DYNAMIC_SECTION(word)
+        DYNAMIC_SECTION(row.word << " with " << row.right << " right of the cursor")
         {
-            REQUIRE(run_bash(app + reply_before_closing_quote(word)) == expected);
+            REQUIRE(run_bash(app + reply_and_status(row.word, row.right)) == row.expected);
         }
     }
 }

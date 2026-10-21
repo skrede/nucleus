@@ -51,8 +51,8 @@ _myapp_quote()
         c="${rest%"${rest#?}"}"; rest="${rest#?}"
         case "$quote$c" in
         \\ | \"\\ | \$\'\\ | \$\"\\) rest="${rest#?}" ;;
-        \' | \") quote="$c"; reopened="$closed"; ever="$ever$closed" ;;
-        \$) case "$rest" in \'* | \"*) quote="\$${rest%"${rest#?}"}"; rest="${rest#?}"; reopened="$closed"; ever="$ever$closed" ;; esac ;;
+        \' | \") quote="$c"; reopened="$closed"; ever="$closed" ;;
+        \$) case "$rest" in \'* | \"*) quote="\$${rest%"${rest#?}"}"; rest="${rest#?}"; reopened="$closed"; ever="$closed" ;; esac ;;
         \'\' | \"\" | \$\'\' | \$\"\") quote=""; closed=1; reopened="" ;;
         esac
     done

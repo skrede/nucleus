@@ -6,12 +6,10 @@
 
 namespace nucleus::detail {
 
-// The tracker spells a reply for the quote bash's quoting of the typed word leaves open, not for its first byte; that
-// word runs past the cursor, so a quote byte or backslash right of the cursor takes the bare spelling, inert under any
-// quote. `$'` and `$"` report no quote and so take the bare spelling, inert there though not always the typed value.
-// Its status is non-zero for a word ending inside a quote opened after another closed and, with a quote byte or
-// backslash right of the cursor, for any word that opened a quote after another closed, because readline keeps the
-// text before that quote and any reply would repeat it.
+// The tracker spells a reply for the quote the typed word leaves open; with a quote byte or backslash right of the
+// cursor, or under `$'` and `$"`, which report no quote, it takes the bare spelling, inert under any quote, though the
+// value readline then inserts is not always the candidate. Its status is non-zero where a reply would repeat the text
+// readline keeps before a quote opened after another closed.
 inline constexpr std::string_view bash_quote_tracker = R"({
     local rest="$1" c closed="" reopened="" ever=""
     quote=""
@@ -19,8 +17,8 @@ inline constexpr std::string_view bash_quote_tracker = R"({
         c="${rest%"${rest#?}"}"; rest="${rest#?}"
         case "$quote$c" in
         \\ | \"\\ | \$\'\\ | \$\"\\) rest="${rest#?}" ;;
-        \' | \") quote="$c"; reopened="$closed"; ever="$ever$closed" ;;
-        \$) case "$rest" in \'* | \"*) quote="\$${rest%"${rest#?}"}"; rest="${rest#?}"; reopened="$closed"; ever="$ever$closed" ;; esac ;;
+        \' | \") quote="$c"; reopened="$closed"; ever="$closed" ;;
+        \$) case "$rest" in \'* | \"*) quote="\$${rest%"${rest#?}"}"; rest="${rest#?}"; reopened="$closed"; ever="$closed" ;; esac ;;
         \'\' | \"\" | \$\'\' | \$\"\") quote=""; closed=1; reopened="" ;;
         esac
     done
