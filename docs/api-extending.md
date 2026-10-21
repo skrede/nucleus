@@ -341,7 +341,9 @@ struct extend_disposition {
 A strength applies per re-open site: in a chain that re-opens one strain in
 several documents, each document's content follows its own `extend`, and a flat
 source obeys the policy whatever the documents declare. An `extend` a flat source
-declares itself gives its content no strength either.
+declares itself is ignored: it gives its content no strength and takes no part in
+the re-open rules below, so it neither permits a derived document's
+re-declaration nor fails for want of a base.
 
 A disposition for a primary-key value not present in any base layer is a loud
 error. Re-declaring a named instance in a derived layer without `extend` is

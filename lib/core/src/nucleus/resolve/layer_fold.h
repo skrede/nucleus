@@ -87,15 +87,13 @@ public:
         return reject_extend_on_repeated(batch);
     }
 
-    // A flat source's extend still counts for the re-open rules but grants its content no strength.
+    // A flat source's extend is ignored, so a stack source can neither widen its own content
+    // nor answer the re-open rules for a document.
     void end_layer(config_source_batch &batch, const layered_handle &layer)
     {
-        for(extend_disposition d : batch.dispositions)
-        {
-            if(!layer.inheritance_layer.has_value())
-                d.strength = extend_strength::narrow;
-            m_dispositions.push_back(ranked_disposition{std::move(d), layer.rank});
-        }
+        if(layer.inheritance_layer.has_value())
+            for(extend_disposition &d : batch.dispositions)
+                m_dispositions.push_back(ranked_disposition{std::move(d), layer.rank});
         m_buffers.push_back(std::move(batch.buffer));
     }
 

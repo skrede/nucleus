@@ -292,6 +292,12 @@ These can fail a load that succeeded before.
   against all of them. Zero or several candidates fail the load with
   `errc::schema_violation`, naming the qualified scope. 0.4.1 accepted a value
   found anywhere in the namespace. `follow_keyref` follows the same rule.
+- **A stack source's `extend` no longer counts for the re-open rules.** A load now
+  ends as it would if the stack source declared no `extend`. A derived document
+  that re-declares a named instance of its parent without `extend`, for example to
+  override one of its routes, fails with `errc::layering_violation` as a duplicate
+  even when a stack source declares `extend` for that instance. 0.4.1 accepted the
+  stack source's `extend` in the document's place and loaded.
 
 These accept more than before.
 
@@ -307,6 +313,10 @@ These accept more than before.
   `cluster/pool`, each beside the primary-keyed `cluster/server`. 0.4.1 failed the
   load with `errc::schema_violation`, with or without a selection, reading the
   instance's ordinal as the keyed container's primary-key value.
+- **A stack source's `extend` over an instance one document declares loads.** A
+  stack source declaring `extend` for a named instance that only one document
+  declares now loads as it would without the `extend`. 0.4.1 failed the load with
+  `errc::layering_violation`, reporting that the instance has no base.
 
 ### Reading a resolved configuration
 

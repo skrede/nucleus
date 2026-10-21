@@ -1,8 +1,9 @@
 #include "collection_shapes.h"
 
 #include "nucleus/config.h"
-#include "support/builder_result_test_support.h"
 #include "nucleus/strain_scope.h"
+
+#include "support/builder_result_test_support.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -139,29 +140,35 @@ TEST_CASE("a stack source's own extend obeys the scope policy", "[collection_sha
         }
 }
 
-TEST_CASE("a stack source's extend still answers the re-open rule for a document that declares none",
+TEST_CASE("a stack source's extend does not answer the re-open rule for a document that declares none",
           "[collection_shapes][keyed][extend]")
 {
     const chain documents = {{"base.xml", base_document},
                              {"derived.xml", "<cluster inherit=\"base.xml\"><server name=\"primary\">" + reopened_route + "</server></cluster>"}};
-    for(const policy scope : every_policy)
-    {
-        CAPTURE(scope);
-        require_lines(load_chain(documents, "derived.xml", scope, stack_document("wide")), host_and_port(scope), {});
-    }
+    for(const std::string extend : {"narrow", "wide"})
+        for(const policy scope : every_policy)
+        {
+            CAPTURE(extend, scope);
+            const nucleus::load_result loaded = load_chain(documents, "derived.xml", scope, stack_document(extend));
+            REQUIRE_FALSE(loaded);
+            REQUIRE(loaded.error().code == nucleus::errc::layering_violation);
+            REQUIRE(loaded.error().message.find("without an extend disposition") != std::string::npos);
+        }
 }
 
-TEST_CASE("a stack source's extend over an instance one document supplies still has no base",
+TEST_CASE("a stack source's extend over an instance only one document supplies loads",
           "[collection_shapes][keyed][extend]")
 {
-    for(const policy scope : every_policy)
-    {
-        CAPTURE(scope);
-        const nucleus::load_result loaded = load_chain({{"base.xml", base_document}}, "base.xml", scope, stack_document("wide"));
-        REQUIRE_FALSE(loaded);
-        REQUIRE(loaded.error().code == nucleus::errc::layering_violation);
-        REQUIRE(loaded.error().message.find("has no base") != std::string::npos);
-    }
+    for(const std::string extend : {"narrow", "wide"})
+        for(const policy scope : every_policy)
+        {
+            CAPTURE(extend, scope);
+            const std::string host = scope == policy::container_open_until_next_strain
+                    ? "stack-host [1|stack[0]|anonymous|-]"
+                    : "base-host " + base_origin;
+            require_lines(load_chain({{"base.xml", base_document}}, "base.xml", scope, stack_document(extend)),
+                          {"cluster/server/host = " + host, "cluster/server/route[0]/port = 80 " + base_origin}, {});
+        }
 }
 
 TEST_CASE("a wide re-open displaces the whole instance a narrow re-open below it addressed",
