@@ -28,6 +28,7 @@ using nucleus::bash_test::print_inserted;
 using nucleus::bash_test::run_bash;
 using nucleus::bash_test::run_history_expanded;
 using nucleus::bash_test::run_seeded;
+using nucleus::bash_test::shell_quoted;
 using nucleus::completion_result_test::script_of;
 
 namespace {
@@ -47,6 +48,13 @@ std::string hostile_script()
     REQUIRE(reg.attach(nucleus::enum_element("mode", anchor::keyspace(key_path::parse("app").value()),
                                              {"x;touch PWN_SEMI", "w\"$(touch PWN_DQ)\"y", "q\"", "$(touch PWN_A)", "a!b", "b!"})));
     return script_of(generate_completion(shell::bash, reg, "myapp"));
+}
+
+std::string reply_before_closing_quote(const std::string &word)
+{
+    const std::string words = "COMP_WORDS=(myapp --app-mode = " + shell_quoted(word) + ")\nCOMP_CWORD=3\n";
+    const std::string line  = "COMP_LINE=" + shell_quoted("myapp --app-mode=" + word) + "\nCOMP_POINT=$((${#COMP_LINE} - 1))\n";
+    return words + line + "_myapp_complete\nprintf '[%s]' \"${COMPREPLY[@]}\"; echo\n";
 }
 }
 
@@ -143,4 +151,22 @@ TEST_CASE("a value shared through a reopened quote completes on the first TAB an
             {hostile, {"--app-mode", "=", "'w'\""}, "--app-mode='w'\"", "\"", ""},
             {app, {"--app-mode", "=", "'a''bc'"}, "--app-mode=", "", "<--app-mode=abc>\n"},
     });
+}
+
+TEST_CASE("a word that reopened a quote is offered nothing with the cursor before its closing quote", "[completion][smoke]")
+{
+    if(!bash_available())
+        SKIP("no bash 5.0 or later on PATH");
+
+    const std::string app = shared_script();
+    for(const auto &[word, expected] : {std::pair<std::string, std::string>{"'h''as spa'", "[]\n"},
+                                        {"\"h\"\"as spa\"", "[]\n"},
+                                        {"'has spa'", "[has\\ space]\n"},
+                                        {"\"has spa\"", "[has\\ space]\n"}})
+    {
+        DYNAMIC_SECTION(word)
+        {
+            REQUIRE(run_bash(app + reply_before_closing_quote(word)) == expected);
+        }
+    }
 }

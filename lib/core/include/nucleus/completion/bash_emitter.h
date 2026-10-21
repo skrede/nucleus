@@ -24,8 +24,9 @@ namespace nucleus {
 //     `--flag=value` from the word before `=`, or from the previous word when `=` is itself the
 //     current word, then completes only the value tail.
 //   * Word-break bytes and reopened quotes. bash splits the typed word at an unquoted, unescaped COMP_WORDBREAKS
-//     byte, so no value is offered past one. A word that ends inside a quote it opened after closing another is
-//     offered nothing, because readline keeps the text before that quote and any reply would repeat it.
+//     byte, so no value is offered past one. Nothing is offered for a word that ends inside a quote it opened after
+//     closing another, nor, with a quote byte or backslash right of the cursor, for any word that did so, because
+//     readline keeps the text before that quote and any reply would repeat it.
 //
 // None of this leaks back into the generator or the model.
 class bash_emitter final : public shell_emitter
