@@ -117,8 +117,8 @@ private:
             }
     }
 
-    // A value stays out when an admissible layer later replaced its whole unit, which an excluded
-    // layer between the two had hidden.
+    // A value stays out when an admissible layer later replaced its unit or an instance enclosing
+    // it, which an excluded layer between the two had hidden.
     bool restorable(const displaced_value &d, region where,
                     const std::map<std::string, std::size_t> &replaced_at,
                     const strain_scope_bounds                &bounds) const
@@ -129,8 +129,23 @@ private:
             return false;
         if(admits(where, d.displaced_by, d.displaced_by_chain, bounds))
             return false;
-        const auto replaced = replaced_at.find(d.unit);
-        return replaced == replaced_at.end() || replaced->second <= d.prov.rank;
+        return !superseded(d, replaced_at);
+    }
+
+    // A unit ends right before a separator or an ordinal bracket, so a leaf list's unit covers
+    // its ordinals.
+    static bool superseded(const displaced_value &d, const std::map<std::string, std::size_t> &replaced_at)
+    {
+        const std::string path = d.path.str();
+        for(std::size_t end = 1; end <= path.size(); ++end)
+        {
+            if(end < path.size() && path[end] != key_path::separator && path[end] != '[')
+                continue;
+            const auto replaced = replaced_at.find(path.substr(0, end));
+            if(replaced != replaced_at.end() && replaced->second > d.prov.rank)
+                return true;
+        }
+        return false;
     }
 
     region region_of(const key_path &path, const std::string &chosen_prefix,

@@ -56,6 +56,20 @@ const std::string base_document = "<cluster><server name=\"primary\"><host>base-
 
 const std::string reopened_route = "<route><port>8080</port><method>put</method></route>";
 
+nucleus::source_stack stack_document(const std::string &extend)
+{
+    return nucleus::source_stack{nucleus::source_handle(nucleus::xml_source::from(nucleus::xml_source_options::of_string(
+            "<cluster><server name=\"primary\" extend=\"" + extend + "\"><host>stack-host</host></server></cluster>")))};
+}
+
+std::vector<std::string> host_and_port(policy scope)
+{
+    if(scope == policy::container_open_until_next_strain)
+        return {"cluster/server/host = stack-host [2|stack[0]|anonymous|-]",
+                "cluster/server/route[0]/port = 8080 [1|path:derived.xml|anonymous|1]"};
+    return {"cluster/server/host = base-host " + base_origin, "cluster/server/route[0]/port = 80 " + base_origin};
+}
+
 void require_lines(const nucleus::load_result &loaded, const std::vector<std::string> &lines,
                    const std::vector<std::string> &absent)
 {
@@ -111,6 +125,42 @@ TEST_CASE("a stack source obeys the scope policy in a strain a document re-opens
                       {"cluster/server/host = " + host, "cluster/server/route[0]/port = 8080 " + derived,
                        "cluster/server/route[0]/method = put " + derived},
                       {"cluster/server/route[1]/port"});
+    }
+}
+
+TEST_CASE("a stack source's own extend obeys the scope policy", "[collection_shapes][keyed][extend]")
+{
+    const chain documents = {{"base.xml", base_document}, {"derived.xml", reopen("base.xml", "narrow", reopened_route)}};
+    for(const std::string extend : {"narrow", "wide"})
+        for(const policy scope : every_policy)
+        {
+            CAPTURE(extend, scope);
+            require_lines(load_chain(documents, "derived.xml", scope, stack_document(extend)), host_and_port(scope), {});
+        }
+}
+
+TEST_CASE("a stack source's extend still answers the re-open rule for a document that declares none",
+          "[collection_shapes][keyed][extend]")
+{
+    const chain documents = {{"base.xml", base_document},
+                             {"derived.xml", "<cluster inherit=\"base.xml\"><server name=\"primary\">" + reopened_route + "</server></cluster>"}};
+    for(const policy scope : every_policy)
+    {
+        CAPTURE(scope);
+        require_lines(load_chain(documents, "derived.xml", scope, stack_document("wide")), host_and_port(scope), {});
+    }
+}
+
+TEST_CASE("a stack source's extend over an instance one document supplies still has no base",
+          "[collection_shapes][keyed][extend]")
+{
+    for(const policy scope : every_policy)
+    {
+        CAPTURE(scope);
+        const nucleus::load_result loaded = load_chain({{"base.xml", base_document}}, "base.xml", scope, stack_document("wide"));
+        REQUIRE_FALSE(loaded);
+        REQUIRE(loaded.error().code == nucleus::errc::layering_violation);
+        REQUIRE(loaded.error().message.find("has no base") != std::string::npos);
     }
 }
 

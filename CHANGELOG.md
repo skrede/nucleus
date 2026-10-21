@@ -255,9 +255,10 @@ These change resolved values *silently* &mdash; no diagnostic is emitted.
   now applies to the document that declares it: in a chain that re-opens a strain
   more than once, each document's content follows its own strength, where the
   highest document's strength used to decide for all of them, and a stack source's
-  value in a strain a document re-opens wide no longer bypasses the scope policy.
-  A layer addressing one field of one instance in the selected strain also no
-  longer drops fields of the instances it does not address.
+  value in the selected strain no longer bypasses the scope policy, whether a
+  document re-opens the strain wide or the stack source declares `extend="wide"`
+  itself. A layer addressing one field of one instance in the selected strain also
+  no longer drops fields of the instances it does not address.
 - **A `replace_by_key` merge keeps each identifier at its first position.** An
   instance replaced by a higher layer stays at the ordinal where its identifier
   first appeared; 0.4.1 moved it after the lower layer's surviving instances.
@@ -292,13 +293,18 @@ These can fail a load that succeeded before.
   `errc::schema_violation`, naming the qualified scope. 0.4.1 accepted a value
   found anywhere in the namespace. `follow_keyref` follows the same rule.
 
-This one accepts more than before.
+These accept more than before.
 
 - **`unique` and identity-group values pool within their enclosing instance.** Two
   `<node>` instances may each hold a route on the same port, and two node instances
   may reuse one identifier. Duplicates inside one enclosing instance are still
   refused. This narrows 0.4.1's "duplicates across instances are now rejected" to
   the instance that encloses the collection.
+- **A general repeated container nested in another loads beside a keyed
+  container.** With a repeated `pool` holding a repeated `member` under `cluster`,
+  beside the primary-keyed `cluster/server`, a configuration supplying a member
+  now loads. 0.4.1 failed the load with `errc::schema_violation`, reading the
+  nested instance's ordinal as the keyed container's primary-key value.
 
 ### Reading a resolved configuration
 

@@ -64,6 +64,8 @@ public:
         strain_buckets strains;
         for(const key_path &path : m_building.paths())
         {
+            if(!path.starts_with(container))
+                continue;
             auto ordinal = ordinal_instance(container, path);
             if(!ordinal)
                 return unexpected(ordinal.error());

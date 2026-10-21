@@ -114,7 +114,7 @@ public:
             for(const keyspace_entry &entry : batch.entries)
                 if(auto folded = m_entry.fold_one(entry, *lh); !folded)
                     return unexpected(folded.error());
-            m_layers.end_layer(batch, lh->rank);
+            m_layers.end_layer(batch, *lh);
         }
         return {};
     }

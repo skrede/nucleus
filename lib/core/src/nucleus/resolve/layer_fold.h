@@ -87,10 +87,15 @@ public:
         return reject_extend_on_repeated(batch);
     }
 
-    void end_layer(config_source_batch &batch, std::size_t rank)
+    // A flat source's extend still counts for the re-open rules but grants its content no strength.
+    void end_layer(config_source_batch &batch, const layered_handle &layer)
     {
-        for(const extend_disposition &d : batch.dispositions)
-            m_dispositions.push_back(ranked_disposition{d, rank});
+        for(extend_disposition d : batch.dispositions)
+        {
+            if(!layer.inheritance_layer.has_value())
+                d.strength = extend_strength::narrow;
+            m_dispositions.push_back(ranked_disposition{std::move(d), layer.rank});
+        }
         m_buffers.push_back(std::move(batch.buffer));
     }
 

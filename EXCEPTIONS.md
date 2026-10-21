@@ -205,7 +205,7 @@ None.
 
 ## Carried — test files over the 200-line ceiling
 
-33 of 176 units. Test units are held to the same ceiling.
+33 of 179 units. Test units are held to the same ceiling.
 
 Two rows here rose to close the pathname expansion the generated bash completion performed
 over its own candidates, and one of the two rose again for the zsh description escaper.
