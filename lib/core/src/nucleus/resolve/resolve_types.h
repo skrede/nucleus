@@ -5,6 +5,7 @@
 #include "nucleus/identity.h"
 
 #include "nucleus/config_source/source_handle.h"
+#include "nucleus/config_source/inherit_declaration.h"
 
 #include <string>
 #include <cstddef>
@@ -19,6 +20,14 @@ using resolve_fold_error = error;
 
 // Maximum cross-leaf reference chain depth. Per-value nesting cap (16) stays in expansion_guard.h.
 inline constexpr std::size_t default_reference_depth_cap = 64;
+
+// A re-open disposition with the rank of the layer that declared it, so an extend strength
+// governs that document's own content rather than every layer of the strain.
+struct ranked_disposition
+{
+    extend_disposition disposition;
+    std::size_t        rank;
+};
 
 // One entry in the handle-based fold: the erased source, its ascending rank
 // (cross-source precedence), a human-readable label for provenance, and an

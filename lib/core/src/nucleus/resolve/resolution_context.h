@@ -10,6 +10,7 @@
 #include "nucleus/resolve/repeated_sweep.h"
 #include "nucleus/resolve/strain_slicing.h"
 #include "nucleus/resolve/keyspace_values.h"
+#include "nucleus/resolve/displaced_values.h"
 #include "nucleus/resolve/typed_conversion.h"
 #include "nucleus/resolve/keyed_merge_state.h"
 #include "nucleus/resolve/reference_resolution.h"
@@ -53,28 +54,29 @@ class resolution_context
 public:
     using layered_handle = nucleus::layered_handle;
 
-    resolution_context(const schema_registry &schema,
-                        const tokenizer_registry &tokenizer,
-                        const converter_registry &converters,
-                        const tree_tokenizer_registry &tree_tokenizer) noexcept
-        : m_schema(schema)
-        , m_tokenizer(tokenizer)
-        , m_converters(converters)
-        , m_tree_tokenizer(tree_tokenizer)
-        , m_budget(default_expansion_budget)
-        , m_layers(m_schema, m_buffers, m_dispositions)
-        , m_sweep(m_building, m_provenance, m_schema)
-        , m_cli_ordinal(m_building, m_provenance, m_schema)
-        , m_conversion(m_building, m_provenance, m_schema, m_converters, m_typed)
-        , m_merge(m_building, m_provenance, m_keyed)
-        , m_references(m_building, m_tree_tokenizer, m_budget)
-        , m_gate(m_building, m_schema, m_sweep, m_keyed_satisfied,
-                 [this] { return group_snapshot(); })
-        , m_divert(m_keyed, m_schema)
-        , m_slicing(m_building, m_provenance, m_schema, m_sweep, m_keyed,
-                    m_dispositions, m_keyed_satisfied)
-        , m_entry(m_layers, m_sweep, m_cli_ordinal, m_divert, m_building,
-                  m_provenance, m_schema, m_tokenizer, m_tree_tokenizer, m_budget)
+    resolution_context(const schema_registry         &schema,
+                       const tokenizer_registry      &tokenizer,
+                       const converter_registry      &converters,
+                       const tree_tokenizer_registry &tree_tokenizer) noexcept
+            : m_schema(schema)
+            , m_tokenizer(tokenizer)
+            , m_converters(converters)
+            , m_tree_tokenizer(tree_tokenizer)
+            , m_budget(default_expansion_budget)
+            , m_layers(m_schema, m_buffers, m_dispositions)
+            , m_sweep(m_building, m_provenance, m_schema, m_displaced)
+            , m_cli_ordinal(m_building, m_provenance, m_schema)
+            , m_conversion(m_building, m_provenance, m_schema, m_converters, m_typed)
+            , m_merge(m_building, m_provenance, m_keyed)
+            , m_references(m_building, m_tree_tokenizer, m_budget)
+            , m_gate(m_building, m_schema, m_sweep, m_keyed_satisfied,
+                     [this]
+                     { return group_snapshot(); })
+            , m_divert(m_keyed, m_schema)
+            , m_slicing(m_building, m_provenance, m_schema, m_sweep, m_keyed,
+                        m_dispositions, m_keyed_satisfied, m_displaced)
+            , m_entry(m_layers, m_sweep, m_cli_ordinal, m_divert, m_building,
+                      m_provenance, m_schema, m_tokenizer, m_tree_tokenizer, m_budget, m_displaced)
     {
     }
 
@@ -112,7 +114,7 @@ public:
             for(const keyspace_entry &entry : batch.entries)
                 if(auto folded = m_entry.fold_one(entry, *lh); !folded)
                     return unexpected(folded.error());
-            m_layers.end_layer(batch);
+            m_layers.end_layer(batch, lh->rank);
         }
         return {};
     }
@@ -171,7 +173,8 @@ private:
     // was consumed and never appears as a leaf.
     std::vector<std::string> m_keyed_satisfied;
     // Re-open dispositions collected from all source batches during fold().
-    std::vector<extend_disposition> m_dispositions;
+    std::vector<ranked_disposition> m_dispositions;
+    displaced_values                m_displaced;
 
     layer_fold m_layers;
     repeated_sweep m_sweep;

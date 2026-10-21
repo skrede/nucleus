@@ -17,7 +17,6 @@
 
 #include "nucleus/config_source/inherit_declaration.h"
 
-#include <map>
 #include <set>
 #include <limits>
 #include <string>
@@ -33,24 +32,23 @@ namespace nucleus {
 // the extend dispositions the fold collected, and owns the unique check.
 class strain_layer_rules
 {
-    using disposition_index =
-            std::map<std::pair<std::string, std::string>, extend_strength>;
+    using disposition_index = std::set<std::pair<std::string, std::string>>;
 
 public:
-    // Where the chosen strain's reach ends, and whether its extend disposition
-    // is wide enough to spare every one of its entries from the scope prune.
+    // Where the chosen strain's reach ends, and the ranks whose own content a wide
+    // re-open spares from the scope prune.
     struct strain_bounds
     {
-        std::size_t competitor_layer;
-        bool        wide_extend;
+        std::size_t           competitor_layer;
+        std::set<std::size_t> wide_ranks;
     };
 
     strain_layer_rules(const keyspace &building, const provenance &prov,
-                       const schema_registry &schema,
-                       const std::vector<extend_disposition> &dispositions) noexcept
-        : m_unique(building, schema)
-        , m_provenance(prov)
-        , m_dispositions(dispositions)
+                       const schema_registry                 &schema,
+                       const std::vector<ranked_disposition> &dispositions) noexcept
+            : m_unique(building, schema)
+            , m_provenance(prov)
+            , m_dispositions(dispositions)
     {
     }
 
@@ -64,13 +62,13 @@ public:
             return unexpected(reopened.error());
         if(auto unique = m_unique.check(container, strains); !unique)
             return unexpected(unique.error());
-        return strain_bounds{bound, wide(disposed, container, chosen)};
+        return strain_bounds{bound, wide_ranks(container, chosen)};
     }
 
 private:
     strain_unique_fields                   m_unique;
     const provenance                      &m_provenance;
-    const std::vector<extend_disposition> &m_dispositions;
+    const std::vector<ranked_disposition> &m_dispositions;
 
     // The first layer ABOVE the defining layer that introduces a competing named
     // strain. A competitor introduced at or below it is not the "next" strain and
@@ -97,16 +95,18 @@ private:
     disposition_index index_dispositions() const
     {
         disposition_index index;
-        for(const extend_disposition &d : m_dispositions)
-            index[{d.container_path, d.key_value}] = d.strength;
+        for(const ranked_disposition &ranked : m_dispositions)
+            index.insert({ranked.disposition.container_path, ranked.disposition.key_value});
         return index;
     }
 
-    static bool wide(const disposition_index &disposed, const key_path &container,
-                     const std::string &chosen)
+    std::set<std::size_t> wide_ranks(const key_path &container, const std::string &chosen) const
     {
-        auto it = disposed.find({container.str(), chosen});
-        return it != disposed.end() && it->second == extend_strength::wide;
+        std::set<std::size_t> ranks;
+        for(const auto &[d, rank] : m_dispositions)
+            if(d.strength == extend_strength::wide && d.key_value == chosen && d.container_path == container.str())
+                ranks.insert(rank);
+        return ranks;
     }
 
     // These rules apply only to inheritance-chain entries, identified by the

@@ -239,12 +239,23 @@ These change resolved values *silently* &mdash; no diagnostic is emitted.
   carry their key and reach strain selection. 0.4.1 collapsed them onto one path,
   the last sibling winning. A duplicate primary-key value there now fails the pull
   with `errc::malformed_source`.
-- **Re-opening the selected strain across inheritance no longer drops its values.**
-  Under `extend="wide"`, the instances of the parent's collection that the derived
-  document does not address now survive; 0.4.1 dropped them. Under
-  `extend="narrow"`, 0.4.1 dropped the strain's primary-key value, and every value
-  of the strain once the derived document supplied an instance; the identity and
-  the surviving instances now resolve, renumbered from 0 in their original order.
+- **Re-opening the selected strain across inheritance no longer drops its
+  values.** Under `extend="wide"`, the instances of the parent's collection that
+  the derived document does not address now survive; 0.4.1 dropped them. Under
+  `extend="narrow"`, content the active scope policy excludes no longer removes
+  what it addressed: with `file_level` or the default policy, a narrow re-open
+  supplying one route over a parent's two resolves to the parent's two routes,
+  unchanged, and a keyed field it overrides keeps the parent's value; under
+  `container_open_until_next_strain` its content still composes below the next
+  competing strain's layer. 0.4.1 dropped the strain's primary-key value, and
+  every value of the strain once the derived document supplied an instance. The
+  same holds without `extend`: a keyed value a higher stack source supplies
+  outside the policy's bounds, and under `file_level` a general value a derived
+  document overrides, leave the lower layer's value in place. An `extend` strength
+  now applies to the document that declares it: in a chain that re-opens a strain
+  more than once, each document's content follows its own strength, where the
+  highest document's strength used to decide for all of them, and a stack source's
+  value in a strain a document re-opens wide no longer bypasses the scope policy.
   A layer addressing one field of one instance in the selected strain also no
   longer drops fields of the instances it does not address.
 - **A `replace_by_key` merge keeps each identifier at its first position.** An

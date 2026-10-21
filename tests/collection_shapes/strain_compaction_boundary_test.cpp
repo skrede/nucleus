@@ -116,11 +116,13 @@ TEST_CASE("nested compaction is confined to the affected outer instance",
     REQUIRE(loaded);
     const nucleus::config &cfg = loaded.value();
     INFO(nucleus::shapes::serialize(cfg));
-    REQUIRE(cfg.get("cluster/server/node[0]/route[0]/port") == "101");
-    REQUIRE(cfg.get("cluster/server/node[0]/route[0]/method") == "a1");
-    REQUIRE(cfg.get("cluster/server/node[0]/route[1]/port") == "102");
-    REQUIRE(cfg.get("cluster/server/node[0]/route[1]/method") == "a2");
-    REQUIRE_FALSE(cfg.contains("cluster/server/node[0]/route[2]/port"));
+    REQUIRE(cfg.get("cluster/server/node[0]/route[0]/port") == "100");
+    REQUIRE(cfg.get("cluster/server/node[0]/route[0]/method") == "a0");
+    REQUIRE(cfg.get("cluster/server/node[0]/route[1]/port") == "101");
+    REQUIRE(cfg.get("cluster/server/node[0]/route[1]/method") == "a1");
+    REQUIRE(cfg.get("cluster/server/node[0]/route[2]/port") == "102");
+    REQUIRE(cfg.get("cluster/server/node[0]/route[2]/method") == "a2");
+    REQUIRE_FALSE(cfg.contains("cluster/server/node[0]/route[3]/port"));
     REQUIRE(cfg.get("cluster/server/node[1]/route[0]/port") == "200");
     REQUIRE(cfg.get("cluster/server/node[1]/route[1]/port") == "201");
     REQUIRE(cfg.get("cluster/server/node[1]/route[2]/port") == "202");

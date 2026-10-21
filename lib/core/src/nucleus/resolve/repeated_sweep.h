@@ -2,6 +2,7 @@
 #define HPP_GUARD_NUCLEUS_RESOLVE_REPEATED_SWEEP_H
 
 #include "nucleus/resolve/resolve_types.h"
+#include "nucleus/resolve/displaced_values.h"
 
 #include "nucleus/error.h"
 #include "nucleus/format.h"
@@ -27,17 +28,18 @@ namespace nucleus {
 // Owns the sweep-and-store discipline over the building keyspace: which unit a
 // repeated entry belongs to, which existing entries a fresh instance displaces,
 // and the paired removal and provenance forget that keep the keyspace and its
-// origins from drifting apart. The keyspace, provenance and schema are borrowed,
-// never owned, and must outlive this collaborator, which lives exactly as long as
-// the resolve that holds it.
+// origins from drifting apart. The keyspace, provenance, schema and displaced-value
+// store are borrowed, never owned, and must outlive this collaborator, which lives
+// exactly as long as the resolve that holds it.
 class repeated_sweep
 {
 public:
-    repeated_sweep(keyspace &building, provenance &prov,
-                   const schema_registry &schema) noexcept
-        : m_building(building)
-        , m_provenance(prov)
-        , m_schema(schema)
+    repeated_sweep(keyspace &building, provenance &prov, const schema_registry &schema,
+                   displaced_values &displaced) noexcept
+            : m_building(building)
+            , m_provenance(prov)
+            , m_schema(schema)
+            , m_displaced(displaced)
     {
     }
 
@@ -105,10 +107,12 @@ public:
     }
 
     // Removal and its provenance forget live together so the pair cannot drift.
-    void sweep_instance(const std::vector<key_path> &bucket)
+    void sweep_instance(const std::vector<key_path> &bucket, const std::string &unit,
+                        const layered_handle &displacer)
     {
         for(const key_path &existing : bucket)
         {
+            m_displaced.record(existing, m_building, m_provenance, unit, displacer);
             m_building.remove(existing);
             m_provenance.forget(existing.str());
         }
@@ -152,6 +156,7 @@ private:
     keyspace                &m_building;
     provenance              &m_provenance;
     const schema_registry   &m_schema;
+    displaced_values        &m_displaced;
 };
 
 }

@@ -6,6 +6,7 @@
 #include "nucleus/resolve/keyed_merge_state.h"
 #include "nucleus/resolve/relayed_addressing.h"
 #include "nucleus/resolve/relayed_compaction.h"
+#include "nucleus/resolve/strain_restoration.h"
 
 #include "nucleus/error.h"
 #include "nucleus/format.h"
@@ -35,14 +36,14 @@ namespace nucleus {
 class strain_relay
 {
     // Bounds one relay: the identity leaf that is read-only, the scope policy and
-    // its two rank bounds, and the extend-wide bypass that spares every chosen entry.
+    // its two rank bounds, and the ranks whose wide re-open spares their own entries.
     struct relay_bounds
     {
-        std::string_view    identity_path;
-        strain_scope_policy policy;
-        std::size_t         Ld;
-        std::size_t         Ls;
-        bool                wide_extend;
+        std::string_view             identity_path;
+        strain_scope_policy          policy;
+        std::size_t                  Ld;
+        std::size_t                  Ls;
+        const std::set<std::size_t> &wide_ranks;
     };
 
     // The two exemptions spare an entry from rank pruning and from displacement.
@@ -71,9 +72,9 @@ public:
     relay_strain(const std::vector<key_path> &keyed_paths,
                  std::string_view             identity_path,
                  strain_scope_policy policy, std::size_t Ld, std::size_t Ls,
-                 bool wide_extend)
+                 const std::set<std::size_t> &wide_ranks)
     {
-        const relay_bounds          bounds{identity_path, policy, Ld, Ls, wide_extend};
+        const relay_bounds          bounds{identity_path, policy, Ld, Ls, wide_ranks};
         const std::set<std::string> relayed_containers =
                 m_compaction.relayed_container_scopes(keyed_paths,
                                                       m_addressing.begin_relay());
@@ -130,11 +131,9 @@ private:
     // the merge mode overrides the default strain scope freezing.
     static bool excluded(const relayed_entry &entry, const relay_bounds &bounds)
     {
-        if(entry.identity_leaf || entry.keyed_merge || bounds.wide_extend)
+        if(entry.identity_leaf || entry.keyed_merge)
             return false;
-        return bounds.policy == strain_scope_policy::container_open_until_next_strain
-                       ? entry.entry_rank >= bounds.Ls
-                       : entry.entry_rank > bounds.Ld;
+        return scope_excludes(bounds.policy, entry.entry_rank, bounds.Ld, bounds.Ls, bounds.wide_ranks);
     }
 
     // A primary key is authoritative and read-only, so a higher-rank flat entry

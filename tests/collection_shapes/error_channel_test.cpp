@@ -159,17 +159,17 @@ TEST_CASE("command-line ordinals address post-compaction collection slots",
     const nucleus::load_result loaded = nucleus::load_config(
             space, nucleus::source_stack{std::move(valid)}, strain_options());
     REQUIRE(loaded);
-    REQUIRE(loaded->get("cluster/server/route[0]/port") == "443");
+    REQUIRE(loaded->get("cluster/server/route[0]/port") == "80");
     REQUIRE(loaded->get("cluster/server/route[0]/method") == "patched");
-    REQUIRE_FALSE(loaded->contains("cluster/server/route[1]/port"));
+    REQUIRE(loaded->get("cluster/server/route[1]/port") == "443");
 
-    nucleus::argv_source invalid({"--cluster-server-route-1-method=patched"});
+    nucleus::argv_source invalid({"--cluster-server-route-2-method=patched"});
     invalid.recognize_with(nucleus::recognizer_of(space));
     const nucleus::load_result rejected = nucleus::load_config(
             space, nucleus::source_stack{std::move(invalid)}, strain_options());
     REQUIRE_FALSE(rejected);
     REQUIRE(rejected.error().code == nucleus::errc::schema_violation);
     REQUIRE(mentions(rejected.error(),
-                     "argv ordinal 1 for 'cluster/server/route' is out of range: "
-                     "1 instance(s) exist; out of range"));
+                     "argv ordinal 2 for 'cluster/server/route' is out of range: "
+                     "2 instance(s) exist; out of range"));
 }

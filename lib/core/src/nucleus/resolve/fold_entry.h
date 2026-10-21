@@ -6,6 +6,7 @@
 #include "nucleus/resolve/keyed_divert.h"
 #include "nucleus/resolve/resolve_types.h"
 #include "nucleus/resolve/repeated_sweep.h"
+#include "nucleus/resolve/displaced_values.h"
 #include "nucleus/resolve/repeated_placement.h"
 
 #include "nucleus/error.h"
@@ -47,16 +48,17 @@ public:
                keyed_divert &divert, keyspace &building, provenance &prov,
                const schema_registry &schema, const tokenizer_registry &tokenizer,
                const tree_tokenizer_registry &tree_tokenizer,
-               substitution_budget &budget) noexcept
-        : m_cli(cli)
-        , m_layers(layers)
-        , m_building(building)
-        , m_divert(divert)
-        , m_provenance(prov)
-        , m_tokenizer(tokenizer)
-        , m_tree_tokenizer(tree_tokenizer)
-        , m_budget(budget)
-        , m_placement(layers, sweep, schema)
+               substitution_budget &budget, displaced_values &displaced) noexcept
+            : m_cli(cli)
+            , m_layers(layers)
+            , m_building(building)
+            , m_divert(divert)
+            , m_provenance(prov)
+            , m_tokenizer(tokenizer)
+            , m_tree_tokenizer(tree_tokenizer)
+            , m_budget(budget)
+            , m_displaced(displaced)
+            , m_placement(layers, sweep, schema)
     {
     }
 
@@ -86,6 +88,7 @@ private:
     const tokenizer_registry        &m_tokenizer;
     const tree_tokenizer_registry   &m_tree_tokenizer;
     substitution_budget             &m_budget;
+    displaced_values                &m_displaced;
     repeated_placement               m_placement;
 
     expected<std::string, resolve_fold_error>
@@ -133,6 +136,7 @@ private:
     void store_plainly(const key_path &path, const keyspace_entry &entry,
                        std::string &text, const layered_handle &layer)
     {
+        m_displaced.record(path, m_building, m_provenance, path.str(), layer);
         m_building.set(path, value::owned(std::move(text)));
         m_provenance.record(entry.path, origin{layer.rank, layer.label, layer.owner,
                                                layer.inheritance_layer});

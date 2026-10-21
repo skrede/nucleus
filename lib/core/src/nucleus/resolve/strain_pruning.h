@@ -12,6 +12,7 @@
 
 #include "nucleus/schema/schema_registry.h"
 
+#include <set>
 #include <string>
 #include <vector>
 #include <cstddef>
@@ -30,10 +31,10 @@ class strain_pruning
     // What the file_level pre-pass measures each path against.
     struct prepass_bounds
     {
-        std::string      chosen_prefix;
-        std::string_view identity_path;
-        std::size_t      defining_layer;
-        bool             wide_extend;
+        std::string                  chosen_prefix;
+        std::string_view             identity_path;
+        std::size_t                  defining_layer;
+        const std::set<std::size_t> &wide_ranks;
     };
 
 public:
@@ -50,7 +51,7 @@ public:
     void prune(const key_path &container, std::string_view identity_path,
                const strain_buckets &strains, const std::string &chosen,
                strain_scope_policy policy, std::size_t defining_layer,
-               bool wide_extend)
+               const std::set<std::size_t> &wide_ranks)
     {
         prune_unchosen(strains, chosen);
         if(policy != strain_scope_policy::file_level)
@@ -58,7 +59,7 @@ public:
         const std::string chosen_prefix =
             container.str() + key_path::separator + chosen + key_path::separator;
         file_level(prepass_bounds{chosen_prefix, identity_path,
-                                  defining_layer, wide_extend});
+                                  defining_layer, wide_ranks});
     }
 
 private:
@@ -103,11 +104,11 @@ private:
         // rank-prune them here either.
         if(m_keyed.under_keyed_merge(m_schema.canonical_text(path)))
             return true;
-        // The chosen identity always survives; extend-wide preserves every other
-        // chosen entry, which must compose regardless of the scope policy.
-        return path.str().starts_with(bounds.chosen_prefix)
-               && (bounds.wide_extend
-                   || m_schema.canonical_text(path) == bounds.identity_path);
+        if(!path.str().starts_with(bounds.chosen_prefix))
+            return false;
+        // The chosen identity always survives; a wide re-open preserves the chosen
+        // entries its own document supplied, which compose regardless of the scope policy.
+        return bounds.wide_ranks.contains(path_rank) || m_schema.canonical_text(path) == bounds.identity_path;
     }
 
     void drop(const key_path &path)

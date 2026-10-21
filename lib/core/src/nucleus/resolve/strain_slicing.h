@@ -7,9 +7,11 @@
 #include "nucleus/resolve/strain_pruning.h"
 #include "nucleus/resolve/strain_bucketing.h"
 #include "nucleus/resolve/strain_selection.h"
+#include "nucleus/resolve/displaced_values.h"
 #include "nucleus/resolve/keyed_merge_state.h"
 #include "nucleus/resolve/relayed_compaction.h"
 #include "nucleus/resolve/strain_layer_rules.h"
+#include "nucleus/resolve/strain_restoration.h"
 
 #include "nucleus/expected.h"
 #include "nucleus/strain_scope.h"
@@ -23,6 +25,7 @@
 
 #include "nucleus/config_source/inherit_declaration.h"
 
+#include <set>
 #include <string>
 #include <vector>
 #include <cstddef>
@@ -37,25 +40,28 @@ namespace nucleus {
 // survive into the frozen keyspace: a key value as a resolved segment would make
 // the tree untraversable without knowing the key.
 //
-// It OWNS the five strain units, which nothing outside the slice consults, and
+// It OWNS the six strain units, which nothing outside the slice consults, and
 // BORROWS what they read and write: the building keyspace, the provenance, the
-// schema, the repeated sweep, the keyed-merge state, the re-open dispositions and
-// the record of containers whose identity the slice satisfies structurally.
+// schema, the repeated sweep, the keyed-merge state, the re-open dispositions, the
+// values the fold displaced and the record of containers whose identity the slice
+// satisfies structurally.
 class strain_slicing
 {
 public:
     strain_slicing(keyspace &building, provenance &prov,
                    const schema_registry &schema, repeated_sweep &sweep,
-                   const keyed_merge_state &keyed,
-                   const std::vector<extend_disposition> &dispositions,
-                   std::vector<std::string> &keyed_satisfied) noexcept
-        : m_schema(schema)
-        , m_keyed_satisfied(keyed_satisfied)
-        , m_compaction(building, prov, schema, keyed)
-        , m_relay(building, prov, sweep, m_compaction, schema, keyed)
-        , m_pruning(building, prov, schema, keyed)
-        , m_selection(building, prov, schema)
-        , m_layer_rules(building, prov, schema, dispositions)
+                   const keyed_merge_state               &keyed,
+                   const std::vector<ranked_disposition> &dispositions,
+                   std::vector<std::string>              &keyed_satisfied,
+                   const displaced_values                &displaced) noexcept
+            : m_schema(schema)
+            , m_keyed_satisfied(keyed_satisfied)
+            , m_compaction(building, prov, schema, keyed)
+            , m_relay(building, prov, sweep, m_compaction, schema, keyed)
+            , m_pruning(building, prov, schema, keyed)
+            , m_selection(building, prov, schema)
+            , m_layer_rules(building, prov, schema, dispositions)
+            , m_restoration(building, prov, schema, keyed, displaced)
     {
     }
 
@@ -106,6 +112,7 @@ private:
     strain_pruning            m_pruning;
     strain_selection          m_selection;
     strain_layer_rules        m_layer_rules;
+    strain_restoration        m_restoration;
 
     expected<void, resolve_fold_error>
     slice_container(const schema_element &el,
@@ -122,8 +129,8 @@ private:
                             selected.value(), policy);
     }
 
-    // Bounds the chosen strain, removes what it displaces, and relays it onto
-    // the unified hierarchy.
+    // Bounds the chosen strain, removes what it displaces, puts back what its
+    // excluded entries displaced, and relays it onto the unified hierarchy.
     expected<void, resolve_fold_error>
     apply_strain(const key_path &container, std::string_view identity_path,
                  const strain_selection::chosen_strain &selected,
@@ -135,16 +142,33 @@ private:
         const auto bounds = m_layer_rules.enforce(container, strains, chosen, Ld);
         if(!bounds)
             return unexpected(bounds.error());
-        const bool wide = bounds.value().wide_extend;
+        const std::set<std::size_t> &wide = bounds.value().wide_ranks;
         m_pruning.prune(container, identity_path, strains, chosen, policy, Ld, wide);
-        if(auto r = m_relay.relay_strain(strains.at(chosen), identity_path, policy,
-                                         Ld, bounds.value().competitor_layer, wide);
-           !r)
+        const strain_scope_bounds scope{identity_path, policy, Ld,
+                                        bounds.value().competitor_layer, wide};
+        if(auto r = restore_and_relay(container, selected, scope); !r)
             return r;
         // The strain's key value named the instance and was consumed; the
         // enforcer's identity-presence check is satisfied structurally.
         m_keyed_satisfied.push_back(container.str());
         return {};
+    }
+
+    // The strain is bucketed again because the fold-time bucket never saw the
+    // entries the restoration put back.
+    expected<void, resolve_fold_error>
+    restore_and_relay(const key_path                        &container,
+                      const strain_selection::chosen_strain &selected,
+                      const strain_scope_bounds             &scope)
+    {
+        const std::string &chosen = selected.chosen;
+        m_restoration.restore(container.str() + key_path::separator + chosen + key_path::separator,
+                              selected.strains.at(chosen), scope);
+        const auto restored = m_selection.select(container, chosen);
+        if(!restored)
+            return unexpected(restored.error());
+        return m_relay.relay_strain(restored.value().strains.at(chosen), scope.identity_path,
+                                    scope.policy, scope.Ld, scope.Ls, scope.wide_ranks);
     }
 };
 

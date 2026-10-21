@@ -134,7 +134,8 @@ private:
         if(!state.buckets.contains(site.scope))
             state.buckets[site.scope] =
                 m_sweep.bucket_by_instance(site.scope, site.scope_is_leaf);
-        m_sweep.sweep_instance(state.buckets[site.scope][site.sweep_key]);
+        m_sweep.sweep_instance(state.buckets[site.scope][site.sweep_key], site.sweep_key,
+                               site.layer);
     }
 };
 

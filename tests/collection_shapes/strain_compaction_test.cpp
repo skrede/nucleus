@@ -9,6 +9,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
+#include <vector>
 #include <sstream>
 #include <filesystem>
 
@@ -17,6 +18,16 @@
 #endif
 
 namespace {
+
+struct expected_route
+{
+    std::string port;
+    std::string method;
+    std::string origin;
+};
+
+const std::string base_origin    = "[0|path:base.xml|anonymous|0]";
+const std::string derived_origin = "[1|path:derived.xml|anonymous|1]";
 
 nucleus::config_space server_space()
 {
@@ -31,22 +42,22 @@ nucleus::source_handle xml_of(const std::string &text)
             nucleus::xml_source::from(nucleus::xml_source_options::of_string(text)));
 }
 
+std::string route_of(const std::string &port, const std::string &method)
+{
+    return "<route><port>" + port + "</port><method>" + method + "</method></route>";
+}
+
 std::string routes(std::size_t count, const std::string &prefix)
 {
     std::string text;
     for(std::size_t ordinal = 0; ordinal < count; ++ordinal)
-        text += "<route><port>" + prefix + "-port-" + std::to_string(ordinal) + "</port><method>" + prefix + "-method-" + std::to_string(ordinal) + "</method></route>";
+        text += route_of(prefix + "-port-" + std::to_string(ordinal), prefix + "-method-" + std::to_string(ordinal));
     return text;
 }
 
-std::string base_document(std::size_t count)
+std::string derived_document(const std::string &extend, const std::string &content)
 {
-    return "<cluster><server name=\"primary\">" + routes(count, "base") + "</server></cluster>";
-}
-
-std::string derived_document(std::size_t count)
-{
-    return "<cluster inherit=\"base.xml\"><server name=\"primary\" extend=\"narrow\">" + routes(count, "derived") + "</server></cluster>";
+    return "<cluster inherit=\"base.xml\"><server name=\"primary\" extend=\"" + extend + "\">" + content + "</server></cluster>";
 }
 
 nucleus::load_result load_narrow_extend(const nucleus::config_space &space,
@@ -75,11 +86,9 @@ nucleus::load_result reload_emitted(const nucleus::config_space &space,
             space, nucleus::source_stack{xml_of(emitted.str())}, options);
 }
 
-nucleus::load_result load_sweep(const nucleus::config_space &space,
-                                std::size_t total, std::size_t supplied)
+nucleus::load_result load_documents(const nucleus::config_space &space, const std::string &base,
+                                    const std::string &derived, nucleus::strain_scope_policy scope)
 {
-    const std::string     base    = base_document(total);
-    const std::string     derived = derived_document(supplied);
     nucleus::load_options opts;
     opts.document_paths = {"derived.xml"};
     opts.make_document  = [base, derived](const std::string &path)
@@ -87,65 +96,43 @@ nucleus::load_result load_sweep(const nucleus::config_space &space,
         return xml_of(nucleus::shapes::filename_of(path) == "base.xml" ? base : derived);
     };
     opts.selection = "primary";
+    opts.scope     = scope;
     return nucleus::load_config(space, nucleus::source_stack{}, opts);
 }
 
-void require_base_origin(const nucleus::config &cfg, const std::string &path)
+void require_routes(const nucleus::load_result &loaded, const std::vector<expected_route> &resolved)
 {
-    const nucleus::origin *origin = cfg.provenance_of(path);
-    REQUIRE(origin != nullptr);
-    REQUIRE(origin->rank == 0);
-    REQUIRE(origin->layer == "path:base.xml");
-    REQUIRE_FALSE(origin->owner.has_value());
-    REQUIRE(origin->inheritance_layer == 0);
-}
-
-void require_sweep(const nucleus::config &cfg, std::size_t total,
-                   std::size_t supplied)
-{
-    REQUIRE(cfg.get("cluster/server/name") == "primary");
-    const nucleus::origin *identity = cfg.provenance_of("cluster/server/name");
-    REQUIRE(identity != nullptr);
-    REQUIRE(identity->rank == 1);
-    REQUIRE(identity->inheritance_layer == 1);
-    const std::size_t survivors = total - supplied;
-    for(std::size_t target = 0; target < survivors; ++target)
+    REQUIRE(loaded);
+    const std::string serialized = nucleus::shapes::serialize(loaded.value());
+    INFO(serialized);
+    REQUIRE(serialized.find("cluster/server/name = primary " + derived_origin + "\n") != std::string::npos);
+    for(std::size_t ordinal = 0; ordinal < resolved.size(); ++ordinal)
     {
-        const std::size_t source = target + supplied;
-        const std::string route  = "cluster/server/route[" + std::to_string(target) + "]";
-        REQUIRE(cfg.get(route + "/port") == "base-port-" + std::to_string(source));
-        REQUIRE(cfg.get(route + "/method") == "base-method-" + std::to_string(source));
-        require_base_origin(cfg, route + "/port");
-        require_base_origin(cfg, route + "/method");
+        const std::string route            = "cluster/server/route[" + std::to_string(ordinal) + "]";
+        const auto &[port, method, origin] = resolved[ordinal];
+        REQUIRE(serialized.find(route + "/port = " + port + " " + origin + "\n") != std::string::npos);
+        REQUIRE(serialized.find(route + "/method = " + method + " " + origin + "\n") != std::string::npos);
     }
-    const std::string absent = "cluster/server/route[" + std::to_string(survivors) + "]";
-    REQUIRE_FALSE(cfg.contains(absent + "/port"));
-    REQUIRE_FALSE(cfg.contains(absent + "/method"));
+    const std::string absent = "cluster/server/route[" + std::to_string(resolved.size()) + "]";
+    REQUIRE_FALSE(loaded->contains(absent + "/port"));
+    REQUIRE_FALSE(loaded->contains(absent + "/method"));
+}
+
+std::vector<expected_route> base_routes(std::size_t total)
+{
+    std::vector<expected_route> resolved;
+    for(std::size_t ordinal = 0; ordinal < total; ++ordinal)
+        resolved.push_back({"base-port-" + std::to_string(ordinal), "base-method-" + std::to_string(ordinal), base_origin});
+    return resolved;
 }
 
 }
 
-TEST_CASE("a narrow extend closes the ordinal gap while preserving the surviving route "
-          "and its complete origin",
+TEST_CASE("a narrow extend the default policy excludes leaves the parent's routes in place",
           "[collection_shapes][keyed][compaction]")
 {
-    const nucleus::config_space space  = server_space();
-    const nucleus::load_result  loaded = load_narrow_extend(space);
-    REQUIRE(loaded);
-    const nucleus::config &cfg        = loaded.value();
-    const std::string      serialized = nucleus::shapes::serialize(cfg);
-    INFO(serialized);
-    REQUIRE(cfg.get("cluster/server/name") == "primary");
-    REQUIRE(serialized.find("cluster/server/name = primary "
-                            "[1|path:derived.xml|anonymous|1]\n") != std::string::npos);
-    REQUIRE(cfg.get("cluster/server/route[0]/port") == "443");
-    REQUIRE(cfg.get("cluster/server/route[0]/method") == "post");
-    REQUIRE_FALSE(cfg.contains("cluster/server/route[1]/port"));
-    REQUIRE_FALSE(cfg.contains("cluster/server/route[1]/method"));
-    REQUIRE(serialized.find("cluster/server/route[0]/port = 443 "
-                            "[0|path:base.xml|anonymous|0]\n") != std::string::npos);
-    REQUIRE(serialized.find("cluster/server/route[0]/method = post "
-                            "[0|path:base.xml|anonymous|0]\n") != std::string::npos);
+    require_routes(load_narrow_extend(server_space()),
+                   {{"80", "get", base_origin}, {"443", "post", base_origin}});
 }
 
 TEST_CASE("a compacted narrow extension retains its identity through XML round trip",
@@ -161,7 +148,7 @@ TEST_CASE("a compacted narrow extension retains its identity through XML round t
         REQUIRE(second->get(key) == first->get(key));
 }
 
-TEST_CASE("narrow extensions compact every removed prefix across an ordinal sweep",
+TEST_CASE("narrow extensions leave every parent route in place across an ordinal sweep",
           "[collection_shapes][keyed][compaction][sweep]")
 {
     const nucleus::config_space space = server_space();
@@ -169,17 +156,38 @@ TEST_CASE("narrow extensions compact every removed prefix across an ordinal swee
         for(std::size_t supplied = 1; supplied < total; ++supplied)
         {
             CAPTURE(total, supplied);
-            const nucleus::load_result loaded = load_sweep(space, total, supplied);
-            REQUIRE(loaded);
-            require_sweep(loaded.value(), total, supplied);
+            const std::string base = "<cluster><server name=\"primary\">" + routes(total, "base") + "</server></cluster>";
+            require_routes(load_documents(space, base, derived_document("narrow", routes(supplied, "derived")),
+                                          nucleus::strain_scope_policy::space_open_container_closed),
+                           base_routes(total));
         }
 }
 
 TEST_CASE("file-level narrow inheritance retains the selected identity",
           "[collection_shapes][keyed][compaction][scope]")
 {
-    const nucleus::load_result loaded = load_narrow_extend(
-            server_space(), nucleus::strain_scope_policy::file_level);
-    REQUIRE(loaded);
-    REQUIRE(loaded->get("cluster/server/name") == "primary");
+    require_routes(load_narrow_extend(server_space(), nucleus::strain_scope_policy::file_level),
+                   {{"80", "get", base_origin}, {"443", "post", base_origin}});
+}
+
+TEST_CASE("a narrow extend composes its route where the scope policy opens the container",
+          "[collection_shapes][keyed][compaction][scope]")
+{
+    require_routes(load_narrow_extend(server_space(), nucleus::strain_scope_policy::container_open_until_next_strain),
+                   {{"8080", "put", derived_origin}, {"443", "post", base_origin}});
+}
+
+TEST_CASE("a wide extend composes its route under every scope policy",
+          "[collection_shapes][keyed][compaction][scope]")
+{
+    const nucleus::config_space space = server_space();
+    const std::string           base  = "<cluster><server name=\"primary\">" + route_of("80", "get") + route_of("443", "post") + "</server></cluster>";
+    for(const nucleus::strain_scope_policy scope : {nucleus::strain_scope_policy::file_level,
+                                                    nucleus::strain_scope_policy::space_open_container_closed,
+                                                    nucleus::strain_scope_policy::container_open_until_next_strain})
+    {
+        CAPTURE(scope);
+        require_routes(load_documents(space, base, derived_document("wide", route_of("8080", "put")), scope),
+                       {{"8080", "put", derived_origin}, {"443", "post", base_origin}});
+    }
 }

@@ -1,4 +1,4 @@
-# The folder include entry is what lets the nineteen sources reach collection_shapes.h by its
+# The folder include entry is what lets the twenty-one sources reach collection_shapes.h by its
 # bare name; the fixture documents the define points at live beside them.
 nucleus_add_test(collection_shapes_test
     SOURCES collection_shapes_test.cpp
@@ -12,6 +12,8 @@ nucleus_add_test(collection_shapes_test
             strain_displacement_test.cpp
             strain_compaction_test.cpp
             strain_compaction_boundary_test.cpp
+            strain_restoration_test.cpp
+            extend_site_strength_test.cpp
             strain_ordering_test.cpp
             transparent_root_test.cpp
             instance_presence_test.cpp

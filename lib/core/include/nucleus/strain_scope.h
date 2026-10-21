@@ -11,16 +11,18 @@ namespace nucleus {
 // and always win by plain precedence. No keyed content => no defining layer => no-op.
 enum class strain_scope_policy : int
 {
-    // Freeze the entire keyspace at the strain's defining layer: every entry whose
-    // winning rank exceeds Ld is discarded (keyed and general alike).
+    // Freeze the entire keyspace at the strain's defining layer: an entry a layer above Ld
+    // supplied is discarded, keyed and general alike, and the value it replaced from a layer at
+    // or below Ld stays.
     file_level,
 
-    // DEFAULT: general entries compose freely; the strain's keyed entries freeze at
-    // Ld (a keyed entry whose winning rank exceeds Ld is excluded).
+    // DEFAULT: general entries compose freely; the strain's keyed entries freeze at Ld: a keyed
+    // entry supplied above Ld is excluded, and the instance or value it displaced stays.
     space_open_container_closed,
 
-    // The strain's keyed entries compose over [Ld, Ls) (excluded at or above Ls;
-    // unbounded if no competing strain above Ld). General entries are unconstrained.
+    // The strain's keyed entries compose over [Ld, Ls): excluded at or above Ls (unbounded if no
+    // competing strain above Ld), leaving what they displaced in place. General entries are
+    // unconstrained.
     container_open_until_next_strain,
 };
 

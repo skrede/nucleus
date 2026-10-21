@@ -41,9 +41,9 @@ builder.register_element(
 
 A container with a primary key and no explicit keyed merge mode follows selected-strain
 composition. The chosen strain's transient key segment is consumed while its entries are re-laid
-onto the declared resolved paths. Within a repeated container, a higher-rank entry displaces the
-same field only in the concrete instance it addresses; other fields and sibling instances stay in
-place. A repeated leaf remains a whole-list unit under one enclosing instance.
+onto the declared resolved paths. Within a repeated container, a higher-rank entry the scope policy
+admits displaces the same field only in the concrete instance it addresses; other fields and sibling
+instances stay in place. A repeated leaf remains a whole-list unit under one enclosing instance.
 
 After the selected entries are re-laid, surviving instances are re-indexed to contiguous ordinals
 in their existing relative order. Layering does not reorder them; only removal renumbers a later

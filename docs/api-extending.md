@@ -328,8 +328,19 @@ struct extend_disposition {
 };
 ```
 
-- `narrow` — the re-open obeys the active scope policy.
-- `wide` — the re-open composes regardless of scope policy.
+- `narrow` — the re-open obeys the active scope policy: content the policy
+  excludes is discarded, and the base instance or value it addressed stays.
+  Under `file_level` and the default policy a narrow re-open therefore adds
+  nothing to the instance but its identity (a keyed-merge collection inside it
+  still composes). Under `container_open_until_next_strain` its content
+  composes, unless a competing strain was introduced above the defining layer
+  and at or below the re-open's own layer.
+- `wide` — the re-open composes regardless of scope policy, for the declaring
+  document's own content only.
+
+A strength applies per re-open site: in a chain that re-opens one strain in
+several documents, each document's content follows its own `extend`, and a flat
+source obeys the policy whatever the documents declare.
 
 A disposition for a primary-key value not present in any base layer is a loud
 error. Re-declaring a named instance in a derived layer without `extend` is

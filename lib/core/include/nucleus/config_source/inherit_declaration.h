@@ -9,8 +9,9 @@
 
 namespace nucleus {
 
-// The strength of a re-open disposition: narrow obeys the active scope policy;
-// wide composes regardless of scope policy.
+// `narrow` obeys the active scope policy: content the policy excludes is discarded, and the base
+// instance or value it addressed stays. `wide` composes regardless of scope policy, for the
+// declaring document's own content only.
 enum class extend_strength { narrow, wide };
 
 // A re-open declaration attached at the batch level. A derived document that

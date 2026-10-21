@@ -350,6 +350,9 @@ layer introducing a competing strain above Ld):
 | `space_open_container_closed` | General entries compose freely from all layers; the strain's keyed entries freeze at Ld. **The default.** |
 | `container_open_until_next_strain` | The strain's keyed entries compose over [Ld, Ls); general entries are unconstrained. |
 
+An excluded entry never displaces what a lower layer supplied: the instance or
+value it addressed resolves as that layer left it.
+
 Re-opening a named instance across an inheritance layer requires explicit
 consent: the derived document marks the instance with an `extend` disposition
 (see [Seams you extend](api-extending.md#inheritance)); re-declaring it without

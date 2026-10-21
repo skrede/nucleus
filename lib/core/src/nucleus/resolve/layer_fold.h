@@ -48,10 +48,10 @@ class layer_fold
 
 public:
     layer_fold(const schema_registry &schema, std::vector<retained_buffer> &buffers,
-               std::vector<extend_disposition> &dispositions) noexcept
-        : m_schema(schema)
-        , m_buffers(buffers)
-        , m_dispositions(dispositions)
+               std::vector<ranked_disposition> &dispositions) noexcept
+            : m_schema(schema)
+            , m_buffers(buffers)
+            , m_dispositions(dispositions)
     {
     }
 
@@ -87,10 +87,10 @@ public:
         return reject_extend_on_repeated(batch);
     }
 
-    void end_layer(config_source_batch &batch)
+    void end_layer(config_source_batch &batch, std::size_t rank)
     {
         for(const extend_disposition &d : batch.dispositions)
-            m_dispositions.push_back(d);
+            m_dispositions.push_back(ranked_disposition{d, rank});
         m_buffers.push_back(std::move(batch.buffer));
     }
 
@@ -109,7 +109,7 @@ public:
 private:
     const schema_registry           &m_schema;
     std::vector<retained_buffer>    &m_buffers;
-    std::vector<extend_disposition> &m_dispositions;
+    std::vector<ranked_disposition> &m_dispositions;
     layer_state             m_state;
     schema_projection       m_projection;
     config_source_result    m_pulled;
