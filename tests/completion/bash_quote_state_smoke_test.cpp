@@ -36,7 +36,7 @@ std::string shared_script()
 {
     schema_registry reg;
     REQUIRE(reg.attach(nucleus::element("app", anchor::root())));
-    REQUIRE(reg.attach(nucleus::enum_element("mode", anchor::keyspace(key_path::parse("app").value()), {"it's", "it'd", "a!b", "a!c"})));
+    REQUIRE(reg.attach(nucleus::enum_element("mode", anchor::keyspace(key_path::parse("app").value()), {"it's", "it'd", "a!b", "a!c", "abc", "has space"})));
     return script_of(generate_completion(shell::bash, reg, "myapp"));
 }
 
@@ -71,7 +71,7 @@ TEST_CASE("a value completes in the spelling of the quote the typed word leaves 
 
     const std::string app = hostile_script();
     check_rows({
-            {app, {"--app-mode", "=", "'w'\""}, "--app-mode='w'\"", "\"", "<--app-mode=ww\"$(touch PWN_DQ)\"y>\n"},
+            {app, {"--app-mode", "=", "'w"}, "--app-mode='", "'", "<--app-mode=w\"$(touch PWN_DQ)\"y>\n"},
             {app, {"--app-mode", "=", "\"q\\\""}, "--app-mode=\"", "\"", "<--app-mode=q\">\n"},
     });
 }
@@ -127,13 +127,20 @@ TEST_CASE("a value shared through a reopened quote completes on the first TAB an
         SKIP("no bash 5.0 or later on PATH");
 
     const std::string app       = shared_script();
+    const std::string hostile   = hostile_script();
     const std::string first_tab = "COMP_WORDS=(myapp --app-mode = \"'i\")\nCOMP_CWORD=3\n_myapp_complete\nprintf '[%s]' \"${COMPREPLY[@]}\"; echo\n";
     REQUIRE(run_bash(app + first_tab) == "[it'\\''s][it'\\''d]\n");
-    // bash matches nothing for a word that closes and reopens a quote, so no value is offered there.
+    // compgen still matches a plain close-and-reopen, but readline would keep the text before the reopened quote, so
+    // nothing is offered for a word that ends inside a quote it reopened.
     check_rows({
             {app, {"--app-mode", "=", "'it'\\''s"}, "--app-mode='it'\\''", "'", ""},
             {app, {"--app-mode", "=", "\"a\"\\!\"b"}, "--app-mode=\"a\"\\!\"", "\"", ""},
             {app, {"--app-mode", "=", "'it'\"'\"'s"}, "--app-mode='it'\"'\"'", "'", ""},
             {app, {"--app-mode", "=", "\"it'\"'s"}, "--app-mode=\"it'\"'", "'", ""},
+            {app, {"--app-mode", "=", "'a''bc"}, "--app-mode='a''", "'", ""},
+            {app, {"--app-mode", "=", "\"h\"\"as spa"}, "--app-mode=\"h\"\"", "\"", ""},
+            {app, {"--app-mode", "=", "'h''as spa"}, "--app-mode='h''", "'", ""},
+            {hostile, {"--app-mode", "=", "'w'\""}, "--app-mode='w'\"", "\"", ""},
+            {app, {"--app-mode", "=", "'a''bc'"}, "--app-mode=", "", "<--app-mode=abc>\n"},
     });
 }

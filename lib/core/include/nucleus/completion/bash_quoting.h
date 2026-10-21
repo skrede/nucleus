@@ -96,13 +96,13 @@ inline std::string bash_join_values(const std::vector<std::string> &values)
 // runs inside the same substitution.
 // A non-empty `prefix` names the emitted `_quote` and `_line` helpers, and each compgen match is piped through
 // `_line` with the quote the typed word leaves open, or with none when a quote byte or backslash lies right of the
-// cursor.
+// cursor; nothing is offered when the tracker refuses the word.
 inline std::string bash_reply_assignment(const std::string &pad, const std::string &words, const std::string &current,
                                          const std::string &prefix, const std::string &also)
 {
     std::string out = pad + "set -f\n";
     if(!prefix.empty())
-        out += pad + "local quote; " + prefix + "_quote \"" + current + "\"\n";
+        out += pad + "local quote; " + prefix + "_quote \"" + current + "\" || return 0\n";
     out += pad + R"(local IFS=$'\n'; COMPREPLY=( $(IFS=$' \t\n'; compgen -W )" + words + " -- \"" + current + "\"";
     out += prefix.empty() ? std::string() : " | while IFS= read -r w; do " + prefix + R"(_line "$quote" "$w"; done)";
     return out + (also.empty() ? std::string() : "; " + also) + ") )\n";
