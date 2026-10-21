@@ -20,6 +20,7 @@
 #include <fstream>
 #include <filesystem>
 #include <string_view>
+#include <system_error>
 
 namespace nucleus::bash_test {
 
@@ -35,18 +36,41 @@ inline bool bash_available()
 #endif
 }
 
-// Two executables drive bash at once under a parallel CTest, so each scratch directory is created
-// exclusively under a name unique to its call, and neither can overwrite or remove the other's.
-inline std::filesystem::path scratch_directory(const std::string &stem)
+// Two executables drive bash at once under a parallel CTest, so each scratch tree is created
+// exclusively under a name unique to its guard, and neither can overwrite or remove the other's.
+class scratch_tree
 {
-    std::random_device random;
-    for(;;)
+public:
+    explicit scratch_tree(const std::string &stem)
+            : m_path(created(stem))
     {
-        std::filesystem::path dir = std::filesystem::temp_directory_path() / (stem + "_" + std::to_string(random()));
-        if(std::filesystem::create_directory(dir))
-            return dir;
     }
-}
+
+    ~scratch_tree()
+    {
+        std::error_code ec;
+        std::filesystem::remove_all(m_path, ec);
+    }
+
+    scratch_tree(const scratch_tree &)            = delete;
+    scratch_tree &operator=(const scratch_tree &) = delete;
+
+    const std::filesystem::path &path() const { return m_path; }
+
+private:
+    std::filesystem::path m_path;
+
+    static std::filesystem::path created(const std::string &stem)
+    {
+        std::random_device random;
+        for(;;)
+        {
+            std::filesystem::path dir = std::filesystem::temp_directory_path() / (stem + "_" + std::to_string(random()));
+            if(std::filesystem::create_directory(dir))
+                return dir;
+        }
+    }
+};
 
 inline std::string shell_quoted(const std::string &text)
 {
@@ -61,30 +85,22 @@ inline std::string shell_quoted(const std::string &text)
     return quoted + "'";
 }
 
-inline std::int32_t close_pipe(std::FILE *pipe)
-{
 #ifdef _MSC_VER
-    return _pclose(pipe);
+inline std::int32_t close_pipe(std::FILE *pipe) { return _pclose(pipe); }
+inline std::FILE   *open_pipe(const std::string &command) { return _popen(command.c_str(), "r"); }
 #else
-    return pclose(pipe);
+inline std::int32_t close_pipe(std::FILE *pipe) { return pclose(pipe); }
+inline std::FILE   *open_pipe(const std::string &command) { return popen(command.c_str(), "r"); }
 #endif
-}
 
 using pipe_handle = std::unique_ptr<std::FILE, decltype(&close_pipe)>;
 
-inline pipe_handle opened_pipe(const std::string &command)
-{
-#ifdef _MSC_VER
-    return pipe_handle(_popen(command.c_str(), "r"), &close_pipe);
-#else
-    return pipe_handle(popen(command.c_str(), "r"), &close_pipe);
-#endif
-}
+inline pipe_handle opened_pipe(const std::string &command) { return pipe_handle(open_pipe(command), &close_pipe); }
 
 inline std::string run_bash(const std::string &script)
 {
-    const std::filesystem::path scratch = scratch_directory("nucleus_completion_smoke");
-    const std::filesystem::path file    = scratch / "script.sh";
+    const scratch_tree          scratch("nucleus_completion_smoke");
+    const std::filesystem::path file = scratch.path() / "script.sh";
     std::ofstream(file) << script;
     std::string  captured;
     std::int32_t status = -1;
@@ -95,7 +111,6 @@ inline std::string run_bash(const std::string &script)
             captured += buf.data();
         status = close_pipe(pipe.release());
     }
-    std::filesystem::remove_all(scratch);
     INFO(captured);
     REQUIRE(status == 0);
     return captured;
@@ -133,23 +148,19 @@ inline std::string print_inserted(const std::vector<std::string> &words, const s
 inline std::string run_seeded(const std::string &completion, const std::string &drive,
                               const std::vector<std::string> &decoys)
 {
-    const std::filesystem::path dir = scratch_directory("nucleus_completion_glob");
+    const scratch_tree dir("nucleus_completion_glob");
     for(const std::string &decoy : decoys)
-        std::ofstream(dir / decoy);
-    const std::string out = run_bash("cd " + shell_quoted(dir.string()) + " || exit 1\n" + completion + drive);
-    std::filesystem::remove_all(dir);
-    return out;
+        std::ofstream(dir.path() / decoy);
+    return run_bash("cd " + shell_quoted(dir.path().string()) + " || exit 1\n" + completion + drive);
 }
 
 // An interactive shell history-expands each line it reads before parsing it, and so does a script once it
 // turns history on; `eval` never does, so the lines are run as script input.
 inline std::string run_history_expanded(const std::string &lines)
 {
-    const std::filesystem::path dir    = scratch_directory("nucleus_completion_history");
-    const std::string           script = "set -o history -H\ncd " + shell_quoted(dir.string()) + " || exit 1\n";
-    const std::string           out    = run_bash(script + std::string(argv_printer) + lines + std::string(payload_check));
-    std::filesystem::remove_all(dir);
-    return out;
+    const scratch_tree dir("nucleus_completion_history");
+    const std::string  script = "set -o history -H\ncd " + shell_quoted(dir.path().string()) + " || exit 1\n";
+    return run_bash(script + std::string(argv_printer) + lines + std::string(payload_check));
 }
 
 inline schema_registry delimiter_registry()

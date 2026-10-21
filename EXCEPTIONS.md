@@ -220,7 +220,7 @@ one that proves nothing, and compressing a case means dropping the seeding that 
 The zsh case is long because it is an enumeration: no zsh runs on the machine that wrote it, so
 each construct it claims to neutralize has to be named and asserted rather than covered by
 driving a shell once. `tests/completion/smoke_test.cpp` has since given its shell-driving helpers
-to a support header shared with the ordinal completion test, and fell to 262.
+to a support header shared with the ordinal completion test, and fell to 257.
 
 The three newest rows are contract tests that rename the example's entry point through the
 preprocessor so it cannot collide with the test runner's own. That rename leaves the renamed
@@ -256,7 +256,7 @@ is the price of the file being stable under both, and the row is the price of th
 | `tests/resolve/resolution_test.cpp` | 278 |
 | `tests/schema/enforcer_test.cpp` | 272 |
 | `tests/completion/completion_test.cpp` | 270 |
-| `tests/completion/smoke_test.cpp` | 262 |
+| `tests/completion/smoke_test.cpp` | 257 |
 | `tests/tokenizer/token_resolution_test.cpp` | 245 |
 | `tests/config_source/discovery_test.cpp` | 240 |
 | `tests/xml/keyed_selection_test.cpp` | 232 |

@@ -26,7 +26,7 @@ using nucleus::shell;
 using nucleus::bash_test::bash_available;
 using nucleus::bash_test::run_bash;
 using nucleus::bash_test::run_seeded;
-using nucleus::bash_test::scratch_directory;
+using nucleus::bash_test::scratch_tree;
 using nucleus::completion_result_test::script_of;
 
 namespace {
@@ -132,9 +132,8 @@ TEST_CASE("a space name places the ordinal wildcard on the segment the path reac
 TEST_CASE("no shell construct in a word list fires or corrupts the candidate",
           "[completion][smoke]")
 {
-    namespace fs = std::filesystem;
-    const fs::path                 dir = scratch_directory("nucleus_completion_word_list");
-    const std::string              s   = (dir / "sentinel").string();
+    const scratch_tree             dir("nucleus_completion_word_list");
+    const std::string              s = (dir.path() / "sentinel").string();
     const std::vector<std::string> payloads{
         "a<(:>" + s + ")b",     // process substitution
         "a$(touch " + s + ")b", // command substitution
@@ -150,18 +149,14 @@ TEST_CASE("no shell construct in a word list fires or corrupts the candidate",
     // No zsh interpreter is assumed to exist here, so the zsh half is pinned by text alone.
     REQUIRE(nucleus::zsh_emitter{}.emit(model).find("a<(") == std::string::npos);
     if(!bash_available())
-    {
-        fs::remove_all(dir);
         return;
-    }
     const std::string script = nucleus::bash_emitter{}.emit(model);
     const std::string drive  = "\nCOMP_WORDS=(myapp -)\nCOMP_CWORD=1\n_myapp_complete\n"
                                "for c in \"${COMPREPLY[@]}\"; do eval \"printf '%s\\n' $c\"; done\n"
                                "COMP_WORDS=(myapp --v =)\nCOMP_CWORD=2\n_myapp_complete\n"
                                "for c in \"${COMPREPLY[@]}\"; do eval \"printf '%s\\n' $c\"; done\n";
     const std::string out    = run_bash(script + drive);
-    REQUIRE(fs::is_empty(dir));
-    fs::remove_all(dir);
+    REQUIRE(std::filesystem::is_empty(dir.path()));
     for(const std::string &payload : payloads)
         expected += payload + "\n";
     REQUIRE(out == expected);

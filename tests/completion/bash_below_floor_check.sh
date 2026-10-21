@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # Sources every *.bash in the working directory under the bash running this check. Each must print nothing on
 # stderr, return status 0 and leave no completion registered.
 echo "bash $BASH_VERSION"

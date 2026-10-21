@@ -94,6 +94,14 @@ nucleus::schema_registry delim_fixture(std::int32_t &failures)
     return reg;
 }
 
+nucleus::schema_registry plain_fixture(std::int32_t &failures)
+{
+    nucleus::schema_registry reg;
+    failures += attached(reg, element("logging", nucleus::anchor::root()));
+    failures += attached(reg, enum_element("level", nucleus::anchor::keyspace("logging"), {"debug", "info"}));
+    return reg;
+}
+
 std::int32_t write_script(const std::filesystem::path &dir, std::string_view name,
                           const nucleus::schema_registry &reg, const nucleus::cli_delimiter &delimiter,
                           const nucleus::key_path &anchor, std::string_view space)
@@ -120,6 +128,7 @@ std::int32_t write_shapes(const std::filesystem::path &dir, const nucleus::cli_d
     const nucleus::schema_registry values    = values_fixture(failures);
     const nucleus::schema_registry quoted    = quoted_fixture(failures);
     const nucleus::schema_registry delim     = delim_fixture(failures);
+    const nucleus::schema_registry plain     = plain_fixture(failures);
     failures += write_script(dir, "ordinal.bash", ordinal, {}, {}, {});
     failures += write_script(dir, "nested.bash", nested, {}, {}, {});
     failures += write_script(dir, "star.bash", ordinal, star, {}, {});
@@ -128,6 +137,7 @@ std::int32_t write_shapes(const std::filesystem::path &dir, const nucleus::cli_d
     failures += write_script(dir, "values.bash", values, {}, {}, {});
     failures += write_script(dir, "quoted.bash", quoted, {}, {}, {});
     failures += write_script(dir, "delim.bash", delim, hostile, {}, {});
+    failures += write_script(dir, "plain.bash", plain, {}, {}, {});
     return failures;
 }
 

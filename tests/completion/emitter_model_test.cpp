@@ -8,7 +8,10 @@
 
 #include <string>
 #include <vector>
+#include <fstream>
 #include <algorithm>
+#include <stdexcept>
+#include <filesystem>
 
 using nucleus::bash_emitter;
 using nucleus::completion_model;
@@ -18,6 +21,7 @@ using nucleus::bash_test::bash_available;
 using nucleus::bash_test::payload_check;
 using nucleus::bash_test::run_bash;
 using nucleus::bash_test::run_seeded;
+using nucleus::bash_test::scratch_tree;
 using nucleus::bash_test::shell_quoted;
 
 namespace {
@@ -105,6 +109,21 @@ TEST_CASE("a hostile program name reaches the zsh script only as inert text", "[
     const std::string shown = "x$(touch PWN_PROG);y\\ntouch PWN_LINE\n";
     REQUIRE(zsh.starts_with("#compdef " + shown + "# zsh completion for " + shown + "#"));
     REQUIRE(std::ranges::count(zsh, '\n') == std::ranges::count(plain, '\n'));
+}
+
+TEST_CASE("a scratch tree is removed when a failure unwinds past it", "[completion][support]")
+{
+    std::filesystem::path recorded;
+    const auto            failing = [&recorded]
+    {
+        const scratch_tree tree("nucleus_completion_unwind");
+        recorded = tree.path();
+        std::ofstream(tree.path() / "held") << "held";
+        throw std::runtime_error("drive failed");
+    };
+    CHECK_THROWS_AS(failing(), std::runtime_error);
+    REQUIRE_FALSE(recorded.empty());
+    REQUIRE_FALSE(std::filesystem::exists(recorded));
 }
 
 // Passes only while run_bash fails a drive on its exit status: the stdout matches, so nothing else can fail it.
