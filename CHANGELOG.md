@@ -300,11 +300,13 @@ These accept more than before.
   may reuse one identifier. Duplicates inside one enclosing instance are still
   refused. This narrows 0.4.1's "duplicates across instances are now rejected" to
   the instance that encloses the collection.
-- **A general repeated container nested in another loads beside a keyed
-  container.** With a repeated `pool` holding a repeated `member` under `cluster`,
-  beside the primary-keyed `cluster/server`, a configuration supplying a member
-  now loads. 0.4.1 failed the load with `errc::schema_violation`, reading the
-  nested instance's ordinal as the keyed container's primary-key value.
+- **A repeated element beside a keyed container no longer fails the load.** A
+  repeated element whose instances sit at the depth of a keyed container's
+  instances, anywhere outside that container, now loads: a repeated `sink` leaf
+  under a plain `cluster/logging`, or a repeated `member` nested in a repeated
+  `cluster/pool`, each beside the primary-keyed `cluster/server`. 0.4.1 failed the
+  load with `errc::schema_violation`, with or without a selection, reading the
+  instance's ordinal as the keyed container's primary-key value.
 
 ### Reading a resolved configuration
 

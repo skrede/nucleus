@@ -102,7 +102,7 @@ private:
     {
         const std::vector<displaced_value> &displaced = m_displaced.all();
         std::vector<region>                 regions;
-        std::map<std::string, std::size_t>  replaced_at;
+        std::map<std::string, std::size_t>  replaced_at = swept_at(chosen_prefix, bounds);
         for(const displaced_value &d : displaced)
         {
             regions.push_back(region_of(d.path, chosen_prefix, bounds));
@@ -115,6 +115,20 @@ private:
                 m_building.set(displaced[i].path, displaced[i].val);
                 m_provenance.record(displaced[i].path.str(), displaced[i].prov);
             }
+    }
+
+    // An admissible sweep counts even when an excluded layer had already emptied the instance.
+    std::map<std::string, std::size_t> swept_at(const std::string         &chosen_prefix,
+                                                const strain_scope_bounds &bounds) const
+    {
+        std::map<std::string, std::size_t> swept;
+        for(const swept_unit &s : m_displaced.sweeps())
+        {
+            const auto unit = key_path::parse(s.unit);
+            if(unit && admits(region_of(unit.value(), chosen_prefix, bounds), s.swept_by, s.swept_by_chain, bounds))
+                swept[s.unit] = std::max(swept[s.unit], s.swept_by);
+        }
+        return swept;
     }
 
     // A value stays out when an admissible layer later replaced its unit or an instance enclosing

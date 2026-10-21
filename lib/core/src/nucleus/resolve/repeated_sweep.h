@@ -110,6 +110,7 @@ public:
     void sweep_instance(const std::vector<key_path> &bucket, const std::string &unit,
                         const layered_handle &displacer)
     {
+        m_displaced.record_sweep(unit, displacer);
         for(const key_path &existing : bucket)
         {
             m_displaced.record(existing, m_building, m_provenance, unit, displacer);

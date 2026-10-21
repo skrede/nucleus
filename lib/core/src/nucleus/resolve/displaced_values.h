@@ -26,6 +26,14 @@ struct displaced_value
     bool        displaced_by_chain;
 };
 
+// Recorded even when nothing was left in the instance to displace.
+struct swept_unit
+{
+    std::string unit;
+    std::size_t swept_by;
+    bool        swept_by_chain;
+};
+
 // The fold displaces before any scope policy is known, so every displaced value is kept here
 // until the slice decides whether its displacer was admissible. Recorded in fold order, which
 // puts the later of two displaced versions of one path after the earlier.
@@ -45,10 +53,18 @@ public:
                                               displacer.inheritance_layer.has_value()});
     }
 
+    void record_sweep(const std::string &unit, const layered_handle &sweeper)
+    {
+        m_swept.push_back(swept_unit{unit, sweeper.rank, sweeper.inheritance_layer.has_value()});
+    }
+
     const std::vector<displaced_value> &all() const noexcept { return m_displaced; }
+
+    const std::vector<swept_unit> &sweeps() const noexcept { return m_swept; }
 
 private:
     std::vector<displaced_value> m_displaced;
+    std::vector<swept_unit>      m_swept;
 };
 
 }
