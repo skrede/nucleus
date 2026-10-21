@@ -67,11 +67,11 @@ private:
     std::string m_reason;
 };
 
-// The registration-policy seam: a host pre-validates or intercepts a registration
-// before it commits, and the default accepts everything (mechanism in core, policy in
-// host), since the core imposes no reservation or namespacing rules beyond this hook.
-// The policy is consulted before the engine's own registration rules, so a
-// registration it accepts can still be refused by them.
+// The default accepts everything, and the engine keeps its own rules: well-formed names and
+// paths, non-empty callables, the reserved tree-tokenizer names, the `nucleus` identity-group
+// prefix and the builder seal. The seal and install_tree_tokenizer's reserved category are checked
+// before the policy is consulted and every other rule after it, so an accepted registration can
+// still be refused.
 class registration_policy
 {
 public:

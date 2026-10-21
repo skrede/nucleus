@@ -602,11 +602,20 @@ into an aggregate `vec3` converter.
 `#include "nucleus/registration_policy.h"`
 
 The seam through which a host pre-validates or refuses a registration before it
-commits. The default policy accepts everything — the core imposes no reservation
-or namespacing rules of its own. The policy is consulted before the engine's own
-registration rules, so a registration it accepts can still be refused by them: a
-schema path whose segment is not a well-formed element name, for example, is
-refused with `errc::rejected_registration` after the policy has accepted it.
+commits. The default policy accepts everything, and the engine keeps rules of its
+own: names and paths must be well formed, a host callable may not be empty, a tree
+tokenizer's category and an identity element's container tag may not be one of the
+reserved names (`env`, `string`, `abs`, `rel`, `scope`, `file`, `dir`, `self`), an
+identity group's namespace may neither be a reserved name nor start with `nucleus`,
+and nothing registers once `build()` has sealed the builder.
+
+Two of those rules run before the policy is asked, so the policy never sees the
+registrations they refuse: any registration on a sealed builder is refused with
+`errc::sealed_builder`, and `install_tree_tokenizer` refuses a reserved category with
+`errc::rejected_registration`. Every other rule runs after the policy has accepted,
+so an accepted registration can still be refused: a schema path whose segment is
+not a well-formed element name, for example, is refused with
+`errc::rejected_registration` after the policy has accepted it.
 
 ```cpp
 enum class registration_kind : std::uint8_t { schema, tokenizer, config_source, converter };

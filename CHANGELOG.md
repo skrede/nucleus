@@ -1,17 +1,21 @@
 # Changelog
 
 All notable changes to `nucleus` are recorded here. This file is written for the
-upgrader: each entry names a behavior that *used to be silent* and is now *loud*,
-so you can predict what a previously clean load or build will now reject &mdash; and
-why. Entries describe behavior, not internals.
+upgrader: each entry names a change you would not otherwise predict, and why it was
+made. A change may turn a previously clean load, build or emit into a failure,
+change a resolved value or emitted text without a diagnostic, change an error code,
+change what building or installing nucleus does, or stop code that used an API from
+compiling; each entry says which. From 0.4.2 on, each release also lists its
+additions. Entries describe behavior, not internals.
 
 ## 0.4.2 (unreleased)
 
 This release makes the emitters honest. Where a previous version would render
 something other than what was resolved &mdash; an ambiguous record, an invalid XML
 name, a collapsed instance ordinal &mdash; the emitter now reports before producing
-any output. Every entry in the emitter groups can turn a previously clean emit into
-a failure.
+any output. Most entries from Instance ordinals through Delivery turn a previously
+clean emit, or the load before it, into a failure; the rest change the emitted text,
+the API or an error code, and each says which.
 
 It reaches well beyond emission. Registration refuses more than it did: names,
 schema paths and allowed values carrying a control character or shell syntax, empty
@@ -24,7 +28,8 @@ before now fail. Some collection and read fixes instead change resolved values
 re-verify the output of any configuration with repeated or keyed containers.
 Generated bash completion now requires bash 5.0, and what nucleus requires to build
 and what an installed package hands a consumer both changed. Read every group that
-matches what you use.
+matches what you use. What the release adds without changing an existing interface
+is listed last, under Additions.
 
 ### Instance ordinals
 
@@ -37,9 +42,10 @@ matches what you use.
   losslessly &mdash; and anything larger fails as a malformed key path naming the
   source and the path.
 - **`key_path::ordinal_of` now returns `std::uint64_t`.** It returned `std::size_t`,
-  and `ordinal_sort_key` pairs carry `std::uint64_t` the same way. Where the two
-  types differ, assigning the result to a `std::size_t` now narrows, and code that
-  deduced the type with `auto` holds the wider one.
+  and `ordinal_sort_key` pairs carry `std::uint64_t` the same way. Assigning the
+  result to a `std::size_t` narrows only where `std::size_t` is
+  narrower than 64 bits, as on a 32-bit build; code that deduced the type with
+  `auto` now holds `std::uint64_t` on every platform.
 
 ### Flat emission (argv and env)
 
@@ -426,6 +432,37 @@ The first three change results *silently*.
   skips with a warning when `ctags` or `jq` is missing. Pass
   `-DNUCLEUS_INSTALL_GIT_HOOKS=OFF` to leave the clone's configuration alone. A
   vendored or fetched nucleus never touches it.
+
+### Additions
+
+- **Every shipped emitter can render into an owned string.** `nucleus::argv`,
+  `nucleus::env` and `nucleus::xml` each add free `render_template` and
+  `render_document` functions, taking the arguments of their `emit_*` counterparts
+  without the stream, and each `emitter` type adds the members
+  `render_template(space)` and `render_document(config, space)`. Each returns
+  `expected<std::string, error>` holding the complete, validated document, so a host
+  can inspect, store or deliver it itself. The XML module also adds
+  `render_document_schema_blind(config, space_name)`.
+- **`nucleus/utility/escaped_text.h` is a new public header.**
+  `nucleus::escaped_text(text)` returns the text with every byte outside printable
+  ASCII, and the backslash, written as an escape such as `\n` or `\x1b`: the form
+  nucleus uses when a diagnostic quotes untrusted text, so a host can quote such
+  text in its own messages the same way. `nucleus/utility/display_controls.h` is
+  installed beside it and holds the classifier nucleus applies to host text it
+  draws in help and completion output &mdash; C0 and C1 controls, DEL and the
+  Unicode `Bidi_Control` set, recognized by UTF-8 sequence &mdash; but its functions
+  live in `nucleus::detail` and remain implementation detail.
+- **The read headers compile without RTTI.** `nucleus/config.h`,
+  `nucleus/identity.h` and `nucleus/query/query.h` no longer use `typeid`, so a
+  translation unit compiled with `-fno-rtti` can include them;
+  `nucleus/config_node.h` already could. Under 0.4.1, `config::get_as` and the
+  `owner_token` comparison used `typeid`, and `query.h` reached the latter.
+- **A typed ordinal now completes the rest of a repeated-container flag.** In the
+  generated bash completion, `--cluster-node-3-<TAB>` offers `--cluster-node-3-port`,
+  a value after it completes as it does for the unnumbered flag, and a flag crossing
+  two repeated containers takes an ordinal for each. 0.4.1 matched the typed word
+  only against the literal `--cluster-node-*-port`, so once an ordinal was typed it
+  offered nothing.
 
 ## 0.4.1
 

@@ -92,7 +92,7 @@ struct load_options
 // registries (schema / tokenizer / converter) plus the host registration policy
 // and the claim/conflict ledger. A host registers on it and then build() seals an
 // immutable config_space. Every registration carries an opaque owner token
-// and is first offered to the registration-policy seam.
+// for the registration-policy seam to review.
 class config_space_builder
 {
 public:
@@ -106,7 +106,7 @@ public:
     config_space_builder &operator=(const config_space_builder &) = delete;
 
     // Installs a host registration policy. The default policy accepts every
-    // registration; the core imposes no reservation or namespacing rules itself.
+    // registration; the engine's own registration rules apply either way.
     registration_result set_registration_policy(std::shared_ptr<registration_policy> policy);
 
     registration_result register_schema(std::string key_path, owner_token owner = {});

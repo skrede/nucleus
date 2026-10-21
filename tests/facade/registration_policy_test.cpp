@@ -14,7 +14,9 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <any>
+#include <memory>
 #include <string>
+#include <cstdint>
 #include <utility>
 #include <typeindex>
 #include <functional>
@@ -68,6 +70,23 @@ struct deny_converters final : nucleus::registration_policy
     }
 };
 
+class counting_policy final : public nucleus::registration_policy
+{
+public:
+    explicit counting_policy(std::int32_t &reviews)
+            : m_reviews(reviews)
+    {
+    }
+
+    nucleus::policy_verdict review(const nucleus::registration_request &) override
+    {
+        ++m_reviews;
+        return policy_verdict::accept();
+    }
+
+private:
+    std::int32_t &m_reviews;
+};
 }
 
 TEST_CASE("a host policy can reject a specific surface", "[policy]")
@@ -78,6 +97,26 @@ TEST_CASE("a host policy can reject a specific surface", "[policy]")
     const auto verdict = policy.review({registration_kind::converter, owner_token{}});
     CHECK_FALSE(verdict.accepted());
     CHECK(verdict.reason() == "converters are closed");
+}
+
+TEST_CASE("the policy is consulted after the seal and a tree tokenizer's reserved category", "[policy][registration]")
+{
+    const auto refused = [](const nucleus::registration_result &result, nucleus::errc code)
+    { return !result && result.error().code == code; };
+    const auto answer = [](const nucleus::tree_access &)
+    { return nucleus::token_result(std::string()); };
+    std::int32_t                  reviews = 0;
+    nucleus::config_space_builder builder;
+    REQUIRE(builder.set_registration_policy(std::make_shared<counting_policy>(reviews)));
+
+    CHECK(refused(builder.install_tree_tokenizer(nucleus::tree_tokenizer("env", answer)), nucleus::errc::rejected_registration));
+    CHECK(reviews == 0);
+    CHECK(refused(builder.register_element(nucleus::primary_key_element("id", nucleus::anchor::keyspace("cluster/env"))), nucleus::errc::rejected_registration));
+    CHECK(reviews == 1);
+
+    nucleus::builder_result_test::built(builder);
+    CHECK(refused(builder.register_schema("late"), nucleus::errc::sealed_builder));
+    CHECK(reviews == 1);
 }
 
 TEST_CASE("a tokenizer carrying an empty field resolver is refused at installation",

@@ -95,7 +95,8 @@ expected<config_space, error> build();   // seals; the builder is spent afterwar
   control or Unicode Bidi_Control code point) &mdash; with
   `errc::rejected_registration`, quoting the refused path and segment with every
   byte outside printable ASCII written as an escape such as `\x1b`.
-- Every registration carries an opaque `owner_token` and is first offered to the
+- Every registration carries an opaque `owner_token` and, unless the seal or a
+  reserved tree-tokenizer category refuses it first, is offered to the
   [registration policy](api-extending.md#registration_policy).
 - After `build()`, every `register_*` / `install_*` call is a loud state-machine
   error (`errc::sealed_builder`), never a silent no-op.
