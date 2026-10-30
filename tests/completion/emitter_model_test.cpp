@@ -126,10 +126,18 @@ TEST_CASE("a scratch tree is removed when a failure unwinds past it", "[completi
     REQUIRE_FALSE(std::filesystem::exists(recorded));
 }
 
-// Passes only while run_bash fails a drive on its exit status: the stdout matches, so nothing else can fail it.
+// Passes only while run_bash fails a drive on its exit status: the output is discarded, so that check is the one
+// assertion it reaches. The control below shares the drive, so a setup failure shows there.
 TEST_CASE("a drive whose bash exits non-zero fails whatever it printed", "[completion][smoke][!shouldfail]")
 {
     if(!bash_available())
         SKIP("no bash 5.0 or later on PATH");
-    REQUIRE(run_bash("echo printed\nexit 3\n") == "printed\n");
+    run_bash("echo printed\nexit 3\n");
+}
+
+TEST_CASE("a drive whose bash exits zero returns what it printed", "[completion][smoke]")
+{
+    if(!bash_available())
+        SKIP("no bash 5.0 or later on PATH");
+    REQUIRE(run_bash("echo printed\n") == "printed\n");
 }

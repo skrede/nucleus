@@ -127,7 +127,7 @@ inline std::string inserted_lines(const std::vector<std::string> &words, const s
     std::string out = "\nCOMP_WORDS=(myapp";
     for(const std::string &word : words)
         out += " " + shell_quoted(word);
-    out += ")\nCOMP_CWORD=$((${#COMP_WORDS[@]} - 1))\n_myapp_complete\n";
+    out += ")\nCOMP_CWORD=$((${#COMP_WORDS[@]} - 1))\n_myapp_complete || exit $?\n";
     out += "p=" + shell_quoted(prefix) + "; q=" + shell_quoted(open) + "\n";
     return out + R"(for c in "${COMPREPLY[@]}"; do case "$c" in *"$q") l="$p$c" ;; *) l="$p$c$q" ;; esac; )";
 }

@@ -123,6 +123,7 @@ TEST_CASE("a value typed past a word-break byte is never inserted twice", "[comp
             {breaks, {"--app-mode", "=", "user", "@", "h"}, "--app-mode=user@", "", ""},
             {breaks, {"--app-mode", "=", "k", "="}, "--app-mode=k", "", ""},
             {plain, {"--v", "=", "k", "="}, "--v=k", "", ""},
+            {plain, {"--v", "=", "k"}, "--v=", "", "<--v=k=v>\n"},
     };
     for(const std::string typed : {"a#b", "a\\#b", "~r", "u^v"})
         rows.push_back({breaks, {"--app-mode", "=", typed, ":"}, "--app-mode=" + typed, "", ""});
