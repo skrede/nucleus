@@ -113,7 +113,6 @@ TEST_CASE("a value typed past a word-break byte is never inserted twice", "[comp
     const std::string breaks = script(breaks_registry());
     const std::string flag   = "--cluster-node-level";
     const std::string plain  = nucleus::bash_emitter{}.emit({"myapp", {{"--v", "d", {"co:lon", "k=v"}, {}}}});
-    REQUIRE(plain.find("_myapp_line") == std::string::npos);
     // bash splits the value at an unquoted break byte and nothing re-joins it, so no value is offered.
     std::vector<insertion_row> rows{
             {values, {flag, "=", "co", ":"}, flag + "=co", "", ""},
@@ -131,6 +130,20 @@ TEST_CASE("a value typed past a word-break byte is never inserted twice", "[comp
     const std::string unbroken = "COMP_WORDBREAKS=${COMP_WORDBREAKS//:/}\n";
     REQUIRE(run_seeded(values, unbroken + insert_and_parse({flag, "=", "co:"}, flag + "=", ""), {}) == "<" + flag + "=co:lon>\n");
     REQUIRE(run_seeded(breaks, unbroken + insert_and_parse({"--app-mode", "=", "a#b:"}, "--app-mode=", ""), {}) == "<--app-mode=a#b:c>\n");
+}
+
+TEST_CASE("a script of plain candidates offers nothing for a word ending inside a reopened quote", "[completion][smoke]")
+{
+    if(!bash_available())
+        SKIP("no bash 5.0 or later on PATH");
+
+    const std::string plain = nucleus::bash_emitter{}.emit({"myapp", {{"--app-mode", "", {"debug", "info"}, {}}}});
+    check_rows({
+            {plain, {"--app-mode", "=", "d"}, "--app-mode=", "", "<--app-mode=debug>\n"},
+            {plain, {"--app-mode", "=", "'d''e"}, "--app-mode='d''", "'", ""},
+            {plain, {"--app-mode", "=", "\"d\"\"e"}, "--app-mode=\"d\"\"", "\"", ""},
+            {plain, {"'--app-m''o"}, "'--app-m''", "'", ""},
+    });
 }
 
 TEST_CASE("every byte but a newline round-trips through the inserted line", "[completion][smoke]")

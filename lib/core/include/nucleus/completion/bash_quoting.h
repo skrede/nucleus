@@ -85,26 +85,17 @@ inline std::string bash_join_values(const std::vector<std::string> &values)
     return out;
 }
 
-// `compgen -W` splits its word list on IFS, and the unquoted command substitution that fills
-// COMPREPLY splits again on the same characters -- so a value carrying a separator has to
-// survive both. Each value backslash-escapes its own separators for the first split, and the
-// assignment narrows IFS to a newline for the second while restoring the default inside the
-// substitution, where compgen still needs it. That same unquoted substitution also GLOBS what
-// it produces, which nothing escaped at the emitter can reach because compgen has already
-// consumed the backslash -- so the assignment runs with globbing suppressed, and the `local -`
-// the completion function opens with restores the caller's setting when it returns. `also`
-// runs inside the same substitution.
-// A non-empty `prefix` names the emitted `_quote` and `_line` helpers, and each compgen match is piped through
-// `_line` with the quote the typed word leaves open, or with none when a quote byte or backslash lies right of the
-// cursor; nothing is offered when the tracker refuses the word.
+// compgen -W splits its word list on IFS and the unquoted substitution filling COMPREPLY splits again, so each value
+// escapes its own separators and the assignment narrows IFS to a newline, keeping the default inside the substitution.
+// That substitution also globs what it yields, past any escape, so the assignment runs under `set -f`, which the
+// `local -` the completion function opens with undoes on return.
 inline std::string bash_reply_assignment(const std::string &pad, const std::string &words, const std::string &current,
                                          const std::string &prefix, const std::string &also)
 {
     std::string out = pad + "set -f\n";
-    if(!prefix.empty())
-        out += pad + "local quote; " + prefix + "_quote \"" + current + "\" || return 0\n";
+    out += pad + "local quote; " + prefix + "_quote \"" + current + "\" || return 0\n";
     out += pad + R"(local IFS=$'\n'; COMPREPLY=( $(IFS=$' \t\n'; compgen -W )" + words + " -- \"" + current + "\"";
-    out += prefix.empty() ? std::string() : " | while IFS= read -r w; do " + prefix + R"(_line "$quote" "$w"; done)";
+    out += " | while IFS= read -r w; do " + prefix + R"(_line "$quote" "$w"; done)";
     return out + (also.empty() ? std::string() : "; " + also) + ") )\n";
 }
 
