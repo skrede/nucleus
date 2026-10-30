@@ -165,7 +165,7 @@ TEST_CASE("a value shared through a reopened quote completes on the first TAB an
     });
 }
 
-TEST_CASE("a word that reopened a quote is offered nothing with a quote byte or backslash right of the cursor", "[completion][smoke]")
+TEST_CASE("a word that opened a quote after other text is offered nothing with a quote byte or backslash right of the cursor", "[completion][smoke]")
 {
     if(!bash_available())
         SKIP("no bash 5.0 or later on PATH");
@@ -177,6 +177,7 @@ TEST_CASE("a word that reopened a quote is offered nothing with a quote byte or 
             {"'h''as spa'", 9, "[] 1\n"},
             {"'h'$'as spa'", 1, "[] 1\n"},
             {"h'a''s'\\", 1, "[] 1\n"},
+            {"h'as spa'", 1, "[] 1\n"},
             {"ha\\", 1, "[has\\ space] 0\n"},
             // These pin the accepted cost of a quote right of the cursor: readline inserts the bare spelling inside the
             // open quote and keeps its backslash, so the value is not the candidate.

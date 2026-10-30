@@ -132,17 +132,24 @@ TEST_CASE("a value typed past a word-break byte is never inserted twice", "[comp
     REQUIRE(run_seeded(breaks, unbroken + insert_and_parse({"--app-mode", "=", "a#b:"}, "--app-mode=", ""), {}) == "<--app-mode=a#b:c>\n");
 }
 
-TEST_CASE("a script of plain candidates offers nothing for a word ending inside a reopened quote", "[completion][smoke]")
+TEST_CASE("a word ending inside a quote opened after other text is offered nothing by any script", "[completion][smoke]")
 {
     if(!bash_available())
         SKIP("no bash 5.0 or later on PATH");
 
-    const std::string plain = nucleus::bash_emitter{}.emit({"myapp", {{"--app-mode", "", {"debug", "info"}, {}}}});
+    const std::string plain  = nucleus::bash_emitter{}.emit({"myapp", {{"--app-mode", "", {"debug", "info"}, {}}}});
+    const std::string quoted = nucleus::bash_emitter{}.emit({"myapp", {{"--app-mode", "", {"has space", "a!c"}, {}}}});
     check_rows({
             {plain, {"--app-mode", "=", "d"}, "--app-mode=", "", "<--app-mode=debug>\n"},
             {plain, {"--app-mode", "=", "'d''e"}, "--app-mode='d''", "'", ""},
             {plain, {"--app-mode", "=", "\"d\"\"e"}, "--app-mode=\"d\"\"", "\"", ""},
             {plain, {"'--app-m''o"}, "'--app-m''", "'", ""},
+            {plain, {"--app-mode", "=", "d'e"}, "--app-mode=d'", "'", ""},
+            {plain, {"--app-m'od"}, "--app-m'", "'", ""},
+            {quoted, {"--app-mode", "=", "'h"}, "--app-mode='", "'", "<--app-mode=has space>\n"},
+            {quoted, {"--app-mode", "=", "h'a"}, "--app-mode=h'", "'", ""},
+            {quoted, {"--app-mode", "=", "a\\!'c"}, "--app-mode=a\\!'", "'", ""},
+            {quoted, {"--app-m'o"}, "--app-m'", "'", ""},
     });
 }
 

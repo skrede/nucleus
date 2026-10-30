@@ -15,9 +15,9 @@
 namespace nucleus {
 
 // readline inserts a reply under the quote open at the cursor and keeps the text typed before that quote, so a reply is
-// spelled for the quote the typed word leaves open and nothing is offered for a word ending inside a quote it reopened.
-// bash splits `=` and every other unquoted COMP_WORDBREAKS byte into a word of its own, so a value is completed from
-// the word after `=` alone and never past another break byte.
+// spelled for the quote the typed word leaves open and nothing is offered for a word ending inside a quote it opened
+// after other text. bash splits `=` and every other unquoted COMP_WORDBREAKS byte into a word of its own, so a value is
+// completed from the word after `=` alone and never past another break byte.
 class bash_emitter final : public shell_emitter
 {
 public:

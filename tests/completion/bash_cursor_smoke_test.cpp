@@ -77,7 +77,7 @@ replied() { _myapp_complete; printf '[%s]' "${COMPREPLY[@]}"; echo; }
 tracked() { _myapp_quote "${COMP_WORDS[COMP_CWORD]}"; printf '[%s]\n' "$quote"; })";
 }
 
-TEST_CASE("a reply typed with a quote or backslash right of the cursor takes the bare spelling", "[completion][smoke]")
+TEST_CASE("a reply at the cursor is bare beside a quote or backslash and absent past a quote opened after other text", "[completion][smoke]")
 {
     if(!bash_available())
         SKIP("no bash 5.0 or later on PATH");
@@ -92,20 +92,21 @@ TEST_CASE("a reply typed with a quote or backslash right of the cursor takes the
     const std::string delimited = script_of(generate_completion(shell::bash, delimiter_registry(), "myapp", *delimiter));
     const std::string app       = cursor_script();
     const std::string cluster   = "--cluster$(touch PWN_DELIM)";
-    const std::string mid       = "m;touch MARK_MID #";
     const std::string e         = "\xc3\xa9";
     const std::string k13       = repeated(e, 13);
     const std::string wide      = "myapp " + k13 + " --app-mode=";
 
     const std::vector<cursor_row> rows = {
-            {app, "[" + bash_line_word(mid) + "]\n", "replied", "myapp --app-mode=m", "'", 3, {"--app-mode", "=", "m'"}},
-            {app, "[" + bash_single_quoted_line_word(mid) + "]\n", "replied", "myapp --app-mode=m'", "", 3, {"--app-mode", "=", "m'"}},
-            {app, "[" + bash_line_word(mid) + "]\n", "replied", wide + "m", "'", 4, {k13, "--app-mode", "=", "m'"}},
+            {app, "[]\n", "replied", "myapp --app-mode=m", "'", 3, {"--app-mode", "=", "m'"}},
+            {app, "[]\n", "replied", "myapp --app-mode=m'", "", 3, {"--app-mode", "=", "m'"}},
+            {app, "[]\n", "replied", wide + "m", "'", 4, {k13, "--app-mode", "=", "m'"}},
             {app, "[" + bash_single_quoted_line_word("only one") + "]\n", "replied", wide + "'o", "", 4, {k13, "--app-mode", "=", "'o"}},
-            {app, "[" + bash_line_word(e + ";touch MARK_MB #") + "]\n", "replied", "myapp --app-mode=" + e, "'", 3, {"--app-mode", "=", e + "'"}},
-            {delimited, "[" + bash_line_word(cluster + "port") + "]\n", "replied", "myapp " + cluster + "p", "'", 1, {cluster + "p'"}},
+            {app, "[]\n", "replied", "myapp --app-mode=" + e, "'", 3, {"--app-mode", "=", e + "'"}},
+            {delimited, "[]\n", "replied", "myapp " + cluster + "p", "'", 1, {cluster + "p'"}},
             {app, "[]\n", "tracked", "myapp --app-mode=\"o", " a\"'b", 3, {"--app-mode", "=", "\"o a\"'b"}},
             {app, "[']\n", "tracked", "myapp --app-mode='o", " and more", 3, {"--app-mode", "=", "'o and more"}},
+            {delimited, "[" + bash_line_word(cluster + "port") + "]\n", "replied", "myapp ", "'" + cluster + "p", 1, {"'" + cluster + "p"}},
+            {delimited, "[" + bash_line_word(cluster + "port") + "]\n", "replied", "myapp " + k13 + " ", "'" + cluster + "p", 2, {k13, "'" + cluster + "p"}},
     };
     for(const cursor_row &row : rows)
     {

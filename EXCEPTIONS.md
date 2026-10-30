@@ -253,7 +253,7 @@ is the price of the file being stable under both, and the row is the price of th
 | `tests/schema/registry_test.cpp` | 333 |
 | `tests/query/selector_test.cpp` | 315 |
 | `tests/schema/constraint_group_test.cpp` | 305 |
-| `tests/completion/completion_test.cpp` | 303 |
+| `tests/completion/completion_test.cpp` | 304 |
 | `tests/runtime/load_front_door_test.cpp` | 289 |
 | `tests/schema/keyed_composition_test.cpp` | 286 |
 | `tests/resolve/resolution_test.cpp` | 278 |
