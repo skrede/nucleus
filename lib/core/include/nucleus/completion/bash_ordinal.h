@@ -72,7 +72,7 @@ inline std::string bash_ordinal_functions(const std::string &ident, const comple
     return out + "}\n";
 }
 
-inline std::string bash_ordinal_dispatch(const std::string &ident, const completion_model &model, const std::string &prefix)
+inline std::string bash_ordinal_dispatch(const std::string &ident, const completion_model &model)
 {
     std::string out;
     for(const completion_option &option : model.options)
@@ -80,7 +80,7 @@ inline std::string bash_ordinal_dispatch(const std::string &ident, const complet
         if(!has_ordinal_slots(option) || option.values.empty())
             continue;
         out += "        if " + bash_ordinal_call(ident, "$flag", option) + " && [ \"$ordinal_name\" = \"$flag\" ]; then\n";
-        out += bash_value_reply("            ", option, prefix);
+        out += bash_value_reply(ident, "            ", option);
         out += "        fi\n";
     }
     return out;

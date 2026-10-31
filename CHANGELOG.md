@@ -158,6 +158,16 @@ is listed last, under Additions.
   ordinal; a list that is not strictly ascending, or whose offsets do not land on a
   `*`, is ignored and the option completes as its literal flag. A flag crossing two
   repeated containers carries two slots, as in `--cluster-node-*-route-*-port`.
+- **A typed word that opens a quote after other text is offered nothing.** The
+  generated bash completion completes nothing for words such as `--mode=d'e<TAB>`
+  and `--mode='d''e<TAB>`: readline keeps the text typed before the quote open at
+  the cursor, so a reply would repeat that text in the argument. With a quote or a
+  backslash right of the cursor, such a word is offered nothing wherever the cursor
+  sits, even where no text would repeat. A word that opens with its quote, as in
+  `--mode='d<TAB>`, still completes. Every script also defines the shell functions
+  `_<prog>_quote` and `_<prog>_line` beside `_<prog>_complete`, so sourcing it
+  replaces any function of either name already defined. What completion offers,
+  and the emitted text, change with no diagnostic.
 - **The text of the generated scripts changed throughout this release.** Beyond the
   last line, the bash and zsh scripts differ from 0.4.1's in many places. Treat
   them as opaque output to install as written; a host that post-processes either

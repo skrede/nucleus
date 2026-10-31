@@ -89,20 +89,20 @@ inline std::string bash_join_values(const std::vector<std::string> &values)
 // escapes its own separators and the assignment narrows IFS to a newline, keeping the default inside the substitution.
 // That substitution also globs what it yields, past any escape, so the assignment runs under `set -f`, which the
 // `local -` the completion function opens with undoes on return.
-inline std::string bash_reply_assignment(const std::string &pad, const std::string &words, const std::string &current,
-                                         const std::string &prefix, const std::string &also)
+inline std::string bash_reply_assignment(const std::string &ident, const std::string &pad, const std::string &words,
+                                         const std::string &current, const std::string &also)
 {
     std::string out = pad + "set -f\n";
-    out += pad + "local quote; " + prefix + "_quote \"" + current + "\" || return 0\n";
+    out += pad + "local quote; _" + ident + "_quote \"" + current + "\" || return 0\n";
     out += pad + R"(local IFS=$'\n'; COMPREPLY=( $(IFS=$' \t\n'; compgen -W )" + words + " -- \"" + current + "\"";
-    out += " | while IFS= read -r w; do " + prefix + R"(_line "$quote" "$w"; done)";
+    out += " | while IFS= read -r w; do _" + ident + R"(_line "$quote" "$w"; done)";
     return out + (also.empty() ? std::string() : "; " + also) + ") )\n";
 }
 
-inline std::string bash_value_reply(const std::string &pad, const completion_option &option, const std::string &prefix)
+inline std::string bash_value_reply(const std::string &ident, const std::string &pad, const completion_option &option)
 {
     const std::string words = bash_single_quote(bash_join_values(option.values));
-    return bash_reply_assignment(pad, words, "$val", prefix, {}) + pad + "return 0\n";
+    return bash_reply_assignment(ident, pad, words, "$val", {}) + pad + "return 0\n";
 }
 
 }

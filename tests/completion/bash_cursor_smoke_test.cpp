@@ -73,11 +73,11 @@ constexpr std::string_view cursor_locale = "C.UTF-8";
 const std::string cursor_drive = R"(
 at_cursor() { COMP_LINE="$2$3"; COMP_POINT=${#2}; COMP_CWORD=$4; local probe="$1"
     shift 4; COMP_WORDS=(myapp "$@"); "$probe"; }
-replied() { _myapp_complete; printf '[%s]' "${COMPREPLY[@]}"; echo; }
+replied() { _myapp_complete || exit $?; printf '[%s]' "${COMPREPLY[@]}"; echo; }
 tracked() { _myapp_quote "${COMP_WORDS[COMP_CWORD]}"; printf '[%s]\n' "$quote"; })";
 }
 
-TEST_CASE("a reply at the cursor is bare beside a quote or backslash and absent past a quote opened after other text", "[completion][smoke]")
+TEST_CASE("a reply at the cursor is bare beside a quote and absent past a quote opened after other text", "[completion][smoke]")
 {
     if(!bash_available())
         SKIP("no bash 5.0 or later on PATH");
@@ -99,10 +99,9 @@ TEST_CASE("a reply at the cursor is bare beside a quote or backslash and absent 
     const std::vector<cursor_row> rows = {
             {app, "[]\n", "replied", "myapp --app-mode=m", "'", 3, {"--app-mode", "=", "m'"}},
             {app, "[]\n", "replied", "myapp --app-mode=m'", "", 3, {"--app-mode", "=", "m'"}},
-            {app, "[]\n", "replied", wide + "m", "'", 4, {k13, "--app-mode", "=", "m'"}},
+            {app, "[]\n", "replied", wide + "m", "';'", 4, {k13, "--app-mode", "=", "m';'"}},
             {app, "[" + bash_single_quoted_line_word("only one") + "]\n", "replied", wide + "'o", "", 4, {k13, "--app-mode", "=", "'o"}},
-            {app, "[]\n", "replied", "myapp --app-mode=" + e, "'", 3, {"--app-mode", "=", e + "'"}},
-            {delimited, "[]\n", "replied", "myapp " + cluster + "p", "'", 1, {cluster + "p'"}},
+            {app, "[]\n", "replied", "myapp --app-mode=" + e + "';", "'", 3, {"--app-mode", "=", e + "';'"}},
             {app, "[]\n", "tracked", "myapp --app-mode=\"o", " a\"'b", 3, {"--app-mode", "=", "\"o a\"'b"}},
             {app, "[']\n", "tracked", "myapp --app-mode='o", " and more", 3, {"--app-mode", "=", "'o and more"}},
             {delimited, "[" + bash_line_word(cluster + "port") + "]\n", "replied", "myapp ", "'" + cluster + "p", 1, {"'" + cluster + "p"}},

@@ -2,7 +2,6 @@
 #define HPP_GUARD_NUCLEUS_COMPLETION_BASH_LINE_FORM_H
 
 #include "nucleus/completion/bash_quoting.h"
-#include "nucleus/completion/bash_typed_word.h"
 #include "nucleus/completion/completion_model.h"
 
 #include <string>
@@ -102,7 +101,7 @@ inline std::string bash_line_lookup(const std::string &ident, const completion_m
     const std::string single_quoted = bash_line_arms(model, bash_single_quoted_line_word);
     const std::string double_quoted = bash_line_arms(model, bash_double_quoted_line_word);
     const std::string bare          = bash_line_arms(model, bash_line_word);
-    std::string       out           = bash_quote_function(ident) + "_" + ident + "_line()\n{\n    case \"$1\" in\n";
+    std::string       out           = "_" + ident + "_line()\n{\n    case \"$1\" in\n";
     out += bash_line_table("\\'", single_quoted) + bash_line_table("\\\"", double_quoted) + bash_line_table("*", bare);
     return out + "    esac\n}\n";
 }
