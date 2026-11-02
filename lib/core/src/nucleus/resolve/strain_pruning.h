@@ -20,15 +20,8 @@
 
 namespace nucleus {
 
-// Removes what the chosen strain displaces: every non-chosen strain's keyed
-// paths, and -- under the file_level policy -- every remaining path the chosen
-// strain's defining layer outranks. It BORROWS the building keyspace it removes
-// from and the provenance it forgets from, plus the schema it canonicalizes
-// paths through and the keyed-merge state it asks which collections were
-// already finalized across layers.
 class strain_pruning
 {
-    // What the file_level pre-pass measures each path against.
     struct prepass_bounds
     {
         std::string                  chosen_prefix;
@@ -79,8 +72,7 @@ private:
         }
     }
 
-    // Sweeps keyed and general entries alike, and walks a snapshot so that
-    // removal cannot invalidate the walk.
+    // Sweeps keyed and general entries alike.
     void file_level(const prepass_bounds &bounds)
     {
         const std::vector<key_path> snapshot = m_building.paths();
@@ -92,22 +84,16 @@ private:
     bool exempt(const key_path &path, const prepass_bounds &bounds) const
     {
         const origin *orig = m_provenance.of(path.str());
-        // Flat unified-path writes (argv/env) carry no inheritance_layer and
-        // always win by plain stack precedence, per strain_scope.h's documented
-        // contract; exempt them from the rank-bounded prune.
+        // A flat write carries no inheritance layer and always wins by plain stack precedence.
         if(orig != nullptr && !orig->inheritance_layer.has_value())
             return true;
         const std::size_t path_rank = orig != nullptr ? orig->rank : 0;
         if(path_rank == 0 || path_rank <= bounds.defining_layer)
             return true;
-        // Keyed-merge collections were finalized across layers already; never
-        // rank-prune them here either.
         if(m_keyed.under_keyed_merge(m_schema.canonical_text(path)))
             return true;
         if(!path.str().starts_with(bounds.chosen_prefix))
             return false;
-        // The chosen identity always survives; a wide re-open preserves the chosen
-        // entries its own document supplied, which compose regardless of the scope policy.
         return bounds.wide_ranks.contains(path_rank) || m_schema.canonical_text(path) == bounds.identity_path;
     }
 

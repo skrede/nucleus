@@ -22,12 +22,8 @@
 
 namespace nucleus {
 
-// Answers where a keyed entry lands when the strain relay unifies it, and whether
-// that landing is already taken. Displacement is bounded by the concrete instance
-// of the innermost repeated scope, and candidate units are derived from raw paths
-// so the keyed and unified forms of one strain remain distinct. The schema lookups
-// the two questions share are refreshed once per relay rather than per entry; the
-// keyspace, provenance, schema and sweep unit are borrowed, never owned.
+// Displacement is bounded by the concrete instance of the innermost repeated scope, and candidate
+// units come from raw paths so the keyed and unified forms of one strain stay distinct.
 class relayed_addressing
 {
 public:
@@ -47,8 +43,6 @@ public:
     {
     }
 
-    // Refreshes the schema lookups every relayed entry shares and hands back the
-    // declared repeated containers, which also bound the compaction that follows.
     const std::set<std::string> &begin_relay()
     {
         m_repeated_declared   = repeated_declared_paths(m_schema);
@@ -57,8 +51,6 @@ public:
         return m_repeated_containers;
     }
 
-    // The unified path a keyed entry relays onto, kept beside the text it parsed
-    // from so a caller can name it without a re-serialization round trip.
     expected<unified_target, resolve_fold_error>
     unified_path(const key_path &keyed) const
     {
@@ -71,9 +63,7 @@ public:
         return unified_target{std::move(path).value(), text};
     }
 
-    // True when a higher-rank instance of the innermost declared repeated scope
-    // already holds this unit. A keyed-merge collection is exempt: its instances
-    // legitimately span ranks, having been finalized across layers beforehand.
+    // True when a higher-rank instance of the innermost declared repeated scope already holds this unit.
     expected<bool, resolve_fold_error>
     scope_displaced(const unified_target &unified, bool keyed_merge,
                     std::size_t entry_rank) const
@@ -103,8 +93,8 @@ private:
     const schema_registry &m_schema;
     std::set<std::string>  m_repeated_declared;
     std::set<std::string>  m_repeated_containers;
-    // An empty m_repeated_declared is legitimately reachable after begin_relay() -- a schema
-    // declaring no repeated container -- so the cached sets cannot report their own unset state.
+    // Kept apart from the cached sets, which a schema declaring no repeated container leaves
+    // legitimately empty after begin_relay().
     bool                   m_relay_open;
 
     bool instance_displaced(const key_path &unified, const std::string &unit,
@@ -126,8 +116,6 @@ private:
         return false;
     }
 
-    // Strips key-value segments (transient primary-key values) but preserves
-    // ordinal segments, so indexed repeated leaves keep their [N] suffix.
     std::string relay_canonical(const key_path &path) const
     {
         std::string canonical;
@@ -145,8 +133,6 @@ private:
         return canonical;
     }
 
-    // True when the schema says the extended path is a keyed instance path one level
-    // past the keyed container, so the trailing segment is a key value, not structure.
     bool keyed_instance_segment(const std::string &canonical,
                                 const std::string &extended) const
     {

@@ -14,39 +14,32 @@
 
 namespace nucleus {
 
-// The error a resolve fold can report: a source pull failure or a token
-// resolution failure, surfaced verbatim with the offending layer named.
 using resolve_fold_error = error;
 
-// Maximum cross-leaf reference chain depth. Per-value nesting cap (16) stays in expansion_guard.h.
+// Bounds a chain of references across leaves; the nesting within one value is capped separately.
 inline constexpr std::size_t default_reference_depth_cap = 64;
 
-// A re-open disposition with the rank of the layer that declared it, so an extend strength
-// governs that document's own content rather than every layer of the strain.
+// The declaring layer's rank, so an extend strength governs that document's own content rather
+// than every layer of the strain.
 struct ranked_disposition
 {
     extend_disposition disposition;
     std::size_t        rank;
 };
 
-// One entry in the handle-based fold: the erased source, its ascending rank
-// (cross-source precedence), a human-readable label for provenance, and an
-// optional inheritance-chain layer ordinal. The layer is present only for
-// inheritance-chain entries (base lowest); flat sources leave it absent and
-// are treated as a single flat layer exempt from the slice re-open rules.
 struct layered_handle
 {
     source_handle *handle;
     std::size_t    rank;
     std::string    label;
     owner_token    owner;
+    // Present only for inheritance-chain entries, base lowest; a flat source leaves it absent and
+    // forms one flat layer exempt from the slice's re-open rules.
     std::optional<std::size_t>          inheritance_layer;
-    // Set for document sources (derives from entries[i].path); absent for stack/argv/env sources.
+    // Set only for document sources.
     std::optional<std::filesystem::path> origin_file;
-    // Set for chain-layer handles: points at the batch chain_walker already
-    // pulled during the inheritance walk, so fold() consumes it instead of
-    // pulling the same handle a second time. Null for stack/argv/env layers,
-    // which have no walk phase and are pulled here for the first time.
+    // The batch the inheritance walk already pulled for a chain layer, so the fold does not pull
+    // its handle twice; null for a layer with no walk.
     config_source_batch *cached_batch = nullptr;
 };
 

@@ -31,16 +31,8 @@
 
 namespace nucleus {
 
-// Folds one source entry into the building keyspace: expands its tokens, parses
-// its path, offers it to each interceptor that may claim it for a later stage,
-// and stores whatever no interceptor claimed. Every collaborator it consults is
-// borrowed and outlives the resolve, the substitution count included: the ceiling
-// spans the whole load, so both token passes charge the one object.
-//
-// Unified storage: ALL repeated paths, leaves and containers alike, are stored as
-// indexed scalars -- "config/tag" with duplicate entries becomes "config/tag[0]",
-// "config/tag[1]" and so on, and "cluster/node[0]/port" from a document source is
-// stored directly. No collection map is used.
+// Every repeated path, leaf or container, is stored as indexed scalars such as config/tag[0];
+// no collection map is used.
 class fold_entry
 {
 public:
@@ -117,8 +109,7 @@ private:
         return std::move(parsed).value();
     }
 
-    // Each interceptor answers whether it claimed the entry; the first that does
-    // ends the entry's journey here and may have moved out of `text`.
+    // The first interceptor to claim the entry ends its fold and may have moved out of `text`.
     expected<bool, resolve_fold_error>
     intercept(const key_path &path, const keyspace_entry &entry, std::string &text,
               const layered_handle &layer)

@@ -26,14 +26,10 @@
 
 namespace nucleus {
 
-// Recognizes the leaves belonging to a keyed-merge collection and parks them on
-// the merge accumulator rather than letting the fold's sweep path store them:
-// their final ordinals are not known until every layer has arrived. It also owns
-// the per-layer grouping that turns flat (non-indexed) arrivals into instances.
-// State and schema are borrowed, and outlive this resolve-lifetime collaborator.
+// Keyed-merge leaves are parked rather than stored, because their final ordinals are not known
+// until every layer has arrived.
 class keyed_divert
 {
-    // The container's declared form, its actual path, and the leaf below it.
     struct divert_site
     {
         std::string canonical;
@@ -55,8 +51,7 @@ public:
         m_flat_suffixes_seen.clear();
     }
 
-    // True when the path lies under a container declaring a keyed merge mode; a
-    // false return leaves `value` untouched for the fold's sweep path.
+    // True when the leaf was parked and `value` moved out; false leaves `value` untouched.
     expected<bool, resolve_fold_error>
     divert(const key_path &path, const keyspace_entry &entry, std::string &value,
            const layered_handle &layer)
@@ -84,7 +79,7 @@ public:
 private:
     keyed_merge_state       &m_keyed;
     const schema_registry   &m_schema;
-    // Keyed by ACTUAL container path (key segments still present pre-slice).
+    // Keyed by the actual container path, whose strain-key segments the slice has not yet stripped.
     std::map<std::string, std::size_t> m_flat_counter;
     std::map<std::string, std::set<std::string>> m_flat_suffixes_seen;
 
@@ -112,7 +107,6 @@ private:
         return flat_ordinal(site, entry, label);
     }
 
-    // A suffix repeating within the current instance means a NEW instance starts.
     expected<std::uint64_t, resolve_fold_error>
     flat_ordinal(const divert_site &site, const keyspace_entry &entry,
                  const std::string &label)
@@ -136,10 +130,8 @@ private:
         return ++m_flat_counter[site.container];
     }
 
-    // The flat grouping REQUIRES instance-major arrival (all of one instance's
-    // fields before the next instance's begin); a suffix reappearing before every
-    // declared field has been seen means the source emitted fields field-major
-    // instead, which cannot be safely disambiguated -- fail rather than mis-pair.
+    // Flat grouping requires instance-major arrival. A suffix reappearing before every declared
+    // field was seen means field-major arrival, which cannot be paired safely, so it fails.
     expected<void, resolve_fold_error>
     require_instance_major(const divert_site &site, const std::set<std::string> &seen,
                            const std::string &label) const

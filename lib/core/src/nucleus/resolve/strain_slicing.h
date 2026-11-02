@@ -35,17 +35,9 @@
 
 namespace nucleus {
 
-// Collapses keyed-container instances into the ONE unified hierarchy the resolved
-// config promises. A primary-key value is internal to resolution -- a transient
-// path segment keeping instances distinct through the fold -- and must NEVER
-// survive into the frozen keyspace: a key value as a resolved segment would make
-// the tree untraversable without knowing the key.
-//
-// It OWNS the six strain units, which nothing outside the slice consults, and
-// BORROWS what they read and write: the building keyspace, the provenance, the
-// schema, the repeated sweep, the keyed-merge state, the re-open dispositions, the
-// values the fold displaced and the record of containers whose identity the slice
-// satisfies structurally.
+// A primary-key value is a transient path segment that keeps instances distinct through the fold.
+// It must never survive into the frozen keyspace, where it would make the tree untraversable
+// without knowing the key.
 class strain_slicing
 {
 public:
@@ -73,21 +65,6 @@ public:
     strain_slicing &operator=(strain_slicing &&) = delete;
     ~strain_slicing() = default;
 
-    // Runs between fold and validate.
-    //
-    // With a selection: the matching named strain survives, non-matching named
-    // strains are pruned from the keyspace, and the selected strain's entries
-    // are re-laid onto the declared (stripped) paths. Selecting a value that
-    // matches no strain is a loud error listing every available strain value --
-    // including when the container holds no keyed instances at all. Selecting
-    // when the schema declares no primary key is a loud error.
-    //
-    // Without a selection: exactly one named strain auto-resolves (its entries
-    // re-laid); several named strains with no selection is a loud error naming
-    // the container and every strain; anonymous-only content collapses unchanged.
-    //
-    // The scope policy applies whenever a strain resolves -- explicitly selected
-    // or auto-resolved -- so the two paths cannot diverge for the same strain.
     expected<void, resolve_fold_error>
     slice(const std::optional<std::string> &selection, strain_scope_policy policy)
     {
@@ -130,8 +107,6 @@ private:
                             selected.value(), policy);
     }
 
-    // Bounds the chosen strain, removes what it displaces, puts back what its
-    // excluded entries displaced, and relays it onto the unified hierarchy.
     expected<void, resolve_fold_error>
     apply_strain(const key_path &container, std::string_view identity_path,
                  const strain_selection::chosen_strain &selected,
@@ -149,14 +124,12 @@ private:
                                         bounds.value().competitor_layer, wide};
         if(auto r = restore_and_relay(container, selected, scope); !r)
             return r;
-        // The strain's key value named the instance and was consumed; the
-        // enforcer's identity-presence check is satisfied structurally.
         m_keyed_satisfied.push_back(container.str());
         return {};
     }
 
-    // The strain is bucketed again because the fold-time bucket never saw the
-    // entries the restoration put back.
+    // The strain is bucketed again because the first bucketing never saw the entries the
+    // restoration put back.
     expected<void, resolve_fold_error>
     restore_and_relay(const key_path                        &container,
                       const strain_selection::chosen_strain &selected,

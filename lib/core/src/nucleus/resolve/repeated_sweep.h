@@ -25,12 +25,6 @@
 
 namespace nucleus {
 
-// Owns the sweep-and-store discipline over the building keyspace: which unit a
-// repeated entry belongs to, which existing entries a fresh instance displaces,
-// and the paired removal and provenance forget that keep the keyspace and its
-// origins from drifting apart. The keyspace, provenance, schema and displaced-value
-// store are borrowed, never owned, and must outlive this collaborator, which lives
-// exactly as long as the resolve that holds it.
 class repeated_sweep
 {
 public:
@@ -43,9 +37,8 @@ public:
     {
     }
 
-    // The sweep unit an entry belongs to. A repeated container instance carries fields, so its unit is the
-    // shortest prefix of the path whose canonical form is the scope; a repeated leaf ordinal carries nothing,
-    // so its unit is the whole value list under one enclosing instance. Empty when the scope is unreachable.
+    // A container instance is swept as one unit, but a repeated leaf's unit is its whole value list under
+    // the enclosing instance. Empty when no prefix of the path canonicalizes to the scope.
     key_path sweep_unit_of(const key_path &path, const std::string &scope, bool scope_is_leaf) const
     {
         if(scope_is_leaf)
@@ -65,19 +58,16 @@ public:
         return sweep_unit_of(path, scope, scope_is_leaf).str();
     }
 
-    // The declared form of a violation path, so a concrete instance path
-    // (cluster/node[0]/port) is recognized as the element it already names and draws
-    // no nearest-key suggestion. A path that does not parse falls through unchanged.
+    // Canonicalizing a violation path lets a concrete instance path be recognized as the element it
+    // names, so it draws no nearest-key suggestion.
     std::string canonical_of(const std::string &path) const
     {
         const auto parsed = key_path::parse(path);
         return parsed ? m_schema.canonical_text(parsed.value()) : path;
     }
 
-    // The declared repeated container a path names without naming one of its
-    // instances, empty when every repeated-container segment carries an ordinal. A
-    // repeated leaf's own segment is never a member of `containers`, so the plain
-    // arrival that mints a leaf ordinal is exempt without a second rule.
+    // A repeated leaf's own segment is never a member of `containers`, so the plain arrival that
+    // mints a leaf ordinal is exempt without a second rule.
     std::string unindexed_repeated_container(const std::set<std::string> &containers,
                                              const key_path &path) const
     {
@@ -95,9 +85,8 @@ public:
         return {};
     }
 
-    // One keyspace scan per scope per layer: every existing entry under the scope is
-    // filed under the same sweep key the entry loop derives, so each instance sweeps
-    // from its bucket and resolution stays linear in the instance count.
+    // Files each entry under the sweep key the entry loop derives, so one scan per scope per layer
+    // serves every instance sweep and resolution stays linear in the instance count.
     std::map<std::string, std::vector<key_path>>
     bucket_by_instance(const std::string &scope, bool scope_is_leaf) const
     {
@@ -115,7 +104,7 @@ public:
         return buckets;
     }
 
-    // Removal and its provenance forget live together so the pair cannot drift.
+    // A removal and its provenance forget, like a store and its provenance record, must not drift apart.
     void sweep_instance(const std::vector<key_path> &bucket, const key_path &unit,
                         const layered_handle &displacer)
     {
@@ -129,7 +118,6 @@ public:
         }
     }
 
-    // The store and its provenance record live together for the same reason.
     void store_entry(const key_path &target, std::string &&text, const layered_handle &lh)
     {
         m_building.set(target, value::owned(std::move(text)));
@@ -137,8 +125,6 @@ public:
                             origin{lh.rank, lh.label, lh.owner, lh.inheritance_layer});
     }
 
-    // The indexed path a repeated leaf arriving without an ordinal is stored at,
-    // taken from the layer's counter for its value list.
     static expected<key_path, resolve_fold_error>
     mint_leaf_ordinal(const keyspace_entry &entry, const std::string &sweep_key,
                       const std::string &label,

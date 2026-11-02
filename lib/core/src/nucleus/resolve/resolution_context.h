@@ -43,12 +43,8 @@
 
 namespace nucleus {
 
-// The transient hand-off vehicle and the convergence keystone. It BORROWS the flat sibling
-// registries it consults, owns none of them, and lives for one load()/resolve(). This is the ONLY
-// path by which one registry reaches another: an operation takes the context (or a named sibling)
-// as a parameter and never stores it. The source registry is not borrowed -- the sources to fold
-// arrive in the precedence stack the facade hands to fold(). Beyond the registries it holds the
-// transient working state of one resolve; freeze() copies the values out, then it is destroyed.
+// Lives for one load and is the only path by which one registry reaches another: an operation
+// takes it as a parameter and never stores it.
 class resolution_context
 {
 public:
@@ -87,8 +83,7 @@ public:
     resolution_context &operator=(resolution_context &&) = delete;
     ~resolution_context() = default;
 
-    // Borrowed by CONST reference and read-only, so concurrent loads on one shared
-    // const config_space share nothing mutable and need no synchronization.
+    // Read-only, so concurrent loads on one shared const configuration space need no synchronization.
     const schema_registry &schema() const noexcept { return m_schema; }
     const tokenizer_registry &tokenizer() const noexcept { return m_tokenizer; }
     const converter_registry &converters() const noexcept { return m_converters; }
@@ -136,14 +131,13 @@ public:
 
     expected<void, resolve_fold_error> convert() { return m_conversion.convert(); }
 
-    // Copies every building value OUT, paired with its provenance, into an immutable config.
     config freeze(std::vector<degradation> degraded = {}) const
     {
         return {owned_values(m_building), m_typed, m_provenance, std::move(degraded)};
     }
 
-    // 0 maps to the engine default, so a budget is never capped at zero. Must be
-    // set before fold(), the first of the two passes that charge the one count.
+    // 0 keeps the engine default. Must be set before fold(), the first of the two passes that
+    // charge the one count.
     void set_expansion_budget(std::size_t budget) noexcept
     {
         if(budget != 0)
@@ -165,14 +159,13 @@ private:
 
     keyspace m_building;
     provenance m_provenance;
-    // Typed values populated by convert(), keyed by full indexed path.
+    // Keyed by full indexed path.
     std::map<std::string, std::any> m_typed;
     std::vector<retained_buffer> m_buffers;
-    // Containers whose single primary-keyed instance was sliced onto the unified hierarchy --
-    // evidence for the enforcer that their identity is satisfied even though the key field
-    // was consumed and never appears as a leaf.
+    // Containers whose identity the slice satisfied structurally: the key field was consumed and
+    // never appears as a leaf.
     std::vector<std::string> m_keyed_satisfied;
-    // Re-open dispositions collected from all source batches during fold().
+    // Only inheritance-chain layers contribute; a flat layer's dispositions are dropped.
     std::vector<ranked_disposition> m_dispositions;
     displaced_values                m_displaced;
 

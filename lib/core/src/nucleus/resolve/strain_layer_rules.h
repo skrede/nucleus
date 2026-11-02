@@ -26,17 +26,11 @@
 
 namespace nucleus {
 
-// Bounds a chosen strain against the layers around it: the competing strain
-// capping its reach, and the cross-layer rules deciding whether it was allowed
-// to be introduced at more than one layer at all. It BORROWS the provenance and
-// the extend dispositions the fold collected, and owns the unique check.
 class strain_layer_rules
 {
     using disposition_index = std::set<std::pair<std::string, std::string>>;
 
 public:
-    // Where the chosen strain's reach ends, and the ranks whose own content a wide
-    // re-open spares from the scope prune.
     struct strain_bounds
     {
         std::size_t           competitor_layer;
@@ -70,9 +64,6 @@ private:
     const provenance                      &m_provenance;
     const std::vector<ranked_disposition> &m_dispositions;
 
-    // The first layer ABOVE the defining layer that introduces a competing named
-    // strain. A competitor introduced at or below it is not the "next" strain and
-    // never bounds the chosen one; unbounded when there is none above.
     std::size_t competitor_layer(const strain_buckets &strains,
                                  const std::string &chosen,
                                  std::size_t defining_layer) const
@@ -109,10 +100,8 @@ private:
         return ranks;
     }
 
-    // These rules apply only to inheritance-chain entries, identified by the
-    // explicit inheritance-layer channel on each origin. Flat source layering
-    // (env, argv, defaults) carries no inheritance layer, forms a single flat
-    // layer by design, and is never a re-open error.
+    // A flat source carries no inheritance layer and forms one flat layer by design, so it is never
+    // a re-open error.
     expected<void, resolve_fold_error>
     check_reopen(const key_path &container, const strain_buckets &strains,
                  const disposition_index &disposed) const

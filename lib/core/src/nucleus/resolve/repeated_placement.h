@@ -21,15 +21,8 @@
 
 namespace nucleus {
 
-// Places the entries that land under a declared repeated scope. Which unit an
-// entry belongs to, which existing entries it displaces and how it is written are
-// the sweep collaborator's rules; what this unit adds is the per-layer discipline
-// around them -- one sweep per instance per layer, one keyspace scan per scope,
-// and a minted ordinal for a repeated leaf that arrived without one.
 class repeated_placement
 {
-    // The borrowed inputs one entry's placement steps share, plus the repeated
-    // scope resolved for it, so every step keeps a one-line signature.
     struct entry_site
     {
         const key_path       &path;
@@ -50,9 +43,8 @@ public:
     {
     }
 
-    // True when the path lies under a declared repeated scope, in which case the
-    // entry has been swept into place and `text` moved out; a false return leaves
-    // `text` untouched for the fold's plain store.
+    // True when the entry was swept into place and `text` moved out; false leaves `text` untouched
+    // for the plain store.
     expected<bool, resolve_fold_error>
     place(const key_path &path, const keyspace_entry &entry, std::string &text,
           const layered_handle &layer)
@@ -127,9 +119,7 @@ private:
                                                  m_layers.state().leaf_ordinals);
     }
 
-    // The scope's buckets come from one keyspace scan the first time a layer
-    // touches the scope, so an instance sweep never rescans the keyspace. A layer
-    // never sweeps away what it wrote itself.
+    // A layer never sweeps away what it wrote itself.
     void sweep_once(const entry_site &site)
     {
         auto &state = m_layers.state();

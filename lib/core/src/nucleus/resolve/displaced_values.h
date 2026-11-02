@@ -14,8 +14,8 @@
 
 namespace nucleus {
 
-// A value the fold removed or overwrote, with the origin it held. The unit is what its displacer
-// replaced as a whole: one instance for a repeated sweep, the path itself for a plain overwrite.
+// The unit is what the displacer replaced as a whole: one instance for a repeated sweep, the path
+// itself for a plain overwrite.
 struct displaced_value
 {
     key_path    path;

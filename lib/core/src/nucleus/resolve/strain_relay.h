@@ -29,14 +29,10 @@
 
 namespace nucleus {
 
-// Moves one strain's keyed entries onto the unified hierarchy: each is pruned by
-// the scope policy, dropped because a higher-rank instance already holds its
-// landing site, or written at its unified path with its origin. Whichever way it
-// goes the keyed path is withdrawn, so no strain survives the slice in keyed form.
+// Every keyed path is withdrawn whichever way its entry goes, so no strain survives the slice in
+// keyed form.
 class strain_relay
 {
-    // Bounds one relay: the identity leaf that is read-only, the scope policy and
-    // its two rank bounds, and the ranks whose wide re-open spares their own entries.
     struct relay_bounds
     {
         std::string_view             identity_path;
@@ -46,7 +42,6 @@ class strain_relay
         const std::set<std::size_t> &wide_ranks;
     };
 
-    // The two exemptions spare an entry from rank pruning and from displacement.
     struct relayed_entry
     {
         const origin *from;
@@ -103,7 +98,6 @@ private:
         auto unified = m_addressing.unified_path(keyed);
         if(!unified)
             return unexpected(std::move(unified).error());
-        // In the strain's bucket but carrying no value: there is nothing to relay.
         const value *v = m_building.find(keyed);
         if(v == nullptr)
             return withdraw(keyed);
@@ -126,9 +120,6 @@ private:
                              canonical == bounds.identity_path};
     }
 
-    // A keyed-merge collection was finalized across layers before the slice ran, so
-    // its instances legitimately span ranks and this pruning must leave them alone:
-    // the merge mode overrides the default strain scope freezing.
     static bool excluded(const relayed_entry &entry, const relay_bounds &bounds)
     {
         if(entry.identity_leaf || entry.keyed_merge)
@@ -160,7 +151,6 @@ private:
         return withdraw(keyed);
     }
 
-    // The removal and its provenance forget live together so the pair cannot drift.
     expected<void, resolve_fold_error> withdraw(const key_path &keyed)
     {
         m_building.remove(keyed);

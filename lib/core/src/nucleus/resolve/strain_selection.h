@@ -21,16 +21,10 @@
 
 namespace nucleus {
 
-// Decides which primary-keyed strain a container resolves to and at which layer
-// that strain was defined. It BORROWS the provenance it reads first-introduction
-// ranks from and the schema it asks for the declared primary key; it owns the
-// bucketing unit by value and keeps no state between calls.
 class strain_selection
 {
 public:
-    // A container's strains, the one that survives, and the layer defining it.
-    // Empty strains means the container holds no keyed instances at all, and
-    // nothing downstream applies to it.
+    // Empty strains means the container holds no keyed instances and nothing downstream applies to it.
     struct chosen_strain
     {
         strain_buckets strains;
@@ -46,9 +40,8 @@ public:
     {
     }
 
-    // A selection needs a slice selector to apply to. Checked before the
-    // per-element loop, which is entered only for identity elements and so would
-    // never fire when there are none.
+    // Checked before the per-element loop, which runs only for identity elements and so would never
+    // fire when there are none.
     expected<void, resolve_fold_error>
     require_declared_key(const std::optional<std::string> &selection) const
     {
@@ -79,9 +72,6 @@ private:
     const provenance      &m_provenance;
     const schema_registry &m_schema;
 
-    // A selection against a container holding no keyed instances is
-    // unsatisfiable and must fail loudly, never silently resolve to whatever
-    // template content exists.
     static expected<chosen_strain, resolve_fold_error>
     unkeyed(const key_path &container, const std::optional<std::string> &selection)
     {
@@ -107,8 +97,6 @@ private:
                              defining.value()};
     }
 
-    // Several named strains with no selection is the undefined resolve the model
-    // rejects; a selection naming no bucketed strain lists every available value.
     static expected<std::string, resolve_fold_error>
     choose(const key_path &container, const strain_buckets &strains,
            const std::optional<std::string> &selection)
@@ -131,10 +119,8 @@ private:
         return strains.begin()->first;
     }
 
-    // The minimum first-introduction rank among the chosen strain's keyed
-    // entries: a later overwrite does not move the defining layer. No recorded
-    // rank for any entry is an invariant violation -- the fold records
-    // provenance with every set -- never a silent default.
+    // First-introduction ranks, so a later overwrite does not move the defining layer. The fold
+    // records provenance with every set, so an entry with no recorded rank is an invariant violation.
     expected<std::size_t, resolve_fold_error>
     defining_layer(const key_path &container, const strain_buckets &strains,
                    const std::string &chosen) const

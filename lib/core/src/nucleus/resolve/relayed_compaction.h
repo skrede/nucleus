@@ -28,11 +28,9 @@
 
 namespace nucleus {
 
-// Closes the ordinal gaps a relay leaves behind: an excluded keyed instance is
-// removed outright, so a repeated container's surviving instances can carry a hole
-// in their ordinal run, and this unit renumbers them back to a dense sequence.
-// Repeated leaves are whole value-list units and cannot form an interior gap, so
-// only declared containers are considered.
+// A relay removes an excluded keyed instance outright, which can leave a hole in a container's
+// ordinal run. A repeated leaf is a whole value-list unit and cannot form an interior gap, so only
+// declared containers are compacted.
 class relayed_compaction
 {
     using relayed_instance_groups =

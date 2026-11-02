@@ -18,12 +18,6 @@
 
 namespace nucleus {
 
-// Relocates one relayed instance's whole subtree onto a new ordinal. Every value
-// at or below the source is read out together with its origin, written at the
-// rewritten target and erased from the source, so the keyspace and the provenance
-// never drift apart mid-move. An occupied target is an invariant violation rather
-// than an overwrite. The keyspace and provenance are borrowed, never owned; the
-// schema is never consulted, because both paths arrive already resolved.
 class relayed_move
 {
     struct relayed_value

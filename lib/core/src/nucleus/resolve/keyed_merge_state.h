@@ -23,17 +23,10 @@
 
 namespace nucleus {
 
-// Owns the keyed-composition state of one resolve: which repeated containers
-// declare a non-default merge mode, the identity-group field keying each of them,
-// the declared leaf names a flat arrival is matched against, and the leaves
-// diverted off the sweep path to await the merge. It owns all of that outright and
-// borrows nothing; the schema is passed per call rather than stored, because only
-// construction reads it. Lives exactly as long as the resolve that holds it.
 class keyed_merge_state
 {
 public:
-    // One leaf diverted out of the fold, tagged with the layer rank and the
-    // per-layer instance ordinal that together identify the instance it belongs to.
+    // source_rank and source_ordinal together identify the instance the leaf belongs to.
     struct keyed_instance_entry
     {
         std::size_t source_rank;
@@ -43,9 +36,6 @@ public:
         origin      prov;
     };
 
-    // Records every repeated element declaring a non-default merge mode against the
-    // identity-group field that keys it. A keyed mode with no covering identity
-    // group has no merge key -- a loud error.
     expected<void, resolve_fold_error> build(const schema_registry &schema)
     {
         for(const schema_element &el : schema.elements())
@@ -91,9 +81,8 @@ public:
         m_keyed_accumulator[actual_container].push_back(std::move(entry));
     }
 
-    // True when a canonical path is at or under a container declaring a keyed merge
-    // mode (unite/replace_by_key). Such collections are finalized across layers by
-    // the keyed merge; the strain slice must relay them verbatim, never rank-prune.
+    // Such a collection is finalized across layers by the keyed merge, so the slice relays it
+    // verbatim and never rank-prunes it.
     bool under_keyed_merge(const std::string &canonical_path) const
     {
         for(const auto &[cpath, mode] : m_keyed_modes)
@@ -107,17 +96,14 @@ public:
     }
 
 private:
-    // Canonical container path -> its non-default merge mode, and the identity-group
-    // field that keys it. The two maps carry the same key set by construction: a
-    // keyed mode without a covering identity group is rejected, never recorded.
+    // The two maps carry the same key set: a keyed mode without a covering identity group is
+    // rejected, never recorded.
     std::map<std::string, merge_mode> m_keyed_modes;
     std::map<std::string, std::string> m_keyed_fields;
-    // Declared leaf names per keyed-merge container, so field-major arrival is
-    // detected from the schema rather than learned incrementally from the data --
-    // see the flat grouping's own comment for why that distinction matters.
+    // Taken from the schema rather than learned from the arriving data, so field-major arrival can
+    // be told apart from instance-major arrival.
     std::map<std::string, std::set<std::string>> m_declared_suffixes;
-    // ACTUAL container path (key segments still present pre-slice) -> diverted leaves,
-    // and its canonical form (to look up mode/field).
+    // Keyed by the actual container path, whose strain-key segments the slice has not yet stripped.
     std::map<std::string, std::vector<keyed_instance_entry>> m_keyed_accumulator;
     std::map<std::string, std::string> m_actual_to_canonical;
 

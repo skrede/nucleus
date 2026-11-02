@@ -19,16 +19,9 @@
 
 namespace nucleus {
 
-// The composition rules of one keyed collection: how diverted leaves group into
-// source instances, the order those instances compose in (defining-layer rank,
-// then source ordinal -- never the arrival order of the accumulator), and which
-// instances survive under each keyed merge mode. Holds no state; every rule is a
-// pure function of the instances handed to it.
 class keyed_merge_rules
 {
 public:
-    // One source instance: the layer rank and per-layer ordinal identifying it, its
-    // merge-key value, and the diverted leaves that belong to it.
     struct merged_instance
     {
         merged_instance()
@@ -144,8 +137,6 @@ public:
     }
 
 private:
-    // unite is strict-additive in both directions: an identifier may appear at most
-    // once within one layer, and may not be reintroduced by a higher layer either.
     static expected<void, resolve_fold_error>
     reject_reintroduction(const merged_instance *seen, const merged_instance *mi,
                           const std::string &canonical, const std::string &field)

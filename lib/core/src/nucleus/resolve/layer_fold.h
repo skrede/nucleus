@@ -29,11 +29,6 @@
 
 namespace nucleus {
 
-// Owns the fold's layer axis: the rank order layers are consumed in, the schema
-// lookups every layer shares, the batch a layer contributes, and the bookkeeping
-// that is scoped to one layer. The schema and the dispositions and buffers that
-// outlive the fold are borrowed; the pulled batch is held here so it outlives the
-// entry loop reading it.
 class layer_fold
 {
     // Scoped to ONE layer: a fresh layer re-mints leaf ordinals and sweeps every
@@ -56,8 +51,6 @@ public:
     {
     }
 
-    // Refreshes the lookups shared across the whole fold and returns the layers in
-    // the ascending rank order the fold consumes them in.
     std::vector<layered_handle *> begin_fold(std::span<layered_handle> layers)
     {
         m_projection = m_schema.projection();
@@ -66,9 +59,6 @@ public:
         return rank_order(layers);
     }
 
-    // A chain layer's batch was already pulled during the inheritance walk, so it
-    // is consumed here rather than pulling the same handle a second time. Stack,
-    // argv and env layers have no walk phase and are pulled here for the only time.
     expected<std::reference_wrapper<config_source_batch>, resolve_fold_error>
     acquire(layered_handle &layer)
     {
@@ -116,6 +106,7 @@ private:
     std::vector<ranked_disposition> &m_dispositions;
     layer_state             m_state;
     schema_projection       m_projection;
+    // Held here so the pulled batch outlives the entry loop reading it.
     config_source_result    m_pulled;
     std::set<std::string>   m_repeated_declared;
     std::set<std::string>   m_repeated_containers;

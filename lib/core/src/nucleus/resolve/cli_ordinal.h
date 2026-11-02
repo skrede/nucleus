@@ -25,17 +25,10 @@
 
 namespace nucleus {
 
-// Owns the plain-ordinal CLI overrides deferred during the fold. A bare decimal
-// segment under a repeated container cannot be range-checked while folding: the
-// instances it addresses only exist once the keyed merge and the strain slice
-// have run. defer() rebrackets the path and parks the write; apply() runs after
-// slice(), against the fully materialized keyspace. The keyspace, provenance and
-// schema are borrowed, never owned, and must outlive this collaborator, which
-// lives exactly as long as the resolve that holds it.
+// A bare decimal segment under a repeated container cannot be range-checked during the fold,
+// because its instances exist only after the keyed merge and the slice, so apply() runs after slice().
 class cli_ordinal
 {
-    // Accumulates one path's rebracketing, carrying the borrowed inputs the
-    // per-segment step needs so each step keeps a one-line signature.
     struct cli_rebracket_state
     {
         const std::set<std::string> &repeated;
@@ -66,8 +59,8 @@ public:
 
     void reset() noexcept { m_deferred_cli_overrides.clear(); }
 
-    // Parks the write and returns true when the path named a plain CLI ordinal,
-    // so the fold skips the entry; false leaves the entry to the normal path.
+    // True when the path named a plain CLI ordinal and the write was parked; false leaves the
+    // entry to the fold.
     expected<bool, resolve_fold_error> defer(
         const key_path &path, const std::set<std::string> &repeated,
         const keyspace_entry &entry, std::string &expanded,

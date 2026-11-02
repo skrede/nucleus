@@ -43,9 +43,6 @@ inline std::string strain_values(const strain_buckets &strains)
     return quoted_list(values);
 }
 
-// Sorts one container's paths into strains. It BORROWS the building keyspace it
-// snapshots and the schema it asks what a keyed instance is, holding both as
-// references for its lifetime, and keeps no state between calls.
 class strain_bucketing
 {
 public:
@@ -55,10 +52,9 @@ public:
     {
     }
 
-    // paths() is a snapshot, so the caller may mutate the keyspace while holding
-    // the buckets. A key value shadowing a declared element name can never be
-    // bucketed and is reported here, rather than left to surface later as an
-    // unrelated unknown-key suggestion.
+    // paths() is a snapshot, so the caller may mutate the keyspace while holding the buckets. A key
+    // value shadowing a declared element name is reported here rather than later as an unrelated
+    // unknown-key suggestion.
     expected<strain_buckets, resolve_fold_error> bucket(const key_path &container) const
     {
         strain_buckets strains;
@@ -83,10 +79,8 @@ private:
     const keyspace        &m_building;
     const schema_registry &m_schema;
 
-    // An indexed-shaped segment is a legitimate ordinal only when a repeated
-    // element is genuinely declared directly at this container under that base
-    // name; otherwise it is a strain whose key value merely happens to be
-    // bracket-shaped, and must not vanish here.
+    // An indexed-shaped segment is an ordinal only where this container declares a repeated child of
+    // that base name; anywhere else it is a bracket-shaped key value that must not vanish.
     expected<bool, resolve_fold_error>
     ordinal_instance(const key_path &container, const key_path &path) const
     {

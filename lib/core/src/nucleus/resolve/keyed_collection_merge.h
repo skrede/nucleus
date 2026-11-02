@@ -23,11 +23,8 @@
 
 namespace nucleus {
 
-// Drains the accumulator the divert filled, applying each collection's merge mode
-// by the identity-group key VALUE (never by ordinal), then re-indexing the
-// survivors onto contiguous ordinals and carrying provenance through every move.
-// replace_by_ordinal never arrives here -- it stays on the fold's sweep path. The
-// keyspace, provenance and merge state are borrowed, and outlive this collaborator.
+// Merges by the identity-group key value, never by ordinal; replace_by_ordinal never arrives here,
+// because it stays on the fold's sweep path.
 class keyed_collection_merge
 {
 public:
@@ -39,8 +36,8 @@ public:
     {
     }
 
-    // Runs between fold() and slice(), so the merge sees every layer while the key
-    // is still present; slice() later strips the transient strain-key segments.
+    // Runs between fold() and slice(), so the merge sees every layer while the key is still
+    // present; slice() later strips the transient strain-key segments.
     expected<void, resolve_fold_error> merge()
     {
         for(auto &[container, entries] : m_keyed.accumulator())

@@ -20,10 +20,6 @@
 
 namespace nucleus {
 
-// Enforces that no non-identity unique field repeats a value across a
-// container's sibling strains. It BORROWS the building keyspace it reads the
-// field values from and the schema that declares which fields are unique; it
-// keeps no state between calls.
 class strain_unique_fields
 {
 public:
@@ -67,7 +63,6 @@ private:
         return {};
     }
 
-    // The unique field's path under one instance is container / key value / name.
     std::map<std::string, std::vector<std::string>>
     field_values(const key_path &container, const schema_element &el,
                  const strain_buckets &strains) const

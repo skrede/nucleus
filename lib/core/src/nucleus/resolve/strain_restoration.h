@@ -23,9 +23,9 @@
 
 namespace nucleus {
 
-// Discards what the scope policy excludes from the chosen strain and puts back what the excluded
-// entries displaced during the fold, so the strain resolves as its admissible layers left it.
-// Under file_level the same holds for general entries a chain layer above Ld displaced.
+// Puts back what excluded entries displaced during the fold, so the strain resolves as its
+// admissible layers left it. Under file_level the same holds for general entries a chain layer
+// above Ld displaced.
 class strain_restoration
 {
     enum class region
