@@ -45,7 +45,7 @@ include(cmake/buildflags.cmake)
 # Diagnostic formatting backend
 #
 # std::format is the interface vocabulary, but libc++/Apple Clang historically
-# lagged on it. Detect __cpp_lib_format; if the standard library lacks it, pull
+# lagged on it. Probe for a usable std::format; if the standard library lacks it, pull
 # {fmt} (the reference implementation) so the format() seam stays buildable. The
 # probe runs here, before add_subdirectory(lib), so its result and the recorded
 # NUCLEUS_FMT_REQUIRED stay in this scope for the package config below; the fmt
@@ -55,12 +55,11 @@ include(CheckCXXSourceCompiles)
 # The probe inherits CMAKE_CXX_STANDARD 20 from buildflags.cmake above, so
 # try_compile picks the right per-compiler standard flag (-std=c++20 vs
 # /std:c++20) on every toolchain.
+# libc++ can define __cpp_lib_format while a deployment target below macOS 13.3
+# marks floating-point formatting unavailable, so the probe formats a double.
 check_cxx_source_compiles(
-    "#include <version>
-     #ifndef __cpp_lib_format
-     #error no std::format
-     #endif
-     int main() {}"
+    "#include <format>
+     int main() { return static_cast<int>(std::format(\"{}\", 1.5).size()); }"
     NUCLEUS_HAVE_STD_FORMAT
 )
 

@@ -2,6 +2,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+include(CheckCXXCompilerFlag)
+
 # Emitted for every configure so tooling (clang-tidy, clangd) has a compilation
 # database without a bespoke build step.
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -113,14 +115,14 @@ function(nucleus_warnings target)
                 # that spelling it is recognized by every clang/AppleClang.
                 -Wno-missing-field-initializers)
 
-            if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND
-               CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 21)
-                # -Wnrvo (added Clang 21) flags roughly ninety return sites
-                # across the tree where NRVO isn't guaranteed by the standard --
-                # an optimization-hint diagnostic, not a correctness defect, not
-                # worth restructuring the resolution/tokenizer core to satisfy.
-                # STREQUAL (not MATCHES) deliberately excludes AppleClang, whose
-                # version numbers do not track upstream LLVM.
+            # -Wnrvo flags roughly ninety return sites across the tree where
+            # NRVO isn't guaranteed by the standard -- an optimization-hint
+            # diagnostic, not a correctness defect, not worth restructuring the
+            # resolution/tokenizer core to satisfy. The flag is probed rather
+            # than inferred from a version: AppleClang carries it too, under
+            # version numbers that do not track upstream LLVM.
+            check_cxx_compiler_flag(-Wnrvo NUCLEUS_HAVE_WNRVO)
+            if(NUCLEUS_HAVE_WNRVO)
                 target_compile_options(${target} PRIVATE -Wno-nrvo)
             endif()
         endif()
