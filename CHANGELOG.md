@@ -617,3 +617,149 @@ deliberate, and are recorded so they are not mistaken for defects.
   entry. The result is idempotent on a second pass.
 - A multi-root unnamed configuration gains a configuration keyspace prefix from
   the emit wrapper. The result is idempotent on a second pass.
+
+### Building nucleus
+
+- **A top-level build of nucleus now treats warnings as errors.** When nucleus is
+  the top-level project, `NUCLEUS_WERROR` defaults on and nucleus's own targets
+  compile with `-Werror`, or `/WX` under MSVC, so a warning a compiler raises in
+  nucleus's code fails the build. Previously its warnings were never fatal.
+  Configure with `-DNUCLEUS_WERROR=OFF` to keep them non-fatal. A nucleus pulled in
+  through `add_subdirectory` or FetchContent leaves the option off, so its warnings
+  never fail the consuming project's build; `-DNUCLEUS_WERROR=ON` opts in.
+
+## 0.4.0
+
+No build ever reported 0.4.0: the version nucleus declared stayed 0.2.0 until 0.4.1.
+
+Apart from the one entry below, this release adds API and leaves the behavior of
+an existing schema unchanged.
+
+### Schema API
+
+- **`schema_element` has two new members after `repeated`.** `merge` and
+  `keyref_into` sit between `repeated` and `allowed_values`, so code that sets
+  `allowed_values`, `converter` or `type_identity` by position in an aggregate
+  initializer no longer compiles. The factory functions and designated
+  initializers are unaffected, and the default, `merge_mode::wholesale_replace`,
+  keeps the cross-layer behavior 0.3.1 had.
+
+## 0.3.1
+
+No build ever reported 0.3.1: the version nucleus declared stayed 0.2.0 until 0.4.1.
+
+### Tokenizer
+
+- **A tokenizer function now takes named arguments only.** The positional call
+  form is gone, so a document value such as `${string.upper(x)}` fails the load
+  with `errc::unresolved_token`: every argument is written `name=value`. The
+  built-in functions take `value=` (`upper`, `lower`, `trim`, `length`), `value=`,
+  `from=` and `to=` (`replace`), and `value=`, `pos=` and an optional `count=`
+  (`substr`); `concat` takes a list, as in
+  `${string.concat(values=['a', 'b'], separator='-')}`, with `separator=` optional.
+- **A host tokenizer function declares its arguments.**
+  `tokenizer_builder::add_function` takes a `std::vector<arg_spec>` between the
+  name and the callable, and the callable receives a `const named_args &` where it
+  received a `std::span<const std::string>`; `function_resolver` is now
+  `named_function_resolver`. Code written against the old form no longer compiles.
+  The call is now checked before the callable runs: an unknown argument name
+  fails with `resolve_errc::unknown_argument`, suggesting the nearest declared
+  name, an absent required one with `missing_argument`, and a value that does not
+  convert to its declared type with `type_mismatch`.
+- **`resolve_errc::arg_count_mismatch` is gone, and the codes after it moved.**
+  `unknown_argument`, `missing_argument` and `type_mismatch` take its place, and
+  the enumeration carries no explicit values, so `out_of_scope_context`,
+  `cyclic_reference`, `depth_exceeded` and `budget_exceeded` each moved up by two.
+  Code that names `arg_count_mismatch` no longer compiles, and a code stored or
+  compared as a number now names a different failure.
+
+## 0.3.0
+
+No build ever reported 0.3.0: the version nucleus declared stayed 0.2.0 until 0.4.1.
+
+This release renames the core vocabulary and makes a repeated container hold its
+instances. The rename and the removed collection API stop code from compiling.
+The Collections group, the reads of a repeated path, a renumbered error code and
+the retained primary-key leaf instead change results *silently* &mdash; no
+diagnostic is emitted &mdash; so re-verify the output of any configuration with
+repeated or keyed containers. The rest refuse, at registration, schemas that were
+accepted before.
+
+### Vocabulary
+
+- **`configuration` is now `config`, throughout.** `nucleus::configuration`,
+  `configuration_space` and `configuration_space_builder` are now `config`,
+  `config_space` and `config_space_builder`; the `configuration_source` concept
+  and `configuration_source_batch`, `_result` and `_error` are now
+  `config_source`, `config_source_batch`, `config_source_result` and
+  `config_source_error`; and
+  `nucleus::load` is now `nucleus::load_config`. The headers moved with them, to
+  `nucleus/config.h`, `nucleus/config_space.h` and `nucleus/config_source/`. No
+  alias keeps an old name, so code that uses one no longer compiles.
+
+### Reading a resolved configuration
+
+- **An unindexed read of a repeated path no longer returns a value.** `get` on a
+  repeated leaf, or on a path beneath a repeated container, returns no value where
+  it returned the last one; `get_as` reports `errc::index_required`, naming the
+  container, where a repeated leaf reported `errc::mismatched_type`. Read one
+  instance as `tags[1]` or `node[0]/port`, or gather them with `get_all`. `keys()`
+  and `size()` now list and count each instance, as `tags[0]` and `tags[1]`,
+  where they listed the repeated path once.
+- **`config::collection_provenance_of` and the collection constructors are
+  gone.** Each instance carries its own origin, read through `provenance_of` on
+  its indexed path, and the `config` constructors taking a collection map were
+  removed. Code using either no longer compiles.
+- **Inserting `errc::index_required` moved two codes.** It sits after
+  `absent_key`, and the enumeration carries no explicit values, so
+  `missing_converter` and `mismatched_type` each moved up by one. Nothing reports
+  the change: a code stored, logged or compared as a number now names a different
+  failure.
+
+### Collections
+
+These change resolved values *silently* &mdash; no diagnostic is emitted.
+
+- **A container declared `repeated` now holds one instance per element.** Three
+  sibling `<node>` elements resolve to `cluster/node[0]/...` through
+  `cluster/node[2]/...`, in document order, and nested repetition composes, as in
+  `node[0]/route[1]/port`. Previously `repeated` took effect only on a leaf: the
+  siblings collapsed onto one path, the last one winning.
+- **A document that supplies a repeated container replaces it whole.** A layer
+  supplying any instance removes every instance the lower layers supplied: a
+  one-instance override of a three-instance base resolves to one instance, and a
+  field the override omits is not taken from the base. Previously the collapsed
+  paths merged key by key. 0.4.2 narrows the rule to the instances a layer
+  addresses; see its first Collections entry.
+- **A source key carrying a malformed instance index is dropped.**
+  `key_path::parse` now refuses a segment that carries `[` without being an index
+  &mdash; `node[]`, `node[x]`, `node[01]`, `[0]`, or an index of more than 18
+  digits &mdash; where it read the segment as an ordinary name. A load skips a key
+  that does not parse, without a diagnostic, so such a key, which used to be
+  stored as written, now vanishes. 0.4.1 turned the skip into a load failure.
+
+### Primary keys
+
+The first entry changes resolved values *silently*.
+
+- **The selected strain's primary-key value is now a resolved leaf.** With `name`
+  as the primary key of `cluster/server`, selecting the `web` strain leaves
+  `cluster/server/name` holding `web`, where the value used to vanish in the
+  slice, and `keys()` lists it. `xml::emit_document(config, out, space_name)` and
+  `xml::emitter` now write it as a `<name>web</name>` child; the new overload
+  taking a `schema_projection` writes it once, as the attribute.
+- **A primary key may not sit under a repeated container.** A primary-key element
+  whose container, or any ancestor of it, is declared `repeated` is refused with
+  `errc::rejected_registration`. Previously the schema was accepted, since
+  `repeated` had no effect on a container.
+- **A keyed container may not take a reserved tokenizer name.** A primary-key
+  element whose container is named `env`, `string`, `abs`, `rel`, `scope`, `file`,
+  `dir` or `self` is refused with `errc::rejected_registration`. Each keyed
+  container now names a tokenizer of its own, as in `${server.name}`, and these
+  names are taken.
+
+### Registration
+
+- **An element name may not open with a digit.** `register_element` refuses such
+  a name with `errc::rejected_registration`: on the command line a digit-led
+  segment reads as an instance index.
