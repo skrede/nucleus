@@ -110,21 +110,22 @@ function(nucleus_warnings target)
                 # compilers older than the subgroup (e.g. Apple clang 15).
                 -Wno-unsafe-buffer-usage
                 # Same designated-initializer pattern as GCC's equivalent
-                # opt-out above. The group form also disables clang 19+'s
-                # -Wmissing-designated-field-initializers subgroup, and unlike
-                # that spelling it is recognized by every clang/AppleClang.
+                # opt-out above.
                 -Wno-missing-field-initializers)
 
-            # -Wnrvo flags roughly ninety return sites across the tree where
-            # NRVO isn't guaranteed by the standard -- an optimization-hint
-            # diagnostic, not a correctness defect, not worth restructuring the
-            # resolution/tokenizer core to satisfy. The flag is probed rather
-            # than inferred from a version: AppleClang carries it too, under
-            # version numbers that do not track upstream LLVM.
-            check_cxx_compiler_flag(-Wnrvo NUCLEUS_HAVE_WNRVO)
-            if(NUCLEUS_HAVE_WNRVO)
-                target_compile_options(${target} PRIVATE -Wno-nrvo)
-            endif()
+            # Probed, not inferred from a version: AppleClang's versions do not
+            # track upstream LLVM, and naming a warning a compiler predates is an
+            # unknown-warning-option error. -Wnrvo flags roughly ninety return
+            # sites where NRVO isn't guaranteed, an optimization hint rather than
+            # a defect; AppleClang 21 keeps the designated-field subgroup on
+            # under the group opt-out above, unlike upstream Clang.
+            foreach(warning IN ITEMS nrvo missing-designated-field-initializers)
+                string(MAKE_C_IDENTIFIER "NUCLEUS_HAVE_W_${warning}" probe)
+                check_cxx_compiler_flag(-W${warning} ${probe})
+                if(${probe})
+                    target_compile_options(${target} PRIVATE -Wno-${warning})
+                endif()
+            endforeach()
         endif()
 
         if(NUCLEUS_WERROR)
