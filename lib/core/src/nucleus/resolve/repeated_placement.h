@@ -16,6 +16,7 @@
 #include "nucleus/schema/schema_registry.h"
 
 #include <string>
+#include <vector>
 #include <utility>
 
 namespace nucleus {
@@ -87,6 +88,7 @@ private:
         if(!target)
             return unexpected(std::move(target).error());
         sweep_once(site);
+        m_layers.state().written.insert(target.value().str());
         m_sweep.store_entry(target.value(), std::move(text), site.layer);
         return {};
     }
@@ -124,7 +126,8 @@ private:
     }
 
     // The scope's buckets come from one keyspace scan the first time a layer
-    // touches the scope, so an instance sweep never rescans the keyspace.
+    // touches the scope, so an instance sweep never rescans the keyspace. A layer
+    // never sweeps away what it wrote itself.
     void sweep_once(const entry_site &site)
     {
         auto &state = m_layers.state();
@@ -134,8 +137,18 @@ private:
         if(!state.buckets.contains(site.scope))
             state.buckets[site.scope] =
                 m_sweep.bucket_by_instance(site.scope, site.scope_is_leaf);
-        m_sweep.sweep_instance(state.buckets[site.scope][site.sweep_key], site.sweep_key,
-                               site.layer);
+        m_sweep.sweep_instance(unwritten(state.buckets[site.scope][site.sweep_key]),
+                               site.sweep_key, site.layer);
+    }
+
+    std::vector<key_path> unwritten(const std::vector<key_path> &bucket) const
+    {
+        const auto           &state = m_layers.state();
+        std::vector<key_path> earlier;
+        for(const key_path &existing : bucket)
+            if(!state.written.contains(existing.str()))
+                earlier.push_back(existing);
+        return earlier;
     }
 };
 

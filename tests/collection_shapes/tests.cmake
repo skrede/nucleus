@@ -1,4 +1,4 @@
-# The folder include entry is what lets the twenty-three sources reach collection_shapes.h by its
+# The folder include entry is what lets the twenty-four sources reach collection_shapes.h by its
 # bare name; the fixture documents the define points at live beside them.
 nucleus_add_test(collection_shapes_test
     SOURCES collection_shapes_test.cpp
@@ -24,6 +24,7 @@ nucleus_add_test(collection_shapes_test
             identity_pool_scope_test.cpp
             combined_shapes_test.cpp
             identity_projection_round_trip_test.cpp
+            same_layer_order_test.cpp
     LINK nucleus::argv nucleus::xml nucleus::runtime
     INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/collection_shapes
     DEFINES NUCLEUS_COLLECTION_SHAPES_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/collection_shapes/fixtures")

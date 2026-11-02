@@ -41,8 +41,9 @@ class layer_fold
     // later layer skip the sweep by which it displaces an earlier one.
     struct layer_state
     {
-        std::map<std::string, std::size_t> leaf_ordinals;
-        std::set<std::string>              swept;
+        std::map<std::string, std::size_t>                                  leaf_ordinals;
+        std::set<std::string>                                               swept;
+        std::set<std::string>                                               written;
         std::map<std::string, std::map<std::string, std::vector<key_path>>> buckets;
     };
 
