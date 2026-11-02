@@ -222,7 +222,8 @@ each construct it claims to neutralize has to be named and asserted rather than 
 driving a shell once. `tests/completion/smoke_test.cpp` has since given its shell-driving helpers
 to a support header shared with the ordinal completion test, and fell to 257.
 `tests/completion/completion_test.cpp` rose again when every generated bash script began carrying
-the quote tracker and the line lookup, which its golden pins.
+the quote tracker and the line lookup, which its golden pins, and again when the tracker's cursor
+guard came to read only the current word.
 
 The three newest rows are contract tests that rename the example's entry point through the
 preprocessor so it cannot collide with the test runner's own. That rename leaves the renamed
@@ -252,8 +253,8 @@ is the price of the file being stable under both, and the row is the price of th
 | `tests/xml/keyed_projection_test.cpp` | 338 |
 | `tests/schema/registry_test.cpp` | 333 |
 | `tests/query/selector_test.cpp` | 315 |
+| `tests/completion/completion_test.cpp` | 306 |
 | `tests/schema/constraint_group_test.cpp` | 305 |
-| `tests/completion/completion_test.cpp` | 304 |
 | `tests/runtime/load_front_door_test.cpp` | 289 |
 | `tests/schema/keyed_composition_test.cpp` | 286 |
 | `tests/resolve/resolution_test.cpp` | 278 |

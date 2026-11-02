@@ -165,7 +165,7 @@ TEST_CASE("a value shared through a reopened quote completes on the first TAB an
     });
 }
 
-TEST_CASE("a word that opened a quote after other text is offered nothing with a quote byte or backslash right of the cursor", "[completion][smoke]")
+TEST_CASE("the cursor rows refuse a word that opened a quote after other text and spell the rest bare", "[completion][smoke]")
 {
     if(!bash_available())
         SKIP("no bash 5.0 or later on PATH");

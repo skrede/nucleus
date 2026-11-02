@@ -57,7 +57,9 @@ _myapp_quote()
         esac
         seen=1
     done
-    case "${COMP_LINE:COMP_POINT}" in *\'* | *\"* | *\\*) quote=""; [ -z "$ever" ]; return ;; esac
+    local after="${COMP_LINE:COMP_POINT}" tail="$1"
+    while [ -n "$tail" ] && [ "${after#"$tail"}" = "$after" ]; do tail="${tail#?}"; done
+    case "$tail" in *\'* | *\"* | *\\*) quote=""; [ -z "$ever" ]; return ;; esac
     case "$quote" in \$*) quote="" ;; esac
     [ -z "$reopened" ]
 }

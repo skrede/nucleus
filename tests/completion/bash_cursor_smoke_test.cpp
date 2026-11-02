@@ -75,17 +75,36 @@ at_cursor() { COMP_LINE="$2$3"; COMP_POINT=${#2}; COMP_CWORD=$4; local probe="$1
     shift 4; COMP_WORDS=(myapp "$@"); "$probe"; }
 replied() { _myapp_complete || exit $?; printf '[%s]' "${COMPREPLY[@]}"; echo; }
 tracked() { _myapp_quote "${COMP_WORDS[COMP_CWORD]}"; printf '[%s]\n' "$quote"; })";
+
+std::string cursor_locale_line()
+{
+    // A failed LC_ALL assignment leaves the locale in force, so C goes first and a missing locale cannot pass on a UTF-8 one.
+    const std::string line = "LC_ALL=C\nLC_ALL=" + std::string(cursor_locale) + "\n";
+    INFO("the cursor rows count characters only under the locale " << cursor_locale);
+    REQUIRE(run_bash(line + "e=$'\\303\\251'; echo ${#e}\n") == "1\n");
+    return line;
+}
+
+void check_cursor_rows(const std::vector<cursor_row> &rows)
+{
+    const std::string locale_line = cursor_locale_line();
+    for(const cursor_row &row : rows)
+    {
+        std::string drive = locale_line + row.script + cursor_drive + "\nat_cursor";
+        for(const std::string &arg : {row.probe, row.left, row.right, std::to_string(row.cword)})
+            drive += " " + shell_quoted(arg);
+        for(const std::string &word : row.words)
+            drive += " " + shell_quoted(word);
+        CAPTURE(row.left, row.right);
+        CHECK(run_bash(drive + "\n") == row.expected);
+    }
+}
 }
 
 TEST_CASE("a reply at the cursor is bare beside a quote and absent past a quote opened after other text", "[completion][smoke]")
 {
     if(!bash_available())
         SKIP("no bash 5.0 or later on PATH");
-
-    // A failed LC_ALL assignment leaves the locale in force, so C goes first and a missing locale cannot pass on a UTF-8 one.
-    const std::string locale_line = "LC_ALL=C\nLC_ALL=" + std::string(cursor_locale) + "\n";
-    INFO("the cursor rows count characters only under the locale " << cursor_locale);
-    REQUIRE(run_bash(locale_line + "e=$'\\303\\251'; echo ${#e}\n") == "1\n");
 
     const auto delimiter = nucleus::cli_delimiter::parse("$(touch PWN_DELIM)");
     REQUIRE(delimiter);
@@ -107,14 +126,24 @@ TEST_CASE("a reply at the cursor is bare beside a quote and absent past a quote 
             {delimited, "[" + bash_line_word(cluster + "port") + "]\n", "replied", "myapp ", "'" + cluster + "p", 1, {"'" + cluster + "p"}},
             {delimited, "[" + bash_line_word(cluster + "port") + "]\n", "replied", "myapp " + k13 + " ", "'" + cluster + "p", 2, {k13, "'" + cluster + "p"}},
     };
-    for(const cursor_row &row : rows)
-    {
-        std::string drive = locale_line + row.script + cursor_drive + "\nat_cursor";
-        for(const std::string &arg : {row.probe, row.left, row.right, std::to_string(row.cword)})
-            drive += " " + shell_quoted(arg);
-        for(const std::string &word : row.words)
-            drive += " " + shell_quoted(word);
-        CAPTURE(row.left, row.right);
-        CHECK(run_bash(drive + "\n") == row.expected);
-    }
+    check_cursor_rows(rows);
+}
+
+TEST_CASE("a quote or backslash in a later word leaves a closed word's reply alone", "[completion][smoke]")
+{
+    if(!bash_available())
+        SKIP("no bash 5.0 or later on PATH");
+
+    const std::string app      = cursor_script();
+    const std::string bare     = "[" + bash_line_word("only one") + "]\n";
+    const std::string reopened = "'o''nly on'";
+
+    const std::vector<cursor_row> rows = {
+            {app, bare, "replied", "myapp --app-mode=" + reopened, " --x 'y'", 3, {"--app-mode", "=", reopened, "--x", "'y'"}},
+            {app, bare, "replied", "myapp --app-mode=" + reopened, " --x a\\b", 3, {"--app-mode", "=", reopened, "--x", "a\\b"}},
+            {app, bare, "replied", "myapp --app-mode=" + reopened, " --name=\"v\"", 3, {"--app-mode", "=", reopened, "--name", "=", "\"v\""}},
+            {app, "[]\n", "replied", "myapp --app-mode='o''nly on", "' --x 'y'", 3, {"--app-mode", "=", reopened, "--x", "'y'"}},
+            {app, bare, "replied", "myapp --app-mode='only on", "' --x 'y'", 3, {"--app-mode", "=", "'only on'", "--x", "'y'"}},
+    };
+    check_cursor_rows(rows);
 }
