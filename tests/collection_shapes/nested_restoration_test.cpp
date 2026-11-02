@@ -9,7 +9,6 @@
 
 #include <map>
 #include <string>
-#include <vector>
 
 namespace {
 
@@ -39,36 +38,9 @@ nucleus::config_space nested_space()
     return nucleus::builder_result_test::built(builder);
 }
 
-nucleus::load_result load_chain(const nucleus::config_space &space, const chain &documents, const std::string &top,
-                                policy scope, nucleus::source_stack stack = nucleus::source_stack{})
-{
-    nucleus::load_options opts;
-    opts.document_paths = {top};
-    opts.make_document  = [documents](const std::string &path)
-    {
-        return nucleus::source_handle(nucleus::xml_source::from(nucleus::xml_source_options::of_string(
-                documents.at(nucleus::shapes::filename_of(path)))));
-    };
-    opts.selection = "primary";
-    opts.scope     = scope;
-    return nucleus::load_config(space, stack, opts);
-}
-
 std::string reopen(const std::string &parent, const std::string &extend, const std::string &inner)
 {
     return "<cluster inherit=\"" + parent + "\"><server name=\"primary\" extend=\"" + extend + "\">" + inner + "</server></cluster>";
-}
-
-void require_lines(const nucleus::load_result &loaded, const std::vector<std::string> &lines,
-                   const std::vector<std::string> &absent)
-{
-    REQUIRE(loaded);
-    const std::string serialized = "\n" + nucleus::shapes::serialize(loaded.value());
-    INFO(serialized);
-    for(const std::string &line : lines)
-        REQUIRE(serialized.find("\n" + line + "\n") != std::string::npos);
-    for(const std::string &key : absent)
-        REQUIRE_FALSE(loaded->contains(key));
 }
 
 chain nested_chain(const std::string &top_inner)
@@ -93,6 +65,7 @@ std::string emptied_label(policy scope)
         return "cluster/server/node[0]/label = M " + mid_origin;
     return "cluster/server/node[0]/label = L0 " + base_origin;
 }
+
 }
 
 TEST_CASE("a wide re-open keeps the base's nested instance out of the instance it replaced",
@@ -102,9 +75,9 @@ TEST_CASE("a wide re-open keeps the base's nested instance out of the instance i
     for(const policy scope : every_policy)
     {
         CAPTURE(scope);
-        require_lines(load_chain(nested_space(), documents, "top.xml", scope),
-                      {"cluster/server/name = primary " + top_origin, "cluster/server/node[0]/label = L2 " + top_origin},
-                      {"cluster/server/node[0]/route[0]/port", "cluster/server/node[0]/route[0]/method"});
+        nucleus::shapes::require_lines(nucleus::shapes::load_chain(nested_space(), documents, "top.xml", scope),
+                                       {"cluster/server/name = primary " + top_origin, "cluster/server/node[0]/label = L2 " + top_origin},
+                                       {"cluster/server/node[0]/route[0]/port", "cluster/server/node[0]/route[0]/method"});
     }
 }
 
@@ -115,10 +88,10 @@ TEST_CASE("a wide re-open supplying one nested field keeps the base's other fiel
     for(const policy scope : every_policy)
     {
         CAPTURE(scope);
-        require_lines(load_chain(nested_space(), documents, "top.xml", scope),
-                      {"cluster/server/node[0]/label = L2 " + top_origin,
-                       "cluster/server/node[0]/route[0]/port = 300 " + top_origin},
-                      {"cluster/server/node[0]/route[0]/method"});
+        nucleus::shapes::require_lines(nucleus::shapes::load_chain(nested_space(), documents, "top.xml", scope),
+                                       {"cluster/server/node[0]/label = L2 " + top_origin,
+                                        "cluster/server/node[0]/route[0]/port = 300 " + top_origin},
+                                       {"cluster/server/node[0]/route[0]/method"});
     }
 }
 
@@ -129,10 +102,10 @@ TEST_CASE("a wide re-open of an inner instance keeps the base's fields out after
     for(const policy scope : every_policy)
     {
         CAPTURE(scope);
-        require_lines(load_chain(nested_space(), documents, "top.xml", scope),
-                      {emptied_label(scope), "cluster/server/node[0]/route[0]/port = 300 " + top_origin},
-                      {"cluster/server/node[0]/route[0]/method", "cluster/server/node[0]/route[0]/tag[0]",
-                       "cluster/server/node[0]/route[0]/tag[1]"});
+        nucleus::shapes::require_lines(nucleus::shapes::load_chain(nested_space(), documents, "top.xml", scope),
+                                       {emptied_label(scope), "cluster/server/node[0]/route[0]/port = 300 " + top_origin},
+                                       {"cluster/server/node[0]/route[0]/method", "cluster/server/node[0]/route[0]/tag[0]",
+                                        "cluster/server/node[0]/route[0]/tag[1]"});
     }
 }
 
@@ -143,9 +116,41 @@ TEST_CASE("a wide re-open supplying one inner field keeps the base's other field
     for(const policy scope : every_policy)
     {
         CAPTURE(scope);
-        require_lines(load_chain(nested_space(), documents, "top.xml", scope),
-                      {emptied_label(scope), "cluster/server/node[0]/route[0]/method = m2 " + top_origin},
-                      {"cluster/server/node[0]/route[0]/port", "cluster/server/node[0]/route[0]/tag[0]",
-                       "cluster/server/node[0]/route[0]/tag[1]"});
+        nucleus::shapes::require_lines(nucleus::shapes::load_chain(nested_space(), documents, "top.xml", scope),
+                                       {emptied_label(scope), "cluster/server/node[0]/route[0]/method = m2 " + top_origin},
+                                       {"cluster/server/node[0]/route[0]/port", "cluster/server/node[0]/route[0]/tag[0]",
+                                        "cluster/server/node[0]/route[0]/tag[1]"});
+    }
+}
+
+TEST_CASE("a wide re-open adding an inner instance after an excluded layer emptied the outer one keeps the base's first instance whole",
+          "[collection_shapes][keyed][restoration][nested]")
+{
+    const chain documents = emptied_chain("</route><route><port>301</port>");
+    for(const policy scope : {policy::file_level, policy::space_open_container_closed})
+    {
+        CAPTURE(scope);
+        nucleus::shapes::require_lines(nucleus::shapes::load_chain(nested_space(), documents, "top.xml", scope),
+                                       {emptied_label(scope), "cluster/server/node[0]/route[0]/port = 100 " + base_origin,
+                                        "cluster/server/node[0]/route[0]/method = a0 " + base_origin,
+                                        "cluster/server/node[0]/route[0]/tag[0] = t0 " + base_origin,
+                                        "cluster/server/node[0]/route[0]/tag[1] = t1 " + base_origin,
+                                        "cluster/server/node[0]/route[1]/port = 301 " + top_origin},
+                                       {});
+    }
+}
+
+TEST_CASE("a wide re-open writing only an inner repeated leaf after an excluded layer emptied the outer one replaces that leaf alone",
+          "[collection_shapes][keyed][restoration][nested]")
+{
+    const chain documents = emptied_chain("<tag>t9</tag>");
+    for(const policy scope : {policy::file_level, policy::space_open_container_closed})
+    {
+        CAPTURE(scope);
+        nucleus::shapes::require_lines(nucleus::shapes::load_chain(nested_space(), documents, "top.xml", scope),
+                                       {emptied_label(scope), "cluster/server/node[0]/route[0]/port = 100 " + base_origin,
+                                        "cluster/server/node[0]/route[0]/method = a0 " + base_origin,
+                                        "cluster/server/node[0]/route[0]/tag[0] = t9 " + top_origin},
+                                       {"cluster/server/node[0]/route[0]/tag[1]"});
     }
 }

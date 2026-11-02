@@ -3,6 +3,7 @@
 
 #include "nucleus/config.h"
 #include "nucleus/config_space.h"
+#include "nucleus/strain_scope.h"
 
 #include "nucleus/keyspace/provenance.h"
 
@@ -15,6 +16,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <map>
 #include <string>
 #include <vector>
 #include <utility>
@@ -120,6 +122,22 @@ runtime_layer(std::vector<std::pair<std::string, std::string>> entries)
     return nucleus::source_handle(nucleus::runtime_source(std::move(entries)));
 }
 
+inline nucleus::load_result load_chain(const nucleus::config_space &space, const std::map<std::string, std::string> &documents,
+                                       const std::string &top, nucleus::strain_scope_policy scope,
+                                       nucleus::source_stack stack = nucleus::source_stack{})
+{
+    nucleus::load_options opts;
+    opts.document_paths = {top};
+    opts.make_document  = [documents](const std::string &path)
+    {
+        return nucleus::source_handle(nucleus::xml_source::from(
+                nucleus::xml_source_options::of_string(documents.at(filename_of(path)))));
+    };
+    opts.selection = "primary";
+    opts.scope     = scope;
+    return nucleus::load_config(space, stack, opts);
+}
+
 // One line per key as `key = value [rank|label|owner|inheritance layer]`. The
 // origin is rendered whole because an untouched sibling must keep its recorded
 // provenance, not merely its value.
@@ -142,6 +160,18 @@ inline std::string serialize(const nucleus::config &config)
         out += "]\n";
     }
     return out;
+}
+
+inline void require_lines(const nucleus::load_result &loaded, const std::vector<std::string> &lines,
+                          const std::vector<std::string> &absent)
+{
+    REQUIRE(loaded);
+    const std::string serialized = "\n" + serialize(loaded.value());
+    INFO(serialized);
+    for(const std::string &line : lines)
+        REQUIRE(serialized.find("\n" + line + "\n") != std::string::npos);
+    for(const std::string &key : absent)
+        REQUIRE_FALSE(loaded->contains(key));
 }
 
 }

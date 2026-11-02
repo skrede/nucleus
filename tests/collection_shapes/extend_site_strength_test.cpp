@@ -32,21 +32,6 @@ nucleus::config_space scalar_space()
     return nucleus::builder_result_test::built(builder);
 }
 
-nucleus::load_result load_chain(const chain &documents, const std::string &top, policy scope,
-                                nucleus::source_stack stack = nucleus::source_stack{})
-{
-    nucleus::load_options opts;
-    opts.document_paths = {top};
-    opts.make_document  = [documents](const std::string &path)
-    {
-        return nucleus::source_handle(nucleus::xml_source::from(nucleus::xml_source_options::of_string(
-                documents.at(nucleus::shapes::filename_of(path)))));
-    };
-    opts.selection = "primary";
-    opts.scope     = scope;
-    return nucleus::load_config(scalar_space(), stack, opts);
-}
-
 std::string reopen(const std::string &parent, const std::string &extend, const std::string &inner)
 {
     return "<cluster inherit=\"" + parent + "\"><server name=\"primary\" extend=\"" + extend + "\">" + inner + "</server></cluster>";
@@ -71,18 +56,6 @@ std::vector<std::string> host_and_port(policy scope)
     return {"cluster/server/host = base-host " + base_origin, "cluster/server/route[0]/port = 80 " + base_origin};
 }
 
-void require_lines(const nucleus::load_result &loaded, const std::vector<std::string> &lines,
-                   const std::vector<std::string> &absent)
-{
-    REQUIRE(loaded);
-    const std::string serialized = "\n" + nucleus::shapes::serialize(loaded.value());
-    INFO(serialized);
-    for(const std::string &line : lines)
-        REQUIRE(serialized.find("\n" + line + "\n") != std::string::npos);
-    for(const std::string &key : absent)
-        REQUIRE_FALSE(loaded->contains(key));
-}
-
 }
 
 TEST_CASE("a narrow re-open above a wide one obeys the policy for its own content only",
@@ -91,10 +64,10 @@ TEST_CASE("a narrow re-open above a wide one obeys the policy for its own conten
     const chain documents = {{"base.xml", base_document},
                              {"mid.xml", reopen("base.xml", "wide", "<host>mid-host</host>")},
                              {"top.xml", reopen("mid.xml", "narrow", reopened_route)}};
-    require_lines(load_chain(documents, "top.xml", policy::space_open_container_closed),
-                  {"cluster/server/name = primary " + top_origin, "cluster/server/host = mid-host " + mid_origin,
-                   "cluster/server/route[0]/port = 80 " + base_origin, "cluster/server/route[0]/method = get " + base_origin},
-                  {"cluster/server/route[1]/port"});
+    nucleus::shapes::require_lines(nucleus::shapes::load_chain(scalar_space(), documents, "top.xml", policy::space_open_container_closed),
+                                   {"cluster/server/name = primary " + top_origin, "cluster/server/host = mid-host " + mid_origin,
+                                    "cluster/server/route[0]/port = 80 " + base_origin, "cluster/server/route[0]/method = get " + base_origin},
+                                   {"cluster/server/route[1]/port"});
 }
 
 TEST_CASE("a wide re-open above a narrow one composes its own content only",
@@ -103,10 +76,10 @@ TEST_CASE("a wide re-open above a narrow one composes its own content only",
     const chain documents = {{"base.xml", base_document},
                              {"mid.xml", reopen("base.xml", "narrow", "<host>mid-host</host>")},
                              {"top.xml", reopen("mid.xml", "wide", reopened_route)}};
-    require_lines(load_chain(documents, "top.xml", policy::space_open_container_closed),
-                  {"cluster/server/name = primary " + top_origin, "cluster/server/host = base-host " + base_origin,
-                   "cluster/server/route[0]/port = 8080 " + top_origin, "cluster/server/route[0]/method = put " + top_origin},
-                  {"cluster/server/route[1]/port"});
+    nucleus::shapes::require_lines(nucleus::shapes::load_chain(scalar_space(), documents, "top.xml", policy::space_open_container_closed),
+                                   {"cluster/server/name = primary " + top_origin, "cluster/server/host = base-host " + base_origin,
+                                    "cluster/server/route[0]/port = 8080 " + top_origin, "cluster/server/route[0]/method = put " + top_origin},
+                                   {"cluster/server/route[1]/port"});
 }
 
 TEST_CASE("a stack source obeys the scope policy in a strain a document re-opens wide",
@@ -120,12 +93,12 @@ TEST_CASE("a stack source obeys the scope policy in a strain a document re-opens
         const std::string host = scope == policy::container_open_until_next_strain
                 ? "stack-host [2|stack[0]|anonymous|-]"
                 : "base-host " + base_origin;
-        require_lines(load_chain(documents, "derived.xml", scope,
-                                 nucleus::source_stack{nucleus::shapes::runtime_layer(
-                                         {{"cluster/server/primary/host", "stack-host"}})}),
-                      {"cluster/server/host = " + host, "cluster/server/route[0]/port = 8080 " + derived,
-                       "cluster/server/route[0]/method = put " + derived},
-                      {"cluster/server/route[1]/port"});
+        nucleus::shapes::require_lines(nucleus::shapes::load_chain(scalar_space(), documents, "derived.xml", scope,
+                                                                   nucleus::source_stack{nucleus::shapes::runtime_layer(
+                                                                           {{"cluster/server/primary/host", "stack-host"}})}),
+                                       {"cluster/server/host = " + host, "cluster/server/route[0]/port = 8080 " + derived,
+                                        "cluster/server/route[0]/method = put " + derived},
+                                       {"cluster/server/route[1]/port"});
     }
 }
 
@@ -136,7 +109,7 @@ TEST_CASE("a stack source's own extend obeys the scope policy", "[collection_sha
         for(const policy scope : every_policy)
         {
             CAPTURE(extend, scope);
-            require_lines(load_chain(documents, "derived.xml", scope, stack_document(extend)), host_and_port(scope), {});
+            nucleus::shapes::require_lines(nucleus::shapes::load_chain(scalar_space(), documents, "derived.xml", scope, stack_document(extend)), host_and_port(scope), {});
         }
 }
 
@@ -149,7 +122,7 @@ TEST_CASE("a stack source's extend does not answer the re-open rule for a docume
         for(const policy scope : every_policy)
         {
             CAPTURE(extend, scope);
-            const nucleus::load_result loaded = load_chain(documents, "derived.xml", scope, stack_document(extend));
+            const nucleus::load_result loaded = nucleus::shapes::load_chain(scalar_space(), documents, "derived.xml", scope, stack_document(extend));
             REQUIRE_FALSE(loaded);
             REQUIRE(loaded.error().code == nucleus::errc::layering_violation);
             REQUIRE(loaded.error().message.find("without an extend disposition") != std::string::npos);
@@ -166,8 +139,8 @@ TEST_CASE("a stack source's extend over an instance only one document supplies l
             const std::string host = scope == policy::container_open_until_next_strain
                     ? "stack-host [1|stack[0]|anonymous|-]"
                     : "base-host " + base_origin;
-            require_lines(load_chain({{"base.xml", base_document}}, "base.xml", scope, stack_document(extend)),
-                          {"cluster/server/host = " + host, "cluster/server/route[0]/port = 80 " + base_origin}, {});
+            nucleus::shapes::require_lines(nucleus::shapes::load_chain(scalar_space(), {{"base.xml", base_document}}, "base.xml", scope, stack_document(extend)),
+                                           {"cluster/server/host = " + host, "cluster/server/route[0]/port = 80 " + base_origin}, {});
         }
 }
 
@@ -180,8 +153,8 @@ TEST_CASE("a wide re-open displaces the whole instance a narrow re-open below it
     for(const policy scope : every_policy)
     {
         CAPTURE(scope);
-        require_lines(load_chain(documents, "top.xml", scope),
-                      {"cluster/server/host = base-host " + base_origin, "cluster/server/route[0]/port = 82 " + top_origin},
-                      {"cluster/server/route[0]/method", "cluster/server/route[1]/port"});
+        nucleus::shapes::require_lines(nucleus::shapes::load_chain(scalar_space(), documents, "top.xml", scope),
+                                       {"cluster/server/host = base-host " + base_origin, "cluster/server/route[0]/port = 82 " + top_origin},
+                                       {"cluster/server/route[0]/method", "cluster/server/route[1]/port"});
     }
 }

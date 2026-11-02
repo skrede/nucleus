@@ -1,8 +1,9 @@
 #include "collection_shapes.h"
 
 #include "nucleus/config.h"
-#include "support/builder_result_test_support.h"
 #include "nucleus/strain_scope.h"
+
+#include "support/builder_result_test_support.h"
 
 #include "nucleus/xml/xml_emitter.h"
 
@@ -129,14 +130,14 @@ std::vector<expected_route> base_routes(std::size_t total)
 }
 
 TEST_CASE("a narrow extend the default policy excludes leaves the parent's routes in place",
-          "[collection_shapes][keyed][compaction]")
+          "[collection_shapes][keyed][extend]")
 {
     require_routes(load_narrow_extend(server_space()),
                    {{"80", "get", base_origin}, {"443", "post", base_origin}});
 }
 
-TEST_CASE("a compacted narrow extension retains its identity through XML round trip",
-          "[collection_shapes][keyed][compaction][round_trip]")
+TEST_CASE("a narrow extend the default policy excludes survives an XML round trip unchanged",
+          "[collection_shapes][keyed][extend][round_trip]")
 {
     const nucleus::config_space space = server_space();
     const nucleus::load_result  first = load_narrow_extend(space);
@@ -149,7 +150,7 @@ TEST_CASE("a compacted narrow extension retains its identity through XML round t
 }
 
 TEST_CASE("narrow extensions leave every parent route in place across an ordinal sweep",
-          "[collection_shapes][keyed][compaction][sweep]")
+          "[collection_shapes][keyed][extend][sweep]")
 {
     const nucleus::config_space space = server_space();
     for(std::size_t total = 2; total <= 12; ++total)
@@ -164,21 +165,21 @@ TEST_CASE("narrow extensions leave every parent route in place across an ordinal
 }
 
 TEST_CASE("file-level narrow inheritance retains the selected identity",
-          "[collection_shapes][keyed][compaction][scope]")
+          "[collection_shapes][keyed][extend][scope]")
 {
     require_routes(load_narrow_extend(server_space(), nucleus::strain_scope_policy::file_level),
                    {{"80", "get", base_origin}, {"443", "post", base_origin}});
 }
 
 TEST_CASE("a narrow extend composes its route where the scope policy opens the container",
-          "[collection_shapes][keyed][compaction][scope]")
+          "[collection_shapes][keyed][extend][scope]")
 {
     require_routes(load_narrow_extend(server_space(), nucleus::strain_scope_policy::container_open_until_next_strain),
                    {{"8080", "put", derived_origin}, {"443", "post", base_origin}});
 }
 
 TEST_CASE("a wide extend composes its route under every scope policy",
-          "[collection_shapes][keyed][compaction][scope]")
+          "[collection_shapes][keyed][extend][scope]")
 {
     const nucleus::config_space space = server_space();
     const std::string           base  = "<cluster><server name=\"primary\">" + route_of("80", "get") + route_of("443", "post") + "</server></cluster>";

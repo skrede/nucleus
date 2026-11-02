@@ -45,20 +45,6 @@ nucleus::config_space scalar_space()
     return nucleus::builder_result_test::built(builder);
 }
 
-nucleus::load_result load_chain(const chain &documents, const std::string &top, policy scope)
-{
-    nucleus::load_options opts;
-    opts.document_paths = {top};
-    opts.make_document  = [documents](const std::string &path)
-    {
-        return nucleus::source_handle(nucleus::xml_source::from(nucleus::xml_source_options::of_string(
-                documents.at(nucleus::shapes::filename_of(path)))));
-    };
-    opts.selection = "primary";
-    opts.scope     = scope;
-    return nucleus::load_config(scalar_space(), nucleus::source_stack{}, opts);
-}
-
 chain scalar_chain(const std::string &outer, const std::string &inner)
 {
     return {{"base.xml", "<cluster><motd>base-motd</motd><server name=\"primary\"><host>base-host</host>" + parent_routes + "</server></cluster>"},
@@ -106,11 +92,11 @@ TEST_CASE("a keyed field a narrow re-open overrides keeps the parent's value whe
 {
     const chain       documents = scalar_chain("<motd>derived-motd</motd>", "<host>derived-host</host>");
     const std::string identity  = "cluster/server/name = primary " + derived_origin;
-    require_lines(load_chain(documents, "derived.xml", policy::file_level), base_routes,
+    require_lines(nucleus::shapes::load_chain(scalar_space(), documents, "derived.xml", policy::file_level), base_routes,
                   {identity, "cluster/server/host = base-host " + base_origin, "cluster/motd = base-motd " + base_origin});
-    require_lines(load_chain(documents, "derived.xml", policy::space_open_container_closed), base_routes,
+    require_lines(nucleus::shapes::load_chain(scalar_space(), documents, "derived.xml", policy::space_open_container_closed), base_routes,
                   {identity, "cluster/server/host = base-host " + base_origin, "cluster/motd = derived-motd " + derived_origin});
-    require_lines(load_chain(documents, "derived.xml", policy::container_open_until_next_strain), base_routes,
+    require_lines(nucleus::shapes::load_chain(scalar_space(), documents, "derived.xml", policy::container_open_until_next_strain), base_routes,
                   {identity, "cluster/server/host = derived-host " + derived_origin, "cluster/motd = derived-motd " + derived_origin});
 }
 
@@ -119,11 +105,11 @@ TEST_CASE("a general value a derived document overrides keeps the parent's value
 {
     const chain       documents = scalar_chain("<motd>derived-motd</motd>", "");
     const std::string host      = "cluster/server/host = base-host " + base_origin;
-    require_lines(load_chain(documents, "derived.xml", policy::file_level), base_routes,
+    require_lines(nucleus::shapes::load_chain(scalar_space(), documents, "derived.xml", policy::file_level), base_routes,
                   {host, "cluster/motd = base-motd " + base_origin});
-    require_lines(load_chain(documents, "derived.xml", policy::space_open_container_closed), base_routes,
+    require_lines(nucleus::shapes::load_chain(scalar_space(), documents, "derived.xml", policy::space_open_container_closed), base_routes,
                   {host, "cluster/motd = derived-motd " + derived_origin});
-    require_lines(load_chain(documents, "derived.xml", policy::container_open_until_next_strain), base_routes,
+    require_lines(nucleus::shapes::load_chain(scalar_space(), documents, "derived.xml", policy::container_open_until_next_strain), base_routes,
                   {host, "cluster/motd = derived-motd " + derived_origin});
 }
 
@@ -150,7 +136,7 @@ TEST_CASE("a narrow re-open above a competing strain leaves the parent's routes 
     for(const policy scope : every_policy)
     {
         CAPTURE(scope);
-        require_lines(load_chain(documents, "top.xml", scope), base_routes,
+        require_lines(nucleus::shapes::load_chain(scalar_space(), documents, "top.xml", scope), base_routes,
                       {"cluster/server/name = primary [2|path:top.xml|anonymous|2]"});
     }
 }
