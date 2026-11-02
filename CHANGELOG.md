@@ -162,12 +162,23 @@ is listed last, under Additions.
   generated bash completion completes nothing for words such as `--mode=d'e<TAB>`
   and `--mode='d''e<TAB>`: readline keeps the text typed before the quote open at
   the cursor, so a reply would repeat that text in the argument. With a quote or a
-  backslash right of the cursor, such a word is offered nothing wherever the cursor
-  sits, even where no text would repeat. A word that opens with its quote, as in
-  `--mode='d<TAB>`, still completes. Every script also defines the shell functions
-  `_<prog>_quote` and `_<prog>_line` beside `_<prog>_complete`, so sourcing it
-  replaces any function of either name already defined. What completion offers,
-  and the emitted text, change with no diagnostic.
+  backslash right of the cursor in the same word, such a word is offered nothing
+  wherever the cursor sits in it, even where no text would repeat; a quote or a
+  backslash in a later argument does not matter. A word that opens with its quote,
+  as in `--mode='d<TAB>`, still completes. Every script also defines the shell
+  functions `_<prog>_quote` and `_<prog>_line` beside `_<prog>_complete`, so
+  sourcing it replaces any function of either name already defined. What
+  completion offers, and the emitted text, change with no diagnostic.
+- **The generated zsh completion escapes what zsh would expand.** Every byte of a
+  flag or an allowed value but letters, digits and `-_./+,@%` is now backslashed,
+  `*` and `=` included: `_arguments` evaluates a value list under `extendedglob`
+  and `nullglob`, where `*` generates file names and a leading `=` expands to a
+  command's path. A `-` or `+` ending a flag that takes no value is escaped as
+  well, since the spec grammar reads it as an argument marker. A description
+  shows C0 controls and DEL in caret form, and C1 controls and the Unicode
+  `Bidi_Control` set as `\xNN` escapes. 0.4.1 escaped only the bytes that end a
+  description or separate a value list's members, and wrote each flag as given.
+  What zsh offers, and the emitted text, change with no diagnostic.
 - **The text of the generated scripts changed throughout this release.** Beyond the
   last line, the bash and zsh scripts differ from 0.4.1's in many places. Treat
   them as opaque output to install as written; a host that post-processes either
@@ -243,6 +254,20 @@ These change resolved values *silently* &mdash; no diagnostic is emitted.
 - **Repeated leaves inside one instance each keep an ordinal of their own.** Two
   `<mark>` elements inside one `<node>` resolve to `mark[0]` and `mark[1]`. 0.4.1
   collapsed them onto one value, the last.
+- **A layer keeps a nested instance it writes before a later field of the same
+  instance.** Within one layer, an instance's fields survive whatever their order:
+  a document writing `<route><port>300</port></route>` before `<label>` in one
+  `<node>` resolves both `node[0]/route[0]/port` and `node[0]/label`, where 0.4.1
+  kept only the label. The same holds for a runtime source's entries and inside a
+  selected strain.
+- **A selected strain renumbers its repeated instances without a gap.** Within the
+  selected strain, the surviving instances of a repeated container are re-indexed
+  to contiguous ordinals, and an instance that resolves no value leaves no gap, so
+  an empty element renumbers the ones after it though nothing was removed. With
+  `<server name="primary"><route/><route><port>9</port></route></server>` selected,
+  `cluster/server/route[0]/port = 9` resolves, where 0.4.1 resolved `route[1]/port`.
+  A repeated container outside a selected strain keeps the gap: `<node/><node>`
+  with content in the second element still resolves it at `node[1]`.
 - **Repeated and keyed elements directly under a named space's root are now
   instances.** Under an XML source given a space name, sibling repeated elements
   beneath the root resolve to distinct indexed paths, and sibling keyed elements
@@ -302,12 +327,19 @@ These can fail a load that succeeded before.
   against all of them. Zero or several candidates fail the load with
   `errc::schema_violation`, naming the qualified scope. 0.4.1 accepted a value
   found anywhere in the namespace. `follow_keyref` follows the same rule.
-- **A stack source's `extend` no longer counts for the re-open rules.** A load now
-  ends as it would if the stack source declared no `extend`. A derived document
+- **A stack source's `extend` no longer counts for the re-open rules.** For an
+  `extend` on a named instance, a load now ends as it would if the stack source
+  declared none. An `extend` on a repeated container still fails the load with
+  `errc::layering_violation` from any source, a flat one included. A derived document
   that re-declares a named instance of its parent without `extend`, for example to
   override one of its routes, fails with `errc::layering_violation` as a duplicate
   even when a stack source declares `extend` for that instance. 0.4.1 accepted the
   stack source's `extend` in the document's place and loaded.
+- **A stack source no longer hides a derived re-declaration from the re-open
+  rules.** A derived document that re-declares a named instance of its parent
+  without `extend` fails with `errc::layering_violation` as a duplicate even when
+  a stack source overwrites every value it wrote, as it already did with no stack
+  source. 0.4.1 loaded it.
 
 These accept more than before.
 
@@ -327,6 +359,11 @@ These accept more than before.
   stack source declaring `extend` for a named instance that only one document
   declares now loads as it would without the `extend`. 0.4.1 failed the load with
   `errc::layering_violation`, reporting that the instance has no base.
+- **A narrow re-open a stack source overwrites loads.** An `extend="narrow"`
+  re-open of a named instance, identity-only or not, whose every value a stack
+  source overwrites now loads, its values following the scope policy. 0.4.1
+  failed the load with `errc::layering_violation`, reporting that the instance
+  has no base.
 
 ### Reading a resolved configuration
 
@@ -427,15 +464,13 @@ The first three change results *silently*.
 ### Building and consuming nucleus
 
 - **Building nucleus now requires CMake 3.25, up from 3.24; consuming an installed
-  package still requires only 3.21.** 3.24 does configure and build nucleus without
-  complaint, which is exactly the problem: it parses `FetchContent_MakeAvailable`
-  without the `SYSTEM` keyword and drops it silently, so a fetched pugixml, `{fmt}`
-  or Catch2 is compiled as an ordinary include rather than a system one. Its own
-  headers' diagnostics then reach nucleus's curated warning set, and because
-  warnings are errors by default for a top-level nucleus build, a warning in code
-  that is not yours fails the build with nothing saying why. The declaration now
-  matches the insulation the build actually relies on. Consuming an installed
-  package is unaffected and keeps its own lower minimum.
+  package still requires only 3.21.** nucleus declares pugixml, `{fmt}` and Catch2
+  with `SYSTEM` on `FetchContent_Declare`, which CMake 3.24 does not understand: it
+  hands the keyword on to the clone step, so a configure that has to fetch any of
+  the three fails. A configure that fetches none of them, finding each one it needs
+  already installed, succeeds under 3.24. 3.25 is the first version that reads the
+  keyword as declared. Consuming an installed package is unaffected and keeps its
+  own lower minimum.
 - **An installed package now declares the formatting backend it was built with.**
   The install tree carries `nucleus/detail/format_backend.h`, defining
   `NUCLEUS_USE_STD_FORMAT` to the answer settled when nucleus was configured, and
@@ -452,6 +487,19 @@ The first three change results *silently*.
   `__cpp_lib_format` test quietly selected `{fmt}` and compiled against a different
   backend than the archive's. Build the package with the consumer's standard
   library, or configure it with the `{fmt}` fallback.
+- **The build selects `std::format` only where it formats a floating-point value.**
+  The configure probe now compiles a `std::format` call on a `double`, where 0.4.1
+  checked `__cpp_lib_format` alone. libc++ can define `__cpp_lib_format` while a
+  macOS deployment target below 13.3 marks floating-point formatting unavailable;
+  such a toolchain now selects the `{fmt}` fallback where 0.4.1 selected
+  `std::format`, and the package it installs declares `{fmt}` as its backend.
+- **A top-level AppleClang build no longer fails on `-Wnrvo` or
+  `-Wmissing-designated-field-initializers`.** The build silences each wherever
+  the compiler accepts the flag. 0.4.1 silenced `-Wnrvo` only on upstream Clang 21
+  and later, and left the designated-field subgroup to
+  `-Wno-missing-field-initializers`, which AppleClang does not extend to it. On an
+  AppleClang carrying either warning, a top-level build, where warnings are errors
+  by default, failed on it.
 - **pugixml 1.15 and `{fmt}` 11 are now discovery floors for the build.** The build
   asks `find_package` for those versions, so a distro-supplied pugixml or `{fmt}`
   below them is no longer linked: FetchContent clones the pinned release instead,
@@ -502,6 +550,10 @@ The first three change results *silently*.
   two repeated containers takes an ordinal for each. 0.4.1 matched the typed word
   only against the literal `--cluster-node-*-port`, so once an ordinal was typed it
   offered nothing.
+- **`nucleus::provenance` adds `last_inheritance_layer_of(key)`.** Beside
+  `first_inheritance_layer_of`, it returns a `const std::size_t *` to the ordinal
+  of the last inheritance-chain layer that wrote the key, or null when no chain
+  document wrote it. An overwrite by a flat source leaves it in place.
 
 ## 0.4.1
 
