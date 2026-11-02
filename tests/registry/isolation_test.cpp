@@ -2,9 +2,9 @@
 
 #include "nucleus/registry/flat_registry.h"
 
+#include "nucleus/schema/converters.h"
 #include "nucleus/schema/schema_registry.h"
 #include "nucleus/schema/converter_registry.h"
-#include "nucleus/schema/converters.h"
 
 #include "nucleus/resolve/resolution_context.h"
 

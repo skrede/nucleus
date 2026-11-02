@@ -186,26 +186,26 @@ None.
 
 ## Carried — library files over the 200-line ceiling
 
-12 of 170 units.
+12 of 173 units.
 
 | File | Lines |
 |---|---|
-| `lib/core/src/nucleus/resolve/configuration_space.cpp` | 651 |
-| `lib/xml/src/nucleus/xml/xml_source.cpp` | 632 |
+| `lib/core/src/nucleus/resolve/configuration_space.cpp` | 652 |
+| `lib/xml/src/nucleus/xml/xml_source.cpp` | 634 |
 | `lib/core/include/nucleus/detail/expected.h` | 543 |
 | `lib/core/include/nucleus/config.h` | 495 |
 | `lib/core/include/nucleus/schema/converters.h` | 389 |
 | `lib/core/src/nucleus/tokenizer/token_lexer.cpp` | 335 |
-| `lib/core/include/nucleus/config_space.h` | 296 |
+| `lib/core/include/nucleus/config_space.h` | 297 |
 | `lib/core/src/nucleus/tokenizer/resolver_scope.cpp` | 291 |
 | `lib/core/src/nucleus/resolve/chain_walker.h` | 286 |
 | `lib/core/src/nucleus/tokenizer/tree_resolver_scope.cpp` | 278 |
-| `lib/argv/include/nucleus/argv/multispace_argv_source.h` | 234 |
+| `lib/argv/include/nucleus/argv/multispace_argv_source.h` | 235 |
 | `lib/core/include/nucleus/schema/schema.h` | 218 |
 
 ## Carried — test files over the 200-line ceiling
 
-33 of 180 units. Test units are held to the same ceiling.
+33 of 187 units. Test units are held to the same ceiling.
 
 Two rows here rose to close the pathname expansion the generated bash completion performed
 over its own candidates, and one of the two rose again for the zsh description escaper.
@@ -241,23 +241,23 @@ accepted by both. A unit only one version will leave alone is a unit that change
 saves it next, which is the local-and-CI divergence this register exists to keep visible. The line
 is the price of the file being stable under both, and the row is the price of the line.
 
-| `tests/config_source/inherit_chain_test.cpp` | 1118 |
-| `tests/keyspace/repeated_container_test.cpp` | 815 |
-| `tests/schema/typed_element_test.cpp` | 809 |
-| `tests/config_node/config_node_test.cpp` | 777 |
+| `tests/config_source/inherit_chain_test.cpp` | 1120 |
+| `tests/keyspace/repeated_container_test.cpp` | 816 |
+| `tests/schema/typed_element_test.cpp` | 810 |
+| `tests/config_node/config_node_test.cpp` | 778 |
 | `tests/argv/source_test.cpp` | 615 |
-| `tests/schema/typed_shape_test.cpp` | 518 |
+| `tests/schema/typed_shape_test.cpp` | 519 |
 | `tests/schema/repeated_element_test.cpp` | 470 |
-| `tests/system/integration_shape_test.cpp` | 428 |
+| `tests/system/integration_shape_test.cpp` | 429 |
 | `tests/keyspace/strain_scope_policy_test.cpp` | 401 |
 | `tests/xml/keyed_projection_test.cpp` | 338 |
 | `tests/schema/registry_test.cpp` | 333 |
-| `tests/query/selector_test.cpp` | 315 |
+| `tests/query/selector_test.cpp` | 317 |
 | `tests/completion/completion_test.cpp` | 306 |
-| `tests/schema/constraint_group_test.cpp` | 305 |
+| `tests/schema/constraint_group_test.cpp` | 306 |
 | `tests/runtime/load_front_door_test.cpp` | 289 |
-| `tests/schema/keyed_composition_test.cpp` | 286 |
-| `tests/resolve/resolution_test.cpp` | 278 |
+| `tests/schema/keyed_composition_test.cpp` | 287 |
+| `tests/resolve/resolution_test.cpp` | 281 |
 | `tests/schema/enforcer_test.cpp` | 272 |
 | `tests/completion/smoke_test.cpp` | 257 |
 | `tests/tokenizer/token_resolution_test.cpp` | 245 |
@@ -265,11 +265,11 @@ is the price of the file being stable under both, and the row is the price of th
 | `tests/xml/keyed_selection_test.cpp` | 232 |
 | `tests/error/expected_test.cpp` | 227 |
 | `tests/tokenizer/pkey_tokenizer_test.cpp` | 226 |
+| `tests/system/multi_source_test.cpp` | 219 |
 | `tests/config_source/source_stack_test.cpp` | 218 |
-| `tests/system/multi_source_test.cpp` | 214 |
-| `tests/collection_shapes/identity_pool_scope_test.cpp` | 208 |
-| `tests/config_source/source_handle_test.cpp` | 204 |
-| `tests/query/instance_addressing_test.cpp` | 202 |
+| `tests/collection_shapes/identity_pool_scope_test.cpp` | 209 |
+| `tests/config_source/source_handle_test.cpp` | 203 |
+| `tests/query/instance_addressing_test.cpp` | 203 |
 | `tests/tokenizer/token_cycle_test.cpp` | 202 |
 | `tests/example_contracts/constraint_groups_contract_test.cpp` | 201 |
 | `tests/example_contracts/pkey_tokenizer_contract_test.cpp` | 201 |

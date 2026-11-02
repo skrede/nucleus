@@ -1,14 +1,13 @@
-#include "nucleus/completion/completion_generator.h"
-#include "nucleus/completion/bash_emitter.h"
 #include "nucleus/completion/zsh_emitter.h"
+#include "nucleus/completion/bash_emitter.h"
 #include "nucleus/completion/program_token.h"
 #include "nucleus/completion/completion_model.h"
+#include "nucleus/completion/completion_generator.h"
 #include "nucleus/completion/completion_projection.h"
 
 #include "nucleus/schema/schema.h"
-#include "nucleus/schema/schema_registry.h"
-
 #include "nucleus/schema/cli_flag.h"
+#include "nucleus/schema/schema_registry.h"
 
 #include "nucleus/keyspace/key_path.h"
 

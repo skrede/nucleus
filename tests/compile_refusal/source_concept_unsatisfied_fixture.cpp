@@ -3,8 +3,8 @@
 // invariant: a struct missing pull() cannot satisfy config_source and cannot
 // be placed inside a source_stack.
 
-#include "nucleus/config_source/source_concept.h"
 #include "nucleus/config_source/source_stack.h"
+#include "nucleus/config_source/source_concept.h"
 
 namespace {
 

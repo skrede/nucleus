@@ -1,9 +1,9 @@
 #ifndef HPP_GUARD_NUCLEUS_SCHEMA_SCHEMA_H
 #define HPP_GUARD_NUCLEUS_SCHEMA_SCHEMA_H
 
-#include "nucleus/expected.h"
-
 #include "nucleus/schema/anchor.h"
+
+#include "nucleus/expected.h"
 
 #include "nucleus/keyspace/key_path.h"
 

@@ -1,4 +1,5 @@
 #include "support/builder_result_test_support.h"
+
 #include "nucleus/config_emitter.h"
 
 #include "nucleus/schema/anchor.h"

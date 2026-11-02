@@ -1,6 +1,7 @@
 nucleus_add_test(facade_test LINK nucleus::env)
 nucleus_add_test(schema_test LINK nucleus::runtime)
-nucleus_add_test(registration_policy_test)
+nucleus_add_test(registration_policy_test
+    SOURCES registration_policy_test.cpp registration_policy_document_paths_test.cpp)
 
 # The name keeps its facade prefix: shedding it would produce completion_test, which the
 # completion folder's own test already registers, and CMake target names and CTest names are

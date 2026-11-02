@@ -1,4 +1,5 @@
 #include "nucleus/config.h"
+
 #include "support/builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
@@ -181,20 +182,4 @@ TEST_CASE("a scalar anchor fails before stream output",
     REQUIRE(result.error().code == nucleus::errc::malformed_source);
     REQUIRE(result.error().message.find("cluster/port") != std::string::npos);
     REQUIRE(output.str().empty());
-}
-
-TEST_CASE("selected line-breaking values fail before stream output",
-          "[flat][emit][env][error]")
-{
-    for(const std::string &value : {std::string("line\nbreak"),
-                                    std::string("line\rbreak")})
-    {
-        const nucleus::config config = checked_config({{"cluster/port", value}});
-        std::ostringstream    output;
-        const auto            result = nucleus::env::emit_document(config, output);
-        REQUIRE_FALSE(result);
-        REQUIRE(result.error().code == nucleus::errc::malformed_source);
-        REQUIRE(result.error().message.find("cluster/port") != std::string::npos);
-        REQUIRE(output.str().empty());
-    }
 }

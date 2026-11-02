@@ -2,24 +2,25 @@
 #define HPP_GUARD_NUCLEUS_CONFIG_SPACE_H
 
 #include "nucleus/error.h"
+#include "nucleus/config.h"
 #include "nucleus/expected.h"
 #include "nucleus/identity.h"
 #include "nucleus/log_sink.h"
 #include "nucleus/strain_scope.h"
-#include "nucleus/config.h"
 #include "nucleus/registration_policy.h"
 
 #include "nucleus/query/schema_query_context.h"
 
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/cli_flag.h"
-#include "nucleus/schema/constraint_group.h"
 #include "nucleus/schema/identity_group.h"
+#include "nucleus/schema/constraint_group.h"
 
 #include "nucleus/config_source/feature_gate.h"
 #include "nucleus/config_source/source_stack.h"
-#include "nucleus/config_source/inherit_declaration.h"
 #include "nucleus/config_source/config_source.h"
+#include "nucleus/config_source/inherit_declaration.h"
+
 #include "nucleus/config_source/argv/key_recognizer.h"
 
 #include "nucleus/diagnostics/conflict_report.h"

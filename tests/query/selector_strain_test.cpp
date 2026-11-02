@@ -1,5 +1,7 @@
 #include "nucleus/query/query.h"
+
 #include "support/builder_result_test_support.h"
+
 #include "nucleus/config.h"
 
 #include "nucleus/schema/anchor.h"
@@ -9,9 +11,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <algorithm>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 // in_strain() — ordinal-instance-correct; no cross-ordinal leak; pkey leaf
 // included; container-level anchor returns empty; null ctx returns empty.

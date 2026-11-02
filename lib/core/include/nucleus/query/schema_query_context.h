@@ -1,11 +1,14 @@
 #ifndef HPP_GUARD_NUCLEUS_QUERY_SCHEMA_QUERY_CONTEXT_H
 #define HPP_GUARD_NUCLEUS_QUERY_SCHEMA_QUERY_CONTEXT_H
 
+#include "nucleus/query/node_role.h"
+
 #include "nucleus/identity.h"
+
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/identity_group.h"
+
 #include "nucleus/keyspace/key_path.h"
-#include "nucleus/query/node_role.h"
 
 #include <map>
 #include <set>

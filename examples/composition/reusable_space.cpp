@@ -1,12 +1,11 @@
 // reusable_space: the space is the authority on layout, reused across many source stacks.
 // Each load yields a disconnected config; the space itself is never modified.
 
+#include "nucleus/config.h"
 #include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
-
-#include "nucleus/config.h"
 
 #include "nucleus/runtime/runtime_source.h"
 

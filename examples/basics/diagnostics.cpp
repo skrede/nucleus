@@ -4,14 +4,14 @@
 // two registrations claiming the same path -- naming every claimant and refusing
 // to pick a winner, because adjudication is the host's policy, not the core's.
 
-#include "nucleus/config_space.h"
 #include "nucleus/identity.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/diagnostics/key_suggester.h"
 #include "nucleus/diagnostics/conflict_report.h"
 
-#include <vector>
 #include <string>
+#include <vector>
 #include <iostream>
 
 int main()

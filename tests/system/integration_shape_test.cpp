@@ -15,8 +15,9 @@
 //   - Opt-out (inherit="none") truncates the chain
 //   - Three loud-error paths: no-selection, unknown selection, duplicate unique value
 
-#include "nucleus/strain_scope.h"
 #include "nucleus/config.h"
+#include "nucleus/strain_scope.h"
+
 #include "support/builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"

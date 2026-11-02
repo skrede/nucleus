@@ -1,7 +1,7 @@
-#include "nucleus/config_space.h"
 #include "nucleus/identity.h"
 #include "nucleus/log_sink.h"
 #include "nucleus/capability.h"
+#include "nucleus/config_space.h"
 #include "nucleus/registration_policy.h"
 
 #include "nucleus/schema/anchor.h"

@@ -1,10 +1,12 @@
 #include "nucleus/config.h"
+
 #include "support/builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
 #include "nucleus/env/env_source.h"
+
 #include "nucleus/xml/xml_source.h"
 
 #include <catch2/catch_test_macros.hpp>

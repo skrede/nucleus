@@ -14,8 +14,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <cstdint>
 #include <string>
+#include <cstdint>
 
 using nucleus::anchor;
 

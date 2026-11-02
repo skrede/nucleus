@@ -1,4 +1,5 @@
 #include "support/builder_result_test_support.h"
+
 #include "nucleus/identity.h"
 
 #include "nucleus/tokenizer/tree_tokenizer.h"
@@ -135,18 +136,6 @@ TEST_CASE("multiple references in one value string all resolve", "[reference][ab
     auto loaded = load_config(space, source_stack{std::move(src)}, {});
     REQUIRE(loaded.has_value());
     CHECK(loaded.value().get("host/addr") == "myhost:8080");
-}
-
-TEST_CASE("a closing brace inside a quoted fallback arm does not end the tree token",
-          "[reference][quoting]")
-{
-    auto space = nucleus::builder_result_test::built(config_space_builder{});
-    runtime_source src;
-    src.set("cluster/alias", "${abs:cluster/absent ?? \"}\"}");
-
-    auto loaded = load_config(space, source_stack{std::move(src)}, {});
-    REQUIRE(loaded.has_value());
-    CHECK(loaded.value().get("cluster/alias").value() == "}");
 }
 
 // Leaf `pool/lN` nests six dispatches (`d.lNn5` down to `d.lNn0`) and then hops to

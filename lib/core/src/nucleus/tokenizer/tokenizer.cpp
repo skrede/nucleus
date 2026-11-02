@@ -1,6 +1,7 @@
+#include "nucleus/tokenizer/tokenizer.h"
+
 #include "nucleus/format.h"
 
-#include "nucleus/tokenizer/tokenizer.h"
 #include "nucleus/diagnostics/key_suggester.h"
 
 #include <span>

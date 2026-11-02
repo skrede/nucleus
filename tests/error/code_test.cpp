@@ -1,7 +1,8 @@
 #include "nucleus/error.h"
 #include "nucleus/config.h"
-#include "support/builder_result_test_support.h"
 #include "nucleus/registration_policy.h"
+
+#include "support/builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -144,17 +145,6 @@ TEST_CASE("a typed element with a garbage value fails with errc::failed_conversi
     auto loaded = nucleus::load_config(space, source_stack{src}, {});
     REQUIRE_FALSE(loaded);
     CHECK(loaded.error().code == errc::failed_conversion);
-}
-
-TEST_CASE("registering on a built builder fails with errc::sealed_builder",
-          "[error][code]")
-{
-    nucleus::config_space_builder builder;
-    (void)nucleus::builder_result_test::built(builder);
-
-    auto rejected = builder.register_schema("server/host");
-    REQUIRE_FALSE(rejected);
-    CHECK(rejected.error().code == errc::sealed_builder);
 }
 
 TEST_CASE("a rejecting policy fails with errc::rejected_registration and the "

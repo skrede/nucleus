@@ -5,16 +5,17 @@
 // pre-order visit() + enter/leave config_tree_walker
 // Repeated instances in numeric ordinal order (correct for N >= 11)
 
+#include "nucleus/error.h"
+#include "nucleus/config.h"
 #include "nucleus/config_node.h"
+
 #include "support/builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/config.h"
-#include "nucleus/error.h"
-
 #include "nucleus/xml/xml_source.h"
+
 #include "nucleus/runtime/runtime_source.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -22,8 +23,8 @@
 #include <map>
 #include <string>
 #include <vector>
-#include <algorithm>
 #include <sstream>
+#include <algorithm>
 
 using nucleus::anchor;
 

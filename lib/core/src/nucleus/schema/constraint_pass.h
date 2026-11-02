@@ -1,14 +1,14 @@
 #ifndef HPP_GUARD_NUCLEUS_SCHEMA_CONSTRAINT_PASS_H
 #define HPP_GUARD_NUCLEUS_SCHEMA_CONSTRAINT_PASS_H
 
-#include "nucleus/config.h"
-#include "nucleus/format.h"
-#include "nucleus/config_node.h"
-
 #include "nucleus/schema/instance_paths.h"
 #include "nucleus/schema/schema_registry.h"
 #include "nucleus/schema/constraint_group.h"
 #include "nucleus/schema/schema_validation.h"
+
+#include "nucleus/config.h"
+#include "nucleus/format.h"
+#include "nucleus/config_node.h"
 
 #include "nucleus/keyspace/key_path.h"
 

@@ -3,13 +3,13 @@
 // the ?? fallback chain, and per-source ${dir.path} location tokens.
 // All values are resolved at load time; the configuration is fully self-contained.
 
-#include "nucleus/config_space.h"
 #include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/runtime/runtime_source.h"
 
-#include <iostream>
 #include <string>
+#include <iostream>
 
 // ${abs:path/to/field} resolves by root-anchored path.
 // server/port holds the canonical value; app/port_label references it by

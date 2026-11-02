@@ -1,7 +1,7 @@
 #include "nucleus/config.h"
 
-#include "nucleus/xml/xml_grammar.h"
 #include "nucleus/xml/xml_emitter.h"
+#include "nucleus/xml/xml_grammar.h"
 
 #include <catch2/catch_test_macros.hpp>
 

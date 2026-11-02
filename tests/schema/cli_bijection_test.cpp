@@ -1,13 +1,12 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
+#include "nucleus/schema/cli_flag.h"
 #include "nucleus/schema/schema_enforcer.h"
 #include "nucleus/schema/schema_registry.h"
 
 #include "nucleus/keyspace/value.h"
 #include "nucleus/keyspace/key_path.h"
 #include "nucleus/keyspace/keyspace.h"
-
-#include "nucleus/schema/cli_flag.h"
 
 #include "nucleus/argv/argv_source.h"
 

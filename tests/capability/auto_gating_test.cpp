@@ -1,4 +1,5 @@
 #include "nucleus/capability.h"
+
 #include "support/builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
@@ -6,6 +7,7 @@
 #include "nucleus/schema/converters.h"
 
 #include "nucleus/config_source/config_source.h"
+
 #include "nucleus/env/env_source.h"
 
 #include <catch2/catch_test_macros.hpp>

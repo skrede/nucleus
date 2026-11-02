@@ -8,8 +8,8 @@
 // FAIL_REGULAR_EXPRESSION), which is what distinguishes a real abort from a
 // recovered "runtime error:" that continued to exit 0.
 
-#include <climits>
 #include <cstdio>
+#include <climits>
 #include <cstdlib>
 
 int main()

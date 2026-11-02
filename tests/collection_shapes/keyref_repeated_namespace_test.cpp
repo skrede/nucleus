@@ -1,6 +1,7 @@
 #include "nucleus/query/query.h"
 
 #include "nucleus/config.h"
+
 #include "support/builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"

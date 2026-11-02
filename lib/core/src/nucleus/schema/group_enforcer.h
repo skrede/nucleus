@@ -1,8 +1,6 @@
 #ifndef HPP_GUARD_NUCLEUS_SCHEMA_GROUP_ENFORCER_H
 #define HPP_GUARD_NUCLEUS_SCHEMA_GROUP_ENFORCER_H
 
-#include "nucleus/config.h"
-
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/keyref_pass.h"
 #include "nucleus/schema/identity_pass.h"
@@ -11,6 +9,8 @@
 #include "nucleus/schema/schema_registry.h"
 #include "nucleus/schema/constraint_group.h"
 #include "nucleus/schema/schema_validation.h"
+
+#include "nucleus/config.h"
 
 #include <vector>
 

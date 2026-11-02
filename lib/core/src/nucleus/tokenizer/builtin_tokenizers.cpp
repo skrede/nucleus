@@ -1,7 +1,7 @@
-#include "nucleus/format.h"
-
 #include "nucleus/tokenizer/tokenizer_builder.h"
 #include "nucleus/tokenizer/builtin_tokenizers.h"
+
+#include "nucleus/format.h"
 
 #include <cctype>
 #include <string>

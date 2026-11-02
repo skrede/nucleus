@@ -29,7 +29,7 @@ nucleus::source_stack env_with(std::string path, std::string text)
     return nucleus::source_stack{std::move(src)};
 }
 
-} // namespace
+}
 
 TEST_CASE("registry supplies the converter for a deferred-converter element", "[converter][registry]")
 {

@@ -1,8 +1,15 @@
+#include "nucleus/resolve/chain_walker.h"
+#include "nucleus/resolve/installable_checks.h"
+#include "nucleus/resolve/resolution_context.h"
+#include "nucleus/resolve/pkey_tree_tokenizer.h"
+
 #include "nucleus/error.h"
 #include "nucleus/format.h"
 #include "nucleus/config_space.h"
-#include "nucleus/query/schema_query_context.h"
+#include "nucleus/strain_scope.h"
 #include "nucleus/registration_policy.h"
+
+#include "nucleus/query/schema_query_context.h"
 
 #include "nucleus/completion/completion_generator.h"
 
@@ -10,12 +17,6 @@
 #include "nucleus/schema/schema_registry.h"
 #include "nucleus/schema/converter_registry.h"
 #include "nucleus/schema/capability_requirements.h"
-
-#include "nucleus/resolve/chain_walker.h"
-#include "nucleus/strain_scope.h"
-#include "nucleus/resolve/installable_checks.h"
-#include "nucleus/resolve/resolution_context.h"
-#include "nucleus/resolve/pkey_tree_tokenizer.h"
 
 #include "nucleus/diagnostics/key_suggester.h"
 #include "nucleus/diagnostics/conflict_report.h"

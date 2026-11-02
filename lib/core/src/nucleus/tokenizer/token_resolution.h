@@ -1,14 +1,14 @@
 #ifndef HPP_GUARD_NUCLEUS_TOKENIZER_TOKEN_RESOLUTION_H
 #define HPP_GUARD_NUCLEUS_TOKENIZER_TOKEN_RESOLUTION_H
 
-#include "nucleus/expected.h"
-
 #include "nucleus/tokenizer/tokenizer.h"
 #include "nucleus/tokenizer/resolve_error.h"
 #include "nucleus/tokenizer/resolver_scope.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
 #include "nucleus/tokenizer/substitution_budget.h"
 #include "nucleus/tokenizer/tree_tokenizer_registry.h"
+
+#include "nucleus/expected.h"
 
 #include <utility>
 #include <filesystem>

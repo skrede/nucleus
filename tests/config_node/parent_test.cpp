@@ -1,6 +1,7 @@
-#include "nucleus/config_node.h"
-#include "support/builder_result_test_support.h"
 #include "nucleus/config.h"
+#include "nucleus/config_node.h"
+
+#include "support/builder_result_test_support.h"
 
 #include "nucleus/runtime/runtime_source.h"
 

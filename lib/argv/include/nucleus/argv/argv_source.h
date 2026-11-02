@@ -1,6 +1,8 @@
 #ifndef HPP_GUARD_NUCLEUS_ARGV_ARGV_SOURCE_H
 #define HPP_GUARD_NUCLEUS_ARGV_ARGV_SOURCE_H
 
+#include "nucleus/argv/cli_surface.h"
+
 #include "nucleus/error.h"
 #include "nucleus/format.h"
 #include "nucleus/expected.h"
@@ -13,7 +15,6 @@
 #include "nucleus/keyspace/value.h"
 #include "nucleus/keyspace/key_path.h"
 
-#include "nucleus/argv/cli_surface.h"
 #include "nucleus/config_source/argv/key_recognizer.h"
 
 #include <string>

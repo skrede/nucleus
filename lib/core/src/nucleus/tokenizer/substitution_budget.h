@@ -1,10 +1,10 @@
 #ifndef HPP_GUARD_NUCLEUS_TOKENIZER_SUBSTITUTION_BUDGET_H
 #define HPP_GUARD_NUCLEUS_TOKENIZER_SUBSTITUTION_BUDGET_H
 
+#include "nucleus/tokenizer/resolve_error.h"
+
 #include "nucleus/format.h"
 #include "nucleus/expected.h"
-
-#include "nucleus/tokenizer/resolve_error.h"
 
 #include <cstddef>
 

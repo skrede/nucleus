@@ -9,8 +9,8 @@
 #include "nucleus/keyspace/value.h"
 
 #include <string>
-#include <utility>
 #include <vector>
+#include <utility>
 
 namespace nucleus {
 

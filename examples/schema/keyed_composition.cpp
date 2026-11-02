@@ -4,8 +4,8 @@
 // (matching identifier replaces the whole element), and the loud duplicate-across-layers
 // error. Two stacked layers (the second overrides). Domain-neutral (endpoints/output[name]).
 
-#include "nucleus/config_space.h"
 #include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
@@ -13,8 +13,8 @@
 
 #include "nucleus/runtime/runtime_source.h"
 
-#include <iostream>
 #include <string>
+#include <iostream>
 
 using namespace nucleus;
 

@@ -1,8 +1,8 @@
 #ifndef HPP_GUARD_NUCLEUS_CONFIG_SOURCE_SOURCE_HANDLE_H
 #define HPP_GUARD_NUCLEUS_CONFIG_SOURCE_SOURCE_HANDLE_H
 
-#include "nucleus/config_source/source_concept.h"
 #include "nucleus/config_source/config_source.h"
+#include "nucleus/config_source/source_concept.h"
 
 #include <memory>
 #include <cassert>

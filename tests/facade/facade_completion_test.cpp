@@ -25,7 +25,7 @@ namespace {
 
 nucleus::key_path path_of(const char *text) { return nucleus::key_path::parse(text).value(); }
 
-} // namespace
+}
 
 TEST_CASE("the facade generates a bash completion script from the registered schema",
           "[facade][completion]")

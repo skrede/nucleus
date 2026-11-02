@@ -5,12 +5,12 @@
 // the engine the same way argv, env, or xml does. This one emits owned values, so
 // it pins no buffer (retained_buffer::none()).
 
+#include "nucleus/capability.h"
 #include "nucleus/config_space.h"
 
-#include "nucleus/capability.h"
-
-#include "nucleus/config_source/source_handle.h"
 #include "nucleus/config_source/config_source.h"
+#include "nucleus/config_source/source_handle.h"
+
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
 

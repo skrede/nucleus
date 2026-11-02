@@ -7,7 +7,6 @@
 #include "nucleus/schema/schema.h"
 
 #include "nucleus/config.h"
-
 #include "nucleus/capability.h"
 
 #include "nucleus/config_source/config_source.h"
@@ -15,6 +14,7 @@
 #include "nucleus/env/env_source.h"
 
 #include "nucleus/xml/xml_source.h"
+
 #include "nucleus/runtime/runtime_source.h"
 
 #include <catch2/catch_test_macros.hpp>

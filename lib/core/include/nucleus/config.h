@@ -490,6 +490,6 @@ inline config_node config_node::ancestor(std::string_view name) const
     return config_node{};
 }
 
-} // namespace nucleus
+}
 
 #endif

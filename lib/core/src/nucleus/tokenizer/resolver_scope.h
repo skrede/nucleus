@@ -1,13 +1,13 @@
 #ifndef HPP_GUARD_NUCLEUS_TOKENIZER_RESOLVER_SCOPE_H
 #define HPP_GUARD_NUCLEUS_TOKENIZER_RESOLVER_SCOPE_H
 
-#include "nucleus/expected.h"
-
 #include "nucleus/tokenizer/tokenizer.h"
 #include "nucleus/tokenizer/scope_frame.h"
 #include "nucleus/tokenizer/resolve_error.h"
 #include "nucleus/tokenizer/expansion_guard.h"
 #include "nucleus/tokenizer/substitution_budget.h"
+
+#include "nucleus/expected.h"
 
 #include <span>
 #include <string>

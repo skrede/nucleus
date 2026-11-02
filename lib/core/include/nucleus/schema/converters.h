@@ -33,9 +33,9 @@
 #define _GNU_SOURCE 1
 #endif
 
-#include "nucleus/expected.h"
-
 #include "nucleus/schema/schema.h"
+
+#include "nucleus/expected.h"
 
 #include <any>
 #include <cctype>

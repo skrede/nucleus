@@ -5,6 +5,7 @@
 #include "nucleus/detail/emitter_delivery.h"
 
 #include "nucleus/env/env_emitter.h"
+
 #include "nucleus/argv/argv_emitter.h"
 
 #include <catch2/catch_test_macros.hpp>

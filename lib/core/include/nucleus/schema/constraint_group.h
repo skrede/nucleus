@@ -1,10 +1,10 @@
 #ifndef HPP_GUARD_NUCLEUS_SCHEMA_CONSTRAINT_GROUP_H
 #define HPP_GUARD_NUCLEUS_SCHEMA_CONSTRAINT_GROUP_H
 
+#include "nucleus/schema/anchor.h"
+
 #include "nucleus/expected.h"
 #include "nucleus/config_node.h"
-
-#include "nucleus/schema/anchor.h"
 
 #include "nucleus/keyspace/key_path.h"
 

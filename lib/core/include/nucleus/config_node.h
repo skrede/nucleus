@@ -12,8 +12,8 @@
 #include <cstddef>
 #include <utility>
 #include <optional>
-#include <functional>
 #include <algorithm>
+#include <functional>
 #include <string_view>
 #include <type_traits>
 
@@ -164,7 +164,7 @@ private:
     std::vector<std::size_t> distinct_ordinals() const;
 };
 
-} // namespace nucleus
+}
 
 // Method bodies that use the full config API are defined in config.h.
 // Include guard prevents re-inclusion; the bodies are injected after config is complete.

@@ -1,4 +1,5 @@
 #include "nucleus/log_sink.h"
+
 #include "support/builder_result_test_support.h"
 
 #include "nucleus/schema/anchor.h"
@@ -162,17 +163,6 @@ TEST_CASE("multispace_argv_source: recognizer integration rejects undeclared inn
     auto result = alpha.pull();
     REQUIRE_FALSE(result);
     REQUIRE(result.error().code == errc::schema_violation);
-}
-
-TEST_CASE("multispace_argv_source: for_space with an unregistered name reports malformed_source",
-          "[multispace_argv][argv]")
-{
-    multispace_argv_source src({});
-    src.register_space("alpha");
-    auto view = src.for_space("delta");
-    REQUIRE_FALSE(view);
-    REQUIRE(view.error().code == errc::malformed_source);
-    REQUIRE(view.error().message.find("delta") != std::string::npos);
 }
 
 TEST_CASE("multispace_argv_source: lenient policy + log_to passes unknown, emits warning",

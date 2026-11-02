@@ -1,11 +1,11 @@
 #ifndef HPP_GUARD_NUCLEUS_CONFIG_SOURCE_CONFIG_SOURCE_H
 #define HPP_GUARD_NUCLEUS_CONFIG_SOURCE_CONFIG_SOURCE_H
 
+#include "nucleus/config_source/inherit_declaration.h"
+
 #include "nucleus/error.h"
 #include "nucleus/expected.h"
 #include "nucleus/capability.h"
-
-#include "nucleus/config_source/inherit_declaration.h"
 
 #include "nucleus/keyspace/entry.h"
 

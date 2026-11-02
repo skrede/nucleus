@@ -1,5 +1,7 @@
 #include "nucleus/config.h"
+
 #include "support/builder_result_test_support.h"
+
 #include "nucleus/config_source/inherit_declaration.h"
 
 #include "nucleus/schema/anchor.h"

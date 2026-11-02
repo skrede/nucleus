@@ -1,14 +1,14 @@
 #ifndef HPP_GUARD_NUCLEUS_SCHEMA_SCHEMA_ENFORCER_H
 #define HPP_GUARD_NUCLEUS_SCHEMA_SCHEMA_ENFORCER_H
 
-#include "nucleus/expected.h"
-
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/value_pass.h"
 #include "nucleus/schema/presence_pass.h"
 #include "nucleus/schema/instance_paths.h"
 #include "nucleus/schema/schema_registry.h"
 #include "nucleus/schema/schema_validation.h"
+
+#include "nucleus/expected.h"
 
 #include "nucleus/keyspace/key_path.h"
 #include "nucleus/keyspace/keyspace.h"

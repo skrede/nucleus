@@ -1,14 +1,14 @@
 #ifndef HPP_GUARD_NUCLEUS_TOKENIZER_TREE_TOKENIZER_H
 #define HPP_GUARD_NUCLEUS_TOKENIZER_TREE_TOKENIZER_H
 
+#include "nucleus/tokenizer/tokenizer.h"
+
 #include "nucleus/keyspace/key_path.h"
 #include "nucleus/keyspace/keyspace.h"
 
-#include "nucleus/tokenizer/tokenizer.h"
-
-#include <functional>
 #include <string>
 #include <utility>
+#include <functional>
 #include <string_view>
 
 namespace nucleus {

@@ -1,16 +1,18 @@
-#include "xml_reader.h"
 #include "nucleus/xml/xml_source.h"
+
+#include "xml_reader.h"
 #include "inherit_attr_rule.h"
 
 #include "nucleus/format.h"
 #include "nucleus/capability.h"
+
 #include "nucleus/config_source/inherit_declaration.h"
 
 #include "nucleus/schema/projection.h"
 
 #include "nucleus/keyspace/entry.h"
-#include "nucleus/keyspace/key_path.h"
 #include "nucleus/keyspace/value.h"
+#include "nucleus/keyspace/key_path.h"
 
 #include <pugixml.hpp>
 

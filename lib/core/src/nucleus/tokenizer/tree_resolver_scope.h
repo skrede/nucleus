@@ -1,21 +1,20 @@
 #ifndef HPP_GUARD_NUCLEUS_TOKENIZER_TREE_RESOLVER_SCOPE_H
 #define HPP_GUARD_NUCLEUS_TOKENIZER_TREE_RESOLVER_SCOPE_H
 
+#include "nucleus/tokenizer/tokenizer.h"
+#include "nucleus/tokenizer/token_lexer.h"
+#include "nucleus/tokenizer/resolve_error.h"
+#include "nucleus/tokenizer/expansion_guard.h"
+#include "nucleus/tokenizer/substitution_budget.h"
+#include "nucleus/tokenizer/tree_tokenizer_registry.h"
+
 #include "nucleus/expected.h"
 
 #include "nucleus/keyspace/key_path.h"
 #include "nucleus/keyspace/keyspace.h"
 
-#include "nucleus/tokenizer/expansion_guard.h"
-#include "nucleus/tokenizer/substitution_budget.h"
-#include "nucleus/tokenizer/resolve_error.h"
-#include "nucleus/tokenizer/token_lexer.h"
-
-#include "nucleus/tokenizer/tokenizer.h"
-#include "nucleus/tokenizer/tree_tokenizer_registry.h"
-
-#include <functional>
 #include <string>
+#include <functional>
 #include <string_view>
 
 namespace nucleus {

@@ -4,14 +4,15 @@
 
 #include "support/builder_result_test_support.h"
 
-#include "nucleus/strain_scope.h"
 #include "nucleus/config.h"
+#include "nucleus/strain_scope.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/converters.h"
 
 #include "nucleus/config_source/config_source.h"
+
 #include "nucleus/env/env_source.h"
 
 #include "nucleus/xml/xml_source.h"
@@ -23,8 +24,8 @@
 #include <vector>
 #include <cstdint>
 #include <optional>
-#include <functional>
 #include <typeindex>
+#include <functional>
 #include <string_view>
 
 using nucleus::anchor;

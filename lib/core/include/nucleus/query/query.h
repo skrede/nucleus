@@ -153,6 +153,6 @@ selector query(config_node anchor, const schema_query_context &ctx);
 expected<config_node, error> follow_keyref(const config_node &keyref_leaf,
                                            const schema_query_context &ctx);
 
-} // namespace nucleus
+}
 
 #endif

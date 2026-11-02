@@ -7,18 +7,19 @@
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
+#include "nucleus/schema/converters.h"
 #include "nucleus/schema/schema_enforcer.h"
 #include "nucleus/schema/schema_registry.h"
-#include "nucleus/schema/converters.h"
 
-#include "nucleus/config.h"
 #include "nucleus/error.h"
+#include "nucleus/config.h"
 
 #include "nucleus/keyspace/value.h"
 #include "nucleus/keyspace/key_path.h"
 #include "nucleus/keyspace/keyspace.h"
 
 #include "nucleus/xml/xml_source.h"
+
 #include "nucleus/runtime/runtime_source.h"
 
 #include <catch2/catch_test_macros.hpp>

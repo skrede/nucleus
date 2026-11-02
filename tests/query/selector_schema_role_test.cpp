@@ -1,5 +1,7 @@
 #include "nucleus/query/query.h"
+
 #include "support/builder_result_test_support.h"
+
 #include "nucleus/config.h"
 
 #include "nucleus/schema/anchor.h"
@@ -9,9 +11,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <algorithm>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 // schema-role selectors (role()) — primary key, all leaves, repeated containers.
 // Schema is the authority; zero-instance repeated containers are still classified

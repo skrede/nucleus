@@ -36,7 +36,7 @@ nucleus::runtime_source one(std::string path, std::string text)
     return src;
 }
 
-} // namespace
+}
 
 TEST_CASE("a typed schema element registers through the builder", "[facade][schema]")
 {

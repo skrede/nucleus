@@ -1,10 +1,6 @@
 #ifndef HPP_GUARD_NUCLEUS_SCHEMA_SCHEMA_REGISTRY_H
 #define HPP_GUARD_NUCLEUS_SCHEMA_SCHEMA_REGISTRY_H
 
-#include "nucleus/format.h"
-#include "nucleus/expected.h"
-#include "nucleus/identity.h"
-
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/projection.h"
@@ -16,6 +12,10 @@
 #include "nucleus/schema/schema_attach_rules.h"
 #include "nucleus/schema/schema_defined_nodes.h"
 #include "nucleus/schema/schema_canonicalization.h"
+
+#include "nucleus/format.h"
+#include "nucleus/expected.h"
+#include "nucleus/identity.h"
 
 #include "nucleus/keyspace/key_path.h"
 

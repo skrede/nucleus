@@ -4,8 +4,8 @@
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/converters.h"
 
-#include "nucleus/strain_scope.h"
 #include "nucleus/config.h"
+#include "nucleus/strain_scope.h"
 
 #include "nucleus/runtime/runtime_source.h"
 

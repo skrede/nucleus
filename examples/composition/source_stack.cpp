@@ -1,15 +1,16 @@
 // source_stack: compose exactly the sources you want, in precedence order.
 // The last source listed in the stack wins when multiple sources supply the same key.
 
+#include "nucleus/config.h"
 #include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
-#include "nucleus/config.h"
-
 #include "nucleus/env/env_source.h"
+
 #include "nucleus/argv/argv_source.h"
+
 #include "nucleus/runtime/runtime_source.h"
 
 #include <vector>

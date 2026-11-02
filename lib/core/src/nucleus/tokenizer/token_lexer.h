@@ -1,10 +1,10 @@
 #ifndef HPP_GUARD_NUCLEUS_TOKENIZER_TOKEN_LEXER_H
 #define HPP_GUARD_NUCLEUS_TOKENIZER_TOKEN_LEXER_H
 
-#include "nucleus/expected.h"
-
 #include "nucleus/tokenizer/named_args.h"
 #include "nucleus/tokenizer/resolve_error.h"
+
+#include "nucleus/expected.h"
 
 #include <string>
 #include <vector>

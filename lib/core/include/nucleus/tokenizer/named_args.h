@@ -1,14 +1,14 @@
 #ifndef HPP_GUARD_NUCLEUS_TOKENIZER_NAMED_ARGS_H
 #define HPP_GUARD_NUCLEUS_TOKENIZER_NAMED_ARGS_H
 
-#include "nucleus/expected.h"
-
 #include "nucleus/tokenizer/resolve_error.h"
+
+#include "nucleus/expected.h"
 
 #include <string>
 #include <vector>
-#include <variant>
 #include <utility>
+#include <variant>
 #include <string_view>
 
 namespace nucleus {

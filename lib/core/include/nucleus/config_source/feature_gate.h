@@ -1,13 +1,13 @@
 #ifndef HPP_GUARD_NUCLEUS_CONFIG_SOURCE_FEATURE_GATE_H
 #define HPP_GUARD_NUCLEUS_CONFIG_SOURCE_FEATURE_GATE_H
 
+#include "nucleus/config_source/degradation.h"
+
 #include "nucleus/error.h"
 #include "nucleus/format.h"
 #include "nucleus/expected.h"
 #include "nucleus/log_sink.h"
 #include "nucleus/capability.h"
-
-#include "nucleus/config_source/degradation.h"
 
 #include <string>
 #include <vector>

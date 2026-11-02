@@ -265,7 +265,7 @@ schema_registry repeated_cluster_registry()
     return reg;
 }
 
-} // namespace
+}
 
 TEST_CASE("completion emits wildcard flag for path crossing a repeated container",
           "[completion][repeated_container]")

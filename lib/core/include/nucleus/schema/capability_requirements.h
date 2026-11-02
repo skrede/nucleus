@@ -1,9 +1,9 @@
 #ifndef HPP_GUARD_NUCLEUS_SCHEMA_CAPABILITY_REQUIREMENTS_H
 #define HPP_GUARD_NUCLEUS_SCHEMA_CAPABILITY_REQUIREMENTS_H
 
-#include "nucleus/capability.h"
-
 #include "nucleus/schema/schema.h"
+
+#include "nucleus/capability.h"
 
 #include "nucleus/config_source/feature_gate.h"
 
