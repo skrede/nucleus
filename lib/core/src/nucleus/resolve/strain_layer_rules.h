@@ -129,22 +129,17 @@ private:
         return {};
     }
 
-    // Both the first-introduction layer and the winning layer count: an entry
-    // overwritten by a higher chain layer records the base and the deriving file
-    // alike, so a re-open via overwrite still reads as multi-layer even when the
-    // overwrite collapses the building keyspace to a single path.
+    // A path counts at its first and its last chain writer, neither of which a
+    // flat source's overwrite replaces, so that overwrite neither hides a derived
+    // layer nor leaves a re-open without its base.
     std::set<std::size_t> inheritance_layers(const std::vector<key_path> &paths) const
     {
         std::set<std::size_t> layers;
         for(const key_path &kp : paths)
-        {
-            const std::size_t *first = m_provenance.first_inheritance_layer_of(kp.str());
-            if(first != nullptr)
-                layers.insert(*first);
-            const origin *win = m_provenance.of(kp.str());
-            if(win != nullptr && win->inheritance_layer.has_value())
-                layers.insert(win->inheritance_layer.value());
-        }
+            for(const std::size_t *writer : {m_provenance.first_inheritance_layer_of(kp.str()),
+                                             m_provenance.last_inheritance_layer_of(kp.str())})
+                if(writer != nullptr)
+                    layers.insert(*writer);
         return layers;
     }
 

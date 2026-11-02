@@ -48,7 +48,10 @@ public:
     {
         m_first_ranks.try_emplace(key, where.rank);
         if(where.inheritance_layer.has_value())
+        {
             m_first_inheritance_layers.try_emplace(key, where.inheritance_layer.value());
+            m_last_inheritance_layers.insert_or_assign(key, where.inheritance_layer.value());
+        }
         m_origins.insert_or_assign(key, std::move(where));
     }
 
@@ -60,6 +63,7 @@ public:
         m_origins.erase(key);
         m_first_ranks.erase(key);
         m_first_inheritance_layers.erase(key);
+        m_last_inheritance_layers.erase(key);
     }
 
     const origin *of(const std::string &key) const
@@ -86,6 +90,14 @@ public:
         return it == m_first_inheritance_layers.end() ? nullptr : &it->second;
     }
 
+    // The inheritance-chain layer ordinal that LAST set `key`, which an overwrite
+    // by a flat source leaves in place.
+    const std::size_t *last_inheritance_layer_of(const std::string &key) const
+    {
+        auto it = m_last_inheritance_layers.find(key);
+        return it == m_last_inheritance_layers.end() ? nullptr : &it->second;
+    }
+
     // Number of origins recorded.
     std::size_t size() const noexcept { return m_origins.size(); }
 
@@ -104,6 +116,8 @@ private:
     // keys an inheritance-chain entry introduced. Drives the slice step's
     // re-open detection independently of cross-source precedence rank.
     std::map<std::string, std::size_t> m_first_inheritance_layers;
+    // Kept so a chain layer whose every write a flat source overwrote still counts in re-open detection.
+    std::map<std::string, std::size_t> m_last_inheritance_layers;
 };
 
 }
