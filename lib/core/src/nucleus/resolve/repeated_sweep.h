@@ -43,17 +43,26 @@ public:
     {
     }
 
-    // The sweep unit an entry belongs to. A repeated container instance carries
-    // fields, so it is addressable on its own; a repeated leaf ordinal carries
-    // nothing, so its unit is the whole value list under one enclosing instance and
-    // the trailing ordinal is dropped. Empty when the scope is unreachable.
-    std::string sweep_key_of(const key_path &path, const std::string &scope,
-                             bool scope_is_leaf) const
+    // The sweep unit an entry belongs to. A repeated container instance carries fields, so its unit is the
+    // shortest prefix of the path whose canonical form is the scope; a repeated leaf ordinal carries nothing,
+    // so its unit is the whole value list under one enclosing instance. Empty when the scope is unreachable.
+    key_path sweep_unit_of(const key_path &path, const std::string &scope, bool scope_is_leaf) const
     {
-        if(!scope_is_leaf)
-            return instance_prefix(m_schema, path, scope);
-        return join_segment(path.parent().str(),
-                            std::string(key_path::base_name(path.leaf())));
+        if(scope_is_leaf)
+            return path.parent().child(std::string(key_path::base_name(path.leaf())));
+        key_path prefix;
+        for(const std::string &segment : path.segments())
+        {
+            prefix = prefix.child(segment);
+            if(m_schema.canonical_text(prefix) == scope)
+                return prefix;
+        }
+        return {};
+    }
+
+    std::string sweep_key_of(const key_path &path, const std::string &scope, bool scope_is_leaf) const
+    {
+        return sweep_unit_of(path, scope, scope_is_leaf).str();
     }
 
     // The declared form of a violation path, so a concrete instance path
@@ -107,13 +116,14 @@ public:
     }
 
     // Removal and its provenance forget live together so the pair cannot drift.
-    void sweep_instance(const std::vector<key_path> &bucket, const std::string &unit,
+    void sweep_instance(const std::vector<key_path> &bucket, const key_path &unit,
                         const layered_handle &displacer)
     {
         m_displaced.record_sweep(unit, displacer);
+        const std::string key = unit.str();
         for(const key_path &existing : bucket)
         {
-            m_displaced.record(existing, m_building, m_provenance, unit, displacer);
+            m_displaced.record(existing, m_building, m_provenance, key, displacer);
             m_building.remove(existing);
             m_provenance.forget(existing.str());
         }

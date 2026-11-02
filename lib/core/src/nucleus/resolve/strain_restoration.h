@@ -3,6 +3,7 @@
 
 #include "nucleus/resolve/displaced_values.h"
 #include "nucleus/resolve/keyed_merge_state.h"
+#include "nucleus/resolve/strain_scope_bounds.h"
 
 #include "nucleus/strain_scope.h"
 
@@ -14,7 +15,6 @@
 #include "nucleus/schema/schema_registry.h"
 
 #include <map>
-#include <set>
 #include <string>
 #include <vector>
 #include <cstddef>
@@ -22,27 +22,6 @@
 #include <string_view>
 
 namespace nucleus {
-
-struct strain_scope_bounds
-{
-    std::string_view             identity_path;
-    strain_scope_policy          policy;
-    std::size_t                  Ld;
-    std::size_t                  Ls;
-    const std::set<std::size_t> &wide_ranks;
-};
-
-// Tested per supplying rank rather than once per strain, because a wide re-open admits only the
-// content of the document that declared it.
-inline bool scope_excludes(strain_scope_policy policy, std::size_t rank, std::size_t Ld,
-                           std::size_t Ls, const std::set<std::size_t> &wide_ranks)
-{
-    if(wide_ranks.contains(rank))
-        return false;
-    if(policy == strain_scope_policy::container_open_until_next_strain)
-        return rank >= Ls;
-    return rank > Ld;
-}
 
 // Discards what the scope policy excludes from the chosen strain and puts back what the excluded
 // entries displaced during the fold, so the strain resolves as its admissible layers left it.
@@ -123,11 +102,11 @@ private:
     {
         std::map<std::string, std::size_t> swept;
         for(const swept_unit &s : m_displaced.sweeps())
-        {
-            const auto unit = key_path::parse(s.unit);
-            if(unit && admits(region_of(unit.value(), chosen_prefix, bounds), s.swept_by, s.swept_by_chain, bounds))
-                swept[s.unit] = std::max(swept[s.unit], s.swept_by);
-        }
+            if(admits(region_of(s.unit, chosen_prefix, bounds), s.swept_by, s.swept_by_chain, bounds))
+            {
+                const std::string unit = s.unit.str();
+                swept[unit]            = std::max(swept[unit], s.swept_by);
+            }
         return swept;
     }
 

@@ -6,7 +6,7 @@
 #include "nucleus/resolve/keyed_merge_state.h"
 #include "nucleus/resolve/relayed_addressing.h"
 #include "nucleus/resolve/relayed_compaction.h"
-#include "nucleus/resolve/strain_restoration.h"
+#include "nucleus/resolve/strain_scope_bounds.h"
 
 #include "nucleus/error.h"
 #include "nucleus/format.h"

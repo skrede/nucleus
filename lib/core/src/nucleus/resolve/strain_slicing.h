@@ -12,6 +12,7 @@
 #include "nucleus/resolve/relayed_compaction.h"
 #include "nucleus/resolve/strain_layer_rules.h"
 #include "nucleus/resolve/strain_restoration.h"
+#include "nucleus/resolve/strain_scope_bounds.h"
 
 #include "nucleus/expected.h"
 #include "nucleus/strain_scope.h"

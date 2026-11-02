@@ -36,6 +36,7 @@ class repeated_placement
         const keyspace_entry &entry;
         const layered_handle &layer;
         std::string           scope;
+        key_path              sweep_unit;
         std::string           sweep_key;
         bool                  scope_is_leaf;
     };
@@ -66,7 +67,7 @@ public:
         const bool scope_is_leaf = !m_layers.repeated_containers().contains(scope);
         if(scope_is_leaf && canonical != scope)
             return false;
-        entry_site site{path, entry, layer, scope, {}, scope_is_leaf};
+        entry_site site{path, entry, layer, scope, {}, {}, scope_is_leaf};
         if(auto swept = sweep_and_store(site, text); !swept)
             return unexpected(swept.error());
         return true;
@@ -95,8 +96,9 @@ private:
 
     expected<void, resolve_fold_error> fill_sweep_key(entry_site &site) const
     {
-        site.sweep_key = m_sweep.sweep_key_of(site.path, site.scope, site.scope_is_leaf);
-        if(!site.sweep_key.empty())
+        site.sweep_unit = m_sweep.sweep_unit_of(site.path, site.scope, site.scope_is_leaf);
+        site.sweep_key  = site.sweep_unit.str();
+        if(!site.sweep_unit.empty())
             return {};
         return unexpected(error{errc::malformed_source, nucleus::format(
             "internal invariant violation: no prefix of '{}' canonicalizes "
@@ -138,7 +140,7 @@ private:
             state.buckets[site.scope] =
                 m_sweep.bucket_by_instance(site.scope, site.scope_is_leaf);
         m_sweep.sweep_instance(unwritten(state.buckets[site.scope][site.sweep_key]),
-                               site.sweep_key, site.layer);
+                               site.sweep_unit, site.layer);
     }
 
     std::vector<key_path> unwritten(const std::vector<key_path> &bucket) const
