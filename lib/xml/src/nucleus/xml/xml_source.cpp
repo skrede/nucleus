@@ -18,6 +18,8 @@
 #include <set>
 #include <memory>
 #include <string>
+#include <vector>
+#include <cstddef>
 #include <optional>
 #include <string_view>
 

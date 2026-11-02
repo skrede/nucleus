@@ -9,6 +9,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <string_view>
 
 // Forward declaration: the pugixml document arena, an xml-module internal.
 // Defined in xml_reader.h (which pulls in pugixml). The shared_ptr member only

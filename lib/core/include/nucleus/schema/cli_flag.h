@@ -9,6 +9,7 @@
 #include "nucleus/utility/display_controls.h"
 
 #include <string>
+#include <cstddef>
 #include <utility>
 #include <string_view>
 

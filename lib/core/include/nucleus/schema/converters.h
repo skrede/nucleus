@@ -44,6 +44,7 @@
 #include <vector>
 #include <cstdint>
 #include <cstdlib>
+#include <utility>
 #include <charconv>
 #include <concepts>
 #include <optional>
@@ -52,6 +53,7 @@
 #include <functional>
 #include <string_view>
 #include <type_traits>
+#include <system_error>
 
 // The strtof/strtod fallback parses against an explicit cached "C" locale using
 // the _l parsers and newlocale/_create_locale; those are not exposed by the

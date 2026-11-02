@@ -14,6 +14,7 @@
 #include <optional>
 #include <typeindex>
 #include <functional>
+#include <string_view>
 
 namespace nucleus {
 

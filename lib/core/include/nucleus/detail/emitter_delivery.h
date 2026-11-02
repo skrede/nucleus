@@ -4,6 +4,7 @@
 #include "nucleus/error.h"
 #include "nucleus/expected.h"
 
+#include <ios>
 #include <limits>
 #include <string>
 #include <cstddef>

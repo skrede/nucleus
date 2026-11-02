@@ -2,8 +2,10 @@
 #define HPP_GUARD_NUCLEUS_CAPABILITY_H
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <string_view>
+#include <initializer_list>
 
 namespace nucleus {
 

@@ -6,6 +6,7 @@
 #include "nucleus/utility/escaped_text.h"
 
 #include <string>
+#include <vector>
 #include <utility>
 #include <cstddef>
 #include <string_view>

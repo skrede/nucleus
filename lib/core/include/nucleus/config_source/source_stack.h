@@ -5,6 +5,8 @@
 
 #include <span>
 #include <vector>
+#include <cstddef>
+#include <utility>
 
 namespace nucleus {
 

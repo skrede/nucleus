@@ -13,6 +13,7 @@
 
 #include <string>
 #include <format>
+#include <utility>
 
 namespace nucleus {
 
@@ -27,6 +28,7 @@ std::string format(std::format_string<Args...> spec, Args &&...args)
 #else
 
 #include <string>
+#include <utility>
 
 // fmt/format.h, not fmt/core.h: since fmt 11 the core header aliases fmt/base.h,
 // which no longer declares fmt::format itself.

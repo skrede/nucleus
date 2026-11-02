@@ -11,7 +11,9 @@
 #include <set>
 #include <span>
 #include <string>
+#include <utility>
 #include <optional>
+#include <functional>
 #include <string_view>
 
 namespace nucleus {

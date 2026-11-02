@@ -8,6 +8,7 @@
 #include "nucleus/keyspace/key_path.h"
 
 #include <string>
+#include <cstddef>
 #include <utility>
 #include <string_view>
 

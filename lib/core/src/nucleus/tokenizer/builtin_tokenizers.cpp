@@ -7,7 +7,9 @@
 #include <string>
 #include <vector>
 #include <cstddef>
+#include <cstdlib>
 #include <utility>
+#include <string_view>
 
 namespace nucleus {
 
