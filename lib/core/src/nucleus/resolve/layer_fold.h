@@ -88,8 +88,8 @@ public:
         return reject_extend_on_repeated(batch);
     }
 
-    // A flat source's extend is ignored, so a stack source can neither widen its own content
-    // nor answer the re-open rules for a document.
+    // A flat source's dispositions reach neither strength nor the re-open rules, though
+    // begin_layer still refuses one on a repeated container for every layer.
     void end_layer(config_source_batch &batch, const layered_handle &layer)
     {
         if(layer.inheritance_layer.has_value())

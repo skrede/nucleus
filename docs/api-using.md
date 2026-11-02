@@ -577,7 +577,9 @@ struct load_options {
 3. folds all layers onto one keyspace, expanding `${...}` tokens per source as
    it goes — documents (and their inheritance chains) occupy the lowest ranks,
    then the stack's sources in stack order above them, so a stack source
-   overrides document content;
+   overrides document content, except a keyed value in the selected strain:
+   that obeys the scope policy like a document's, so under `file_level` and the
+   default policy it does not replace content the policy keeps;
 4. slices the selected strain, validates against the schema, converts typed
    paths, and freezes the result into an immutable `config`.
 
@@ -1005,10 +1007,13 @@ ordinal order. See
 `#include "nucleus/expected.h"` and `"nucleus/error.h"`
 
 `expected<T, E>` is the fallible-return vocabulary used across the public API.
-It mirrors `std::expected` (C++23); a future migration points the aliases at
-the standard type and edits nothing else. Truthy when it holds a value;
-construct the error alternative with `nucleus::unexpected(e)`. Check every
-result — a load, a registration — rather than discarding it.
+It mirrors `std::expected` (C++23). The aliases move to the standard type when
+nucleus's language floor becomes C++23; that move changes the public type and
+the exception a wrong-state accessor throws, so it is a breaking release. Until
+then a wrong-state `value()` or `error()` throws `std::bad_variant_access`.
+Truthy when it holds a value; construct the error alternative with
+`nucleus::unexpected(e)`. Check every result — a load, a registration — rather
+than discarding it.
 
 Every public result channel carries `nucleus::error` as its `E`:
 

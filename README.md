@@ -21,8 +21,10 @@ Command-line flags (`--a-b-c=v`), XML elements, and environment values all map
 onto the *same* keyspace. The schema dictates what keys may exist, so a `--flag`
 the schema does not declare is an error and a document key it does not declare is
 caught &mdash; the source never decides what is admissible. Sources are pluggable, not
-built-in assumptions; ownership, reservation, and filename conventions live in the
-host that embeds the engine, never in the core.
+built-in assumptions; ownership and filename conventions live in the host that
+embeds the engine, never in the core, and so does every reservation beyond the
+core's own, the reserved tree-tokenizer names and the `nucleus` identity-group
+prefix.
 
 ## Features
 

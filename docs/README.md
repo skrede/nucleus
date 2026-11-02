@@ -45,8 +45,9 @@ config_space_builder  --register_*-->  build()  -->  config_space (sealed)
                           nucleus::load_config(space, stack, options)  --+-->  config (resolved, immutable)
 ```
 
-The core carries no policy: ownership, reservation, filename conventions, and
-which environment variable maps to which key are all the host's to decide. The
-core provides the mechanism -- identity-tagged registration, referential
-integrity, automatic capability gating, conflict and provenance reporting, and
-the seams above.
+The core keeps no policy beyond its own built-in reservations, the reserved
+tree-tokenizer names and the `nucleus` identity-group prefix: ownership, every
+further reservation, filename conventions, and which environment variable maps
+to which key are all the host's to decide. The core provides the mechanism --
+identity-tagged registration, referential integrity, automatic capability
+gating, conflict and provenance reporting, and the seams above.

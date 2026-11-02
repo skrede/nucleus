@@ -45,9 +45,12 @@ onto the declared resolved paths. Within a repeated container, a higher-rank ent
 admits displaces the same field only in the concrete instance it addresses; other fields and sibling
 instances stay in place. A repeated leaf remains a whole-list unit under one enclosing instance.
 
-After the selected entries are re-laid, surviving instances are re-indexed to contiguous ordinals
-in their existing relative order. Layering does not reorder them; only removal renumbers a later
-instance. Every moved value retains its recorded provenance at the new ordinal. See the
+After the selected entries are re-laid, surviving instances are re-indexed to contiguous ordinals in
+their existing relative order. Layering does not reorder surviving instances, and an instance that
+resolves no value leaves no gap: a selected strain holding `<route/><route>…</route>` resolves the
+second element's content at `route[0]`. A repeated container outside any selected strain keeps the
+gap: `<node/><node>…</node>` resolves the second element's content at `node[1]`. Every moved value
+retains its recorded provenance at the new ordinal. See the
 [constraint-group error channels](constraint-groups.md#error-channels) for the public codes used by
 duplicate-identifier and uniqueness failures.
 

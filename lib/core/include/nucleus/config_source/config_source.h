@@ -52,7 +52,9 @@ private:
 struct config_source_batch
 {
     std::vector<keyspace_entry> entries;
-    std::vector<extend_disposition> dispositions; // empty for flat sources
+    // A document source on the stack still reports its dispositions; the fold refuses one on a
+    // repeated container and otherwise ignores them for a flat layer.
+    std::vector<extend_disposition> dispositions;
     retained_buffer buffer;
 };
 

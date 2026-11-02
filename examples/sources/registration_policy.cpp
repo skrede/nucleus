@@ -1,8 +1,10 @@
 // registration_policy: intercept registrations before they commit.
 //
-// The core imposes no reservation or namespacing rules -- mechanism in core,
-// policy in the host. A host installs a registration_policy whose review() can
-// reject a registration with a reason the facade surfaces verbatim.
+// The core keeps its own built-in rules, among them the reserved tree-tokenizer
+// names and the `nucleus` identity-group prefix, and leaves every further
+// reservation and namespacing rule to the host's policy. A host installs a
+// registration_policy whose review() can reject a registration with a reason the
+// facade surfaces verbatim.
 
 #include "nucleus/config_space.h"
 #include "nucleus/registration_policy.h"

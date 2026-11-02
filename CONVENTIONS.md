@@ -62,12 +62,17 @@ encodes:
   `#endif`, and no `// namespace x` comment on a closing brace.
 * Include order: project includes (quoted) first, third-party second, standard
   library third — one blank line between these sections. Within a section,
-  group by folder with a blank line between groups; within a group, sort by
-  line length, ties alphabetically. `.clang-format` sets `SortIncludes: Never`
-  so the formatter cannot fight this rule.
+  group by folder with a blank line between groups; in the project section the
+  file's own subsystem group comes first. Within a group, sort by file-name
+  length, shortest first, ties alphabetically. Only a header that must come
+  before another may break this order. `.clang-format` sets
+  `SortIncludes: Never` so the formatter cannot fight this rule.
+* A `.cpp` may rely on the standard headers its own header includes; any other
+  unit includes every standard header whose names it uses.
 * A public header (`lib/<module>/include/`) must never include a private one
   (`lib/<module>/src/`). Enforced: `public_surface_test` compiles every public
-  header with only the public include roots.
+  header together with only the public include roots, and
+  `public_header_self_containment_test` compiles each one alone.
 * The core is format-agnostic: nothing under `lib/core/` may name a document
   format or include a module adapter header. Enforced: `core_purity_check`
   (CTest gate and `scripts/core_purity_check.sh` in CI).
@@ -87,10 +92,18 @@ A comment that says what the next line already says is noise: delete it.
 
 ## Errors
 
-* No exceptions across the public API. Every fallible operation returns
-  `nucleus::expected`; failures carry `nucleus::error` — an `errc` code naming
-  the failure class plus the verbatim human-readable reason. New failure paths
-  attach the correct `errc`.
+* No fallible operation reports failure by throwing: the rule governs the public
+  API's error channel, not a `-fno-exceptions` build. A wrong-state `value()` or
+  `error()` throws `std::bad_variant_access`, as `std::expected`'s `value()`
+  throws on misuse; RTTI and `std::any` are used where typed values need them.
+* Every fallible operation returns `nucleus::expected`; failures carry
+  `nucleus::error` — an `errc` code naming the failure class plus the verbatim
+  human-readable reason. New failure paths attach the correct `errc`, and
+  internal code may catch a standard-library throw at a seam and convert it.
+* `nucleus::expected` stays the project's own type on the C++20 floor and moves
+  to `std::expected` at a C++23 floor, not on `__cpp_lib_expected`, which would
+  let the building and the consuming standard library disagree on the public
+  type. The move changes the public and the thrown type: a breaking release.
 * Every `expected` result is checked, including in tests and examples.
 * Errors are loud and named. Never degrade silently, never swallow a failure,
   never report a misleading class (a syntax error is not a range error).
@@ -105,8 +118,10 @@ A comment that says what the next line already says is noise: delete it.
   concept seam over inheritance only when it genuinely wins, not dogmatically.
 * Entry points borrow, they do not consume: a `const configuration_space &`
   and a reusable `source_stack &`.
-* Mechanism in core, policy in host: the core imposes no vocabulary,
-  reservation, or namespacing rules of its own.
+* Mechanism in core, policy in host: the core keeps only its own built-in
+  reservations, the reserved tree-tokenizer names and the `nucleus`
+  identity-group prefix, and leaves every further vocabulary, reservation, or
+  namespacing rule to the host.
 * Domain-neutral vocabulary everywhere a user can see (code, docs, examples,
   tests): generic names like `server`, `cluster`, `host`, `port`. Never
   reference any particular embedding application.

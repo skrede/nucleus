@@ -3,8 +3,8 @@
 
 #include "nucleus/detail/expected.h"
 
-// Public seam for the fallible-return vocabulary. A future C++23 migration points
-// these aliases at std::expected / std::unexpected and edits nothing else.
+// These aliases move to std::expected / std::unexpected only when the language floor becomes
+// C++23, and that move is a breaking release: it changes the public type and what a misused accessor throws.
 namespace nucleus {
 
 using detail::expected;
