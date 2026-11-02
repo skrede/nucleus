@@ -732,6 +732,209 @@ jobs:
           "$NUCLEUS_PINNED_CMAKE" --build build-cf-consumer
           ./build-cf-consumer/integration_test
 
+  # No other leg pairs a package built with the {fmt} fallback with a consumer whose standard
+  # library has std::format, so the backend is asserted from three places that do not read each
+  # other: the installed header, the installed archive and the code the consumer compiled.
+  format-fallback-consumer:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # The runner's own libfmt-dev is below the version floor, which would leave the installed
+      # package's find_dependency(fmt) nothing to resolve.
+      - name: Build {fmt} at the pinned commit
+        run: |
+          git clone https://github.com/fmtlib/fmt.git build-fmt-src
+          git -C build-fmt-src checkout --detach 0c9fce2ffefecfdce794e1859584e25877b7b592
+          if [ "$(git -C build-fmt-src rev-parse HEAD)" != 0c9fce2ffefecfdce794e1859584e25877b7b592 ]; then
+            echo "the {fmt} checkout is not at the commit nucleus pins; the package below would be built against another {fmt}" >&2
+            exit 1
+          fi
+          cmake -S build-fmt-src -B build-fmt \
+            -DFMT_TEST=OFF \
+            -DFMT_DOC=OFF \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/fmt-prefix
+          cmake --build build-fmt
+          cmake --install build-fmt
+
+      - name: Build and install nucleus with the {fmt} fallback forced
+        run: |
+          cmake . -B build-fallback \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DNUCLEUS_HAVE_STD_FORMAT=FALSE \
+            -DCMAKE_PREFIX_PATH=${{ github.workspace }}/fmt-prefix \
+            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/fallback-prefix \
+            -DNUCLEUS_BUILD_TESTS=OFF \
+            -DNUCLEUS_BUILD_EXAMPLES=OFF \
+            -DNUCLEUS_BUILD_SOURCE_XML=OFF
+          if [ -e build-fallback/_deps/fmt-src ]; then
+            echo "the build populated its own {fmt} instead of discovering the one at the pinned commit" >&2
+            exit 1
+          fi
+          if ! grep -qF "fmt_DIR:PATH=${{ github.workspace }}/fmt-prefix/" build-fallback/CMakeCache.txt; then
+            grep '^fmt_DIR:' build-fallback/CMakeCache.txt >&2 || true
+            echo "the build discovered a {fmt} other than the one at the pinned commit" >&2
+            exit 1
+          fi
+          cmake --build build-fallback
+          cmake --install build-fallback
+
+      - name: Assert the package declares and carries the {fmt} backend
+        run: |
+          if ! grep -qx '#define NUCLEUS_USE_STD_FORMAT 0' fallback-prefix/include/nucleus/detail/format_backend.h; then
+            echo "the installed header does not declare the {fmt} backend the build was forced to" >&2
+            exit 1
+          fi
+          archive=$(find fallback-prefix -name libnucleus_core.a -print -quit)
+          if [ -z "$archive" ]; then
+            echo "the installed prefix carries no libnucleus_core.a, so the archive's backend cannot be read" >&2
+            exit 1
+          fi
+          references=$(nm -C -u "$archive" | grep -c 'fmt::' || true)
+          if [ "$references" -eq 0 ]; then
+            echo "the installed archive references no {fmt} symbol, so it was not compiled against the {fmt} backend" >&2
+            exit 1
+          fi
+          echo "$archive references $references undefined fmt:: symbols"
+
+      # The answer is the seam's type rather than the macro the installed header declares, so it
+      # changes the moment the seam re-decides the backend in the consumer's own preprocessor.
+      - name: Report the backend a std::format consumer compiled
+        run: |
+          mkdir -p fallback-check
+          cat > fallback-check/reporter.cpp <<'REPORTER'
+          #include "nucleus/format.h"
+
+          #include <cstdio>
+          #include <format>
+          #include <string>
+          #include <version>
+          #include <type_traits>
+
+          #ifndef __cpp_lib_format
+          #error "this consumer's standard library has no std::format, so it cannot form the pairing this job checks"
+          #endif
+
+          int main()
+          {
+              constexpr bool compiled_std_format =
+                  std::is_same_v<decltype(&nucleus::format<int>), std::string (*)(std::format_string<int>, int &&)>;
+              std::printf("%d\n", compiled_std_format ? 1 : 0);
+              std::printf("%s\n", nucleus::format("{}", 42).c_str());
+              return 0;
+          }
+          REPORTER
+          cat > fallback-check/CMakeLists.txt <<'REPORTER'
+          cmake_minimum_required(VERSION 3.25)
+          project(nucleus_fallback_reporter CXX)
+          set(CMAKE_CXX_STANDARD 20)
+          set(CMAKE_CXX_STANDARD_REQUIRED ON)
+          find_package(nucleus REQUIRED CONFIG)
+          add_executable(fallback_reporter reporter.cpp)
+          target_link_libraries(fallback_reporter PRIVATE nucleus::nucleus)
+          REPORTER
+          cmake -S fallback-check -B build-fallback-reporter \
+            -DCMAKE_BUILD_TYPE=Release \
+            "-DCMAKE_PREFIX_PATH=${{ github.workspace }}/fallback-prefix;${{ github.workspace }}/fmt-prefix"
+          cmake --build build-fallback-reporter
+          ./build-fallback-reporter/fallback_reporter > fallback-check/report
+          cat fallback-check/report
+          head -n 1 fallback-check/report > fallback-check/compiled
+          if ! nm -C build-fallback-reporter/fallback_reporter | grep -q 'fmt::'; then
+            echo "the consumer's binary carries no {fmt} symbol, so it did not format through {fmt}" >&2
+            exit 1
+          fi
+          if [ "$(sed -n 2p fallback-check/report)" != 42 ]; then
+            echo "the consumer did not format 42 through the seam" >&2
+            exit 1
+          fi
+
+      - name: Compare the three answers
+        run: |
+          cat > fallback-check/compare.sh <<'COMPARE'
+          header=$1
+          archive=$2
+          compiled=$3
+          if [ ! -r "$header" ]; then
+            echo "the backend comparison cannot read $header, so it is not reading the header it claims to read" >&2
+            exit 1
+          fi
+          declared=$(sed -n 's/^#define NUCLEUS_USE_STD_FORMAT \([01]\)$/\1/p' "$header")
+          if [ -z "$declared" ]; then
+            echo "$header declares no backend, so the comparison extracted nothing and would have reported agreement" >&2
+            exit 1
+          fi
+          if ! symbols=$(nm -C -u "$archive"); then
+            echo "the backend comparison cannot read the archive $archive" >&2
+            exit 1
+          fi
+          if printf '%s\n' "$symbols" | grep -q 'fmt::'; then
+            carried=0
+          else
+            carried=1
+          fi
+          if [ -z "$compiled" ]; then
+            echo "the consumer reported no backend, so the comparison would have reported agreement" >&2
+            exit 1
+          fi
+          if [ "$carried" != "$declared" ]; then
+            echo "the installed header declares NUCLEUS_USE_STD_FORMAT $declared while the archive was built for $carried" >&2
+            exit 1
+          fi
+          if [ "$compiled" != "$declared" ]; then
+            echo "the installed header declares NUCLEUS_USE_STD_FORMAT $declared while the consumer compiled under $compiled" >&2
+            exit 1
+          fi
+          echo "header, archive and consumer agree on NUCLEUS_USE_STD_FORMAT $declared"
+          COMPARE
+          sh fallback-check/compare.sh \
+            fallback-prefix/include/nucleus/detail/format_backend.h \
+            "$(find fallback-prefix -name libnucleus_core.a -print -quit)" \
+            "$(cat fallback-check/compiled)"
+
+      - name: Build and run the installed-package consumer
+        run: |
+          cmake -S tests/consumer_surface/integration -B build-fallback-consumer \
+            -DCMAKE_BUILD_TYPE=Release \
+            "-DCMAKE_PREFIX_PATH=${{ github.workspace }}/fallback-prefix;${{ github.workspace }}/fmt-prefix"
+          cmake --build build-fallback-consumer
+          ./build-fallback-consumer/integration_test
+
+      # The copy differs from the installed package only in deciding the backend from the consumer's
+      # standard library, so a comparison that accepts it cannot see the mismatch it exists for.
+      - name: Assert the comparison refuses the 0.4.1 seam
+        run: |
+          cp -R fallback-prefix fallback-0.4.1-prefix
+          seam=fallback-0.4.1-prefix/include/nucleus/format.h
+          sed -i \
+            -e 's|^#include "nucleus/detail/format_backend.h"$|#include <version>|' \
+            -e 's|^#if NUCLEUS_USE_STD_FORMAT$|#ifdef __cpp_lib_format|' "$seam"
+          if [ "$(grep -cx '#include <version>' "$seam")" != 1 ] || [ "$(grep -cx '#ifdef __cpp_lib_format' "$seam")" != 1 ]; then
+            echo "the 0.4.1 seam was not reconstructed in the copy, so the control below would measure the current seam" >&2
+            exit 1
+          fi
+          cmake -S fallback-check -B build-fallback-0.4.1-reporter \
+            -DCMAKE_BUILD_TYPE=Release \
+            "-DCMAKE_PREFIX_PATH=${{ github.workspace }}/fallback-0.4.1-prefix;${{ github.workspace }}/fmt-prefix"
+          cmake --build build-fallback-0.4.1-reporter
+          ./build-fallback-0.4.1-reporter/fallback_reporter > fallback-check/report-0.4.1
+          cat fallback-check/report-0.4.1
+          compiled=$(head -n 1 fallback-check/report-0.4.1)
+          if [ "$compiled" != 1 ]; then
+            echo "the reporter did not see the 0.4.1 seam compile the std::format branch, so its type test cannot tell the backends apart" >&2
+            exit 1
+          fi
+          if sh fallback-check/compare.sh \
+              fallback-0.4.1-prefix/include/nucleus/detail/format_backend.h \
+              "$(find fallback-0.4.1-prefix -name libnucleus_core.a -print -quit)" \
+              "$compiled"; then
+            echo "the comparison accepted a consumer that compiled std::format against a package built with {fmt}" >&2
+            exit 1
+          fi
+          rm -rf fallback-0.4.1-prefix build-fallback-0.4.1-reporter
+
   # bash parses every function above the registration check before it reaches the check, so a construct bash 3.2
   # cannot parse would stop the source there, with an error on every shell start.
   bash-below-floor:
