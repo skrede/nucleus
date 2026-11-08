@@ -729,13 +729,17 @@ No build ever reported 0.3.1: the version nucleus declared stayed 0.2.0 until 0.
 
 No build ever reported 0.3.0: the version nucleus declared stayed 0.2.0 until 0.4.1.
 
-This release renames the core vocabulary and makes a repeated container hold its
-instances. The rename and the removed collection API stop code from compiling.
-The Collections group, the reads of a repeated path, a renumbered error code and
-the retained primary-key leaf instead change results *silently* &mdash; no
-diagnostic is emitted &mdash; so re-verify the output of any configuration with
-repeated or keyed containers. The rest refuse, at registration, schemas that were
-accepted before.
+This release renames the core vocabulary, gives every failure a typed error code,
+and makes a repeated container hold its instances. The rename, the typed error
+model and the removed collection API stop code from compiling. The Collections
+group, the reads of a repeated path, a renumbered error code, the retained
+primary-key leaf, XML CDATA values and the argv emitter's flag spelling instead
+change results or emitted text *silently* &mdash; no diagnostic is emitted
+&mdash; so re-verify the output of any configuration with repeated or keyed
+containers, and of any program that writes argv flags. A flag spelled with `/`
+and an XML document nested past a depth cap now fail the load, and an installed
+package asks for minimum dependency versions. The rest refuse, at registration,
+schemas that were accepted before.
 
 ### Vocabulary
 
@@ -748,6 +752,29 @@ accepted before.
   `nucleus::load` is now `nucleus::load_config`. The headers moved with them, to
   `nucleus/config.h`, `nucleus/config_space.h` and `nucleus/config_source/`. No
   alias keeps an old name, so code that uses one no longer compiles.
+
+### Errors
+
+Both entries stop code from compiling, and the first also changes logged text.
+They use the names of this release; see Vocabulary.
+
+- **Every public result channel now carries a `nucleus::error`, not a string.**
+  `load_result`, `registration_result`, `gate_result`, `config_source_result`,
+  `extension_result` and `config::get_as` and `get_all_as` report a
+  `nucleus::error`: a code from the new `nucleus::errc`, which 0.2.0 did not have,
+  and the reason as `message`. Code that compares, assigns or appends the error
+  as a `std::string` no longer compiles; read `message`, or branch on `code`. A
+  host source whose `pull()` returns `unexpected` of a string no longer compiles
+  either: it returns a `config_source_error` naming a code. Streaming the error
+  still compiles, but `operator<<` now writes `code: message`, as does the new
+  `to_string(error)`, so the text you log gains a prefix without a diagnostic. A
+  registration policy's verdict and a host converter still return plain strings;
+  nucleus attaches the code.
+- **`registration_result` and `extension_result` hold `void` on success.** They
+  were `expected<std::monostate, std::string>` and are now
+  `expected<void, error>`, so code that builds one from `std::monostate{}` or
+  reads a `std::monostate` out of `value()` no longer compiles.
+  `registration_ok()` still builds the success value.
 
 ### Reading a resolved configuration
 
@@ -766,7 +793,8 @@ accepted before.
   `absent_key`, and the enumeration carries no explicit values, so
   `missing_converter` and `mismatched_type` each moved up by one. Nothing reports
   the change: a code stored, logged or compared as a number now names a different
-  failure.
+  failure. Code upgrading from 0.2.0 has no such numbers to re-check, since
+  `errc` itself is new in this release.
 
 ### Collections
 
@@ -815,3 +843,57 @@ The first entry changes resolved values *silently*.
 - **An element name may not open with a digit.** `register_element` refuses such
   a name with `errc::rejected_registration`: on the command line a digit-led
   segment reads as an instance index.
+
+### Sources
+
+The first entry changes resolved values *silently*.
+
+- **An XML value written as a CDATA section is now read.** An element such as
+  `<host><![CDATA[a<b]]></host>` now resolves `host` to `a<b`. Previously it was
+  not taken for a text leaf, and its value vanished without a diagnostic. A
+  primary-key field written as CDATA now names its instance, where the instance
+  was read as though it had no key.
+- **An XML document nested too deeply now fails the load.** An element more than
+  64 levels below the document root is refused with `errc::malformed_source`.
+  Previously the document loaded, or, nested deeply enough, overflowed the stack.
+- **A `runtime_source` may set a repeated path more than once.** Two `set` calls
+  on one repeated field now resolve to both values in order. Previously the load
+  failed, reporting that the source does not support `duplicate_keys`.
+
+### Command line
+
+The first entry changes emitted text *silently*; the second turns a previously
+clean load into a failure.
+
+- **The argv emitter now writes flags with `-`, not `/`.** `argv::emit_template`
+  and `argv::emit_document` render the path `server/port` as `--server-port=`,
+  where they wrote `--server/port=`. That is the flag shell completion already
+  offered and `argv_source` already read. The delimiter is now a
+  `cli_delimiter`, `-` by default, which `argv_source::delimit_with`, the argv
+  emitter and `generate_completion` each take, and which must agree across them.
+- **A flag carrying `/` is refused under the default delimiter.** `argv_source`
+  read `--server/port=80` as `server/port`; it now fails the load with
+  `errc::malformed_source`, as does `normalize_arg`, and so does a file of flags
+  the 0.2.0 emitter wrote. To keep `/`, hand `cli_delimiter::parse("/")` to the
+  source, the emitter and the completion generator alike; `-` then no longer
+  separates segments.
+- **`argv_source` now declares `nesting` and `duplicate_keys`.** A schema with
+  nested or repeated elements now loads from argv alone, where the capability
+  gate refused it with `errc::unmet_capability`, and a repeated flag such as
+  `--tag=a --tag=b` gives a repeated field both values, where the load failed.
+  `argv_source::descriptor()` and `check_capabilities` report the change.
+
+### Building nucleus
+
+- **An installed package now asks for pugixml 1.15 and `{fmt}` 11.** The package
+  configuration passes those minimum versions to `find_dependency`, where it
+  accepted any version, so a consumer whose pugixml, or whose `{fmt}` where the
+  package uses the fallback, is older fails at `find_package(nucleus)`.
+- **nucleus's libraries are now built position-independent.** A static nucleus
+  linked into a consumer's shared library failed to relocate on Linux; it now
+  links.
+- **`NUCLEUS_BUILD_SANITIZER` now adds UndefinedBehaviorSanitizer.** The new
+  `NUCLEUS_SANITIZER` cache variable selects `address`, the default, which pairs
+  AddressSanitizer with UndefinedBehaviorSanitizer, or `thread`, for
+  ThreadSanitizer. A sanitizer build that was clean can now report undefined
+  behavior.
