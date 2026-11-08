@@ -144,6 +144,7 @@ TEST_CASE("a quote or backslash in a later word leaves a closed word's reply alo
             {app, bare, "replied", "myapp --app-mode=" + reopened, " --name=\"v\"", 3, {"--app-mode", "=", reopened, "--name", "=", "\"v\""}},
             {app, "[]\n", "replied", "myapp --app-mode='o''nly on", "' --x 'y'", 3, {"--app-mode", "=", reopened, "--x", "'y'"}},
             {app, bare, "replied", "myapp --app-mode='only on", "' --x 'y'", 3, {"--app-mode", "=", "'only on'", "--x", "'y'"}},
+            {app, bare, "replied", "myapp --app-mode=only' 'o", " 'other'", 3, {"--app-mode", "=", "only' 'o", "'other'"}},
     };
     check_cursor_rows(rows);
 }

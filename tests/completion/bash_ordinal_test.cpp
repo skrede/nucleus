@@ -57,9 +57,14 @@ _myapp_quote()
         esac
         seen=1
     done
-    local after="${COMP_LINE:COMP_POINT}" tail="$1"
-    while [ -n "$tail" ] && [ "${after#"$tail"}" = "$after" ]; do tail="${tail#?}"; done
-    case "$tail" in *\'* | *\"* | *\\*) quote=""; [ -z "$ever" ]; return ;; esac
+    local i=0 at=0 gap word="${COMP_WORDS[COMP_CWORD]}"
+    while :; do
+        gap="${COMP_LINE:at}"; gap="${gap%%[![:space:]]*}"; at=$((at + ${#gap}))
+        [ "$i" -lt "$COMP_CWORD" ] || break
+        at=$((at + ${#COMP_WORDS[i]})); i=$((i + 1))
+    done
+    at=$((COMP_POINT - at)); [ "$at" -ge 0 ] || at=0; [ -n "$COMP_LINE" ] || at=${#word}
+    case "${word:at}" in *\'* | *\"* | *\\*) quote=""; [ -z "$ever" ]; return ;; esac
     case "$quote" in \$*) quote="" ;; esac
     [ -z "$reopened" ]
 }

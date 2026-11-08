@@ -223,7 +223,7 @@ driving a shell once. `tests/completion/smoke_test.cpp` has since given its shel
 to a support header shared with the ordinal completion test, and fell to 257.
 `tests/completion/completion_test.cpp` rose again when every generated bash script began carrying
 the quote tracker and the line lookup, which its golden pins, and again when the tracker's cursor
-guard came to read only the current word.
+guard came to read only the current word, and to find where that word starts on the line.
 
 The three newest rows are contract tests that rename the example's entry point through the
 preprocessor so it cannot collide with the test runner's own. That rename leaves the renamed
@@ -253,7 +253,7 @@ is the price of the file being stable under both, and the row is the price of th
 | `tests/xml/keyed_projection_test.cpp` | 338 |
 | `tests/schema/registry_test.cpp` | 333 |
 | `tests/query/selector_test.cpp` | 317 |
-| `tests/completion/completion_test.cpp` | 306 |
+| `tests/completion/completion_test.cpp` | 311 |
 | `tests/schema/constraint_group_test.cpp` | 306 |
 | `tests/runtime/load_front_door_test.cpp` | 289 |
 | `tests/schema/keyed_composition_test.cpp` | 287 |
