@@ -144,11 +144,13 @@ cmake --build build
 ctest --test-dir build
 ```
 
-New library code is required to remain C++20, exception-free, and RTTI-free.
-The scoped `read_api_compile_check` target proves those constraints for the
-public read headers and query/resolver translation units it compiles, with
-exceptions and RTTI disabled. It does not claim that unrelated legacy paths
-have eliminated every throw or RTTI use.
+New library code is required to remain C++20 and to report every failure
+through `nucleus::expected` rather than by throwing; the Errors section of
+`CONVENTIONS.md` states the rule's scope. The scoped `read_api_compile_check`
+target compiles the public read headers and the query/resolver translation
+units it names with exceptions and RTTI disabled. It makes no claim about the
+rest of the library, which uses RTTI and `std::any` where typed values need
+them.
 
 Catch2 and pugixml are fetched automatically via `FetchContent`. `std::format` is
 the diagnostic vocabulary; on a toolchain that lacks it, `{fmt}` is fetched as the
