@@ -241,10 +241,13 @@ accepted by both. A unit only one version will leave alone is a unit that change
 saves it next, which is the local-and-CI divergence this register exists to keep visible. The line
 is the price of the file being stable under both, and the row is the price of the line.
 
+Four rows rose by one line each when the test units came to include `<cstddef>` for the
+`std::size_t` they name, the standard-header rule the library units already follow.
+
 | `tests/config_source/inherit_chain_test.cpp` | 1120 |
-| `tests/keyspace/repeated_container_test.cpp` | 816 |
+| `tests/keyspace/repeated_container_test.cpp` | 817 |
 | `tests/schema/typed_element_test.cpp` | 810 |
-| `tests/config_node/config_node_test.cpp` | 778 |
+| `tests/config_node/config_node_test.cpp` | 779 |
 | `tests/argv/source_test.cpp` | 615 |
 | `tests/schema/typed_shape_test.cpp` | 519 |
 | `tests/schema/repeated_element_test.cpp` | 470 |
@@ -252,7 +255,7 @@ is the price of the file being stable under both, and the row is the price of th
 | `tests/keyspace/strain_scope_policy_test.cpp` | 401 |
 | `tests/xml/keyed_projection_test.cpp` | 338 |
 | `tests/schema/registry_test.cpp` | 333 |
-| `tests/query/selector_test.cpp` | 317 |
+| `tests/query/selector_test.cpp` | 318 |
 | `tests/completion/completion_test.cpp` | 311 |
 | `tests/schema/constraint_group_test.cpp` | 306 |
 | `tests/runtime/load_front_door_test.cpp` | 289 |
@@ -265,8 +268,8 @@ is the price of the file being stable under both, and the row is the price of th
 | `tests/xml/keyed_selection_test.cpp` | 232 |
 | `tests/error/expected_test.cpp` | 227 |
 | `tests/tokenizer/pkey_tokenizer_test.cpp` | 226 |
+| `tests/config_source/source_stack_test.cpp` | 219 |
 | `tests/system/multi_source_test.cpp` | 219 |
-| `tests/config_source/source_stack_test.cpp` | 218 |
 | `tests/collection_shapes/identity_pool_scope_test.cpp` | 209 |
 | `tests/config_source/source_handle_test.cpp` | 203 |
 | `tests/query/instance_addressing_test.cpp` | 203 |

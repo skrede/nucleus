@@ -17,6 +17,7 @@
 
 #include <string>
 #include <vector>
+#include <cstddef>
 #include <sstream>
 #include <utility>
 

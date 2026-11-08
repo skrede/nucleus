@@ -12,6 +12,7 @@
 
 #include <array>
 #include <string>
+#include <cstddef>
 #include <cstdint>
 #include <utility>
 

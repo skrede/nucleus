@@ -13,6 +13,7 @@
 
 #include <string>
 #include <vector>
+#include <cstddef>
 #include <algorithm>
 
 // query() entry + each()/collect() + ordinal-stable ordering.

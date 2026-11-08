@@ -23,6 +23,7 @@
 #include <vector>
 #include <cstddef>
 #include <utility>
+#include <initializer_list>
 
 namespace nucleus {
 

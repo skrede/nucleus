@@ -13,6 +13,7 @@
 
 #include <string>
 #include <vector>
+#include <cstddef>
 #include <algorithm>
 
 // in_strain() — ordinal-instance-correct; no cross-ordinal leak; pkey leaf
