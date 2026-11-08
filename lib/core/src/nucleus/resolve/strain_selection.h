@@ -125,19 +125,19 @@ private:
     defining_layer(const key_path &container, const strain_buckets &strains,
                    const std::string &chosen) const
     {
-        std::size_t Ld = 0;
+        std::size_t lowest    = 0;
         bool        found_any = false;
         for(const key_path &keyed : strains.at(chosen))
         {
             const std::size_t *first = m_provenance.first_rank_of(keyed.str());
-            if(first != nullptr && (!found_any || *first < Ld))
+            if(first != nullptr && (!found_any || *first < lowest))
             {
-                Ld = *first;
+                lowest    = *first;
                 found_any = true;
             }
         }
         if(found_any)
-            return Ld;
+            return lowest;
         return unexpected(error{errc::layering_violation, nucleus::format(
             "strain '{}' in container '{}' has no recorded "
             "provenance: resolve cannot bound its defining layer",

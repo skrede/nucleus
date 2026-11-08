@@ -25,7 +25,7 @@ namespace nucleus {
 
 // Puts back what excluded entries displaced during the fold, so the strain resolves as its
 // admissible layers left it. Under file_level the same holds for general entries a chain layer
-// above Ld displaced.
+// above defining_layer displaced.
 class strain_restoration
 {
     enum class region
@@ -68,7 +68,8 @@ private:
             const std::string canonical = m_schema.canonical_text(path);
             if(from == nullptr || canonical == bounds.identity_path || m_keyed.under_keyed_merge(canonical))
                 continue;
-            if(scope_excludes(bounds.policy, from->rank, bounds.Ld, bounds.Ls, bounds.wide_ranks))
+            if(scope_excludes(bounds.policy, from->rank, bounds.defining_layer, bounds.competing_layer,
+                              bounds.wide_ranks))
             {
                 m_building.remove(path);
                 m_provenance.forget(path.str());
@@ -158,8 +159,9 @@ private:
     static bool admits(region where, std::size_t rank, bool chain, const strain_scope_bounds &bounds)
     {
         if(where == region::chosen)
-            return !scope_excludes(bounds.policy, rank, bounds.Ld, bounds.Ls, bounds.wide_ranks);
-        return !chain || rank <= bounds.Ld;
+            return !scope_excludes(bounds.policy, rank, bounds.defining_layer, bounds.competing_layer,
+                                   bounds.wide_ranks);
+        return !chain || rank <= bounds.defining_layer;
     }
 
     bool under_keyed_container(const std::string &canonical) const

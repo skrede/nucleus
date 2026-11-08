@@ -114,13 +114,13 @@ private:
     {
         const strain_buckets &strains = selected.strains;
         const std::string    &chosen  = selected.chosen;
-        const std::size_t     Ld      = selected.defining_layer;
-        const auto bounds = m_layer_rules.enforce(container, strains, chosen, Ld);
+        const std::size_t     defining_layer = selected.defining_layer;
+        const auto            bounds         = m_layer_rules.enforce(container, strains, chosen, defining_layer);
         if(!bounds)
             return unexpected(bounds.error());
         const std::set<std::size_t> &wide = bounds.value().wide_ranks;
-        m_pruning.prune(container, identity_path, strains, chosen, policy, Ld, wide);
-        const strain_scope_bounds scope{identity_path, policy, Ld,
+        m_pruning.prune(container, identity_path, strains, chosen, policy, defining_layer, wide);
+        const strain_scope_bounds scope{identity_path, policy, defining_layer,
                                         bounds.value().competitor_layer, wide};
         if(auto r = restore_and_relay(container, selected, scope); !r)
             return r;
@@ -142,7 +142,7 @@ private:
         if(!restored)
             return unexpected(restored.error());
         return m_relay.relay_strain(restored.value().strains.at(chosen), scope.identity_path,
-                                    scope.policy, scope.Ld, scope.Ls, scope.wide_ranks);
+                                    scope.policy, scope.defining_layer, scope.competing_layer, scope.wide_ranks);
     }
 };
 

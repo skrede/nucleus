@@ -37,8 +37,8 @@ class strain_relay
     {
         std::string_view             identity_path;
         strain_scope_policy          policy;
-        std::size_t                  Ld;
-        std::size_t                  Ls;
+        std::size_t                  defining_layer;
+        std::size_t                  competing_layer;
         const std::set<std::size_t> &wide_ranks;
     };
 
@@ -66,10 +66,12 @@ public:
     expected<void, resolve_fold_error>
     relay_strain(const std::vector<key_path> &keyed_paths,
                  std::string_view             identity_path,
-                 strain_scope_policy policy, std::size_t Ld, std::size_t Ls,
+                 strain_scope_policy          policy,
+                 std::size_t                  defining_layer,
+                 std::size_t                  competing_layer,
                  const std::set<std::size_t> &wide_ranks)
     {
-        const relay_bounds          bounds{identity_path, policy, Ld, Ls, wide_ranks};
+        const relay_bounds          bounds{identity_path, policy, defining_layer, competing_layer, wide_ranks};
         const std::set<std::string> relayed_containers =
                 m_compaction.relayed_container_scopes(keyed_paths,
                                                       m_addressing.begin_relay());
@@ -124,7 +126,8 @@ private:
     {
         if(entry.identity_leaf || entry.keyed_merge)
             return false;
-        return scope_excludes(bounds.policy, entry.entry_rank, bounds.Ld, bounds.Ls, bounds.wide_ranks);
+        return scope_excludes(bounds.policy, entry.entry_rank, bounds.defining_layer, bounds.competing_layer,
+                              bounds.wide_ranks);
     }
 
     // A primary key is authoritative and read-only, so a higher-rank flat entry

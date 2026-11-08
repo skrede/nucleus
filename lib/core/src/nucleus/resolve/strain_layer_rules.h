@@ -68,7 +68,7 @@ private:
                                  const std::string &chosen,
                                  std::size_t defining_layer) const
     {
-        std::size_t Ls = std::numeric_limits<std::size_t>::max();
+        std::size_t nearest = std::numeric_limits<std::size_t>::max();
         for(const auto &[key_value, paths] : strains)
         {
             if(key_value == chosen)
@@ -76,11 +76,11 @@ private:
             for(const key_path &keyed : paths)
             {
                 const std::size_t *first = m_provenance.first_rank_of(keyed.str());
-                if(first != nullptr && *first > defining_layer && *first < Ls)
-                    Ls = *first;
+                if(first != nullptr && *first > defining_layer && *first < nearest)
+                    nearest = *first;
             }
         }
-        return Ls;
+        return nearest;
     }
 
     disposition_index index_dispositions() const
