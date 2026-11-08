@@ -1,5 +1,6 @@
 nucleus_add_test(key_path_test)
 nucleus_add_test(keyspace_test)
+nucleus_add_test(provenance_test)
 nucleus_add_test(config_storage_shape_test LINK nucleus::runtime)
 
 if(NUCLEUS_BUILD_SOURCE_XML)
