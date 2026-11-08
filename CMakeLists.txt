@@ -56,11 +56,13 @@ include(CheckCXXSourceCompiles)
 # try_compile picks the right per-compiler standard flag (-std=c++20 vs
 # /std:c++20) on every toolchain.
 # libc++ can define __cpp_lib_format while a deployment target below macOS 13.3
-# marks floating-point formatting unavailable, so the probe formats a double.
+# marks floating-point formatting unavailable, so the probe formats a double. Its result
+# is cached under a name 0.4.1's __cpp_lib_format probe never used, so an existing build
+# tree probes again rather than keeping that probe's answer.
 check_cxx_source_compiles(
     "#include <format>
      int main() { return static_cast<int>(std::format(\"{}\", 1.5).size()); }"
-    NUCLEUS_HAVE_STD_FORMAT
+    NUCLEUS_HAVE_STD_FORMAT_FLOAT
 )
 
 # The lowest version of each dependency this build accepts. One number reaches both the
@@ -75,7 +77,7 @@ set(NUCLEUS_FMT_VERSION 11)
 # downstream. Recorded here and consumed by the config template below.
 set(NUCLEUS_FMT_REQUIRED FALSE)
 
-if(NOT NUCLEUS_HAVE_STD_FORMAT)
+if(NOT NUCLEUS_HAVE_STD_FORMAT_FLOAT)
     include(FetchContent)
     FetchContent_Declare(
         fmt

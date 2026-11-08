@@ -102,7 +102,7 @@ set_target_properties(nucleus_core PROPERTIES VERSION ${PROJECT_VERSION})
 # library. The template lives outside the include root because that root is installed wholesale.
 # BUILD_INTERFACE covers an add_subdirectory consumer; the INSTALL_INTERFACE entry every module
 # already carries covers a find_package one, so one include spelling resolves for both.
-set(NUCLEUS_USE_STD_FORMAT ${NUCLEUS_HAVE_STD_FORMAT})
+set(NUCLEUS_USE_STD_FORMAT ${NUCLEUS_HAVE_STD_FORMAT_FLOAT})
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/core/format_backend.h.in
     ${CMAKE_CURRENT_BINARY_DIR}/generated/nucleus/detail/format_backend.h
@@ -197,7 +197,7 @@ endif()
 # format() seam falls back to {fmt} in a public header, so the link is PUBLIC. The
 # probe + fetch run in the root before add_subdirectory(lib); here we only wire the
 # link once nucleus_core exists.
-if(NOT NUCLEUS_HAVE_STD_FORMAT)
+if(NOT NUCLEUS_HAVE_STD_FORMAT_FLOAT)
     target_link_libraries(nucleus_core PUBLIC fmt::fmt)
 endif()
 

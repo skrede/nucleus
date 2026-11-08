@@ -27,7 +27,7 @@ target_link_libraries(ordinal_width_probe PRIVATE nucleus::core)
 # arguments on the way into the driver.
 set(ordinal_width_includes
     "$<JOIN:$<TARGET_PROPERTY:nucleus::core,INTERFACE_INCLUDE_DIRECTORIES>,|>")
-if(NOT NUCLEUS_HAVE_STD_FORMAT)
+if(NOT NUCLEUS_HAVE_STD_FORMAT_FLOAT)
     string(APPEND ordinal_width_includes
         "|$<JOIN:$<TARGET_PROPERTY:fmt::fmt,INTERFACE_INCLUDE_DIRECTORIES>,|>")
 endif()

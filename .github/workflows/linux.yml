@@ -763,7 +763,7 @@ jobs:
         run: |
           cmake . -B build-fallback \
             -DCMAKE_BUILD_TYPE=Release \
-            -DNUCLEUS_HAVE_STD_FORMAT=FALSE \
+            -DNUCLEUS_HAVE_STD_FORMAT_FLOAT=FALSE \
             -DCMAKE_PREFIX_PATH=${{ github.workspace }}/fmt-prefix \
             -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/fallback-prefix \
             -DNUCLEUS_BUILD_TESTS=OFF \
