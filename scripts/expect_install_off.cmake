@@ -8,14 +8,17 @@
 # catch NUCLEUS_INSTALL silently defaulting back to ON for a vendoring consumer,
 # which is the exact regression this test exists to prevent.
 #
-# find_package is disabled for pugixml alone so the dependency is populated from
-# source instead of resolved. A discovered package is an imported target that
-# never evaluates PUGIXML_INSTALL, so on a machine carrying a system pugixml the
-# whole check would pass while measuring nothing.
+# find_package is disabled for pugixml alone so the handed-on source is populated
+# instead of a package being resolved. A discovered package is an imported target
+# that never evaluates PUGIXML_INSTALL, so on a machine carrying a system pugixml
+# the whole check would pass while measuring nothing. With no pugixml source handed
+# on, the check is skipped (exit 77) naming why; it never populates one itself.
 #
 # Invoke: cmake -DNUCLEUS_FIXTURE_SOURCE_DIR=<dir> -DNUCLEUS_FIXTURE_BINARY_DIR=<dir>
 #               [-DNUCLEUS_FIXTURE_PREFIX_DIR=<dir>]
 #               [-DNUCLEUS_FIXTURE_PUGIXML_SOURCE_DIR=<dir>]
+#               [-DNUCLEUS_FIXTURE_SKIP_REASON=<text>]
+#               [-DNUCLEUS_FIXTURE_FMT_SOURCE_DIR=<dir>]
 #               -P scripts/expect_install_off.cmake
 
 cmake_minimum_required(VERSION 3.25)
@@ -26,15 +29,26 @@ foreach(required NUCLEUS_FIXTURE_SOURCE_DIR NUCLEUS_FIXTURE_BINARY_DIR)
     endif()
 endforeach()
 
-set(configure_args -DPUGIXML_INSTALL=OFF -DCMAKE_DISABLE_FIND_PACKAGE_pugixml=ON)
+if(NOT NUCLEUS_FIXTURE_PUGIXML_SOURCE_DIR)
+    if(NOT NUCLEUS_FIXTURE_SKIP_REASON)
+        set(NUCLEUS_FIXTURE_SKIP_REASON "no pugixml source was handed on")
+    endif()
+    message(STATUS "install gate check skipped: ${NUCLEUS_FIXTURE_SKIP_REASON}")
+    # cmake_language(EXIT) is 3.29; below it the test's SKIP_REGULAR_EXPRESSION reads the sentence.
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.29)
+        cmake_language(EXIT 77)
+    endif()
+    return()
+endif()
+
+# The handed-on source still takes the FetchContent path, so the population assertion below holds.
+set(configure_args -DPUGIXML_INSTALL=OFF -DCMAKE_DISABLE_FIND_PACKAGE_pugixml=ON
+    -DFETCHCONTENT_SOURCE_DIR_PUGIXML=${NUCLEUS_FIXTURE_PUGIXML_SOURCE_DIR})
 if(NUCLEUS_FIXTURE_PREFIX_DIR)
     list(APPEND configure_args -DCMAKE_INSTALL_PREFIX=${NUCLEUS_FIXTURE_PREFIX_DIR})
 endif()
-# An already-populated source skips the clone and still takes the FetchContent
-# path, so the population assertion below holds either way.
-if(NUCLEUS_FIXTURE_PUGIXML_SOURCE_DIR)
-    list(APPEND configure_args
-        -DFETCHCONTENT_SOURCE_DIR_PUGIXML=${NUCLEUS_FIXTURE_PUGIXML_SOURCE_DIR})
+if(NUCLEUS_FIXTURE_FMT_SOURCE_DIR)
+    list(APPEND configure_args -DFETCHCONTENT_SOURCE_DIR_FMT=${NUCLEUS_FIXTURE_FMT_SOURCE_DIR})
 endif()
 
 execute_process(
@@ -106,6 +120,11 @@ if(NUCLEUS_FIXTURE_PREFIX_DIR)
 
     file(GLOB_RECURSE installed_files RELATIVE "${NUCLEUS_FIXTURE_PREFIX_DIR}"
         "${NUCLEUS_FIXTURE_PREFIX_DIR}/*")
+    if(NOT "bin/install_consumer" IN_LIST installed_files)
+        message(FATAL_ERROR
+            "the vendoring consumer's own executable is missing from its prefix, so a prefix "
+            "nothing was installed into would pass the leak check")
+    endif()
     set(leaked)
     foreach(entry IN LISTS installed_files)
         if(entry MATCHES "nucleus|pugixml")

@@ -7,7 +7,11 @@
 # catch NUCLEUS_WERROR silently defaulting back to ON for a nested consumer,
 # which is the exact regression this test exists to prevent.
 #
+# The XML module is off because the claim is about option resolution and needs no
+# target; with it on, the configure would populate pugixml.
+#
 # Invoke: cmake -DNUCLEUS_FIXTURE_SOURCE_DIR=<dir> -DNUCLEUS_FIXTURE_BINARY_DIR=<dir>
+#               [-DNUCLEUS_FIXTURE_FMT_SOURCE_DIR=<dir>]
 #               -P scripts/expect_nested_consumer_werror_off.cmake
 
 cmake_minimum_required(VERSION 3.25)
@@ -18,8 +22,14 @@ foreach(required NUCLEUS_FIXTURE_SOURCE_DIR NUCLEUS_FIXTURE_BINARY_DIR)
     endif()
 endforeach()
 
+set(configure_args -DNUCLEUS_BUILD_SOURCE_XML=OFF)
+if(NUCLEUS_FIXTURE_FMT_SOURCE_DIR)
+    list(APPEND configure_args -DFETCHCONTENT_SOURCE_DIR_FMT=${NUCLEUS_FIXTURE_FMT_SOURCE_DIR})
+endif()
+
 execute_process(
     COMMAND ${CMAKE_COMMAND} -S ${NUCLEUS_FIXTURE_SOURCE_DIR} -B ${NUCLEUS_FIXTURE_BINARY_DIR}
+            ${configure_args}
     RESULT_VARIABLE configure_result
     OUTPUT_VARIABLE configure_stdout
     ERROR_VARIABLE  configure_stderr)
