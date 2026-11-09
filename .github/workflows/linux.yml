@@ -90,7 +90,24 @@ jobs:
         run: sudo locale-gen de_DE.UTF-8 && sudo update-locale
 
       - name: Test
-        run: cd build && ctest --output-on-failure --timeout 300
+        run: cd build && ctest --output-on-failure --timeout 300 --output-junit ctest-junit.xml
+
+      # The install gate skips wherever no pugixml source can be handed on, so only a leg that
+      # populates one can show the gate still runs.
+      - name: Assert the vendoring-consumer install gate ran
+        run: |
+          if [ ! -s build/ctest-junit.xml ]; then
+            echo "ctest wrote no JUnit report, so whether the install gate ran cannot be read" >&2
+            exit 1
+          fi
+          if [ ! -d build/_deps/pugixml-src ]; then
+            echo "this leg's build did not populate pugixml from source, so it cannot be the leg that requires the vendoring-consumer install gate to run" >&2
+            exit 1
+          fi
+          if ! grep -qE '<testcase name="nested_consumer_install_default_off"[^>]*status="run"' build/ctest-junit.xml; then
+            echo "the vendoring-consumer install gate did not run on a leg whose build populated pugixml from source; skipped on every leg, it would prove nothing" >&2
+            exit 1
+          fi
 
       # NUCLEUS_COVERAGE scopes instrumentation to first-party targets, so the
       # fetched dependencies emit no gcov data; the exclude below is
@@ -263,6 +280,9 @@ jobs:
     # error raised by a test target, so a configure-only probe with tests off
     # stops before the step that would name it. Examples on carries the separate
     # claim that enabling examples does not drag the optional module back in.
+    # Nothing beneath this build populates pugixml: the nested werror check turns the module off and the
+    # install gate, with no source to hand on, skips. The suite, examples and guards hold with the module's
+    # dependency absent from the whole tree; the install gate's real run is the build job's.
     steps:
       - uses: actions/checkout@v4
 
@@ -284,7 +304,28 @@ jobs:
         run: cmake --build build-xml-off
 
       - name: Test
-        run: cd build-xml-off && ctest --output-on-failure --timeout 300
+        run: cd build-xml-off && ctest --output-on-failure --timeout 300 --output-junit ctest-junit.xml
+
+      - name: Assert nothing beneath the module-off build populated pugixml
+        run: |
+          populated=$(find build-xml-off -type d -name 'pugixml-*')
+          if [ -n "$populated" ]; then
+            printf '%s\n' "$populated"
+            echo "pugixml was populated beneath the module-off build, so this job builds the optional module's dependency after all" >&2
+            exit 1
+          fi
+          if [ ! -s build-xml-off/ctest-junit.xml ]; then
+            echo "ctest wrote no JUnit report, so whether the install gate ran cannot be read" >&2
+            exit 1
+          fi
+          if ! grep -qE '<testcase name="nested_consumer_install_default_off"[^>]*status="notrun"' build-xml-off/ctest-junit.xml; then
+            echo "the vendoring-consumer install gate ran or failed on a build with no pugixml source to hand on, where it must report itself skipped" >&2
+            exit 1
+          fi
+          if ! grep -qF 'install gate check skipped: the outer build has NUCLEUS_BUILD_SOURCE_XML OFF' build-xml-off/ctest-junit.xml; then
+            echo "the install gate skipped without naming the module being off as its reason" >&2
+            exit 1
+          fi
 
       # Without this the job stays green on a tree whose option guard was dropped
       # but whose target happens to exist for some other reason. The control links
