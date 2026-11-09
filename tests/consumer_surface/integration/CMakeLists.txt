@@ -14,7 +14,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # archive's link interface.
 option(NUCLEUS_INTEGRATION_WITH_XML "Also consume the installed xml module" OFF)
 
-find_package(nucleus REQUIRED CONFIG COMPONENTS core runtime OPTIONAL_COMPONENTS xml)
+find_package(nucleus 0.4 REQUIRED CONFIG COMPONENTS core runtime OPTIONAL_COMPONENTS xml)
 
 if(NOT TARGET nucleus::nucleus)
     message(FATAL_ERROR
