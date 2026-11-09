@@ -290,7 +290,9 @@ jobs:
       # but whose target happens to exist for some other reason. The control links
       # the module's namespaced target from outside every guard and requires the
       # module-off generate to refuse it. It is written under a build directory
-      # name so the whole-tree listings in the gates workflow cannot reach it.
+      # name so the whole-tree listings in the gates workflow cannot reach it. A
+      # configure can fail for reasons that have nothing to do with the guard, so
+      # the refusal is recognized by CMake's own diagnostic for the missing target.
       - name: Assert the module-off build still refuses an unguarded link
         run: |
           mkdir -p build-xmloff-control
@@ -305,8 +307,14 @@ jobs:
           if cmake -S build-xmloff-control -B build-xmloff-control-gen \
               -DNUCLEUS_BUILD_TESTS=OFF \
               -DNUCLEUS_BUILD_EXAMPLES=OFF \
-              -DNUCLEUS_BUILD_SOURCE_XML=OFF; then
+              -DNUCLEUS_BUILD_SOURCE_XML=OFF > build-xmloff-control/configure.log 2>&1; then
+            cat build-xmloff-control/configure.log
             echo "a link to the XML module's target generated cleanly with the module off; the module-disabled build has stopped noticing an unguarded link" >&2
+            exit 1
+          fi
+          if ! tr -s ' \n' ' ' < build-xmloff-control/configure.log | grep -qF 'Target "unguarded_link" links to: nucleus::xml but the target was not found.'; then
+            cat build-xmloff-control/configure.log
+            echo "the module-off configure failed, but not by refusing the link to nucleus::xml; a configure that fails for any other reason would pass this control" >&2
             exit 1
           fi
           rm -rf build-xmloff-control build-xmloff-control-gen
@@ -510,8 +518,10 @@ jobs:
     # Two installs, because an absence asserted against one of them is
     # indistinguishable from a probe that resolved nothing at all. The cases
     # below differ in nothing but which prefix answers and how the xml component
-    # is asked for, so the second prefix is what gives the negative cases a
-    # positive twin.
+    # is asked for. The three refusals rest on their positive twin,
+    # "Resolve every component the install carries": the required case run
+    # against the prefix that carries the module, where a probe that refused
+    # whatever it read would fail.
     steps:
       - uses: actions/checkout@v4
 
@@ -647,23 +657,6 @@ jobs:
             -DCMAKE_PREFIX_PATH=${{ github.workspace }}/build-cx-off-prefix
           cmake --build build-cx-consumer
           ./build-cx-consumer/integration_test
-
-      # Every negative case above would hold just as well of a probe that refuses
-      # whatever it reads. This runs the refused case's own command line against
-      # the prefix that does carry the module, so the two differ in nothing but
-      # the install; a refusal here means the cases above never read either one.
-      - name: Assert the component check still refuses
-        run: |
-          set -o pipefail
-          status=0
-          cmake -S build-cx-probe -B build-cx-control \
-            -DPROBE_XML=required \
-            -DCMAKE_PREFIX_PATH=${{ github.workspace }}/build-cx-on-prefix 2>&1 | tee build-cx-control.log || status=$?
-          if [ "$status" -ne 0 ]; then
-            echo "the required-module probe was refused against ${{ github.workspace }}/build-cx-on-prefix, an install that carries the module; the refusals above hold against any prefix and measure nothing" >&2
-            exit 1
-          fi
-          rm -rf build-cx-probe build-cx-control
 
   consumer-floor:
     runs-on: ubuntu-24.04
@@ -903,7 +896,8 @@ jobs:
           ./build-fallback-consumer/integration_test
 
       # The copy differs from the installed package only in deciding the backend from the consumer's
-      # standard library, so a comparison that accepts it cannot see the mismatch it exists for.
+      # standard library, so a comparison that accepts it cannot see the mismatch it exists for. A
+      # refusal for any other reason would also satisfy a bare non-zero test.
       - name: Assert the comparison refuses the 0.4.1 seam
         run: |
           cp -R fallback-prefix fallback-0.4.1-prefix
@@ -929,8 +923,13 @@ jobs:
           if sh fallback-check/compare.sh \
               fallback-0.4.1-prefix/include/nucleus/detail/format_backend.h \
               "$(find fallback-0.4.1-prefix -name libnucleus_core.a -print -quit)" \
-              "$compiled"; then
+              "$compiled" 2> fallback-check/refusal-0.4.1; then
             echo "the comparison accepted a consumer that compiled std::format against a package built with {fmt}" >&2
+            exit 1
+          fi
+          cat fallback-check/refusal-0.4.1
+          if ! grep -qxF 'the installed header declares NUCLEUS_USE_STD_FORMAT 0 while the consumer compiled under 1' fallback-check/refusal-0.4.1; then
+            echo "the comparison refused the 0.4.1 seam for a reason other than the mismatch it exists to catch, so this control would pass a comparison that cannot see a consumer compiling std::format against a {fmt} package" >&2
             exit 1
           fi
           rm -rf fallback-0.4.1-prefix build-fallback-0.4.1-reporter
