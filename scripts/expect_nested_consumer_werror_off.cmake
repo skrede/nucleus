@@ -19,10 +19,16 @@
 cmake_minimum_required(VERSION 3.25)
 
 foreach(required NUCLEUS_FIXTURE_SOURCE_DIR NUCLEUS_FIXTURE_BINARY_DIR)
-    if(NOT DEFINED ${required})
-        message(FATAL_ERROR "${required} must be defined")
+    if(NOT ${required})
+        message(FATAL_ERROR "${required} must be defined and non-empty")
     endif()
 endforeach()
+
+cmake_path(IS_PREFIX NUCLEUS_FIXTURE_BINARY_DIR "${NUCLEUS_FIXTURE_SOURCE_DIR}" NORMALIZE binary_holds_source)
+if(NOT IS_ABSOLUTE "${NUCLEUS_FIXTURE_BINARY_DIR}" OR binary_holds_source)
+    message(FATAL_ERROR "NUCLEUS_FIXTURE_BINARY_DIR is deleted before the configure, so it must be "
+        "an absolute path outside the fixture source: '${NUCLEUS_FIXTURE_BINARY_DIR}'")
+endif()
 
 set(configure_args -DNUCLEUS_BUILD_SOURCE_XML=OFF -DFETCHCONTENT_FULLY_DISCONNECTED=ON)
 if(NUCLEUS_FIXTURE_CXX_COMPILER)
@@ -32,6 +38,8 @@ if(NUCLEUS_FIXTURE_FMT_SOURCE_DIR)
     list(APPEND configure_args -DFETCHCONTENT_SOURCE_DIR_FMT=${NUCLEUS_FIXTURE_FMT_SOURCE_DIR})
 endif()
 
+# A reused tree whose cached compiler differs is reconfigured without these arguments.
+file(REMOVE_RECURSE "${NUCLEUS_FIXTURE_BINARY_DIR}")
 execute_process(
     COMMAND ${CMAKE_COMMAND} -S ${NUCLEUS_FIXTURE_SOURCE_DIR} -B ${NUCLEUS_FIXTURE_BINARY_DIR}
             ${configure_args}
