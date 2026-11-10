@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-foreach(required IN ITEMS NUCLEUS_README NUCLEUS_PROJECT_FILE NUCLEUS_PIN_DIR)
+foreach(required IN ITEMS NUCLEUS_README NUCLEUS_PROJECT_FILE NUCLEUS_PIN_DIR NUCLEUS_PIN_REQUIRE_PUBLISHED)
     if(NOT DEFINED ${required} OR "${${required}}" STREQUAL "")
         message(FATAL_ERROR "${required} must be set")
     endif()
@@ -41,12 +41,16 @@ function(resolve_tag name)
     endif()
     if(NOT published STREQUAL "")
         message(STATUS "readme pin: ${name} is published at ${repository}")
-    elseif(name STREQUAL "v${version}")
-        execute_process(COMMAND "${CMAKE_COMMAND}" -E echo
-            "::notice title=README pin::pending release tag v${version}: ${NUCLEUS_README} pins the release this tree declares, which ${repository} has not published yet")
-    else()
+    elseif(NOT name STREQUAL "v${version}")
         message(FATAL_ERROR "${NUCLEUS_README} pins ${name}, which ${repository} has not published "
             "and which is not the release this tree declares (v${version})")
+    elseif(NUCLEUS_PIN_REQUIRE_PUBLISHED)
+        # On a release-tag run the pinned tag should already exist, so a pending pass would hide a lookup that finds none.
+        message(FATAL_ERROR "${NUCLEUS_README} pins ${name}, the release this tree declares, but ${repository} "
+            "has not published it, and a release-tag run passes only a published tag")
+    else()
+        execute_process(COMMAND "${CMAKE_COMMAND}" -E echo
+            "::notice title=README pin::pending release tag v${version}: ${NUCLEUS_README} pins the release this tree declares, which ${repository} has not published yet")
     endif()
 endfunction()
 

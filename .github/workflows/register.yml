@@ -8,8 +8,8 @@ name: Register
 # The build workflows keep theirs, because none of their jobs reads a markdown
 # file -- a workflow's triggers are derived from what its own jobs read, and the
 # divergence here is deliberate. Do not align this block with the sibling
-# workflows. A pushed release tag runs it too, so a README pinned to that tag is
-# resolved once the tag exists.
+# workflows. A pushed release tag runs it too, and on that run a README tag pin
+# passes only if the remote has published the tag.
 #
 # The size-ceiling gate below measures the whole tree rather than the units one
 # change touched, and that is what takes the pull request out of the equation.
@@ -243,6 +243,16 @@ jobs:
           refuses "a vendoring pin naming another release" \
             "the vendoring pin names v0.0.0, but the project declares" \
             -DNUCLEUS_README="$c/foreign-tag.md"
+          doctor README.md "$c/quoted-tag.md" -E 's/GIT_TAG [^ )]+/GIT_TAG "v0.0.0"/'
+          refuses "a quoted vendoring pin naming another release" \
+            "the vendoring pin names v0.0.0, but the project declares" \
+            -DNUCLEUS_README="$c/quoted-tag.md"
+          doctor README.md "$c/comment-paren.md" '/^FetchContent_Declare(nucleus$/a\    # a comment (with a parenthesis)'
+          if ! readme_gate -DNUCLEUS_README="$c/comment-paren.md"; then
+            cat "$c/gate.log" >&2
+            echo "the README gate refused a vendoring block whose comment carries a parenthesis, so it reads the comment as the block's end" >&2
+            exit 1
+          fi
           version=$(sed -nE 's/^project\(nucleus VERSION ([0-9.]+).*/\1/p' CMakeLists.txt)
           sed -E "s/GIT_TAG [^ )]+/GIT_TAG v$version/" README.md > "$c/own-tag.md"
           if [ -z "$version" ] || ! grep -qF "GIT_TAG v$version)" "$c/own-tag.md"; then
@@ -258,13 +268,19 @@ jobs:
 
       - name: README pin gate
         run: |
+          require=OFF
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            require=ON
+          fi
           cmake -DNUCLEUS_README=README.md \
             -DNUCLEUS_PROJECT_FILE=CMakeLists.txt \
             -DNUCLEUS_PIN_DIR=build-readme-pin \
+            -DNUCLEUS_PIN_REQUIRE_PUBLISHED=$require \
             -P tests/cmake/check_readme_pin.cmake
 
       # Every control's output goes to a file, so the pending control's notice
-      # does not render as an annotation on every run.
+      # does not render as an annotation on every run. The published arm is
+      # controlled against a local remote because the real one may carry no tag.
       - name: Assert the pin gate still refuses
         run: |
           c=build-pin-control
@@ -273,6 +289,7 @@ jobs:
             cmake -DNUCLEUS_README=README.md \
               -DNUCLEUS_PROJECT_FILE=CMakeLists.txt \
               -DNUCLEUS_PIN_DIR="$c/clone" \
+              -DNUCLEUS_PIN_REQUIRE_PUBLISHED=OFF \
               "$@" -P tests/cmake/check_readme_pin.cmake > "$c/gate.log" 2>&1
           }
           doctor() {
@@ -309,9 +326,30 @@ jobs:
           refuses "a branch name" \
             "neither a full commit SHA nor a release tag" \
             -DNUCLEUS_README="$c/branch.md"
+          git init --quiet --bare "$c/remote.git"
+          tree=$(git -C "$c/remote.git" mktree < /dev/null)
+          commit=$(git -C "$c/remote.git" -c user.name=control -c user.email=control@invalid \
+            commit-tree --no-gpg-sign -m control "$tree")
+          git -C "$c/remote.git" update-ref refs/tags/v77.0.0 "$commit"
+          remote="file://$PWD/$c/remote.git"
+          doctor CMakeLists.txt "$c/CMakeLists-77.txt" -E 's/^project\(nucleus VERSION [0-9.]+/project(nucleus VERSION 77.0.0/'
+          doctor README.md "$c/published.md" -E -e "s|GIT_REPOSITORY [^ )]+|GIT_REPOSITORY $remote|" \
+            -e 's/GIT_TAG [^ )]+/GIT_TAG v77.0.0/'
+          if ! pin_gate -DNUCLEUS_README="$c/published.md" -DNUCLEUS_PROJECT_FILE="$c/CMakeLists-77.txt" \
+              -DNUCLEUS_PIN_REQUIRE_PUBLISHED=ON ||
+              ! grep -qF "readme pin: v77.0.0 is published at $remote" "$c/gate.log"; then
+            cat "$c/gate.log" >&2
+            echo "the pin gate did not find a release tag the remote has published, so its published arm may never pass" >&2
+            exit 1
+          fi
           doctor CMakeLists.txt "$c/CMakeLists.txt" -E 's/^project\(nucleus VERSION [0-9.]+/project(nucleus VERSION 99.0.0/'
-          doctor README.md "$c/pending.md" -E 's/GIT_TAG [^ )]+/GIT_TAG v99.0.0/'
-          if ! pin_gate -DNUCLEUS_README="$c/pending.md" -DNUCLEUS_PROJECT_FILE="$c/CMakeLists.txt" ||
+          doctor README.md "$c/unpublished.md" -E -e "s|GIT_REPOSITORY [^ )]+|GIT_REPOSITORY $remote|" \
+            -e 's/GIT_TAG [^ )]+/GIT_TAG v99.0.0/'
+          refuses "a pending own release tag on a release-tag run" \
+            "has not published it, and a release-tag run passes only a published tag" \
+            -DNUCLEUS_README="$c/unpublished.md" -DNUCLEUS_PROJECT_FILE="$c/CMakeLists.txt" \
+            -DNUCLEUS_PIN_REQUIRE_PUBLISHED=ON
+          if ! pin_gate -DNUCLEUS_README="$c/unpublished.md" -DNUCLEUS_PROJECT_FILE="$c/CMakeLists.txt" ||
               ! grep -q '^::notice title=README pin::pending release tag v99\.0\.0' "$c/gate.log"; then
             cat "$c/gate.log" >&2
             echo "the pin gate did not pass a pending own release tag with its notice" >&2
