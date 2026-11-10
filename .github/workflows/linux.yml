@@ -944,10 +944,16 @@ jobs:
           cp -R fallback-prefix fallback-0.4.1-prefix
           seam=fallback-0.4.1-prefix/include/nucleus/format.h
           sed -i \
+            -e '/^#include <version>$/d' \
+            -e '/^#if NUCLEUS_USE_STD_FORMAT && /,/^#endif$/d' \
             -e 's|^#include "nucleus/detail/format_backend.h"$|#include <version>|' \
             -e 's|^#if NUCLEUS_USE_STD_FORMAT$|#ifdef __cpp_lib_format|' "$seam"
           if [ "$(grep -cx '#include <version>' "$seam")" != 1 ] || [ "$(grep -cx '#ifdef __cpp_lib_format' "$seam")" != 1 ]; then
             echo "the 0.4.1 seam was not reconstructed in the copy, so the control below would measure the current seam" >&2
+            exit 1
+          fi
+          if grep -qF 'NUCLEUS_USE_STD_FORMAT &&' "$seam"; then
+            echo "the guard survived in the 0.4.1 copy, so the control below would measure a seam 0.4.1 never had" >&2
             exit 1
           fi
           cmake -S fallback-check -B build-fallback-0.4.1-reporter \
@@ -974,6 +980,70 @@ jobs:
             exit 1
           fi
           rm -rf fallback-0.4.1-prefix build-fallback-0.4.1-reporter
+
+  # A std::format package meeting a consumer whose standard library lacks std::format is the one
+  # pairing that cannot work. nucleus/format.h refuses it, and two compilers on one runner can show
+  # that the refusal comes first.
+  format-pairing-guard:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert g++-12 lacks what the guard tests
+        run: |
+          if ! printf '#if __has_include(<format>)\n#error\n#endif\n' | g++-12 -std=c++20 -x c++ -fsyntax-only -; then
+            echo "g++-12 on this runner provides what the guard tests for, so the consumer below cannot form the pairing the guard refuses" >&2
+            exit 1
+          fi
+
+      - name: Build and install nucleus with std::format
+        env:
+          CXX: g++-14
+        run: |
+          cmake . -B build-pair \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/build-pair-prefix \
+            -DNUCLEUS_BUILD_TESTS=OFF \
+            -DNUCLEUS_BUILD_EXAMPLES=OFF \
+            -DNUCLEUS_BUILD_SOURCE_XML=OFF
+          cmake --build build-pair
+          cmake --install build-pair
+          if ! grep -qx '#define NUCLEUS_USE_STD_FORMAT 1' build-pair-prefix/include/nucleus/detail/format_backend.h; then
+            echo "the package built with g++-14 does not declare std::format, so the pairing below is not the one the guard refuses" >&2
+            exit 1
+          fi
+
+      - name: Build and run a std::format consumer of the package
+        env:
+          CXX: g++-13
+        run: |
+          cmake -S tests/consumer_surface/integration -B build-pair-consumer-13 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH=${{ github.workspace }}/build-pair-prefix
+          cmake --build build-pair-consumer-13
+          ./build-pair-consumer-13/integration_test
+
+      # The guard must be the first error g++-12 reports. An earlier one would mean the refusal comes
+      # from elsewhere, or that <format> is reached before the guard.
+      - name: Assert the guard refuses a consumer without std::format
+        env:
+          CXX: g++-12
+        run: |
+          cmake -S tests/consumer_surface/integration -B build-pair-consumer-12 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH=${{ github.workspace }}/build-pair-prefix
+          if cmake --build build-pair-consumer-12 > build-pair-consumer-12/build.log 2>&1; then
+            cat build-pair-consumer-12/build.log
+            echo "a consumer whose standard library has no std::format compiled against a package built with it" >&2
+            exit 1
+          fi
+          first=$(grep -m1 -E '(fatal )?error:' build-pair-consumer-12/build.log || true)
+          echo "$first"
+          if ! printf '%s\n' "$first" | grep -qF 'nucleus was configured for std::format, but this standard library has no <format> header'; then
+            cat build-pair-consumer-12/build.log
+            echo "the consumer's first error is not the nucleus guard, so the build failed somewhere the guard does not control" >&2
+            exit 1
+          fi
 
   # bash parses every function above the registration check before it reaches the check, so a construct bash 3.2
   # cannot parse would stop the source there, with an error on every shell start.

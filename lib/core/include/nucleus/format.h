@@ -3,6 +3,12 @@
 
 #include "nucleus/detail/format_backend.h"
 
+// A package configured for std::format cannot serve a translation unit without <format>. The test
+// is on the header because libc++ 17 and 18 provide it without defining __cpp_lib_format.
+#if NUCLEUS_USE_STD_FORMAT && !__has_include(<format>)
+    #error "nucleus was configured for std::format, but this standard library has no <format> header"
+#endif
+
 // Diagnostic / sink vocabulary, over std::format where it was available and the {fmt} reference
 // implementation where it was not. Which one is settled at nucleus's configure time and carried
 // in the generated header above: the consuming translation unit's own standard library is not the

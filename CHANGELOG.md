@@ -482,8 +482,12 @@ The first three change results *silently*.
   whatever its own library advertises.
 - **A package built with `std::format` no longer compiles for a consumer whose
   standard library lacks it.** This is the one pairing that cannot work: the
-  archive carries `std::format` in its interface, and `nucleus/format.h` now
-  includes `<format>` because the package says so. Under 0.4.1 the consumer's own
+  archive carries `std::format` in its interface, and `nucleus/format.h` now stops
+  such a translation unit with an `#error` naming the mismatch wherever the
+  consumer's standard library has no `<format>` header. A library whose `<format>`
+  is present but unusable (libc++ 14-16, an MSVC mode without it, an Apple
+  deployment target below 13.3) passes that check and fails later, inside
+  `<format>` or at the call. Under 0.4.1 the consumer's own
   `__cpp_lib_format` test quietly selected `{fmt}` and compiled against a different
   backend than the archive's. Build the package with the consumer's standard
   library, or configure it with the `{fmt}` fallback.
