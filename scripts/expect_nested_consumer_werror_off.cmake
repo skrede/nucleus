@@ -8,10 +8,12 @@
 # which is the exact regression this test exists to prevent.
 #
 # The XML module is off because the claim is about option resolution and needs no
-# target; with it on, the configure would populate pugixml.
+# target; with it on, the configure would populate pugixml. The configure runs
+# disconnected, so nothing it lacks is fetched.
 #
 # Invoke: cmake -DNUCLEUS_FIXTURE_SOURCE_DIR=<dir> -DNUCLEUS_FIXTURE_BINARY_DIR=<dir>
 #               [-DNUCLEUS_FIXTURE_FMT_SOURCE_DIR=<dir>]
+#               [-DNUCLEUS_FIXTURE_CXX_COMPILER=<path>]
 #               -P scripts/expect_nested_consumer_werror_off.cmake
 
 cmake_minimum_required(VERSION 3.25)
@@ -22,7 +24,10 @@ foreach(required NUCLEUS_FIXTURE_SOURCE_DIR NUCLEUS_FIXTURE_BINARY_DIR)
     endif()
 endforeach()
 
-set(configure_args -DNUCLEUS_BUILD_SOURCE_XML=OFF)
+set(configure_args -DNUCLEUS_BUILD_SOURCE_XML=OFF -DFETCHCONTENT_FULLY_DISCONNECTED=ON)
+if(NUCLEUS_FIXTURE_CXX_COMPILER)
+    list(APPEND configure_args "-DCMAKE_CXX_COMPILER=${NUCLEUS_FIXTURE_CXX_COMPILER}")
+endif()
 if(NUCLEUS_FIXTURE_FMT_SOURCE_DIR)
     list(APPEND configure_args -DFETCHCONTENT_SOURCE_DIR_FMT=${NUCLEUS_FIXTURE_FMT_SOURCE_DIR})
 endif()

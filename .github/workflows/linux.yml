@@ -94,6 +94,7 @@ jobs:
 
       # The install gate skips wherever no pugixml source can be handed on, so only a leg that
       # populates one can show the gate still runs.
+      # Only the full sentence shows the gate's prefix half ran.
       - name: Assert the vendoring-consumer install gate ran
         run: |
           if [ ! -s build/ctest-junit.xml ]; then
@@ -106,6 +107,10 @@ jobs:
           fi
           if ! grep -qE '<testcase name="nested_consumer_install_default_off"[^>]*status="run"' build/ctest-junit.xml; then
             echo "the vendoring-consumer install gate did not run on a leg whose build populated pugixml from source; skipped on every leg, it would prove nothing" >&2
+            exit 1
+          fi
+          if ! grep -qF 'install gate check: NUCLEUS_INSTALL resolves OFF for a vendoring consumer, pugixml was populated from source with its install rules off, and its own install prefix carries no nucleus or pugixml files' build/ctest-junit.xml; then
+            echo "the install gate ran without its prefix leak check, so a vendoring consumer leaking nucleus files into its prefix would pass" >&2
             exit 1
           fi
 
@@ -991,6 +996,10 @@ jobs:
 
       - name: Assert g++-12 lacks what the guard tests
         run: |
+          if ! command -v g++-12 > /dev/null; then
+            echo "this runner has no g++-12, so the consumer below cannot form the pairing the guard refuses" >&2
+            exit 1
+          fi
           if ! printf '#if __has_include(<format>)\n#error\n#endif\n' | g++-12 -std=c++20 -x c++ -fsyntax-only -; then
             echo "g++-12 on this runner provides what the guard tests for, so the consumer below cannot form the pairing the guard refuses" >&2
             exit 1

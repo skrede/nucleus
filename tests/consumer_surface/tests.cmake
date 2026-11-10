@@ -18,8 +18,9 @@ function(nucleus_fixture_skip_reason out deps)
     set(${out} "${reason}" PARENT_SCOPE)
 endfunction()
 
-# The nested configures reuse the dependency sources the outer build populated, because ctest
-# must not need the network.
+# The nested configures use the outer build's compiler and the dependency sources it populated,
+# and run disconnected, because ctest must not need the network. A dependency not handed on
+# therefore fails the configure rather than being cloned.
 set(nucleus_fixture_deps ${CMAKE_BINARY_DIR}/_deps)
 if(FETCHCONTENT_BASE_DIR)
     set(nucleus_fixture_deps ${FETCHCONTENT_BASE_DIR})
@@ -38,6 +39,7 @@ add_test(
     COMMAND ${CMAKE_COMMAND}
         -DNUCLEUS_FIXTURE_SOURCE_DIR=${CMAKE_SOURCE_DIR}/tests/consumer_surface/nested_consumer_fixture
         -DNUCLEUS_FIXTURE_BINARY_DIR=${CMAKE_BINARY_DIR}/nested_consumer_fixture_build
+        -DNUCLEUS_FIXTURE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
         ${nucleus_fixture_fmt_args}
         -P ${CMAKE_SOURCE_DIR}/scripts/expect_nested_consumer_werror_off.cmake
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
@@ -62,6 +64,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             -DNUCLEUS_FIXTURE_SOURCE_DIR=${CMAKE_SOURCE_DIR}/tests/consumer_surface/install_consumer_fixture
             -DNUCLEUS_FIXTURE_BINARY_DIR=${CMAKE_BINARY_DIR}/install_consumer_fixture_build
             -DNUCLEUS_FIXTURE_PREFIX_DIR=${CMAKE_BINARY_DIR}/install_consumer_fixture_prefix
+            -DNUCLEUS_FIXTURE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
             ${nucleus_fixture_args}
             ${nucleus_fixture_fmt_args}
             -P ${CMAKE_SOURCE_DIR}/scripts/expect_install_off.cmake

@@ -12,13 +12,15 @@
 # instead of a package being resolved. A discovered package is an imported target
 # that never evaluates PUGIXML_INSTALL, so on a machine carrying a system pugixml
 # the whole check would pass while measuring nothing. With no pugixml source handed
-# on, the check is skipped (exit 77) naming why; it never populates one itself.
+# on, the check is skipped (exit 77) naming why; it never populates one itself, and
+# the configure runs disconnected, so nothing it lacks is fetched.
 #
 # Invoke: cmake -DNUCLEUS_FIXTURE_SOURCE_DIR=<dir> -DNUCLEUS_FIXTURE_BINARY_DIR=<dir>
 #               [-DNUCLEUS_FIXTURE_PREFIX_DIR=<dir>]
 #               [-DNUCLEUS_FIXTURE_PUGIXML_SOURCE_DIR=<dir>]
 #               [-DNUCLEUS_FIXTURE_SKIP_REASON=<text>]
 #               [-DNUCLEUS_FIXTURE_FMT_SOURCE_DIR=<dir>]
+#               [-DNUCLEUS_FIXTURE_CXX_COMPILER=<path>]
 #               -P scripts/expect_install_off.cmake
 
 cmake_minimum_required(VERSION 3.25)
@@ -43,7 +45,11 @@ endif()
 
 # The handed-on source still takes the FetchContent path, so the population assertion below holds.
 set(configure_args -DPUGIXML_INSTALL=OFF -DCMAKE_DISABLE_FIND_PACKAGE_pugixml=ON
-    -DFETCHCONTENT_SOURCE_DIR_PUGIXML=${NUCLEUS_FIXTURE_PUGIXML_SOURCE_DIR})
+    -DFETCHCONTENT_SOURCE_DIR_PUGIXML=${NUCLEUS_FIXTURE_PUGIXML_SOURCE_DIR}
+    -DFETCHCONTENT_FULLY_DISCONNECTED=ON)
+if(NUCLEUS_FIXTURE_CXX_COMPILER)
+    list(APPEND configure_args "-DCMAKE_CXX_COMPILER=${NUCLEUS_FIXTURE_CXX_COMPILER}")
+endif()
 if(NUCLEUS_FIXTURE_PREFIX_DIR)
     list(APPEND configure_args -DCMAKE_INSTALL_PREFIX=${NUCLEUS_FIXTURE_PREFIX_DIR})
 endif()
