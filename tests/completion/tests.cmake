@@ -18,6 +18,8 @@ nucleus_add_test(zsh_ordinal_test)
 
 nucleus_add_test(bash_insertion_smoke_test PROPERTIES SKIP_RETURN_CODE 4)
 
+nucleus_add_test(bash_admitted_values_smoke_test PROPERTIES SKIP_RETURN_CODE 4)
+
 nucleus_add_test(bash_quoted_insertion_smoke_test PROPERTIES SKIP_RETURN_CODE 4)
 
 nucleus_add_test(bash_quote_state_smoke_test PROPERTIES SKIP_RETURN_CODE 4)

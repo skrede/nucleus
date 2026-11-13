@@ -222,7 +222,8 @@ is listed last, under Additions.
   character in an allowed value, a newline or a NUL included, is refused at
   registration with `errc::rejected_registration`, naming the element and the
   value. 0.4.1 accepted it, and the completion menus then dropped the value without
-  a word.
+  a word. A host that builds a `completion_model` itself skips this rule, and an
+  emitter renders such a value as given.
 - **A child declared beneath a required element is refused.** The refusal names
   both elements. 0.4.1 accepted the declaration. A required leaf still attaches
   whether or not it repeats.

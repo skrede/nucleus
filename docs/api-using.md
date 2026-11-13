@@ -1132,7 +1132,11 @@ non-empty, every completion entry is prefixed with the space name, matching a
 `multispace_argv_source` that routes tokens by their first segment. Each of its
 segments is held to the same bare-command-token grammar as `prog`, since the
 prefix reaches the generated script's word list beside every flag it carries.
-An `enum_element`'s value set becomes that flag's completion candidates. A pure
+An `enum_element`'s value set becomes that flag's completion candidates.
+Registration refuses an allowed value carrying a control character, so every
+candidate reaches the script as registered. A host that
+builds a `completion_model` itself and renders it with an emitter skips that
+rule and holds its values to it. A pure
 read of the sealed schema. nucleus is a library, not a CLI — it returns the
 script and the host decides how to surface it.
 
