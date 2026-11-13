@@ -1,6 +1,8 @@
+#include "nucleus/tokenizer/brace_scan.h"
 #include "nucleus/tokenizer/token_lexer.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <utility>
 
 namespace nucleus {
@@ -99,56 +101,53 @@ void skip_ws(std::string_view body, std::size_t &i)
         ++i;
 }
 
-// Reads one scalar value starting at i, stopping (without consuming) at a
-// top-level character in `stops`. Single/double quotes group and protect a
-// literal (stripped, content verbatim, so '' is the empty string); a nested
-// ${...} is copied verbatim at brace depth; a balanced (...) run survives. Bare
-// leading/trailing whitespace is trimmed; interior and quoted whitespace survive.
+// Reads one scalar from i, stopping before a top-level character in `stops`. Quotes
+// group and protect a literal and are stripped, so '' is the empty string; a nested
+// ${...} is copied unchanged, quotes included, and lexes its own arguments when it
+// resolves; a balanced (...) run survives. Only bare boundary whitespace is trimmed.
 expected<std::string, resolve_error> read_scalar(std::string_view body, std::size_t &i,
                                                  std::string_view stops)
 {
-    std::string current;
-    std::size_t significant_end = 0;
-    int brace_depth = 0;
-    int paren_depth = 0;
-    char quote_char = '\0';
-    auto keep = [&](char c) { current += c; significant_end = current.size(); };
+    std::string  current;
+    std::size_t  significant_end = 0;
+    std::int32_t paren_depth     = 0;
 
-    for(; i < body.size(); ++i)
+    auto keep = [&](std::string_view s)
+    { current += s; significant_end = current.size(); };
+
+    while(i < body.size())
     {
+        if(std::size_t const past = skip_quoted(body, i); past != i)
+        {
+            if(past == std::string_view::npos)
+                return parse_failure("unterminated quote in token argument value");
+            if(std::string_view const run = body.substr(i + 1, past - i - 2); !run.empty())
+                keep(run);
+            i = past;
+            continue;
+        }
+        if(body.substr(i).starts_with("${"))
+        {
+            std::size_t const close = scan_braced_span(body, i + 2);
+            if(close == std::string_view::npos)
+                return parse_failure("unterminated ${ in token argument value");
+            keep(body.substr(i, close + 1 - i));
+            i = close + 1;
+            continue;
+        }
         char const c = body[i];
-        if(quote_char != '\0')
-        {
-            if(c == quote_char) { quote_char = '\0'; continue; }
-            keep(c);
-            continue;
-        }
-        if(c == '\'' || c == '"') { quote_char = c; continue; }
-        if(c == '$' && i + 1 < body.size() && body[i + 1] == '{')
-        {
-            ++brace_depth;
-            keep(c);
-            keep(body[++i]);
-            continue;
-        }
-        if(c == '}' && brace_depth > 0) { --brace_depth; keep(c); continue; }
-        if(brace_depth == 0)
-        {
-            if(c == '(') { ++paren_depth; keep(c); continue; }
-            if(c == ')' && paren_depth > 0) { --paren_depth; keep(c); continue; }
-            if(paren_depth == 0 && stops.find(c) != std::string_view::npos)
-                break;
-        }
-        if(c == ' ' || c == '\t')
-        {
-            if(!current.empty())
-                current += c;
-            continue;
-        }
-        keep(c);
+        if(c == '(')
+            ++paren_depth;
+        else if(c == ')' && paren_depth > 0)
+            --paren_depth;
+        else if(paren_depth == 0 && stops.find(c) != std::string_view::npos)
+            break;
+        if(c != ' ' && c != '\t')
+            keep(body.substr(i, 1));
+        else if(!current.empty())
+            current += c;
+        ++i;
     }
-    if(quote_char != '\0')
-        return parse_failure("unterminated quote in token argument value");
     current.resize(significant_end);
     return current;
 }

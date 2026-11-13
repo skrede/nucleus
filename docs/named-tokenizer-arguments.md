@@ -41,7 +41,9 @@ argument's type.
 - Quote a literal to carry a top-level `,` or `]`, to preserve leading/trailing
   whitespace, or to write the empty string `''`.
 - Bare values are trimmed; interior whitespace survives; a nested `${...}` is
-  resolved per value (and per list element) before coercion.
+  resolved per value (and per list element) before coercion. It is handed on
+  whole, its own quotes included, so quotes inside it group that token's own
+  arguments and are stripped when it is lexed, not before.
 
 ```
 ${string.concat(values=['a,b', 'c]d'], separator='|')}  -> a,b|c]d

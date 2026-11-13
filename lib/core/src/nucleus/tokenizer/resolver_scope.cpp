@@ -20,36 +20,17 @@ struct token_span
     std::size_t end;
 };
 
-// When the token's head (the category.name part, before any top-level argument
-// list) contains a nested ${...}, returns the token body for whole-body
-// re-expansion. Returns nullopt when no nesting precedes the first top-level
-// '(' -- the function-form case, where nesting lives in arguments resolved
-// separately. Scans the body honoring quotes and nested-brace depth.
+// The body, for whole-body re-expansion, when a nested token sits at its top level and
+// no top-level '(' opens an argument list; nullopt otherwise, because nesting inside
+// arguments resolves per argument.
 std::optional<std::string> body_head_has_nested_token(std::string_view token)
 {
     if(token.size() < 3) return std::nullopt;
     std::string_view const body = token.substr(2, token.size() - 3);
 
-    char quote_char = '\0';
-    int brace_depth = 0;
-    bool saw_nested = false;
-    for(std::size_t i = 0; i < body.size(); ++i)
-    {
-        char const c = body[i];
-        if(quote_char != '\0')
-        {
-            if(c == quote_char) quote_char = '\0';
-            continue;
-        }
-        if(c == '\'' || c == '"') { quote_char = c; continue; }
-        if(c == '$' && i + 1 < body.size() && body[i + 1] == '{') { ++brace_depth; saw_nested = true; ++i; continue; }
-        if(c == '}' && brace_depth > 0) { --brace_depth; continue; }
-        if(brace_depth == 0 && c == '(')
-            return std::nullopt;
-    }
-    if(saw_nested)
-        return std::string(body);
-    return std::nullopt;
+    if(find_top_level(body, "(") != std::string_view::npos || find_top_level(body, "${") == std::string_view::npos)
+        return std::nullopt;
+    return std::string(body);
 }
 
 // Nullopt when no further token start remains, or when the token that starts
@@ -176,8 +157,8 @@ token_result resolver_scope::resolve_one(std::string_view token)
     // Field-form nesting (${env.${var}}): a nested ${...} that sits OUTSIDE any
     // argument list is resolved into the head before lexing, so the lexer sees a
     // flat category.name. Function-argument nesting (${f.g(${b})}) is left to the
-    // per-argument resolve_all below. The two are told apart by whether a nested
-    // ${ precedes the first top-level '('.
+    // per-argument resolve_all below. The two are told apart by whether a top-level
+    // '(' opens an argument list.
     std::string flattened;
     std::string_view to_lex = token;
     if(auto head_inner = body_head_has_nested_token(token); head_inner)

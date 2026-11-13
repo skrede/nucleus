@@ -94,6 +94,20 @@ TEST_CASE("nested token inside a value is preserved verbatim", "[lexer]")
     REQUIRE(r.value().args.size() == 1);
     REQUIRE(r.value().args[0].values.size() == 1);
     CHECK(r.value().args[0].values[0] == "${env.HOME}");
+
+    auto quoted = lex_token("${string.upper(value=${string.lower(value='A, B')})}");
+    REQUIRE(quoted.has_value());
+    REQUIRE(quoted.value().args.size() == 1);
+    REQUIRE(quoted.value().args[0].values.size() == 1);
+    CHECK(quoted.value().args[0].values[0] == "${string.lower(value='A, B')}");
+}
+
+TEST_CASE("a nested token that never closes inside an argument is a parse error", "[lexer]")
+{
+    auto r = lex_token("${f.g(value=${a)}");
+    REQUIRE_FALSE(r.has_value());
+    CHECK(r.error().code == resolve_errc::parse_error);
+    CHECK(r.error().message == "unterminated ${ in token argument value");
 }
 
 TEST_CASE("interior whitespace survives, boundary whitespace trimmed", "[lexer]")

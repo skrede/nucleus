@@ -428,6 +428,13 @@ The first three change results *silently*.
   the outer pair and yielded `a" "b` &mdash; a silent value change. A resolver
   returning `${"a" "b"}` fails the load with `errc::unresolved_token`
   (`unrecognized token body`) rather than yielding `a" "b`.
+- **A nested token inside a function argument keeps its quotes.** The nested
+  token is handed on unchanged and lexes its own arguments when it resolves.
+  `${string.concat(values=[${string.concat(values=['a,b', 'c'])}, 'd'])}` now
+  yields `a,bcd`, where 0.4.1 stripped the inner quotes and yielded `abcd`
+  &mdash; a silent value change. A quoted space or `)` inside the nested token is
+  kept the same way: `to=' y '` keeps its spaces, and `to=')'` no longer fails the
+  load.
 - **A tree-tokenizer field naming a nested path is refused before dispatch.** A
   field carrying `/` is reported as a missing field, so a `??` fallback still
   applies, and the host resolver is never called with it.

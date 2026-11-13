@@ -13,6 +13,7 @@
 
 #include <string>
 #include <cstdlib>
+#include <string_view>
 
 using nucleus::owner_token;
 using nucleus::resolve_errc;
@@ -27,6 +28,12 @@ tokenizer_registry core_registry()
     r.add(nucleus::make_env_tokenizer(), owner_token{});
     r.add(nucleus::make_string_tokenizer(), owner_token{});
     return r;
+}
+
+std::string resolved(std::string_view text)
+{
+    auto r = resolve_tokens(text, core_registry());
+    return r ? r.value() : r.error().message;
 }
 
 }
@@ -126,4 +133,26 @@ TEST_CASE("a closing brace inside a quoted function argument does not end the to
     auto reg = core_registry();
     CHECK(resolve_tokens("${string.replace(value=abc, from=b, to='}')}", reg).value() == "a}c");
     CHECK(resolve_tokens("${string.concat(values=['}', 'x'], separator='-')}", reg).value() == "}-x");
+}
+
+TEST_CASE("a nested token inside an argument keeps its own quotes", "[named-args][quoting]")
+{
+    CHECK(resolved("${string.concat(values=[${string.concat(values=['a,b', 'c'])}, 'd'])}") == "a,bcd");
+    CHECK(resolved("${string.replace(value=${string.replace(value=x, from=x, to=' y ')}, from=q, to=q)}") == " y ");
+    CHECK(resolved("${string.concat(values=[${string.replace(value=ab, from=b, to=')')}, z])}") == "a)z");
+}
+
+TEST_CASE("a nested token in the head is flattened only outside an argument list", "[named-args][nested]")
+{
+    auto reg = core_registry();
+
+    auto field = resolve_tokens("${string.${string.lower(value=UPPER)}}", reg);
+    REQUIRE_FALSE(field.has_value());
+    CHECK(field.error().code == resolve_errc::missing_field);
+    CHECK(field.error().message.find("'string' has no field 'upper'") != std::string::npos);
+
+    auto function = resolve_tokens("${string.${string.lower(value=UPPER)}(value=abc)}", reg);
+    REQUIRE_FALSE(function.has_value());
+    CHECK(function.error().code == resolve_errc::parse_error);
+    CHECK(function.error().message == "token name is empty or contains a dot");
 }
