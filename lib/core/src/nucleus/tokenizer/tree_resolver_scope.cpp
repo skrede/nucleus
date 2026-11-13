@@ -56,7 +56,6 @@ token_result tree_resolver_scope::resolve_value(std::string_view value_text)
         const std::string_view token_body = value_text.substr(open + 2, close - open - 2);
         pos = close + 1;
 
-        // Split on top-level '??' to get fallback arms.
         std::vector<std::string_view> const arms = split_fallback_arms(token_body);
 
         token_result last = unexpected(resolve_error(
@@ -83,15 +82,17 @@ token_result tree_resolver_scope::resolve_value(std::string_view value_text)
     return result;
 }
 
-// Resolves one fallback arm. An arm is either an abs:/rel: tree token, a
-// category-named tree-tokenizer dispatch (${category.field}), or a literal
-// string, which only a fallback arm may be. An unrecognised category returns
-// unknown_category so the ?? chain does NOT silently swallow typos.
+// An arm is read, in order, as a quoted literal (one run in either quote spanning
+// the whole arm), an abs:/rel: tree token, a category-named tree-tokenizer
+// dispatch (${category.field}), or the unquoted floor, which only a fallback arm
+// may reach. An unrecognized category returns unknown_category so the ?? chain
+// does NOT silently swallow typos.
 token_result tree_resolver_scope::resolve_one_arm(std::string_view arm, bool is_fallback)
 {
     auto stripped = arm;
+    if(auto const end = skip_quoted(stripped, 0); end != 0 && end == stripped.size())
+        return std::string(stripped.substr(1, end - 2));
 
-    // Check for colon-scheme heads (abs: / rel:).
     auto colon = stripped.find(':');
     if(colon != std::string_view::npos && colon > 0)
     {
@@ -102,7 +103,6 @@ token_result tree_resolver_scope::resolve_one_arm(std::string_view arm, bool is_
             return resolve_relative(stripped.substr(colon + 1));
     }
 
-    // Category-named dispatch: no colon scheme, but body contains a dot.
     // lex_token parses the full ${...} form, so reconstruct the token for it.
     {
         auto dot = stripped.find('.');
@@ -136,9 +136,6 @@ token_result tree_resolver_scope::resolve_one_arm(std::string_view arm, bool is_
             }
         }
     }
-
-    if(stripped.size() >= 2 && stripped.front() == '"' && stripped.back() == '"')
-        return std::string(stripped.substr(1, stripped.size() - 2));
 
     if(stripped.empty())
         return unexpected(resolve_error(resolve_errc::missing_field,

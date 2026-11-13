@@ -535,19 +535,22 @@ Three outcomes are possible, and the second is the one to design for:
   the scan never finds the closing brace.
 
 To carry text that merely resembles a token, quote it. A token whose only arm is
-a double-quoted literal yields the text between the quotes verbatim, braces
-included:
+a quoted literal — one run in single or double quotes spanning the whole
+arm — yields the text between the quotes verbatim, braces and dots
+included. The arm is read as a literal before it is read as a reference:
 
 ```
 ${"${HOME}"}          ->  ${HOME}
 PREFIX=${"${HOME}"}/bin  ->  PREFIX=${HOME}/bin
 ${"literal ${ brace"}    ->  literal ${ brace
+${"${HOME}/.config"}     ->  ${HOME}/.config
+${'x'}                   ->  x
 ```
 
-Known limitation: the quoted arm has no escape of its own. Text containing a
-double quote cannot be carried through it — there is no backslash escape, and a
-single-quoted arm is not a literal arm (`${'x'}` is reported, not stripped). A
-resolver needing a literal double quote must emit it outside a token.
+Known limitation: the quoted arm has no escape of its own. A `'...'` arm can
+carry a `"`, and a `"..."` arm can carry a `'`, but text holding both quote
+characters cannot be carried through one arm, since there is no backslash
+escape. A resolver needing such text must emit it outside a token.
 
 Two bounds hold the recursion:
 

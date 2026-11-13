@@ -409,7 +409,25 @@ The first three change results *silently*.
   across the whole expansion.
 - **A `}` inside a quoted fallback arm of a tree reference stays literal.**
   `${abs:a/missing ?? "}"}` now yields `}`; 0.4.1 ended the token at that brace
-  and yielded `""}`. A quoted function argument already behaved this way.
+  and yielded `""}`. Either quote works: `?? '}'` yields `}` as well. A quoted
+  function argument already behaved this way.
+- **A single-quoted fallback arm is a literal, the same as a double-quoted one.**
+  `${abs:a/missing ?? 'x'}` now yields `x`, where 0.4.1 kept the quotes and
+  yielded `'x'` &mdash; a silent value change. A `??` inside a quoted arm of either
+  kind no longer splits it: `?? 'a??b'` yields `a??b`, where 0.4.1 yielded `'a`,
+  again without a diagnostic. A single-quoted arm can carry a `"`, and a
+  double-quoted one a `'`.
+- **A quoted fallback arm is a literal even when it carries a dot.** The arm is
+  read as a quoted literal before it is read as a reference, so `?? "1.5"` now
+  yields `1.5`, where 0.4.1 read the dot as a category separator and failed the
+  load with `errc::unresolved_token` (`unknown tree tokenizer category`). A
+  resolver's output quoted the same way is a literal too: `${"${HOME}/.config"}`
+  yields `${HOME}/.config`. Each turns a failing load into a clean one.
+- **An arm is a quoted literal only when one quoted run spans all of it.**
+  `?? "a" "b"` now yields `"a" "b"` from the unquoted floor, where 0.4.1 stripped
+  the outer pair and yielded `a" "b` &mdash; a silent value change. A resolver
+  returning `${"a" "b"}` fails the load with `errc::unresolved_token`
+  (`unrecognized token body`) rather than yielding `a" "b`.
 - **A tree-tokenizer field naming a nested path is refused before dispatch.** A
   field carrying `/` is reported as a missing field, so a `??` fallback still
   applies, and the host resolver is never called with it.
