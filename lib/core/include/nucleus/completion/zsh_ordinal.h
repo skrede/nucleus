@@ -56,14 +56,14 @@ inline std::string zsh_ordinal_walker()
     return std::string(zsh_walker_head) + "            " + check + " || return 1\n" + std::string(zsh_walker_tail);
 }
 
-inline std::string zsh_ordinal_function(const std::string &ident)
+inline std::string zsh_ordinal_function(const std::string &function)
 {
-    return "_" + ident + "_ordinal()\n" + zsh_ordinal_walker();
+    return function + "_ordinal()\n" + zsh_ordinal_walker();
 }
 
-inline std::string zsh_ordinal_call(const std::string &ident, const completion_option &option)
+inline std::string zsh_ordinal_call(const std::string &function, const completion_option &option)
 {
-    std::string out = "    _" + ident + "_ordinal \"$ordinal_word\" " + zsh_single_quote(zsh_spec_tail(option));
+    std::string out = "    " + function + "_ordinal \"$ordinal_word\" " + zsh_single_quote(zsh_spec_tail(option));
 
     const std::vector<std::string> raw     = ordinal_pieces(option);
     const std::vector<std::string> escaped = zsh_name_pieces(option);
@@ -72,13 +72,13 @@ inline std::string zsh_ordinal_call(const std::string &ident, const completion_o
     return out + "\n";
 }
 
-inline std::string zsh_ordinal_calls(const std::string &ident, const completion_model &model)
+inline std::string zsh_ordinal_calls(const std::string &function, const completion_model &model)
 {
     std::string out = "    local -a ordinal_specs\n    local ordinal_word=${(Q)${PREFIX%%=*}}\n";
     for(const completion_option &option : model.options)
     {
         if(has_ordinal_slots(option))
-            out += zsh_ordinal_call(ident, option);
+            out += zsh_ordinal_call(function, option);
     }
     return out;
 }

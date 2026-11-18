@@ -25,18 +25,18 @@ namespace nucleus {
 // emit a bare `'--flag[desc]'` spec. The spec grammar and its quoting live in
 // zsh_spec.h, a description is rendered by zsh_description.h, and for a model with an
 // ordinal option the specs zsh_ordinal.h builds from the typed word precede the static ones.
-// Autoloaded from $fpath as `_<ident>` the file body completes, and sourced after compinit it registers.
+// Autoloaded from $fpath as `_nucleus_<ident>` the file body completes, and sourced after compinit it registers.
 class zsh_emitter final : public shell_emitter
 {
 public:
     std::string emit(const completion_model &model) const override
     {
-        const std::string ident = sanitize_ident(model.prog);
-        std::string       out   = header(model.prog);
+        const std::string fn  = function_name(model.prog);
+        std::string       out = header(model.prog);
         if(has_ordinal_options(model))
-            out += detail::zsh_ordinal_function(ident);
-        out += function_head(ident, model) + spec_lines(model);
-        return out + "}\n" + tail(ident, model.prog);
+            out += detail::zsh_ordinal_function(fn);
+        out += function_head(fn, model) + spec_lines(model);
+        return out + "}\n" + tail(fn, model.prog);
     }
 
 private:
@@ -51,19 +51,18 @@ private:
     // Only an autoload runs this text as the function itself, in the `loadautofunc` evaluation context.
     // The funcstack test turns away an `eval` of the text, whose context is `eval`, and the context test turns
     // away a file sourced under the function's own name, which funcstack reports as that name.
-    static std::string tail(const std::string &ident, const std::string &prog)
+    static std::string tail(const std::string &fn, const std::string &prog)
     {
-        const std::string fn   = "_" + ident;
         const std::string test = R"(if [ "$funcstack[1]" = ")" + fn + R"(" ] && [ "${zsh_eval_context[-1]}" != file ]; then )";
         return test + fn + R"( "$@"; else compdef )" + fn + " " + detail::zsh_word(prog) + "; fi\n";
     }
 
-    static std::string function_head(const std::string &ident, const completion_model &model)
+    static std::string function_head(const std::string &fn, const completion_model &model)
     {
-        const std::string head = "_" + ident + "()\n{\n";
+        const std::string head = fn + "()\n{\n";
         if(!has_ordinal_options(model))
             return head + "    _arguments -s \\\n";
-        return head + detail::zsh_ordinal_calls(ident, model) + "    _arguments -s \"${ordinal_specs[@]}\" \\\n";
+        return head + detail::zsh_ordinal_calls(fn, model) + "    _arguments -s \"${ordinal_specs[@]}\" \\\n";
     }
 
     static std::string spec_lines(const completion_model &model)
@@ -77,6 +76,8 @@ private:
         }
         return out;
     }
+
+    static std::string function_name(const std::string &prog) { return "_nucleus_" + sanitize_ident(prog); }
 
     static std::string sanitize_ident(const std::string &text)
     {

@@ -93,8 +93,7 @@ std::string replaced(std::string text, const std::string &from, const std::strin
 
 bool draws(const zsh_session &session, std::string_view text) { return session.cases[0].terminal.find(text) != std::string::npos; }
 
-zsh_session drive(const std::string &script, const std::string &typed) { return drive_zsh({{"_myapp", script}}, {typed}); }
-
+zsh_session drive(const std::string &script, const std::string &typed) { return drive_zsh({{"_nucleus_myapp", script}}, {typed}); }
 }
 
 TEST_CASE("a control byte in a description is drawn as caret text and never sent to the terminal", "[completion][smoke][zsh]")

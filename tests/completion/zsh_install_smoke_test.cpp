@@ -45,15 +45,15 @@ std::string logging_script()
 }
 
 constexpr std::array<zsh_route, 4>        source_routes{zsh_route::source, zsh_route::source_bare, zsh_route::source_dot, zsh_route::source_path};
-constexpr std::array<std::string_view, 3> source_files{"_myapp", "myapp.zsh", "_myapp.zsh"};
+constexpr std::array<std::string_view, 4> source_files{"_nucleus_myapp", "_myapp", "myapp.zsh", "_myapp.zsh"};
 }
 
 TEST_CASE("the generated zsh script installed on fpath completes under a real zsh", "[completion][smoke][zsh]")
 {
     if(!zsh_available())
         SKIP("no zsh with zsh/zpty reachable");
-    const zsh_session session = drive_zsh({{"_myapp", logging_script()}}, {"myapp --log", "myapp --logging-level=", "myapp --logging-level=w"});
-    REQUIRE(session.registered == "_myapp");
+    const zsh_session session = drive_zsh({{"_nucleus_myapp", logging_script()}}, {"myapp --log", "myapp --logging-level=", "myapp --logging-level=w"});
+    REQUIRE(session.registered == "_nucleus_myapp");
     REQUIRE(records_of(session.cases[0], "HIT") == std::vector<std::string>{"--logging", "--logging-level"});
     REQUIRE(records_of(session.cases[1], "VALUE") == std::vector<std::string>{"debug", "info", "warn", "error"});
     REQUIRE(records_of(session.cases[2], "BUF") == std::vector<std::string>{"myapp --logging-level=warn "});
@@ -66,7 +66,7 @@ TEST_CASE("sourcing the generated zsh script after compinit registers its comple
         SKIP("no zsh with zsh/zpty reachable");
     const zsh_session session = drive_zsh({{"myapp.zsh", logging_script()}}, {"myapp --logging-level=w"}, {.route = zsh_route::source});
     INFO(session.setup);
-    REQUIRE(session.registered == "_myapp");
+    REQUIRE(session.registered == "_nucleus_myapp");
     REQUIRE(records_of(session.cases[0], "BUF") == std::vector<std::string>{"myapp --logging-level=warn "});
     require_quiet(session);
 }
@@ -76,7 +76,7 @@ TEST_CASE("the source route fails visibly when the script ends in a bare call", 
     if(!zsh_available())
         SKIP("no zsh with zsh/zpty reachable");
     const std::string script = logging_script();
-    const std::string bare   = script.substr(0, script.rfind('\n', script.size() - 2) + 1) + "_myapp \"$@\"\n";
+    const std::string bare   = script.substr(0, script.rfind('\n', script.size() - 2) + 1) + "_nucleus_myapp \"$@\"\n";
     REQUIRE(bare != script);
     const zsh_session session = drive_zsh({{"myapp.zsh", bare}}, {"myapp --logging-level=w"}, {.route = zsh_route::source});
     REQUIRE(session.setup.find("can only be called from completion function") != std::string::npos);
@@ -93,7 +93,7 @@ TEST_CASE("sourcing the generated zsh script after compinit registers it whateve
             {
                 const zsh_session session = drive_zsh({{std::string(file), logging_script()}}, {"myapp --logging-level=w"}, {.route = route});
                 INFO(session.setup);
-                REQUIRE(session.registered == "_myapp");
+                REQUIRE(session.registered == "_nucleus_myapp");
                 REQUIRE(records_of(session.cases[0], "BUF") == std::vector<std::string>{"myapp --logging-level=warn "});
                 require_quiet(session);
             }
@@ -105,7 +105,7 @@ TEST_CASE("evaluating the generated zsh script after compinit registers its comp
         SKIP("no zsh with zsh/zpty reachable");
     const zsh_session session = drive_zsh({{"myapp.zsh", logging_script()}}, {"myapp --logging-level=w"}, {.route = zsh_route::eval});
     INFO(session.setup);
-    REQUIRE(session.registered == "_myapp");
+    REQUIRE(session.registered == "_nucleus_myapp");
     REQUIRE(records_of(session.cases[0], "BUF") == std::vector<std::string>{"myapp --logging-level=warn "});
     require_quiet(session);
 }

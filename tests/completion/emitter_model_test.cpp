@@ -76,8 +76,8 @@ TEST_CASE("a usable ordinal slot list still emits the walker", "[completion][mod
     REQUIRE(bash.find("    '--a*b') printf '%s\\n' '--a\\*b' ;;\n") != std::string::npos);
 
     const std::string zsh = zsh_emitter{}.emit(model_of({"--a*b", "", {}, {3}}));
-    REQUIRE(zsh.find("_myapp_ordinal()\n") != std::string::npos);
-    REQUIRE(zsh.find("    _myapp_ordinal \"$ordinal_word\" '[]' '--a' '--a' 'b' 'b'\n") != std::string::npos);
+    REQUIRE(zsh.find("_nucleus_myapp_ordinal()\n") != std::string::npos);
+    REQUIRE(zsh.find("    _nucleus_myapp_ordinal \"$ordinal_word\" '[]' '--a' '--a' 'b' 'b'\n") != std::string::npos);
 }
 
 TEST_CASE("a hostile program name reaches the bash script only as inert text", "[completion][model][smoke]")
@@ -108,7 +108,7 @@ TEST_CASE("a hostile program name reaches the zsh script only as inert text", "[
     const std::string plain = zsh_emitter{}.emit(model_of({"--w", "", {}, {}}));
     const std::string shown = "x$(touch PWN_PROG);y\\ntouch PWN_LINE\n";
     REQUIRE(zsh.starts_with("#compdef " + shown + "# zsh completion for " + shown + "#"));
-    const std::string fn = "_x__touch_PWN_PROG__y_touch_PWN_LINE";
+    const std::string fn = "_nucleus_x__touch_PWN_PROG__y_touch_PWN_LINE";
     REQUIRE(zsh.ends_with("}\nif [ \"$funcstack[1]\" = \"" + fn + "\" ] && [ \"${zsh_eval_context[-1]}\" != file ]; then " + fn + " \"$@\"; else compdef " + fn + " x\\$\\(touch\\ PWN_PROG\\)\\;y\\\ntouch\\ PWN_LINE; fi\n"));
     REQUIRE(std::ranges::count(zsh, '\n') == std::ranges::count(plain, '\n') + 1);
 }

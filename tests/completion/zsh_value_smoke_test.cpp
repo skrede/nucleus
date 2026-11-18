@@ -64,7 +64,7 @@ bool names_decoy(const zsh_seen &seen)
 
 zsh_session drive_globs(const std::string &script, const std::vector<std::string> &typed)
 {
-    return drive_zsh({{"_myapp", script}}, typed, {.decoys = decoys});
+    return drive_zsh({{"_nucleus_myapp", script}}, typed, {.decoys = decoys});
 }
 
 }
@@ -99,7 +99,7 @@ TEST_CASE("shell syntax in an allowed value is offered as text and inserted esca
     if(!zsh_available())
         SKIP("no zsh with zsh/zpty reachable");
     const std::vector<std::string> values{"$(touch PWN_V)", "`touch PWN_BQ`", "x;touch PWN_SEMI", "has space", "co:lon", "back\\slash"};
-    const zsh_session              session = drive_zsh({{"_myapp", script_with("pick", values)}}, {"myapp --app-pick=", "myapp --app-pick=\\$", "myapp --app-pick=\\`"});
+    const zsh_session              session = drive_zsh({{"_nucleus_myapp", script_with("pick", values)}}, {"myapp --app-pick=", "myapp --app-pick=\\$", "myapp --app-pick=\\`"});
     INFO("zsh " << session.version);
     INFO(session.cases[0].records);
     REQUIRE(sorted(records_of(session.cases[0], "VALUE")) == sorted(values));
@@ -114,7 +114,7 @@ TEST_CASE("every allowed value the registration rule admits round-trips through 
     if(!zsh_available())
         SKIP("no zsh with zsh/zpty reachable");
     const std::vector<std::string> values  = admitted_bytes();
-    const zsh_session              session = drive_zsh({{"_myapp", script_with("mode", values)}}, {"myapp --app-mode="});
+    const zsh_session              session = drive_zsh({{"_nucleus_myapp", script_with("mode", values)}}, {"myapp --app-mode="});
     INFO("zsh " << session.version);
     REQUIRE(values.size() == 191);
     REQUIRE(sorted(records_of(session.cases[0], "VALUE")) == sorted(values));

@@ -73,8 +73,7 @@ std::vector<std::string> sorted(std::vector<std::string> values)
     return values;
 }
 
-zsh_session drive(const std::string &script, const std::vector<std::string> &typed) { return drive_zsh({{"_myapp", script}}, typed); }
-
+zsh_session drive(const std::string &script, const std::vector<std::string> &typed) { return drive_zsh({{"_nucleus_myapp", script}}, typed); }
 }
 
 TEST_CASE("a description cannot reach the spec's action field under real zsh", "[completion][smoke][zsh]")

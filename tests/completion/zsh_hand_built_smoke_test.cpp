@@ -29,7 +29,7 @@ const std::vector<hand_built> refused{{"starflag", "*x"}, {"parenflag", "(a)b"},
 zsh_script script_of(const hand_built &program)
 {
     const nucleus::completion_model model{program.prog, {{"--ok", "d", {}, {}}, {program.flag, "d", {}, {}}}};
-    return {"_" + program.prog, nucleus::zsh_emitter{}.emit(model)};
+    return {"_nucleus_" + program.prog, nucleus::zsh_emitter{}.emit(model)};
 }
 
 void require_no_completion(const zsh_seen &seen, const std::string &typed)
@@ -59,7 +59,7 @@ TEST_CASE("a hand-built flag that opens with neither dash nor plus leaves its pr
     const zsh_session session = drive_zsh(scripts, typed, {.prog = "plusflag"});
     INFO("zsh " << session.version);
     INFO(session.setup);
-    REQUIRE(session.registered == "_plusflag");
+    REQUIRE(session.registered == "_nucleus_plusflag");
     for(std::size_t k = 0; k < refused.size(); ++k)
         require_no_completion(session.cases[k], typed[k]);
     CHECK(records_of(session.cases[4], "BUF") == std::vector<std::string>{"plusflag --ok "});

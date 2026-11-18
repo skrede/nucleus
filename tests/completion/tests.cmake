@@ -46,6 +46,8 @@ nucleus_add_zsh_smoke_test(zsh_install_smoke_test)
 
 nucleus_add_zsh_smoke_test(zsh_program_name_smoke_test)
 
+nucleus_add_zsh_smoke_test(zsh_compsys_name_smoke_test)
+
 nucleus_add_zsh_smoke_test(zsh_ordinal_smoke_test)
 
 nucleus_add_zsh_smoke_test(zsh_quoted_flag_smoke_test)

@@ -78,7 +78,7 @@ std::string script(const schema_registry &reg, std::string_view delimiter = "-")
     return script_of(generate_completion(shell::zsh, reg, "myapp", cli_delimiter::parse(delimiter).value()));
 }
 
-zsh_session drive(const std::string &script, const std::string &typed, const zsh_drive_options &options = {}) { return drive_zsh({{"_myapp", script}}, {typed}, options); }
+zsh_session drive(const std::string &script, const std::string &typed, const zsh_drive_options &options = {}) { return drive_zsh({{"_nucleus_myapp", script}}, {typed}, options); }
 
 std::vector<std::string> buffer_of(const zsh_session &session) { return records_of(session.cases[0], "BUF"); }
 

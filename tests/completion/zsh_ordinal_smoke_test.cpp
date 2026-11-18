@@ -98,7 +98,7 @@ zsh_session check_rows(const std::string &script, const std::vector<ordinal_row>
     std::vector<std::string> typed;
     for(const ordinal_row &row : rows)
         typed.push_back(row.typed);
-    const zsh_session session = drive_zsh({{"_myapp", script}}, typed);
+    const zsh_session session = drive_zsh({{"_nucleus_myapp", script}}, typed);
     for(std::size_t k = 0; k < rows.size(); ++k)
     {
         INFO(rows[k].typed);

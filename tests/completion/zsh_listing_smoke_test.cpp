@@ -65,7 +65,7 @@ std::string shell_syntax_script()
 
 zsh_session drive(const std::string &script, const std::string &typed, const zsh_drive_options &options = {})
 {
-    return drive_zsh({{"_myapp", script}}, {typed}, options);
+    return drive_zsh({{"_nucleus_myapp", script}}, {typed}, options);
 }
 
 bool draws(const zsh_session &session, std::string_view text) { return session.cases[0].terminal.find(text) != std::string::npos; }

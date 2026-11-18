@@ -140,17 +140,29 @@ is listed last, under Additions.
   where it used to be a bare `complete -F` line. A host that rewrote that line
   &mdash; to append aliases, or to strip it and register further names &mdash;
   must adjust to the new shape.
+- **The zsh script's function, and the file it installs as, are now named
+  `_nucleus_<ident>`.** `<ident>` is `prog` with every byte other than a letter, a
+  digit or `_` replaced by `_`. 0.4.1 named the function `_<ident>`, so a program
+  named after one of zsh's completion functions replaced that function for the
+  whole shell, on zsh 5.0.8 through 5.9 and on either install route. With `tags`,
+  every completion through `_arguments` stopped and printed a recursion error;
+  with `files`, file-name completion stopped; with `values`, a completion calling
+  `_values` was offered the program's flags. No function of zsh's completion
+  system carries the `_nucleus_` prefix. Save the script on `$fpath` as
+  `_nucleus_<ident>` and remove the file an earlier release installed: a file left
+  under the old name completes nothing on its first TAB, and completion starts on
+  the second. The emitted text and the install name change with no diagnostic.
 - **The zsh script's last line now registers the completion when the script is
   sourced.** It reads
-  `if [ "$funcstack[1]" = "_<prog>" ] && [ "${zsh_eval_context[-1]}" != file ]; then _<prog> "$@"; else compdef _<prog> <prog>; fi`
-  where it used to be a bare `_<prog> "$@"`. Sourcing the 0.4.1 script after
+  `if [ "$funcstack[1]" = "_nucleus_<ident>" ] && [ "${zsh_eval_context[-1]}" != file ]; then _nucleus_<ident> "$@"; else compdef _nucleus_<ident> <prog>; fi`
+  where it used to be a bare `_<ident> "$@"`. Sourcing the 0.4.1 script after
   `compinit` printed
   `_arguments:comparguments:327: can only be called from completion function` and
   registered nothing. Sourced after `compinit`, the script now registers silently
   whatever the file is named, and whether `source` is given its bare name, a `./`
   path or an absolute path, or finds it through `$path`. A file autoloaded from
-  `$fpath` completes as before. A host that rewrote that line must adjust to the
-  new shape.
+  `$fpath` under its install name completes on the first TAB, as before. A host
+  that rewrote that line must adjust to the new shape.
 - **A program name that is not a bare command token is refused.**
   `config_space::generate_completion` now returns `expected<std::string, error>`
   rather than `std::string`, so a caller that used the result as a string no
