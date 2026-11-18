@@ -1101,3 +1101,56 @@ jobs:
               exit 1
             fi
           done
+
+  # Only a container reaches more than one zsh release, and releases before 5.9 insert a flag carrying `*`
+  # differently.
+  zsh-versions:
+    name: zsh completion under zsh 5.0.8 to 5.9
+    runs-on: ubuntu-24.04
+    env:
+      ZSH_IMAGES: >-
+        5.0.8=docker.io/zshusers/zsh@sha256:6ff6d6d8b8de12e56511a55c59d0ff0d140ec50f2e799c572be3d0fc5fd9cd4c
+        5.5.1=docker.io/zshusers/zsh@sha256:3d27b05d4f45056855b827c2e6e12d5a31dc443d829fd2b14c6cee45cc0af37c
+        5.8.1=docker.io/zshusers/zsh@sha256:b10a1603ed6c29955af694db8feccf1543dbaf43a014aa5226bbaf53b03d9686
+        5.9=docker.io/zshusers/zsh@sha256:78ba9a921ee1c41f90e3ea6ab8c6bcafa5aa48cb44fe387ca5029cb298aabcbd
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: >-
+          cmake . -B build
+          -DNUCLEUS_BUILD_TESTS=ON
+          -DNUCLEUS_BUILD_SOURCE_XML=OFF
+
+      - name: Build the zsh smoke tests
+        run: cmake --build build --target zsh_smoke_tests
+
+      - name: Assert each image is the zsh it names
+        run: |
+          for pair in $ZSH_IMAGES; do
+            v=${pair%%=*}
+            image=${pair#*=}
+            if ! got=$(docker run --rm "$image" zsh -fc 'zmodload zsh/zpty && print -r -- $ZSH_VERSION') || [ "$got" != "$v" ]; then
+              echo "$image reports zsh '$got', not $v" >&2
+              exit 1
+            fi
+            echo "$image is zsh $got"
+          done
+
+      # The container runs as the runner's user, so the tests' own cleanup can remove all it writes under $TMPDIR.
+      - name: Run the zsh cases under each zsh
+        run: |
+          export TMPDIR="$RUNNER_TEMP/zsh"
+          mkdir -p "$TMPDIR"
+          for pair in $ZSH_IMAGES; do
+            echo "zsh ${pair%%=*}"
+            NUCLEUS_ZSH="docker run --rm --user $(id -u):$(id -g) -v $TMPDIR:$TMPDIR -v $PWD:$PWD:ro ${pair#*=} zsh" sh tests/completion/zsh_ran_check.sh build
+          done
+
+      # A check only ever run against tests that ran cannot show that it still fails.
+      - name: Assert the check refuses a run whose zsh tests skipped
+        run: |
+          if NUCLEUS_ZSH=false sh tests/completion/zsh_ran_check.sh build; then
+            echo "the check accepted a run in which every zsh smoke test skipped" >&2
+            exit 1
+          fi

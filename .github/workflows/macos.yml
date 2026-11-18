@@ -54,6 +54,11 @@ jobs:
           brew install bash
           bash -c 'echo "$BASH_VERSION"; ((BASH_VERSINFO[0] >= 5))'
 
+      # The zsh smoke tests skip where zsh or its zsh/zpty module is missing, so a runner without them would
+      # pass those tests unexercised.
+      - name: Assert a zsh with zsh/zpty
+        run: zsh -fc 'zmodload zsh/zpty && print -r -- "$ZSH_VERSION"'
+
       - name: Configure
         run: |
           cmake . -B build -DCMAKE_BUILD_TYPE=Release \
@@ -70,6 +75,9 @@ jobs:
 
       - name: Test
         run: cd build && ctest --output-on-failure --timeout 300
+
+      - name: Assert the zsh smoke tests ran
+        run: sh tests/completion/zsh_ran_check.sh build
 
   install-test:
     strategy:
@@ -141,6 +149,11 @@ jobs:
           brew install bash
           bash -c 'echo "$BASH_VERSION"; ((BASH_VERSINFO[0] >= 5))'
 
+      # The zsh smoke tests skip where zsh or its zsh/zpty module is missing, so a runner without them would
+      # pass those tests unexercised.
+      - name: Assert a zsh with zsh/zpty
+        run: zsh -fc 'zmodload zsh/zpty && print -r -- "$ZSH_VERSION"'
+
       - name: Configure
         run: >-
           cmake . -B build-san
@@ -154,3 +167,6 @@ jobs:
 
       - name: Test
         run: cd build-san && ctest --output-on-failure --timeout 300
+
+      - name: Assert the zsh smoke tests ran
+        run: sh tests/completion/zsh_ran_check.sh build-san
