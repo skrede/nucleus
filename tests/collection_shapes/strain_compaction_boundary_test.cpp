@@ -52,7 +52,7 @@ std::string nested_derived()
            "</server></cluster>";
 }
 
-nucleus::load_result load_chain(const nucleus::config_space &space)
+nucleus::load_result load_nested_chain(const nucleus::config_space &space)
 {
     const std::string     base    = nested_base();
     const std::string     derived = nested_derived();
@@ -113,7 +113,7 @@ TEST_CASE("nested compaction is confined to the affected outer instance",
           "[collection_shapes][keyed][compaction][nested]")
 {
     const nucleus::config_space space  = nested_space();
-    const nucleus::load_result  loaded = load_chain(space);
+    const nucleus::load_result  loaded = load_nested_chain(space);
     REQUIRE(loaded);
     const nucleus::config &cfg = loaded.value();
     INFO(nucleus::shapes::serialize(cfg));
