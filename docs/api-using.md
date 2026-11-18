@@ -1144,8 +1144,15 @@ The bash script requires bash 5.0 or later. On older bash, including the bash 3.
 macOS ships as `/bin/bash` and the bash 4.4 of RHEL 8 and its rebuilds, the script
 installs no completion.
 
-In zsh, load the zsh script: the bash script loaded through `bashcompinit`
-registers nothing, since zsh has no `BASH_VERSINFO`.
+In zsh, load the zsh script one of two ways. Either save it as a file named
+`_<prog>` in a directory on `$fpath` before `compinit` runs, with every byte of
+`prog` other than a letter, a digit or `_` replaced by `_` &mdash; the name of the
+function the script defines, so `my-tool.v2` installs as `_my_tool_v2` &mdash; or
+source it after `compinit`, for example from `.zshrc`. A file named after the raw
+program name, such as `_my-tool.v2`, completes nothing on the first TAB, which
+only registers the function the script defines; completion starts on the second.
+The bash script loaded through `bashcompinit` registers nothing, since zsh has no
+`BASH_VERSINFO`.
 
 `prog` reaches shell command position unquoted in the generated script, so it must
 be a bare command token: it opens with a letter, a digit or `_`, and carries only

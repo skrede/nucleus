@@ -108,7 +108,9 @@ TEST_CASE("a hostile program name reaches the zsh script only as inert text", "[
     const std::string plain = zsh_emitter{}.emit(model_of({"--w", "", {}, {}}));
     const std::string shown = "x$(touch PWN_PROG);y\\ntouch PWN_LINE\n";
     REQUIRE(zsh.starts_with("#compdef " + shown + "# zsh completion for " + shown + "#"));
-    REQUIRE(std::ranges::count(zsh, '\n') == std::ranges::count(plain, '\n'));
+    const std::string fn = "_x__touch_PWN_PROG__y_touch_PWN_LINE";
+    REQUIRE(zsh.ends_with("}\nif [ \"$funcstack[1]\" = \"" + fn + "\" ]; then " + fn + " \"$@\"; else compdef " + fn + " x\\$\\(touch\\ PWN_PROG\\)\\;y\\\ntouch\\ PWN_LINE; fi\n"));
+    REQUIRE(std::ranges::count(zsh, '\n') == std::ranges::count(plain, '\n') + 1);
 }
 
 TEST_CASE("a scratch tree is removed when a failure unwinds past it", "[completion][support]")

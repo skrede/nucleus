@@ -140,6 +140,15 @@ is listed last, under Additions.
   where it used to be a bare `complete -F` line. A host that rewrote that line
   &mdash; to append aliases, or to strip it and register further names &mdash;
   must adjust to the new shape.
+- **The zsh script's last line now registers the completion when the script is
+  sourced.** It reads
+  `if [ "$funcstack[1]" = "_<prog>" ]; then _<prog> "$@"; else compdef _<prog> <prog>; fi`
+  where it used to be a bare `_<prog> "$@"`. Sourcing the 0.4.1 script after
+  `compinit` printed
+  `_arguments:comparguments:327: can only be called from completion function` and
+  registered nothing; it now registers silently, and a file autoloaded from
+  `$fpath` completes as before. A host that rewrote that line must adjust to the
+  new shape.
 - **A program name that is not a bare command token is refused.**
   `config_space::generate_completion` now returns `expected<std::string, error>`
   rather than `std::string`, so a caller that used the result as a string no
