@@ -106,7 +106,7 @@ _myapp()
         '--cluster-node-port[]' \
         '--cluster-node-\*-port[]'
 }
-if [ "$funcstack[1]" = "_myapp" ]; then _myapp "$@"; else compdef _myapp myapp; fi
+if [ "$funcstack[1]" = "_myapp" ] && [ "${zsh_eval_context[-1]}" != file ]; then _myapp "$@"; else compdef _myapp myapp; fi
 )zsh";
 }
 
@@ -141,7 +141,7 @@ TEST_CASE("the static spec of a slotted option takes no value", "[completion][or
     {
         DYNAMIC_SECTION(row.option.flag)
         {
-            REQUIRE(nucleus::zsh_emitter{}.emit({"myapp", {row.option}}).ends_with(row.arguments + "}\nif [ \"$funcstack[1]\" = \"_myapp\" ]; then _myapp \"$@\"; else compdef _myapp myapp; fi\n"));
+            REQUIRE(nucleus::zsh_emitter{}.emit({"myapp", {row.option}}).ends_with(row.arguments + "}\nif [ \"$funcstack[1]\" = \"_myapp\" ] && [ \"${zsh_eval_context[-1]}\" != file ]; then _myapp \"$@\"; else compdef _myapp myapp; fi\n"));
         }
     }
 }

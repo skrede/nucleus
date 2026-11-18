@@ -142,11 +142,13 @@ is listed last, under Additions.
   must adjust to the new shape.
 - **The zsh script's last line now registers the completion when the script is
   sourced.** It reads
-  `if [ "$funcstack[1]" = "_<prog>" ]; then _<prog> "$@"; else compdef _<prog> <prog>; fi`
+  `if [ "$funcstack[1]" = "_<prog>" ] && [ "${zsh_eval_context[-1]}" != file ]; then _<prog> "$@"; else compdef _<prog> <prog>; fi`
   where it used to be a bare `_<prog> "$@"`. Sourcing the 0.4.1 script after
   `compinit` printed
   `_arguments:comparguments:327: can only be called from completion function` and
-  registered nothing; it now registers silently, and a file autoloaded from
+  registered nothing. Sourced after `compinit`, the script now registers silently
+  whatever the file is named, and whether `source` is given its bare name, a `./`
+  path or an absolute path, or finds it through `$path`. A file autoloaded from
   `$fpath` completes as before. A host that rewrote that line must adjust to the
   new shape.
 - **A program name that is not a bare command token is refused.**

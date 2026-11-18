@@ -109,7 +109,7 @@ TEST_CASE("a hostile program name reaches the zsh script only as inert text", "[
     const std::string shown = "x$(touch PWN_PROG);y\\ntouch PWN_LINE\n";
     REQUIRE(zsh.starts_with("#compdef " + shown + "# zsh completion for " + shown + "#"));
     const std::string fn = "_x__touch_PWN_PROG__y_touch_PWN_LINE";
-    REQUIRE(zsh.ends_with("}\nif [ \"$funcstack[1]\" = \"" + fn + "\" ]; then " + fn + " \"$@\"; else compdef " + fn + " x\\$\\(touch\\ PWN_PROG\\)\\;y\\\ntouch\\ PWN_LINE; fi\n"));
+    REQUIRE(zsh.ends_with("}\nif [ \"$funcstack[1]\" = \"" + fn + "\" ] && [ \"${zsh_eval_context[-1]}\" != file ]; then " + fn + " \"$@\"; else compdef " + fn + " x\\$\\(touch\\ PWN_PROG\\)\\;y\\\ntouch\\ PWN_LINE; fi\n"));
     REQUIRE(std::ranges::count(zsh, '\n') == std::ranges::count(plain, '\n') + 1);
 }
 

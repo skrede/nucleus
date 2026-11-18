@@ -138,7 +138,7 @@ const std::string expected_zsh =
         "        '--plexus[]' \\\n"
         "        '--plexus-port[]'\n"
         "}\n"
-        "if [ \"$funcstack[1]\" = \"_myapp\" ]; then _myapp \"$@\"; else compdef _myapp myapp; fi\n";
+        "if [ \"$funcstack[1]\" = \"_myapp\" ] && [ \"${zsh_eval_context[-1]}\" != file ]; then _myapp \"$@\"; else compdef _myapp myapp; fi\n";
 }
 
 TEST_CASE("the bash script matches the golden projection byte-for-byte", "[completion]")

@@ -52,15 +52,21 @@ inline bool below_5_9(const std::string &version)
 enum class zsh_route
 {
     fpath,
-    source
+    source,
+    source_bare,
+    source_dot,
+    source_path
 };
 
 inline std::string_view route_text(zsh_route route)
 {
     switch(route)
     {
-        case zsh_route::fpath:  return "fpath";
-        case zsh_route::source: return "source";
+        case zsh_route::fpath:       return "fpath";
+        case zsh_route::source:      return "source";
+        case zsh_route::source_bare: return "source-bare";
+        case zsh_route::source_dot:  return "source-dot";
+        case zsh_route::source_path: return "source-path";
     }
     return "unknown";
 }

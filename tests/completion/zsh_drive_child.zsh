@@ -37,18 +37,31 @@ nucleus_probe()
     zle -R
 }
 
-nucleus_install()
+nucleus_source_scripts()
 {
     local f
-    if [[ $(<$nucleus_scratch/in/route) == fpath ]]; then
+    local -a kept
+    # (N): an empty directory must not abort the loop under NOMATCH.
+    for f in $nucleus_scratch/scripts/*(N); do
+        case $1 in
+            (source) source $f ;;
+            (source-bare) cd $f:h && source $f:t ;;
+            (source-dot) cd $f:h && source ./$f:t ;;
+            (source-path) kept=( $path ); path=( $f:h $path ); source $f:t; path=( $kept ) ;;
+        esac
+    done
+    cd $nucleus_scratch/work
+}
+
+nucleus_install()
+{
+    local route="$(<$nucleus_scratch/in/route)"
+    if [[ $route == fpath ]]; then
         fpath=( $nucleus_scratch/scripts $fpath )
     fi
     autoload -U compinit && compinit -u -d $nucleus_scratch/out/zcompdump
-    if [[ $(<$nucleus_scratch/in/route) == source ]]; then
-        # (N): an empty directory must not abort the loop under NOMATCH.
-        for f in $nucleus_scratch/scripts/*(N); do
-            source $f
-        done
+    if [[ $route == source* ]]; then
+        nucleus_source_scripts $route
     fi
     source $nucleus_scratch/in/setup.zsh
 }
