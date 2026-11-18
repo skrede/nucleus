@@ -13,9 +13,11 @@
 #include <cstdlib>
 #include <fstream>
 #include <sstream>
+#include <charconv>
 #include <iterator>
 #include <filesystem>
 #include <string_view>
+#include <system_error>
 
 namespace nucleus::zsh_test {
 
@@ -34,6 +36,17 @@ inline bool zsh_available()
 #else
     return std::system((zsh_command() + " -fc 'zmodload zsh/zpty' >/dev/null 2>&1").c_str()) == 0;
 #endif
+}
+
+inline bool below_5_9(const std::string &version)
+{
+    std::int32_t major      = 0;
+    std::int32_t minor      = 0;
+    const char  *end        = version.data() + version.size();
+    const auto [dot, error] = std::from_chars(version.data(), end, major);
+    if(error != std::errc{} || dot == end || *dot != '.' || std::from_chars(dot + 1, end, minor).ec != std::errc{})
+        FAIL("cannot read the zsh version '" << version << "'");
+    return major < 5 || (major == 5 && minor < 9);
 }
 
 enum class zsh_route

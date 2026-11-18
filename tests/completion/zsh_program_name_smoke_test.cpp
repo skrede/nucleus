@@ -14,8 +14,10 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <tuple>
 #include <string>
 #include <vector>
+#include <cstddef>
 #include <utility>
 #include <algorithm>
 
@@ -29,6 +31,7 @@ using nucleus::completion_result_test::script_of;
 using nucleus::zsh_test::drive_zsh;
 using nucleus::zsh_test::records_of;
 using nucleus::zsh_test::require_quiet;
+using nucleus::zsh_test::route_text;
 using nucleus::zsh_test::zsh_available;
 using nucleus::zsh_test::zsh_route;
 using nucleus::zsh_test::zsh_session;
@@ -50,6 +53,19 @@ std::vector<std::string> sorted_hits(const nucleus::zsh_test::zsh_seen &seen)
     std::vector<std::string> hits = records_of(seen, "HIT");
     std::ranges::sort(hits);
     return hits;
+}
+
+std::string alpha_script(const std::string &prog)
+{
+    schema_registry reg;
+    REQUIRE(reg.attach(nucleus::element("alpha", anchor::root())));
+    return script_of(generate_completion(shell::zsh, reg, prog));
+}
+
+// zsh reports the runaway recursion in one of two wordings, depending on its release.
+bool recursion_reported(const std::string &terminal)
+{
+    return terminal.find("maximum nested function level reached") != std::string::npos || terminal.find("recursion limit exceeded") != std::string::npos;
 }
 
 zsh_session drive_tool(const std::string &file, zsh_route route, const std::vector<std::string> &typed)
@@ -95,4 +111,27 @@ TEST_CASE("a hostile program name runs nothing when the zsh script is installed 
     const zsh_session sourced = drive_zsh({{"hostile.zsh", script}}, {"PWN_LINE --"}, {.route = zsh_route::source, .prog = "x$(touch PWN_PROG);ytouch PWN_LINE"});
     REQUIRE(sourced.registered == "_" + ident);
     require_quiet(sourced);
+}
+
+// The script for `tags` defines `_tags`, replacing the compsys function `_arguments` itself calls, so every
+// completion that goes through `_arguments` recurses until zsh gives up.
+TEST_CASE("a program named after a zsh completion function gets no completion", "[completion][smoke][zsh]")
+{
+    if(!zsh_available())
+        SKIP("no zsh with zsh/zpty reachable");
+    const std::vector<std::string> typed{"tags --a", "myapp --a", "ls --al"};
+    for(const auto &[route, tags, myapp] : {std::tuple{zsh_route::fpath, "_tags", "_myapp"}, std::tuple{zsh_route::source, "tags.zsh", "myapp.zsh"}})
+    {
+        const zsh_session session = drive_zsh({{myapp, alpha_script("myapp")}, {tags, alpha_script("tags")}}, typed, {.route = route});
+        INFO(route_text(route));
+        REQUIRE(session.registered == "_myapp");
+        REQUIRE(session.payload.empty());
+        for(std::size_t k = 0; k < typed.size(); ++k)
+        {
+            INFO(session.cases[k].terminal);
+            CHECK(records_of(session.cases[k], "HIT").empty());
+            CHECK(records_of(session.cases[k], "BUF") == std::vector<std::string>{typed[k]});
+            CHECK(recursion_reported(session.cases[k].terminal));
+        }
+    }
 }

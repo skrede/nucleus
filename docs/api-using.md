@@ -1154,6 +1154,27 @@ only registers the function the script defines; completion starts on the second.
 The bash script loaded through `bashcompinit` registers nothing, since zsh has no
 `BASH_VERSINFO`.
 
+The zsh script supports zsh 5.0.8 and later, and its behavior is tested on zsh
+5.0.8, 5.5.1, 5.8.1 and 5.9. It carries no version check: an older zsh is not
+refused, but it is not supported.
+
+Before zsh 5.9, a flag carrying a character zsh quotes is affected. Only the
+wildcard flags of a repeated container, such as `--cluster-node-\*-port`, and a
+delimiter holding `*`, a space or another character zsh quotes produce one. zsh
+before 5.9 inserts such a flag unquoted: under a `*` delimiter,
+`--cluster*node*2*` completes to `--cluster*node*2*port`, and running the command
+then reports `no matches found`. A word typed with that character escaped, such
+as `--cluster-node-\*-p` or, under a `*` delimiter, `--cluster\*node\*2\*`, is not
+completed. zsh 5.9 completes both quoted, to `--cluster-node-\*-port` and
+`--cluster\*node\*2\*port`.
+
+A program named after one of zsh's own completion functions, such as `tags`,
+`values` or `files`, gets no zsh completion, because the script defines
+`_<prog>`, a name zsh's completion system already holds. Installing that script
+replaces zsh's function for the whole shell. For `tags`, on either install route,
+every completion that goes through `_arguments` then stops working, including that
+of every other program, and each TAB prints a recursion error.
+
 `prog` reaches shell command position unquoted in the generated script, so it must
 be a bare command token: it opens with a letter, a digit or `_`, and carries only
 letters, digits, `.`, `_` and `-`. A name carrying a path separator, whitespace, a

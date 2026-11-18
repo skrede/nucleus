@@ -188,6 +188,16 @@ is listed last, under Additions.
   `Bidi_Control` set as `\xNN` escapes. 0.4.1 escaped only the bytes that end a
   description or separate a value list's members, and wrote each flag as given.
   What zsh offers, and the emitted text, change with no diagnostic.
+- **A typed `\*` in a zsh flag now completes.** Under a `*` delimiter, zsh inserts
+  each `*` of a flag as `\*`, and the generated completion compared that typed
+  word with its backslashes, so a flag such as `--cluster\*node\*2\*` completed
+  nothing. The typed word is now read with its quoting removed, so on zsh 5.9
+  such a flag completes, as does one whose delimiter holds a space or another
+  byte zsh escapes. What zsh completes, and the emitted text, change with no
+  diagnostic.
+- **The zsh script is supported on zsh 5.0.8 and later.** It carries no version
+  check. Before zsh 5.9, a flag carrying `*` or another character zsh quotes is
+  inserted unquoted or not completed, as the completion docs describe.
 - **The text of the generated scripts changed throughout this release.** Beyond the
   last line, the bash and zsh scripts differ from 0.4.1's in many places. Treat
   them as opaque output to install as written; a host that post-processes either

@@ -95,7 +95,7 @@ _myapp_ordinal()
 _myapp()
 {
     local -a ordinal_specs
-    local ordinal_word=${PREFIX%%=*}
+    local ordinal_word=${(Q)${PREFIX%%=*}}
     _myapp_ordinal "$ordinal_word" '=[]:value:(debug info)' '--cluster-node-' '--cluster-node-' '-level' '-level'
     _myapp_ordinal "$ordinal_word" '[]' '--cluster-node-' '--cluster-node-' '-port' '-port'
     _arguments -s "${ordinal_specs[@]}" \
