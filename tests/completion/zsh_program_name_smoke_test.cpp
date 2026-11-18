@@ -73,6 +73,27 @@ zsh_session drive_tool(const std::string &file, zsh_route route, const std::vect
     return drive_zsh({{file, tool_script()}}, typed, {.route = route, .prog = "my-tool.v2"});
 }
 
+struct compsys_row
+{
+    std::string name;
+    std::string own_buf;
+    bool        fallback_offers_alpha;
+};
+
+const std::vector<compsys_row> compsys_rows{{"files", "files --alpha ", true}, {"values", "values --alpha ", false}};
+
+std::vector<nucleus::zsh_test::zsh_script> named_scripts(zsh_route route, const std::string &name)
+{
+    if(route == zsh_route::fpath)
+        return {{"_myapp", alpha_script("myapp")}, {"_" + name, alpha_script(name)}};
+    return {{"myapp.zsh", alpha_script("myapp")}, {name + ".zsh", alpha_script(name)}};
+}
+
+bool offers_alpha(const nucleus::zsh_test::zsh_seen &seen)
+{
+    const std::vector<std::string> hits = records_of(seen, "HIT");
+    return std::ranges::find(hits, "--alpha") != hits.end();
+}
 }
 
 TEST_CASE("a program name that is not an identifier completes from the file named for its function", "[completion][smoke][zsh]")
@@ -134,4 +155,23 @@ TEST_CASE("a program named after a zsh completion function gets no completion", 
             CHECK(recursion_reported(session.cases[k].terminal));
         }
     }
+}
+
+// A command with no completion of its own falls back to compsys's `_files`, so it offers what the program
+// named `files` defines.
+TEST_CASE("a program named after a zsh completion function replaces that function for the whole shell", "[completion][smoke][zsh]")
+{
+    if(!zsh_available())
+        SKIP("no zsh with zsh/zpty reachable");
+    for(const zsh_route route : {zsh_route::fpath, zsh_route::source})
+        for(const compsys_row &row : compsys_rows)
+        {
+            const zsh_session session = drive_zsh(named_scripts(route, row.name), {row.name + " --a", "myapp --a", "othertool --al"}, {.route = route});
+            INFO(route_text(route) << " " << row.name);
+            REQUIRE(session.registered == "_myapp");
+            require_quiet(session);
+            CHECK(records_of(session.cases[0], "BUF") == std::vector<std::string>{row.own_buf});
+            CHECK(offers_alpha(session.cases[1]));
+            CHECK(offers_alpha(session.cases[2]) == row.fallback_offers_alpha);
+        }
 }

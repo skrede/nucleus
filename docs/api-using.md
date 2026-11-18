@@ -1171,11 +1171,16 @@ completed. zsh 5.9 completes both quoted, to `--cluster-node-\*-port` and
 `--cluster\*node\*2\*port`.
 
 A program named after one of zsh's own completion functions, such as `tags`,
-`values` or `files`, gets no zsh completion, because the script defines
-`_<prog>`, a name zsh's completion system already holds. Installing that script
-replaces zsh's function for the whole shell. For `tags`, on either install route,
-every completion that goes through `_arguments` then stops working, including that
-of every other program, and each TAB prints a recursion error.
+`files` or `values`, gets a script that defines `_<prog>`, a name zsh's
+completion system already holds. Installing that script replaces zsh's function
+for the whole shell. For `tags`, on either install route, every completion that
+goes through `_arguments` then stops working, including that of every other
+program, and each TAB prints a recursion error. A program named `files` or
+`values` completes its own flags on either install route, and another generated
+program in the same shell still completes its own. With `files` installed, a
+completion that falls back to file names, such as that of a command with no
+completion of its own, offers the `files` program's flags. With `values`
+installed, that command is not offered them.
 
 `prog` reaches shell command position unquoted in the generated script, so it must
 be a bare command token: it opens with a letter, a digit or `_`, and carries only
