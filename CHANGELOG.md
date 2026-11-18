@@ -812,15 +812,15 @@ They use the names of this release; see Vocabulary.
 - **Every public result channel now carries a `nucleus::error`, not a string.**
   `load_result`, `registration_result`, `gate_result`, `config_source_result`,
   `extension_result` and `config::get_as` and `get_all_as` report a
-  `nucleus::error`: a code from the new `nucleus::errc`, which 0.2.0 did not have,
-  and the reason as `message`. Code that compares, assigns or appends the error
-  as a `std::string` no longer compiles; read `message`, or branch on `code`. A
-  host source whose `pull()` returns `unexpected` of a string no longer compiles
-  either: it returns a `config_source_error` naming a code. Streaming the error
-  still compiles, but `operator<<` now writes `code: message`, as does the new
-  `to_string(error)`, so the text you log gains a prefix without a diagnostic. A
-  registration policy's verdict and a host converter still return plain strings;
-  nucleus attaches the code.
+  `nucleus::error`: a code from the new `nucleus::errc`, which the 0.2.0 version
+  bump did not have, and the reason as `message`. Code that compares, assigns or
+  appends the error as a `std::string` no longer compiles; read `message`, or
+  branch on `code`. A host source whose `pull()` returns `unexpected` of a
+  string no longer compiles either: it returns a `config_source_error` naming a
+  code. Streaming the error still compiles, but `operator<<` now writes
+  `code: message`, as does the new `to_string(error)`, so the text you log gains
+  a prefix without a diagnostic. A registration policy's verdict and a host
+  converter still return plain strings; nucleus attaches the code.
 - **`registration_result` and `extension_result` hold `void` on success.** They
   were `expected<std::monostate, std::string>` and are now
   `expected<void, error>`, so code that builds one from `std::monostate{}` or
@@ -844,8 +844,8 @@ They use the names of this release; see Vocabulary.
   `absent_key`, and the enumeration carries no explicit values, so
   `missing_converter` and `mismatched_type` each moved up by one. Nothing reports
   the change: a code stored, logged or compared as a number now names a different
-  failure. Code upgrading from 0.2.0 has no such numbers to re-check, since
-  `errc` itself is new in this release.
+  failure. Code upgrading from the 0.2.0 version bump has no such numbers to
+  re-check, since `errc` itself is new in this release.
 
 ### Collections
 

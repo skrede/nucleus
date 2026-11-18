@@ -339,13 +339,14 @@ struct extend_disposition {
   document's own content only.
 
 A strength applies per re-open site: in a chain that re-opens one strain in
-several documents, each document's content follows its own `extend`, and a flat
-source obeys the policy whatever the documents declare. An `extend` a flat source
+several documents, each document's content follows its own `extend`, and a
+source outside the inheritance chain, a document on the `source_stack` included,
+obeys the policy whatever the documents declare. An `extend` such a source
 declares on a named instance gives its content no strength and takes no part in
 the re-open rules below, so it neither permits a derived document's
 re-declaration nor fails for want of a base. An `extend` on a repeated container
-fails the load with `errc::layering_violation` from any source, a flat one
-included.
+fails the load with `errc::layering_violation` from any source, in the chain or
+not.
 
 A disposition for a primary-key value not present in any base layer is a loud
 error. Re-declaring a named instance in a derived layer without `extend` is

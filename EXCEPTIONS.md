@@ -244,6 +244,11 @@ is the price of the file being stable under both, and the row is the price of th
 Four rows rose by one line each when the test units came to include `<cstddef>` for the
 `std::size_t` they name, the standard-header rule the library units already follow.
 
+Thirteen rows rose by one to five lines when every include block was put in the project's include
+order, which separates each folder group from the next with a blank line.
+
+| File | Lines |
+|---|---|
 | `tests/config_source/inherit_chain_test.cpp` | 1120 |
 | `tests/keyspace/repeated_container_test.cpp` | 817 |
 | `tests/schema/typed_element_test.cpp` | 810 |
