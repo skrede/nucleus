@@ -113,12 +113,12 @@ function(nucleus_warnings target)
                 # opt-out above.
                 -Wno-missing-field-initializers)
 
-            # Probed, not inferred from a version: AppleClang's versions do not
-            # track upstream LLVM, and naming a warning a compiler predates is an
-            # unknown-warning-option error. -Wnrvo flags roughly ninety return
-            # sites where NRVO isn't guaranteed, an optimization hint rather than
-            # a defect; AppleClang 21 keeps the designated-field subgroup on
-            # under the group opt-out above, unlike upstream Clang.
+            # Probed, not inferred from a version, since AppleClang's versions do
+            # not track upstream LLVM and naming a warning a compiler predates is
+            # an unknown-warning-option error. -Wnrvo's ~90 return sites are
+            # optimization hints, not defects, and AppleClang 21, unlike upstream
+            # Clang, keeps the designated-field subgroup on under the group
+            # opt-out above.
             foreach(warning IN ITEMS nrvo missing-designated-field-initializers)
                 string(MAKE_C_IDENTIFIER "NUCLEUS_HAVE_W_${warning}" probe)
                 check_cxx_compiler_flag(-W${warning} ${probe})

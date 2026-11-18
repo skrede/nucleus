@@ -6,12 +6,10 @@
 
 namespace nucleus::detail {
 
-// The tracker spells a reply for the quote the typed word leaves open; with a quote byte or backslash in the current
-// word right of the cursor, or under `$'` and `$"`, which report no quote, it takes the bare spelling, inert under any
-// quote, though the value readline then inserts is not always the candidate. Its status is non-zero where a reply would
-// repeat the text readline keeps before a quote opened after other text, for a word ending inside one; with a quote byte
-// or backslash in the current word right of the cursor it cannot tell which side of the cursor the quote opened on, so
-// it refuses any word that opened one after other text, even where readline keeps nothing.
+// Sets `quote` to the quote the typed word leaves open, or to empty (the bare spelling, inert under any quote, though
+// readline may then insert other than the candidate) under `$'`, `$"`, or a quote byte or backslash right of the cursor.
+// Fails for a word ending inside a quote opened after other text, whose reply would repeat the text readline keeps
+// before it, or, with a quote byte or backslash right of the cursor, for any word that opened one after other text.
 inline constexpr std::string_view bash_quote_tracker = R"({
     local rest="$1" c seen="" reopened="" ever=""
     quote=""

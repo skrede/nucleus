@@ -5,7 +5,7 @@
 # limit the alignment settings below are read differently by different releases, so two
 # accepted versions means two verdicts for one tree.
 # SortIncludes is off because the project's include order (grouped by origin and
-# folder, sorted by line length then alphabetically) is not expressible here;
+# folder, sorted by file-name length then alphabetically) is not expressible here;
 # see CONVENTIONS.md.
 ---
 Language: Cpp
