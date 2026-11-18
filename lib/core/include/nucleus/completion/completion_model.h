@@ -34,7 +34,9 @@ struct completion_option
 // the generated script is reproducible byte-for-byte). The generator builds this
 // purely from the schema; each shell emitter renders it into that shell's dialect.
 // The generator fills only values registration admitted, none carrying a control character. A model built
-// by hand skips that rule: an emitter renders each value as given, so a newline or NUL does not survive.
+// by hand skips that rule: an emitter renders each value as given, so a newline or NUL does not reach every
+// shell intact. A hand-built flag that opens with neither `-` nor `+` makes zsh's `_arguments` refuse the
+// spec list, so the program completes nothing under zsh.
 struct completion_model
 {
     std::string prog;

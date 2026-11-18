@@ -1,4 +1,5 @@
 #include "completion/bash_test_support.h"
+#include "completion/admitted_values_test_support.h"
 
 #include "support/escaped_echo_test_support.h"
 #include "support/builder_result_test_support.h"
@@ -13,37 +14,15 @@
 
 #include <string>
 #include <vector>
-#include <cstdint>
 
+using nucleus::admitted_values_test::admitted;
+using nucleus::admitted_values_test::admitted_bytes;
 using nucleus::bash_test::bash_available;
 using nucleus::bash_test::insert_and_parse;
 using nucleus::bash_test::run_seeded;
 using nucleus::builder_result_test::built;
 using nucleus::completion_result_test::script_of;
 using nucleus::escaped_echo_test::under;
-
-namespace {
-
-bool admitted(const std::string &value)
-{
-    nucleus::config_space_builder engine;
-    REQUIRE(engine.register_element(nucleus::element("app", nucleus::anchor::root())));
-    return static_cast<bool>(engine.register_element(nucleus::enum_element("mode", under("app"), {value})));
-}
-
-std::vector<std::string> admitted_bytes()
-{
-    std::vector<std::string> out;
-    for(std::uint32_t byte = 0x00; byte <= 0xff; ++byte)
-    {
-        const std::string value(1, static_cast<char>(byte));
-        if(admitted(value))
-            out.push_back(value);
-    }
-    return out;
-}
-
-}
 
 TEST_CASE("the registration rule admits 191 single-byte allowed values, neither a newline nor a NUL",
           "[completion][registration]")

@@ -1136,7 +1136,9 @@ An `enum_element`'s value set becomes that flag's completion candidates.
 Registration refuses an allowed value carrying a control character, so every
 candidate reaches the script as registered. A host that
 builds a `completion_model` itself and renders it with an emitter skips that
-rule and holds its values to it. A pure
+rule and holds its values to it. Such a host also holds each flag to opening
+with `-` or `+`, since zsh's `_arguments` refuses any other spec and the
+program then completes nothing in zsh. A pure
 read of the sealed schema. nucleus is a library, not a CLI — it returns the
 script and the host decides how to surface it.
 
