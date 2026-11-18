@@ -1,4 +1,5 @@
 #include "nucleus/completion/zsh_emitter.h"
+#include "nucleus/completion/zsh_quoted_flag.h"
 #include "nucleus/completion/completion_model.h"
 #include "nucleus/completion/completion_generator.h"
 
@@ -30,6 +31,32 @@ std::string emitted(const std::string &flag, const std::string &description,
     return nucleus::zsh_emitter{}.emit({"myapp", {{flag, description, values}}});
 }
 
+const std::vector<std::pair<std::string, bool>> insertion_rows{
+        {"--a-b", false},
+        {"--a.b", false},
+        {"--a_b", false},
+        {"--a,b", false},
+        {"--a@b", false},
+        {"--a%b", false},
+        {"--a+b", false},
+        {"--a/b", false},
+        {"--a:b", false},
+        {"--a=b", false},
+        {"--a*b", true},
+        {"--a b", true},
+        {"--a$b", true},
+        {"--a;b", true},
+        {"--a(b", true},
+        {"--a|b", true},
+        {"--a~b", true},
+        {"--a!b", true},
+        {"--a#b", true},
+        {std::string("--a\0b", 5), true},
+        {"--a\nb", true},
+        {"--a\xc3\xa9z", false},
+        {"--a\xc2\x9bz", true},
+        {"--a\xffz", true},
+};
 }
 
 TEST_CASE("a glob in a zsh value group is escaped so the eval offers it literally", "[completion]")
@@ -133,5 +160,14 @@ TEST_CASE("a bare C1 byte in a zsh description is rendered and nothing else is",
         CAPTURE(spec);
         REQUIRE(spec.find(rendered) != std::string::npos);
         REQUIRE(std::ranges::none_of(spec, is_c1_byte));
+    }
+}
+
+TEST_CASE("a flag text counts as quoted exactly when zsh 5.9 quotes it on insertion", "[completion]")
+{
+    for(const auto &[text, quoted] : insertion_rows)
+    {
+        CAPTURE(text);
+        CHECK(nucleus::detail::zsh_quotes_on_insert(text) == quoted);
     }
 }
