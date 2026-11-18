@@ -74,7 +74,7 @@ jobs:
         run: cmake --build build
 
       - name: Test
-        run: cd build && ctest --output-on-failure --timeout 300
+        run: cd build && ctest --output-on-failure --timeout 300 -E '^zsh_.*_smoke_test$'
 
       - name: Assert the zsh smoke tests ran
         run: sh tests/completion/zsh_ran_check.sh build
@@ -166,7 +166,7 @@ jobs:
         run: cmake --build build-san
 
       - name: Test
-        run: cd build-san && ctest --output-on-failure --timeout 300
+        run: cd build-san && ctest --output-on-failure --timeout 300 -E '^zsh_.*_smoke_test$'
 
       - name: Assert the zsh smoke tests ran
         run: sh tests/completion/zsh_ran_check.sh build-san

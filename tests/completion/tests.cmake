@@ -33,6 +33,9 @@ add_custom_target(zsh_smoke_tests)
 # Catch2 exits 4 when every case skipped, which here means no zsh with zsh/zpty was reachable; tell CTest
 # that is a skip and not a failure.
 function(nucleus_add_zsh_smoke_test name)
+    if(NOT name MATCHES "^zsh_.*_smoke_test$")
+        message(FATAL_ERROR "${name} is not named zsh_*_smoke_test, the pattern the zsh ran-check selects tests by")
+    endif()
     nucleus_add_test(${name}
         DEFINES NUCLEUS_ZSH_DRIVER="${CMAKE_CURRENT_SOURCE_DIR}/completion/zsh_drive.zsh"
         PROPERTIES SKIP_RETURN_CODE 4)

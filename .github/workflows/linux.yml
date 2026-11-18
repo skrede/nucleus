@@ -1107,6 +1107,7 @@ jobs:
   zsh-versions:
     name: zsh completion under zsh 5.0.8 to 5.9
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     env:
       ZSH_IMAGES: >-
         5.0.8=docker.io/zshusers/zsh@sha256:6ff6d6d8b8de12e56511a55c59d0ff0d140ec50f2e799c572be3d0fc5fd9cd4c
