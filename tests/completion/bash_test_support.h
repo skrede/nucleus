@@ -1,6 +1,8 @@
 #ifndef HPP_GUARD_NUCLEUS_TESTS_COMPLETION_BASH_TEST_SUPPORT_H
 #define HPP_GUARD_NUCLEUS_TESTS_COMPLETION_BASH_TEST_SUPPORT_H
 
+#include "completion/pipe_test_support.h"
+
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/schema_registry.h"
@@ -9,13 +11,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <array>
-#include <cstdio>
-#include <memory>
 #include <random>
 #include <string>
 #include <vector>
-#include <cstdint>
 #include <cstdlib>
 #include <fstream>
 #include <filesystem>
@@ -85,35 +83,12 @@ inline std::string shell_quoted(const std::string &text)
     return quoted + "'";
 }
 
-#ifdef _MSC_VER
-inline std::int32_t close_pipe(std::FILE *pipe) { return _pclose(pipe); }
-inline std::FILE   *open_pipe(const std::string &command) { return _popen(command.c_str(), "r"); }
-#else
-inline std::int32_t close_pipe(std::FILE *pipe) { return pclose(pipe); }
-inline std::FILE   *open_pipe(const std::string &command) { return popen(command.c_str(), "r"); }
-#endif
-
-using pipe_handle = std::unique_ptr<std::FILE, decltype(&close_pipe)>;
-
-inline pipe_handle opened_pipe(const std::string &command) { return pipe_handle(open_pipe(command), &close_pipe); }
-
 inline std::string run_bash(const std::string &script)
 {
     const scratch_tree          scratch("nucleus_completion_smoke");
     const std::filesystem::path file = scratch.path() / "script.sh";
     std::ofstream(file) << script;
-    std::string  captured;
-    std::int32_t status = -1;
-    if(pipe_handle pipe = opened_pipe("bash " + shell_quoted(file.string()) + " 2>/dev/null"))
-    {
-        std::array<char, 256> buf{};
-        while(std::fgets(buf.data(), static_cast<int>(buf.size()), pipe.get()))
-            captured += buf.data();
-        status = close_pipe(pipe.release());
-    }
-    INFO(captured);
-    REQUIRE(status == 0);
-    return captured;
+    return run_captured("bash " + shell_quoted(file.string()) + " 2>/dev/null");
 }
 
 inline constexpr std::string_view argv_printer  = "myapp() { for a in \"$@\"; do printf '<%s>' \"$a\"; done; echo; }\n";

@@ -205,7 +205,7 @@ None.
 
 ## Carried — test files over the 200-line ceiling
 
-33 of 200 units. Test units are held to the same ceiling.
+33 of 201 units. Test units are held to the same ceiling.
 
 Two rows here rose to close the pathname expansion the generated bash completion performed
 over its own candidates, and one of the two rose again for the zsh description escaper.
@@ -262,7 +262,7 @@ Four rows rose by one line each when the test units came to include `<cstddef>` 
 | `tests/schema/keyed_composition_test.cpp` | 287 |
 | `tests/resolve/resolution_test.cpp` | 281 |
 | `tests/schema/enforcer_test.cpp` | 272 |
-| `tests/completion/smoke_test.cpp` | 256 |
+| `tests/completion/smoke_test.cpp` | 255 |
 | `tests/tokenizer/token_resolution_test.cpp` | 245 |
 | `tests/config_source/discovery_test.cpp` | 240 |
 | `tests/xml/keyed_selection_test.cpp` | 232 |

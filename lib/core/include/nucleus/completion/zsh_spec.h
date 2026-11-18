@@ -28,7 +28,7 @@ inline bool zsh_bare_byte(char c)
 // every other byte is backslashed. That covers the spec-grammar delimiters, the
 // whitespace separating members, and the expansions zsh runs over a word once it reads
 // it back out of the spec, without any of them having been thought of first. Each byte
-// in the safe set was measured inert under zsh 5.9: `_arguments` evals a value group
+// in the safe set was measured inert under zsh 5.0.8 through 5.9: `_arguments` evals a value group
 // under `extendedglob nullglob`, so `*` is filename generation and a leading `=` is
 // EQUALS expansion, and neither is in it. The escape is unconditional; what a
 // registration rule refuses is not this file's business, and assuming otherwise is

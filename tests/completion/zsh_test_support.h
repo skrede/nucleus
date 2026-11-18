@@ -2,6 +2,7 @@
 #define HPP_GUARD_NUCLEUS_TESTS_COMPLETION_ZSH_TEST_SUPPORT_H
 
 #include "completion/bash_test_support.h"
+#include "completion/pipe_test_support.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -125,18 +126,7 @@ inline void prepare_drive(const std::filesystem::path &root, const std::vector<z
 
 inline void run_driver(const std::filesystem::path &root)
 {
-    const std::string command = zsh_command() + " -f " + bash_test::shell_quoted(NUCLEUS_ZSH_DRIVER) + " " + bash_test::shell_quoted(root.string()) + " 2>&1";
-    std::string       captured;
-    std::int32_t      status = -1;
-    if(bash_test::pipe_handle pipe = bash_test::opened_pipe(command))
-    {
-        std::array<char, 256> buf{};
-        while(std::fgets(buf.data(), static_cast<int>(buf.size()), pipe.get()))
-            captured += buf.data();
-        status = bash_test::close_pipe(pipe.release());
-    }
-    INFO(captured);
-    REQUIRE(status == 0);
+    bash_test::run_captured(zsh_command() + " -f " + bash_test::shell_quoted(NUCLEUS_ZSH_DRIVER) + " " + bash_test::shell_quoted(root.string()) + " 2>&1");
 }
 
 inline zsh_session drive_zsh(const std::vector<zsh_script> &scripts, const std::vector<std::string> &typed, const zsh_drive_options &options = {})

@@ -146,7 +146,6 @@ TEST_CASE("no shell construct in a word list fires or corrupts the candidate",
         model.options.push_back({"--" + payload, "d", {}});
         expected += "--" + payload + "\n";
     }
-    // No zsh interpreter is assumed to exist here, so the zsh half is pinned by text alone.
     REQUIRE(nucleus::zsh_emitter{}.emit(model).find("a<(") == std::string::npos);
     if(!bash_available())
         return;
