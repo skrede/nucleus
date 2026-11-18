@@ -30,7 +30,6 @@ class repeated_placement
         const layered_handle &layer;
         std::string           scope;
         key_path              sweep_unit;
-        std::string           sweep_key;
         bool                  scope_is_leaf;
     };
 
@@ -59,7 +58,7 @@ public:
         const bool scope_is_leaf = !m_layers.repeated_containers().contains(scope);
         if(scope_is_leaf && canonical != scope)
             return false;
-        entry_site site{path, entry, layer, scope, {}, {}, scope_is_leaf};
+        entry_site site{path, entry, layer, scope, {}, scope_is_leaf};
         if(auto swept = sweep_and_store(site, text); !swept)
             return unexpected(swept.error());
         return true;
@@ -73,8 +72,8 @@ private:
     expected<void, resolve_fold_error>
     sweep_and_store(entry_site &site, std::string &text)
     {
-        if(auto keyed = fill_sweep_key(site); !keyed)
-            return unexpected(keyed.error());
+        if(auto unit = fill_sweep_unit(site); !unit)
+            return unexpected(unit.error());
         if(auto addressed = reject_unaddressed(site); !addressed)
             return unexpected(addressed.error());
         auto target = sweep_target(site);
@@ -86,10 +85,9 @@ private:
         return {};
     }
 
-    expected<void, resolve_fold_error> fill_sweep_key(entry_site &site) const
+    expected<void, resolve_fold_error> fill_sweep_unit(entry_site &site) const
     {
         site.sweep_unit = m_sweep.sweep_unit_of(site.path, site.scope, site.scope_is_leaf);
-        site.sweep_key  = site.sweep_unit.str();
         if(!site.sweep_unit.empty())
             return {};
         return unexpected(error{errc::malformed_source, nucleus::format(
@@ -114,7 +112,7 @@ private:
     {
         if(!site.scope_is_leaf || key_path::is_indexed_segment(site.path.leaf()))
             return site.path;
-        return repeated_sweep::mint_leaf_ordinal(site.entry, site.sweep_key,
+        return repeated_sweep::mint_leaf_ordinal(site.entry, site.sweep_unit.str(),
                                                  site.layer.label,
                                                  m_layers.state().leaf_ordinals);
     }
@@ -122,14 +120,14 @@ private:
     // A layer never sweeps away what it wrote itself.
     void sweep_once(const entry_site &site)
     {
-        auto &state = m_layers.state();
-        if(state.swept.contains(site.sweep_key))
+        auto             &state = m_layers.state();
+        const std::string key   = site.sweep_unit.str();
+        if(!state.swept.insert(key).second)
             return;
-        state.swept.insert(site.sweep_key);
         if(!state.buckets.contains(site.scope))
             state.buckets[site.scope] =
                 m_sweep.bucket_by_instance(site.scope, site.scope_is_leaf);
-        m_sweep.sweep_instance(unwritten(state.buckets[site.scope][site.sweep_key]),
+        m_sweep.sweep_instance(unwritten(state.buckets[site.scope][key]),
                                site.sweep_unit, site.layer);
     }
 
