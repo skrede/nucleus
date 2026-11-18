@@ -53,6 +53,10 @@ nucleus_add_zsh_smoke_test(zsh_spec_smoke_test)
 
 nucleus_add_zsh_smoke_test(zsh_hand_built_smoke_test)
 
+nucleus_add_zsh_smoke_test(zsh_control_bytes_smoke_test)
+
+nucleus_add_zsh_smoke_test(zsh_listing_smoke_test)
+
 # CI sources these scripts under bash versions the generated script must stay silent on. Only a container
 # runs that bash, so this is a plain executable rather than a CTest test.
 add_executable(bash_fixture_writer ${CMAKE_CURRENT_SOURCE_DIR}/completion/bash_fixture_writer.cpp)

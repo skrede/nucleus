@@ -36,8 +36,9 @@ inline void append_rendered(std::string &out, std::string_view bytes)
         append_escaped(out, c);
 }
 
-// `\ [ ] :` are what `_arguments` reads as structure around a description and are backslashed, an
-// unescaped `]` being the one route into the action field it evaluates. C0 and DEL take caret form so a
+// `]` and `\` are backslashed because an unescaped `]` is the one route into the action field `_arguments`
+// evaluates and a trailing `\` invalidates the spec; `[` and `:` are no structure inside a description and
+// are escaped as defense in depth, which zsh strips before display. C0 and DEL take caret form so a
 // newline cannot split the spec; the C1 controls, as UTF-8 and as a bare byte outside a well-formed
 // sequence, and the Unicode Bidi_Control property take escaped_text's `\xNN` form. Every other byte
 // passes unchanged, so non-ASCII prose stays readable. The rule assumes a UTF-8 terminal, where a

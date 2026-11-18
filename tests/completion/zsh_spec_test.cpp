@@ -14,8 +14,8 @@
 #include <utility>
 #include <algorithm>
 
-// No zsh runs where this suite runs, so these pin the emitted text. What each assertion implies was
-// measured under zsh 5.9: `_arguments` evals a `(...)` value group under `extendedglob nullglob`.
+// These pin the emitted text; zsh 5.0.8 through 5.9 `_arguments` evaluates a `(...)` value group under
+// `extendedglob nullglob`.
 
 namespace {
 

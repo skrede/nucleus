@@ -67,6 +67,7 @@ nucleus_start()
 nucleus_case()
 {
     local sentinel=NUCLEUS_DONE_$2_
+    nucleus_await NUCLEUS_ZLE
     zpty -w -n nucleus_z "$1$nucleus_keys"
     zpty -w nucleus_z $'\x15'"print -r -- NUCLEUS''_DONE_$2_; (( ++nucleus_case ))"
     nucleus_await $sentinel

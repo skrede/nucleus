@@ -205,7 +205,7 @@ None.
 
 ## Carried — test files over the 200-line ceiling
 
-33 of 198 units. Test units are held to the same ceiling.
+33 of 200 units. Test units are held to the same ceiling.
 
 Two rows here rose to close the pathname expansion the generated bash completion performed
 over its own candidates, and one of the two rose again for the zsh description escaper.
@@ -217,10 +217,10 @@ match a candidate, and then by one that pins the emitted `_arguments` spec const
 construct. The bash defect was invisible to every text assertion that file already held — the
 emitted text was correct and the shell rewrote it one stage later — so a shorter test there is
 one that proves nothing, and compressing a case means dropping the seeding that is the case.
-The zsh case is long because it is an enumeration: no zsh runs on the machine that wrote it, so
-each construct it claims to neutralize has to be named and asserted rather than covered by
-driving a shell once. `tests/completion/smoke_test.cpp` has since given its shell-driving helpers
-to a support header shared with the ordinal completion test, and fell to 257.
+The zsh case is long because it pins the emitted spec construct by construct, with one assertion
+for each construct it neutralizes. `tests/completion/smoke_test.cpp` has since given its
+shell-driving helpers to a support header shared with the ordinal completion test, which
+shortened it.
 `tests/completion/completion_test.cpp` rose again when every generated bash script began carrying
 the quote tracker and the line lookup, which its golden pins, and again when the tracker's cursor
 guard came to read only the current word, and to find where that word starts on the line.
@@ -262,7 +262,7 @@ Four rows rose by one line each when the test units came to include `<cstddef>` 
 | `tests/schema/keyed_composition_test.cpp` | 287 |
 | `tests/resolve/resolution_test.cpp` | 281 |
 | `tests/schema/enforcer_test.cpp` | 272 |
-| `tests/completion/smoke_test.cpp` | 257 |
+| `tests/completion/smoke_test.cpp` | 256 |
 | `tests/tokenizer/token_resolution_test.cpp` | 245 |
 | `tests/config_source/discovery_test.cpp` | 240 |
 | `tests/xml/keyed_selection_test.cpp` | 232 |

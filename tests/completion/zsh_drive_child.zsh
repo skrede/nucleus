@@ -53,7 +53,8 @@ nucleus_install()
     source $nucleus_scratch/in/setup.zsh
 }
 
-PS1='%# '
+# zle sets the terminal raw before it draws the prompt, so the driver writes a case only once it sees this marker.
+PS1='NUCLEUS_ZLE%# '
 RPS1=
 setopt nobeep
 bindkey -e

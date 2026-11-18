@@ -218,12 +218,12 @@ TEST_CASE("driving the completion leaves the caller's glob setting as it found i
 }
 
 // The description is the one host-supplied field that is prose, so it cannot take the word
-// list's byte allowlist -- that would backslash every space the tool emits. What can leave a
-// `[...]` description is enumerated instead: `]` ends it and puts what follows into the spec's
-// action, the one field _arguments evaluates; `[` moves where zsh reads the end; a trailing `\`
-// swallows the terminator; `:` separates the spec's fields. Nothing else there is structure, and
-// the single quote wrapping each spec is what holds the rest inert. No zsh exists on this
-// machine, so these pin the emitted text and the behavior they imply is unverified.
+// list's byte allowlist -- that would backslash every space the tool emits. An unescaped `]` ends
+// the description and hands what follows to the action field _arguments evaluates, and a trailing
+// unescaped `\` makes the whole spec invalid, so the program completes nothing. zsh strips one
+// backslash before any byte of a description, so `[` and `:`, which are no structure there, are
+// escaped as defense in depth and drawn without the mark. The single quote around each spec holds
+// the rest inert.
 TEST_CASE("a hostile option description cannot leave the zsh spec entry", "[completion]")
 {
     const auto emitted = [](const std::string &description) {
@@ -233,12 +233,11 @@ TEST_CASE("a hostile option description cannot leave the zsh spec entry", "[comp
     // The breakout: an unescaped `]` would hand `:*:->state` to the action field.
     REQUIRE(emitted("d]:*:->state").find("'--f=[d\\]\\:*\\:->state]:value:(v1)'")
             != std::string::npos);
-    // A trailing backslash reaches the same field by swallowing the terminator.
+    // A trailing backslash would leave the description unterminated and the spec invalid.
     REQUIRE(emitted("d\\").find("'--f=[d\\\\]:value:(v1)'") != std::string::npos);
     REQUIRE(emitted("a[b").find("'--f=[a\\[b]:value:(v1)'") != std::string::npos);
 
-    // Inert unescaped, because the spec is one single-quoted word; a backslash on any of these
-    // would reach the menu rather than zsh, which strips one only where it documents doing so.
+    // Inert unescaped, because the spec is one single-quoted word.
     REQUIRE(emitted("d$(id)`id`;id|id&").find("'--f=[d$(id)`id`;id|id&]:value:(v1)'")
             != std::string::npos);
     // The one byte that wrapper does treat as special closes and reopens it instead of ending it.
