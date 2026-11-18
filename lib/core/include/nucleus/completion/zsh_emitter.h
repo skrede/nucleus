@@ -4,12 +4,13 @@
 #include "nucleus/completion/zsh_spec.h"
 #include "nucleus/completion/zsh_ordinal.h"
 #include "nucleus/completion/shell_emitter.h"
+#include "nucleus/completion/zsh_quoted_flag.h"
 #include "nucleus/completion/completion_model.h"
 
 #include "nucleus/utility/escaped_text.h"
 
 #include <string>
-#include <cstddef>
+#include <algorithm>
 
 namespace nucleus {
 
@@ -33,9 +34,11 @@ public:
     {
         const std::string fn  = function_name(model.prog);
         std::string       out = header(model.prog);
+        if(guarded(model))
+            out += "autoload -Uz is-at-least\n";
         if(has_ordinal_options(model))
             out += detail::zsh_ordinal_function(fn);
-        out += function_head(fn, model) + spec_lines(model);
+        out += fn + "()\n{\n" + guarded_block(fn, model) + arguments_line(model);
         return out + "}\n" + tail(fn, model.prog);
     }
 
@@ -57,24 +60,45 @@ private:
         return test + fn + R"( "$@"; else compdef )" + fn + " " + detail::zsh_word(prog) + "; fi\n";
     }
 
-    static std::string function_head(const std::string &fn, const completion_model &model)
+    static bool quoted_spec(const completion_option &option) { return has_ordinal_slots(option) || detail::zsh_quotes_on_insert(option.flag); }
+
+    static bool guarded(const completion_model &model) { return std::ranges::any_of(model.options, quoted_spec); }
+
+    static std::string guarded_block(const std::string &fn, const completion_model &model)
     {
-        const std::string head = fn + "()\n{\n";
-        if(!has_ordinal_options(model))
-            return head + "    _arguments -s \\\n";
-        return head + detail::zsh_ordinal_calls(fn, model) + "    _arguments -s \"${ordinal_specs[@]}\" \\\n";
+        if(!guarded(model))
+            return "";
+        std::string out = "    local -a quoted_specs\n    local -i inserts_quoted=0\n    is-at-least 5.9 && inserts_quoted=1\n";
+        if(has_ordinal_options(model))
+            out += std::string(detail::zsh_ordinal_locals) + detail::zsh_ordinal_calls(fn, model, false);
+        out += "    if (( inserts_quoted )); then\n" + detail::zsh_ordinal_calls(fn, model, true) + "        quoted_specs=(\n";
+        for(const completion_option &option : model.options)
+        {
+            if(quoted_spec(option))
+                out += "            " + detail::zsh_single_quote(detail::zsh_spec(option)) + "\n";
+        }
+        return out + "        )\n    fi\n";
     }
 
+    static std::string arguments_line(const completion_model &model)
+    {
+        const std::string ordinal = has_ordinal_options(model) ? " \"${ordinal_specs[@]}\"" : "";
+        return "    _arguments -s" + ordinal + " \\\n" + spec_lines(model);
+    }
+
+    // zsh inserts a word matching several specs differently by their order; the guarded specs follow the others so a
+    // wildcard flag still follows its plain sibling.
     static std::string spec_lines(const completion_model &model)
     {
         std::string out;
-        for(std::size_t i = 0; i < model.options.size(); ++i)
+        for(const completion_option &option : model.options)
         {
-            const bool last = (i + 1 == model.options.size());
-            out += "        " + detail::zsh_single_quote(detail::zsh_spec(model.options[i]));
-            out += last ? "\n" : " \\\n";
+            if(!quoted_spec(option))
+                out += (out.empty() ? "        " : " \\\n        ") + detail::zsh_single_quote(detail::zsh_spec(option));
         }
-        return out;
+        if(guarded(model))
+            out += (out.empty() ? "        " : " \\\n        ") + std::string("\"${quoted_specs[@]}\"");
+        return out.empty() ? out : out + "\n";
     }
 
     static std::string function_name(const std::string &prog) { return "_nucleus_" + sanitize_ident(prog); }

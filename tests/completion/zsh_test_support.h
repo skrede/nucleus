@@ -154,7 +154,7 @@ inline std::vector<std::string> records_of(const zsh_seen &seen, std::string_vie
     return out;
 }
 
-inline void require_quiet(const zsh_session &session)
+inline void require_no_noise(const zsh_session &session)
 {
     constexpr std::array<std::string_view, 6> noise{"_arguments:", "comparguments", "command not found", "invalid option definition", "invalid argument", "no matches found"};
     std::string                               terminal = session.setup;
@@ -163,6 +163,11 @@ inline void require_quiet(const zsh_session &session)
     INFO(terminal);
     for(const std::string_view text : noise)
         REQUIRE(terminal.find(text) == std::string::npos);
+}
+
+inline void require_quiet(const zsh_session &session)
+{
+    require_no_noise(session);
     REQUIRE(session.payload.empty());
 }
 }

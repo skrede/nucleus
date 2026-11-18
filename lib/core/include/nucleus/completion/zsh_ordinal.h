@@ -2,6 +2,7 @@
 #define HPP_GUARD_NUCLEUS_COMPLETION_ZSH_ORDINAL_H
 
 #include "nucleus/completion/zsh_spec.h"
+#include "nucleus/completion/zsh_quoted_flag.h"
 #include "nucleus/completion/completion_model.h"
 
 #include "nucleus/keyspace/key_path.h"
@@ -9,6 +10,7 @@
 #include <string>
 #include <vector>
 #include <cstddef>
+#include <algorithm>
 #include <string_view>
 
 namespace nucleus::detail {
@@ -32,8 +34,9 @@ inline constexpr std::string_view zsh_walker_head = R"({
         if [[ -n $digits ]]; then
 )";
 
+// The walker reads the caller's `inserts_quoted` by zsh's dynamic scoping, as it appends to the caller's `ordinal_specs`.
 inline constexpr std::string_view zsh_walker_tail = R"(            name+=$digits; rest=${rest#"$digits"}; filled+=1
-        elif [[ -z $rest ]]; then
+        elif [[ -z $rest ]] && (( inserts_quoted )); then
             name+='\*'
         else
             return 1
@@ -61,9 +64,11 @@ inline std::string zsh_ordinal_function(const std::string &function)
     return function + "_ordinal()\n" + zsh_ordinal_walker();
 }
 
+inline constexpr std::string_view zsh_ordinal_locals = "    local -a ordinal_specs\n    local ordinal_word=${(Q)${PREFIX%%=*}}\n";
+
 inline std::string zsh_ordinal_call(const std::string &function, const completion_option &option)
 {
-    std::string out = "    " + function + "_ordinal \"$ordinal_word\" " + zsh_single_quote(zsh_spec_tail(option));
+    std::string out = function + "_ordinal \"$ordinal_word\" " + zsh_single_quote(zsh_spec_tail(option));
 
     const std::vector<std::string> raw     = ordinal_pieces(option);
     const std::vector<std::string> escaped = zsh_name_pieces(option);
@@ -72,13 +77,21 @@ inline std::string zsh_ordinal_call(const std::string &function, const completio
     return out + "\n";
 }
 
-inline std::string zsh_ordinal_calls(const std::string &function, const completion_model &model)
+inline bool zsh_walker_quotes(const completion_option &option)
 {
-    std::string out = "    local -a ordinal_specs\n    local ordinal_word=${(Q)${PREFIX%%=*}}\n";
+    const std::vector<std::string> pieces = ordinal_pieces(option);
+    return std::ranges::any_of(pieces, [](const std::string &piece)
+                               { return zsh_quotes_on_insert(piece); });
+}
+
+inline std::string zsh_ordinal_calls(const std::string &function, const completion_model &model, bool quoted)
+{
+    const std::string indent = quoted ? "        " : "    ";
+    std::string       out;
     for(const completion_option &option : model.options)
     {
-        if(has_ordinal_slots(option))
-            out += zsh_ordinal_call(function, option);
+        if(has_ordinal_slots(option) && zsh_walker_quotes(option) == quoted)
+            out += indent + zsh_ordinal_call(function, option);
     }
     return out;
 }

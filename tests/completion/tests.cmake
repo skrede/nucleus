@@ -52,6 +52,8 @@ nucleus_add_zsh_smoke_test(zsh_ordinal_smoke_test)
 
 nucleus_add_zsh_smoke_test(zsh_quoted_flag_smoke_test)
 
+nucleus_add_zsh_smoke_test(zsh_shell_syntax_delimiter_smoke_test)
+
 nucleus_add_zsh_smoke_test(zsh_value_smoke_test)
 
 nucleus_add_zsh_smoke_test(zsh_spec_smoke_test)

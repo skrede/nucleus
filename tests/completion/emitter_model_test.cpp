@@ -80,6 +80,18 @@ TEST_CASE("a usable ordinal slot list still emits the walker", "[completion][mod
     REQUIRE(zsh.find("    _nucleus_myapp_ordinal \"$ordinal_word\" '[]' '--a' '--a' 'b' 'b'\n") != std::string::npos);
 }
 
+TEST_CASE("a flag zsh quotes is offered only from zsh 5.9", "[completion][model]")
+{
+    const std::string zsh = zsh_emitter{}.emit({"myapp", {{"--a", "d", {}, {}}, {"--b$c", "d", {}, {}}}});
+    REQUIRE(zsh.find("do not edit by hand.\nautoload -Uz is-at-least\n_nucleus_myapp()\n") != std::string::npos);
+    REQUIRE(zsh.find("is-at-least\n") == zsh.rfind("is-at-least\n"));
+    REQUIRE(zsh.find("    if (( inserts_quoted )); then\n        quoted_specs=(\n            '--b\\$c[d]'\n        )\n    fi\n") != std::string::npos);
+    REQUIRE(zsh.find("--b\\$c") == zsh.rfind("--b\\$c"));
+    REQUIRE(zsh.find("    _arguments -s \\\n        '--a[d]' \\\n        \"${quoted_specs[@]}\"\n}\n") != std::string::npos);
+    REQUIRE(zsh_emitter{}.emit({"myapp", {{"--b$c", "d", {}, {}}}}).find("    _arguments -s \\\n        \"${quoted_specs[@]}\"\n}\n") != std::string::npos);
+    REQUIRE(zsh_emitter{}.emit({"myapp", {{"--a", "d", {}, {}}}}).find("is-at-least") == std::string::npos);
+}
+
 TEST_CASE("a hostile program name reaches the bash script only as inert text", "[completion][model][smoke]")
 {
     const std::string bash = bash_emitter{}.emit(model_of({"--w", "", {}, {}}, hostile_prog));

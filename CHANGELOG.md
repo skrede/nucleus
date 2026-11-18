@@ -209,9 +209,14 @@ is listed last, under Additions.
   such a flag completes, as does one whose delimiter holds a space or another
   byte zsh escapes. What zsh completes, and the emitted text, change with no
   diagnostic.
-- **The zsh script is supported on zsh 5.0.8 and later.** It carries no version
-  check. Before zsh 5.9, a flag carrying `*` or another character zsh quotes is
-  inserted unquoted or not completed, as the completion docs describe.
+- **Before zsh 5.9, the zsh script offers no flag carrying a character zsh
+  quotes.** zsh before 5.9 inserted such a flag unquoted, so a `*` in it was
+  globbed, and shell syntax in a host delimiter, such as `$(...)` or `;`, ran when
+  the completed command line ran. The script learns the version from zsh's
+  `is-at-least`, and stays supported on zsh 5.0.8 and later. Before zsh 5.9, the
+  wildcard flags of a repeated container and every flag whose text carries such a
+  character are no longer offered, and the emitted text of a script with an
+  ordinal option or such a flag changes, with no diagnostic.
 - **The text of the generated scripts changed throughout this release.** Beyond the
   last line, the bash and zsh scripts differ from 0.4.1's in many places. Treat
   them as opaque output to install as written; a host that post-processes either
