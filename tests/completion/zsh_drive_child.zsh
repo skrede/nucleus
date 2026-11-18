@@ -48,6 +48,7 @@ nucleus_source_scripts()
             (source-bare) cd $f:h && source $f:t ;;
             (source-dot) cd $f:h && source ./$f:t ;;
             (source-path) kept=( $path ); path=( $f:h $path ); source $f:t; path=( $kept ) ;;
+            (eval) eval "$(<$f)" ;;
         esac
     done
     cd $nucleus_scratch/work
@@ -60,7 +61,7 @@ nucleus_install()
         fpath=( $nucleus_scratch/scripts $fpath )
     fi
     autoload -U compinit && compinit -u -d $nucleus_scratch/out/zcompdump
-    if [[ $route == source* ]]; then
+    if [[ $route == (source*|eval) ]]; then
         nucleus_source_scripts $route
     fi
     source $nucleus_scratch/in/setup.zsh

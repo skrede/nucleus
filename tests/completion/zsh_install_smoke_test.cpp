@@ -15,6 +15,7 @@
 #include <array>
 #include <string>
 #include <vector>
+#include <cstddef>
 #include <string_view>
 
 using nucleus::anchor;
@@ -96,4 +97,34 @@ TEST_CASE("sourcing the generated zsh script after compinit registers it whateve
                 REQUIRE(records_of(session.cases[0], "BUF") == std::vector<std::string>{"myapp --logging-level=warn "});
                 require_quiet(session);
             }
+}
+
+TEST_CASE("evaluating the generated zsh script after compinit registers its completion and prints nothing", "[completion][smoke][zsh]")
+{
+    if(!zsh_available())
+        SKIP("no zsh with zsh/zpty reachable");
+    const zsh_session session = drive_zsh({{"myapp.zsh", logging_script()}}, {"myapp --logging-level=w"}, {.route = zsh_route::eval});
+    INFO(session.setup);
+    REQUIRE(session.registered == "_myapp");
+    REQUIRE(records_of(session.cases[0], "BUF") == std::vector<std::string>{"myapp --logging-level=warn "});
+    require_quiet(session);
+}
+
+TEST_CASE("the eval route fails visibly when the last line tests only the evaluation context", "[completion][smoke][zsh]")
+{
+    if(!zsh_available())
+        SKIP("no zsh with zsh/zpty reachable");
+    constexpr std::string_view joiner = R"(" ] && )";
+    const std::string          script = logging_script();
+    const std::size_t          from   = script.find(R"([ "$funcstack[1]" = ")");
+    const std::size_t          join   = script.find(joiner, from);
+    REQUIRE(from != std::string::npos);
+    REQUIRE(join != std::string::npos);
+    std::string context_only = script;
+    context_only.erase(from, join + joiner.size() - from);
+    REQUIRE(context_only != script);
+    const zsh_session session = drive_zsh({{"myapp.zsh", context_only}}, {"myapp --logging-level=w"}, {.route = zsh_route::eval});
+    INFO(session.setup);
+    REQUIRE(session.setup.find("can only be called from completion function") != std::string::npos);
+    REQUIRE(session.registered == "unset");
 }

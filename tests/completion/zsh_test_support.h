@@ -56,7 +56,8 @@ enum class zsh_route
     source,
     source_bare,
     source_dot,
-    source_path
+    source_path,
+    eval
 };
 
 inline std::string_view route_text(zsh_route route)
@@ -68,6 +69,7 @@ inline std::string_view route_text(zsh_route route)
         case zsh_route::source_bare: return "source-bare";
         case zsh_route::source_dot:  return "source-dot";
         case zsh_route::source_path: return "source-path";
+        case zsh_route::eval:        return "eval";
     }
     return "unknown";
 }
