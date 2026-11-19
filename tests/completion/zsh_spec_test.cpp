@@ -53,9 +53,14 @@ const std::vector<std::pair<std::string, bool>> insertion_rows{
         {"--a#b", true},
         {std::string("--a\0b", 5), true},
         {"--a\nb", true},
-        {"--a\xc3\xa9z", false},
+        {"--a\xc3\xa9z", true},
         {"--a\xc2\x9bz", true},
         {"--a\xffz", true},
+        {"--a\xe2\x80\xa8z", true},
+        {"--a\xe2\x80\xaez", true},
+        {"--a\xef\xbf\xbfz", true},
+        {"--a\x7fz", true},
+        {"--a\x80z", true},
 };
 }
 
@@ -163,7 +168,7 @@ TEST_CASE("a bare C1 byte in a zsh description is rendered and nothing else is",
     }
 }
 
-TEST_CASE("a flag text counts as quoted exactly when zsh 5.9 quotes it on insertion", "[completion]")
+TEST_CASE("a flag text counts as quoted exactly when it holds a byte outside printable, non-syntax ASCII", "[completion]")
 {
     for(const auto &[text, quoted] : insertion_rows)
     {

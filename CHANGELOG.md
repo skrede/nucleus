@@ -209,14 +209,17 @@ is listed last, under Additions.
   such a flag completes, as does one whose delimiter holds a space or another
   byte zsh escapes. What zsh completes, and the emitted text, change with no
   diagnostic.
-- **Before zsh 5.9, the zsh script offers no flag carrying a character zsh
-  quotes.** zsh before 5.9 inserted such a flag unquoted, so a `*` in it was
-  globbed, and shell syntax in a host delimiter, such as `$(...)` or `;`, ran when
-  the completed command line ran. The script learns the version from zsh's
-  `is-at-least`, and stays supported on zsh 5.0.8 and later. Before zsh 5.9, the
-  wildcard flags of a repeated container and every flag whose text carries such a
-  character are no longer offered, and the emitted text of a script with an
-  ordinal option or such a flag changes, with no diagnostic.
+- **Before zsh 5.9, the zsh script offers no flag holding a byte outside
+  printable, non-syntax ASCII.** zsh before 5.9 inserted shell syntax unquoted, so
+  a `*` in a flag was globbed, and shell syntax in a host delimiter, such as
+  `$(...)` or `;`, ran when the completed command line ran. The script learns the
+  version from zsh's `is-at-least`, and stays supported on zsh 5.0.8 and later.
+  Before zsh 5.9, the wildcard flags of a repeated container and every flag
+  holding a syntax character, a control byte or any non-ASCII byte are no longer
+  offered, a flag such as `--größe` among them. zsh 5.9 judges a non-ASCII
+  character by the C library, so it may insert it quoted on one platform and as
+  typed on another. The emitted text of a script with an ordinal option or such a
+  flag changes, with no diagnostic.
 - **The text of the generated scripts changed throughout this release.** Beyond the
   last line, the bash and zsh scripts differ from 0.4.1's in many places. Treat
   them as opaque output to install as written; a host that post-processes either

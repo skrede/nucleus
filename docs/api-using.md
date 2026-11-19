@@ -1160,19 +1160,23 @@ The bash script loaded through `bashcompinit` registers nothing, since zsh has n
 The zsh script supports zsh 5.0.8 and later, and its behavior is tested on zsh
 5.0.8, 5.5.1, 5.8.1 and 5.9. An older zsh is not refused, but it is not supported.
 
-zsh before 5.9 inserts a flag without quoting it, so a `*` in an inserted flag is
-globbed and shell syntax in a delimiter runs when the command line runs. Before
-zsh 5.9 the script therefore offers no flag carrying a character zsh quotes, which
-it learns from zsh's `is-at-least`. Those characters are the space, `!`, `"`, `#`,
-`$`, `&`, `'`, `(`, `)`, `*`, `;`, `<`, `>`, `?`, `[`, `\`, `]`, `^`, `` ` ``,
-`{`, `|`, `}`, `~`, every C0 control character and DEL, the C1 controls, the
-Unicode `Bidi_Control` set, and any byte that is not part of well-formed UTF-8.
-This includes the wildcard flags of a repeated container, such as
-`--cluster-node-\*-port`, and every flag under a delimiter holding one of these
-characters. Before zsh 5.9, a repeated container's flag under any other delimiter
-completes once every ordinal in it is typed, as `--cluster-node-2-` completes to
-`--cluster-node-2-port`, and every other flag completes as on zsh 5.9. zsh 5.9
-offers every flag and inserts these characters quoted.
+zsh before 5.9 inserts the shell syntax in a flag unquoted, so a `*` in an
+inserted flag is globbed and shell syntax in a delimiter runs when the command
+line runs. Before zsh 5.9 the script therefore offers no flag holding any byte
+outside printable, non-syntax ASCII, and it learns the version from zsh's
+`is-at-least`. Printable, non-syntax ASCII means the letters, the digits and `%`,
+`+`, `,`, `-`, `.`, `/`, `:`, `=`, `@` and `_`. So the space, the shell's syntax
+characters, every control byte and DEL, and every byte of a non-ASCII character
+each keep a flag out, and a flag holding a printable non-ASCII character, such as
+`--größe`, is not offered before zsh 5.9. This includes the wildcard flags of a
+repeated container, such as `--cluster-node-\*-port`, and every flag under a
+delimiter holding such a byte. Before zsh 5.9, a repeated container's flag under
+any other delimiter completes once every ordinal in it is typed, as
+`--cluster-node-2-` completes to `--cluster-node-2-port`, and every other flag
+completes as on zsh 5.9. zsh 5.9 offers every flag. It inserts those ASCII bytes
+quoted, and a non-ASCII character quoted or as typed, depending on whether the
+platform's C library deems it printable, so one flag can be inserted differently
+on Linux and on macOS.
 
 The function the script defines carries the `_nucleus_` prefix, which no
 function of zsh's completion system uses. A program named after one of zsh's

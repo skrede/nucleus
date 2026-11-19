@@ -30,16 +30,14 @@ struct flag_unit
 {
     std::string flag;
     std::string typed;
+    std::string quoted;
 };
 
-// U+00E9, U+20AC and U+1F600 are printable, U+009B is a C1 control, U+202E is Bidi_Control, and a lone 0xff is
-// malformed UTF-8.
-constexpr std::array<std::string_view, 6> non_ascii_samples{"\xc3\xa9", "\xe2\x82\xac", "\xf0\x9f\x98\x80",
-                                                            "\xc2\x9b", "\xe2\x80\xae", "\xff"};
-
-// The category rule marks every C1 and Bidi_Control character quoted on purpose, so it over-matches U+202E, which
-// zsh 5.9 inserts unchanged; older releases still leave such a flag out.
-const std::vector<std::string> over_matched{"--kx5\xe2\x80\xaez"};
+// The samples span printable letters and symbols, a C1 control, bidirectional controls, separators, an unassigned
+// code point, a noncharacter and malformed UTF-8; zsh 5.9 quotes some of them on one platform and not on another.
+constexpr std::array<std::string_view, 13> non_ascii_samples{
+        "\xc3\xa9", "\xe2\x82\xac", "\xf0\x9f\x98\x80", "\xc2\x9b", "\xe2\x80\xae", "\xff", "\xe2\x80\xa8",
+        "\xe2\x80\xa9", "\xcd\xb8", "\xef\xbf\xbf", "\xe2\x80\x8e", "\xd8\x9c", "\xe2\x81\xa6"};
 
 constexpr std::array<zsh_route, 3> install_routes{zsh_route::fpath, zsh_route::source, zsh_route::eval};
 
@@ -49,10 +47,22 @@ std::string hex_of(std::uint8_t byte)
     return {digits[byte >> 4], digits[byte & 0x0f]};
 }
 
+std::string dollar_quoted(std::string_view bytes)
+{
+    std::string text = "$'";
+    for(const char c : bytes)
+    {
+        const auto byte = static_cast<std::uint8_t>(c);
+        text += {'\\', static_cast<char>('0' + (byte >> 6)), static_cast<char>('0' + ((byte >> 3) & 7)),
+                 static_cast<char>('0' + (byte & 7))};
+    }
+    return text + "'";
+}
+
 flag_unit unit_of(const std::string &label, std::string_view carried)
 {
     const std::string prefix = "--k" + label;
-    return {prefix + std::string(carried) + "z", "myapp " + prefix};
+    return {prefix + std::string(carried) + "z", "myapp " + prefix, {}};
 }
 
 std::vector<flag_unit> flag_units()
@@ -62,7 +72,10 @@ std::vector<flag_unit> flag_units()
         if(byte != 0x0a)
             units.push_back(unit_of(hex_of(byte), std::string(1, static_cast<char>(byte))));
     for(std::size_t k = 0; k < non_ascii_samples.size(); ++k)
-        units.push_back(unit_of("x" + std::to_string(k + 1), non_ascii_samples[k]));
+    {
+        units.push_back(unit_of((k < 9 ? "x0" : "x") + std::to_string(k + 1), non_ascii_samples[k]));
+        units.back().quoted = units.back().typed + dollar_quoted(non_ascii_samples[k]) + "z ";
+    }
     return units;
 }
 
@@ -87,16 +100,13 @@ bool offered(const zsh_seen &seen, const std::string &flag)
     return std::ranges::find(values, flag) != values.end();
 }
 
-void require_unit(const zsh_seen &seen, const flag_unit &unit, bool old)
+void require_ascii_unit(const zsh_seen &seen, const flag_unit &unit, bool old)
 {
     const bool                     quoted = nucleus::detail::zsh_quotes_on_insert(unit.flag);
-    const bool                     over   = std::ranges::find(over_matched, unit.flag) != over_matched.end();
     const std::vector<std::string> buffer = records_of(seen, "BUF");
     const std::vector<std::string> raw{"myapp " + unit.flag + " "};
     INFO("typed " << unit.typed << (quoted ? ", classified quoted" : ", classified verbatim"));
-    if(over)
-        CHECK(quoted);
-    if(!quoted || (over && !old))
+    if(!quoted)
         CHECK(buffer == raw);
     else if(old)
     {
@@ -109,9 +119,27 @@ void require_unit(const zsh_seen &seen, const flag_unit &unit, bool old)
         CHECK(buffer != raw);
     }
 }
+
+void require_non_ascii_unit(const zsh_seen &seen, const flag_unit &unit, bool old)
+{
+    const bool                     quoted = nucleus::detail::zsh_quotes_on_insert(unit.flag);
+    const std::vector<std::string> buffer = records_of(seen, "BUF");
+    INFO("typed " << unit.typed << (quoted ? ", classified quoted" : ", classified verbatim"));
+    CHECK(quoted);
+    if(old)
+    {
+        CHECK(records_of(seen, "HIT").empty());
+        CHECK(buffer == std::vector<std::string>{unit.typed});
+        return;
+    }
+    CHECK(offered(seen, unit.flag));
+    // zsh 5.9 quotes a non-ASCII character only where the C library deems it unprintable, so either form is right.
+    const bool as_typed = buffer == std::vector<std::string>{"myapp " + unit.flag + " "};
+    CHECK((as_typed || buffer == std::vector<std::string>{unit.quoted}));
+}
 }
 
-TEST_CASE("a flag is left out before zsh 5.9 exactly when the classifier marks it, and the classifier covers what zsh 5.9 quotes, on every install route", "[completion][smoke][zsh]")
+TEST_CASE("a flag holding any byte outside printable, non-syntax ASCII is left out before zsh 5.9 and offered by zsh 5.9, on every install route", "[completion][smoke][zsh]")
 {
     if(!zsh_available())
         SKIP("no zsh with zsh/zpty reachable");
@@ -122,8 +150,12 @@ TEST_CASE("a flag is left out before zsh 5.9 exactly when the classifier marks i
             INFO("zsh " << session.version);
             REQUIRE(session.registered == "_nucleus_myapp");
             REQUIRE(session.cases.size() == units.size());
+            const bool old = below_5_9(session.version);
             for(std::size_t k = 0; k < units.size(); ++k)
-                require_unit(session.cases[k], units[k], below_5_9(session.version));
+                if(units[k].quoted.empty())
+                    require_ascii_unit(session.cases[k], units[k], old);
+                else
+                    require_non_ascii_unit(session.cases[k], units[k], old);
             require_quiet(session);
         }
 }
