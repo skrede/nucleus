@@ -151,10 +151,13 @@ is listed last, under Additions.
   system carries the `_nucleus_` prefix. A script for a program with a repeated
   container also defines `_nucleus_<ident>-ordinal`, so sourcing it replaces any
   function of that name already defined; no program's completion function can
-  carry that name. Save the script on `$fpath` as
-  `_nucleus_<ident>` and remove the file an earlier release installed: a file left
-  under the old name completes nothing on its first TAB, and completion starts on
-  the second. The emitted text and the install name change with no diagnostic.
+  carry that name. Save the script on `$fpath` as `_nucleus_<ident>` and remove
+  the `_<ident>` file an earlier release installed. Left in place, it is the file
+  `compinit` registers whenever its name sorts first, as `_myapp` does before
+  `_nucleus_myapp`, and the program keeps the earlier release's completion, with
+  no message. The new script saved under the old name instead completes nothing
+  on its first TAB, and completion starts on the second. The emitted text and the
+  install name change with no diagnostic.
 - **The zsh script's last line now registers the completion when the script is
   sourced.** It reads
   `if [ "$funcstack[1]" = "_nucleus_<ident>" ] && [ "${zsh_eval_context[-1]}" != file ]; then _nucleus_<ident> "$@"; else compdef _nucleus_<ident> <prog>; fi`

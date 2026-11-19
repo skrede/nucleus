@@ -1102,8 +1102,8 @@ jobs:
             fi
           done
 
-  # Only a container reaches more than one zsh release, and releases before 5.9 insert a flag carrying `*`
-  # differently.
+  # Only a container reaches more than one zsh release, and before zsh 5.9 the script leaves out every flag
+  # holding a byte outside printable, non-syntax ASCII.
   zsh-versions:
     name: zsh completion under zsh 5.0.8 to 5.9
     runs-on: ubuntu-24.04

@@ -1138,24 +1138,30 @@ candidate reaches the script as registered. A host that
 builds a `completion_model` itself and renders it with an emitter skips that
 rule and holds its values to it. Such a host also holds each flag to opening
 with `-` or `+`, since zsh's `_arguments` refuses any other spec and the
-program then completes nothing in zsh. A pure
-read of the sealed schema. nucleus is a library, not a CLI — it returns the
-script and the host decides how to surface it.
+program then completes nothing: in zsh 5.9 always, and before zsh 5.9 only when
+the script offers that flag there, which it does unless the flag holds a byte
+outside printable, non-syntax ASCII. A pure read of the sealed schema. nucleus
+is a library, not a CLI — it returns the script and the host decides how to
+surface it.
 
 The bash script requires bash 5.0 or later. On older bash, including the bash 3.2
 macOS ships as `/bin/bash` and the bash 4.4 of RHEL 8 and its rebuilds, the script
 installs no completion.
 
 In zsh, load the zsh script one of two ways. Either save it as a file named
-`_nucleus_<prog>` in a directory on `$fpath` before `compinit` runs, with every
-byte of `prog` other than a letter, a digit or `_` replaced by `_` &mdash; the
-name of the function the script defines, so `my-tool.v2` installs as
-`_nucleus_my_tool_v2` &mdash; or source it after `compinit`, for example from
-`.zshrc`. A file under any other name, such as `_my-tool.v2`, or `_my_tool_v2` as
-releases before 0.4.2 documented it, completes nothing on the first TAB, which
-only registers the function the script defines; completion starts on the second.
-The bash script loaded through `bashcompinit` registers nothing, since zsh has no
-`BASH_VERSINFO`.
+`_nucleus_<ident>` in a directory on `$fpath` before `compinit` runs, where
+`<ident>` is `prog` with every byte other than a letter, a digit or `_` replaced
+by `_` &mdash; the name of the function the script defines, so `my-tool.v2`
+installs as `_nucleus_my_tool_v2` &mdash; or source it after `compinit`, for
+example from `.zshrc`. A file under any other name, such as `_my-tool.v2`, or
+`_my_tool_v2` as releases before 0.4.2 documented it, completes nothing on the
+first TAB, which only registers the function the script defines; completion
+starts on the second. Remove a `_<ident>` file an earlier release installed:
+`compinit` registers the first file it finds for a program, so a leftover whose
+name sorts first, as `_myapp` does before `_nucleus_myapp`, is the one
+registered, and the program keeps the earlier release's completion, with no
+message. The bash script loaded through `bashcompinit` registers nothing, since
+zsh has no `BASH_VERSINFO`.
 
 The zsh script supports zsh 5.0.8 and later, and its behavior is tested on zsh
 5.0.8, 5.5.1, 5.8.1 and 5.9. An older zsh is not refused, but it is not supported.

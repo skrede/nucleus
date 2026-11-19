@@ -36,7 +36,8 @@ struct completion_option
 // The generator fills only values registration admitted, none carrying a control character. A model built
 // by hand skips that rule: an emitter renders each value as given, so a newline or NUL does not reach every
 // shell intact. A hand-built flag that opens with neither `-` nor `+` makes zsh's `_arguments` refuse the
-// spec list, so the program completes nothing under zsh.
+// spec list, so the program completes nothing under zsh 5.9, and nothing under an older zsh unless the flag
+// holds a byte the script leaves out there.
 struct completion_model
 {
     std::string prog;
