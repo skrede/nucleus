@@ -31,9 +31,18 @@ using nucleus::zsh_test::records_of;
 using nucleus::zsh_test::require_quiet;
 using nucleus::zsh_test::zsh_available;
 using nucleus::zsh_test::zsh_route;
+using nucleus::zsh_test::zsh_script;
+using nucleus::zsh_test::zsh_seen;
 using nucleus::zsh_test::zsh_session;
 
 namespace {
+
+struct helper_install
+{
+    std::string             label;
+    zsh_route               route;
+    std::vector<zsh_script> scripts;
+};
 
 const std::vector<std::string> logging_flags{"--logging", "--logging-level"};
 
@@ -50,6 +59,17 @@ std::vector<std::string> sorted_hits(const nucleus::zsh_test::zsh_seen &seen)
     std::vector<std::string> hits = records_of(seen, "HIT");
     std::ranges::sort(hits);
     return hits;
+}
+
+std::vector<std::string> buffers_of(const zsh_session &session)
+{
+    std::vector<std::string> out;
+    for(const zsh_seen &seen : session.cases)
+    {
+        const std::vector<std::string> buffer = records_of(seen, "BUF");
+        out.insert(out.end(), buffer.begin(), buffer.end());
+    }
+    return out;
 }
 
 zsh_session drive_tool(const std::string &file, zsh_route route, const std::vector<std::string> &typed)
@@ -98,4 +118,28 @@ TEST_CASE("a hostile program name runs nothing when the zsh script is installed 
     const zsh_session sourced = drive_zsh({{"hostile.zsh", script}}, {"PWN_LINE --"}, {.route = zsh_route::source, .prog = "x$(touch PWN_PROG);ytouch PWN_LINE"});
     REQUIRE(sourced.registered == "_nucleus_" + ident);
     require_quiet(sourced);
+}
+
+TEST_CASE("a program named after another program's ordinal helper leaves the completion of both working on every install route", "[completion][smoke][zsh]")
+{
+    if(!zsh_available())
+        SKIP("no zsh with zsh/zpty reachable");
+    const std::string                 foo     = zsh_emitter{}.emit({"foo", {{"--a*b", "d", {}, {3}}}});
+    const std::string                 ordinal = zsh_emitter{}.emit({"foo-ordinal", {{"--zz", "d", {}, {}}}});
+    const std::vector<helper_install> installs{
+            {"fpath", zsh_route::fpath, {{"_nucleus_foo", foo}, {"_nucleus_foo_ordinal", ordinal}}},
+            {"source-foo-first", zsh_route::source, {{"1-foo.zsh", foo}, {"2-foo-ordinal.zsh", ordinal}}},
+            {"source-foo-ordinal-first", zsh_route::source, {{"1-foo-ordinal.zsh", ordinal}, {"2-foo.zsh", foo}}}};
+    const std::vector<std::string> typed{"foo --a2", "foo-ordinal --", "foo --a2", "foo-ordinal --"};
+    for(const helper_install &install : installs)
+    {
+        DYNAMIC_SECTION(install.label)
+        {
+            const zsh_session session = drive_zsh(install.scripts, typed, {.route = install.route, .prog = "foo-ordinal"});
+            INFO("zsh " << session.version);
+            REQUIRE(session.registered == "_nucleus_foo_ordinal");
+            REQUIRE(buffers_of(session) == std::vector<std::string>{"foo --a2b ", "foo-ordinal --zz ", "foo --a2b ", "foo-ordinal --zz "});
+            require_quiet(session);
+        }
+    }
 }

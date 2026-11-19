@@ -148,7 +148,10 @@ is listed last, under Additions.
   every completion through `_arguments` stopped and printed a recursion error;
   with `files`, file-name completion stopped; with `values`, a completion calling
   `_values` was offered the program's flags. No function of zsh's completion
-  system carries the `_nucleus_` prefix. Save the script on `$fpath` as
+  system carries the `_nucleus_` prefix. A script for a program with a repeated
+  container also defines `_nucleus_<ident>-ordinal`, so sourcing it replaces any
+  function of that name already defined; no program's completion function can
+  carry that name. Save the script on `$fpath` as
   `_nucleus_<ident>` and remove the file an earlier release installed: a file left
   under the old name completes nothing on its first TAB, and completion starts on
   the second. The emitted text and the install name change with no diagnostic.

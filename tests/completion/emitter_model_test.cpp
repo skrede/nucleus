@@ -76,11 +76,11 @@ TEST_CASE("a usable ordinal slot list still emits the walker", "[completion][mod
     REQUIRE(bash.find("    '--a*b') printf '%s\\n' '--a\\*b' ;;\n") != std::string::npos);
 
     const std::string zsh = zsh_emitter{}.emit(model_of({"--a*b", "", {}, {3}}));
-    REQUIRE(zsh.find("_nucleus_myapp_ordinal()\n") != std::string::npos);
-    REQUIRE(zsh.find("    _nucleus_myapp_ordinal \"$ordinal_word\" '[]' '--a' '--a' 'b' 'b'\n") != std::string::npos);
+    REQUIRE(zsh.find("_nucleus_myapp-ordinal()\n") != std::string::npos);
+    REQUIRE(zsh.find("    _nucleus_myapp-ordinal \"$ordinal_word\" '[]' '--a' '--a' 'b' 'b'\n") != std::string::npos);
 }
 
-TEST_CASE("a flag zsh quotes is offered only from zsh 5.9", "[completion][model]")
+TEST_CASE("a flag holding a byte outside printable, non-syntax ASCII is offered only from zsh 5.9", "[completion][model]")
 {
     const std::string zsh = zsh_emitter{}.emit({"myapp", {{"--a", "d", {}, {}}, {"--b$c", "d", {}, {}}}});
     REQUIRE(zsh.find("do not edit by hand.\nautoload -Uz is-at-least\n_nucleus_myapp()\n") != std::string::npos);

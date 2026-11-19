@@ -1178,11 +1178,15 @@ quoted, and a non-ASCII character quoted or as typed, depending on whether the
 platform's C library deems it printable, so one flag can be inserted differently
 on Linux and on macOS.
 
-The function the script defines carries the `_nucleus_` prefix, which no
+Every function the script defines carries the `_nucleus_` prefix, which no
 function of zsh's completion system uses. A program named after one of zsh's
 completion functions, such as `tags`, `files` or `values`, therefore completes its
 own flags, and on either install route the completion of other programs,
-file-name completion and completions that call zsh's `_values` keep working.
+file-name completion and completions that call zsh's `_values` keep working. A
+script for a program with a repeated container also defines
+`_nucleus_<ident>-ordinal`, where `_nucleus_<ident>` names its completion
+function; no program's completion function can take that name, since `<ident>`
+holds no `-`.
 
 `prog` reaches shell command position unquoted in the generated script, so it must
 be a bare command token: it opens with a letter, a digit or `_`, and carries only

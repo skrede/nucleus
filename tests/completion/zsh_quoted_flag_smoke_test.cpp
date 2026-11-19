@@ -69,7 +69,7 @@ bool offers_star(const zsh_session &session)
 }
 }
 
-TEST_CASE("a typed backslash-escaped star under a star delimiter completes the flag", "[completion][smoke][zsh][ordinal]")
+TEST_CASE("on zsh 5.9 a typed backslash-escaped star under a star delimiter completes the flag", "[completion][smoke][zsh][ordinal]")
 {
     if(!zsh_available())
         SKIP("no zsh with zsh/zpty reachable");
@@ -86,7 +86,7 @@ TEST_CASE("a typed backslash-escaped star under a star delimiter completes the f
     require_quiet(hostile);
 }
 
-TEST_CASE("below zsh 5.9 a flag carrying a character zsh quotes is not offered", "[completion][smoke][zsh][ordinal]")
+TEST_CASE("below zsh 5.9 a flag carrying a byte outside printable, non-syntax ASCII is not offered", "[completion][smoke][zsh][ordinal]")
 {
     if(!zsh_available())
         SKIP("no zsh with zsh/zpty reachable");

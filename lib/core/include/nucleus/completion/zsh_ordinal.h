@@ -48,10 +48,10 @@ inline constexpr std::string_view zsh_walker_tail = R"(            name+=$digits
 
 // `_arguments` matches option names literally, so the walker builds a spec for the word being
 // completed: each raw piece is only compared, as a quoted pattern, with the typed word once its
-// quoting is removed, and the spec is the escaped pieces, the typed digit runs (`\*` for a slot not
-// yet reached) and the static spec's own tail. A digit run fills a slot only inside the CLI's
-// ordinal domain, read in base 10 whatever `octalzeroes` says, so the walker accepts exactly the
-// flags the CLI does.
+// quoting is removed, and the spec is the escaped pieces, the typed digit runs (from zsh 5.9, `\*`
+// for a slot not yet reached) and the static spec's own tail. A digit run fills a slot only inside
+// the CLI's ordinal domain, read in base 10 whatever `octalzeroes` says, so the walker accepts
+// exactly the flags the CLI does.
 inline std::string zsh_ordinal_walker()
 {
     const std::string bound = std::to_string(key_path::max_ordinal);
@@ -59,16 +59,22 @@ inline std::string zsh_ordinal_walker()
     return std::string(zsh_walker_head) + "            " + check + " || return 1\n" + std::string(zsh_walker_tail);
 }
 
+// No program's function name holds a `-`, so the walker cannot take another program's name.
+inline std::string zsh_walker_name(const std::string &function)
+{
+    return function + "-ordinal";
+}
+
 inline std::string zsh_ordinal_function(const std::string &function)
 {
-    return function + "_ordinal()\n" + zsh_ordinal_walker();
+    return zsh_walker_name(function) + "()\n" + zsh_ordinal_walker();
 }
 
 inline constexpr std::string_view zsh_ordinal_locals = "    local -a ordinal_specs\n    local ordinal_word=${(Q)${PREFIX%%=*}}\n";
 
 inline std::string zsh_ordinal_call(const std::string &function, const completion_option &option)
 {
-    std::string out = function + "_ordinal \"$ordinal_word\" " + zsh_single_quote(zsh_spec_tail(option));
+    std::string out = zsh_walker_name(function) + " \"$ordinal_word\" " + zsh_single_quote(zsh_spec_tail(option));
 
     const std::vector<std::string> raw     = ordinal_pieces(option);
     const std::vector<std::string> escaped = zsh_name_pieces(option);

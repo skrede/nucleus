@@ -81,7 +81,7 @@ TEST_CASE("a hand-built flag that opens with neither dash nor plus leaves its pr
     REQUIRE(session.payload.empty());
 }
 
-TEST_CASE("a hand-built option whose only static flag zsh quotes still completes through its walker", "[completion][smoke][zsh]")
+TEST_CASE("a hand-built option whose only static flag holds a byte outside printable, non-syntax ASCII still completes through its walker", "[completion][smoke][zsh]")
 {
     if(!zsh_available())
         SKIP("no zsh with zsh/zpty reachable");
