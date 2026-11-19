@@ -30,6 +30,7 @@ using nucleus::zsh_test::require_quiet;
 using nucleus::zsh_test::route_text;
 using nucleus::zsh_test::zsh_available;
 using nucleus::zsh_test::zsh_route;
+using nucleus::zsh_test::zsh_script;
 using nucleus::zsh_test::zsh_session;
 
 namespace {
@@ -44,8 +45,24 @@ std::string logging_script()
     return script_of(generate_completion(shell::zsh, reg, "myapp"));
 }
 
+std::string empty_script() { return script_of(generate_completion(shell::zsh, schema_registry{}, "myapp")); }
+
+const zsh_script ignoreclosebraces{"0-ignoreclosebraces.zsh", "setopt ignoreclosebraces\n"};
+
 constexpr std::array<zsh_route, 4>        source_routes{zsh_route::source, zsh_route::source_bare, zsh_route::source_dot, zsh_route::source_path};
 constexpr std::array<std::string_view, 4> source_files{"_nucleus_myapp", "_myapp", "myapp.zsh", "_myapp.zsh"};
+
+void require_loads_under_ignoreclosebraces(const std::string &script)
+{
+    for(const zsh_route route : {zsh_route::source, zsh_route::eval})
+        DYNAMIC_SECTION(route_text(route))
+        {
+            const zsh_session session = drive_zsh({ignoreclosebraces, {"myapp.zsh", script}}, {"myapp -"}, {.route = route});
+            INFO(session.setup);
+            REQUIRE(session.registered == "_nucleus_myapp");
+            REQUIRE(session.setup.find("parse error") == std::string::npos);
+        }
+}
 }
 
 TEST_CASE("the generated zsh script installed on fpath completes under a real zsh", "[completion][smoke][zsh]")
@@ -127,4 +144,18 @@ TEST_CASE("the eval route fails visibly when the last line tests only the evalua
     INFO(session.setup);
     REQUIRE(session.setup.find("can only be called from completion function") != std::string::npos);
     REQUIRE(session.registered == "unset");
+}
+
+TEST_CASE("the zsh script of a program with no flags sources under ignoreclosebraces", "[completion][smoke][zsh]")
+{
+    if(!zsh_available())
+        SKIP("no zsh with zsh/zpty reachable");
+    require_loads_under_ignoreclosebraces(empty_script());
+}
+
+TEST_CASE("a zsh script with flags sources under ignoreclosebraces", "[completion][smoke][zsh]")
+{
+    if(!zsh_available())
+        SKIP("no zsh with zsh/zpty reachable");
+    require_loads_under_ignoreclosebraces(logging_script());
 }

@@ -92,6 +92,13 @@ TEST_CASE("a flag holding a byte outside printable, non-syntax ASCII is offered 
     REQUIRE(zsh_emitter{}.emit({"myapp", {{"--a", "d", {}, {}}}}).find("is-at-least") == std::string::npos);
 }
 
+TEST_CASE("a model with no options closes its _arguments line", "[completion][model]")
+{
+    const std::string zsh = zsh_emitter{}.emit({"myapp", {}});
+    REQUIRE(zsh.find("_nucleus_myapp()\n{\n    _arguments -s\n}") != std::string::npos);
+    REQUIRE(zsh.find("\\\n}") == std::string::npos);
+}
+
 TEST_CASE("a hostile program name reaches the bash script only as inert text", "[completion][model][smoke]")
 {
     const std::string bash = bash_emitter{}.emit(model_of({"--w", "", {}, {}}, hostile_prog));

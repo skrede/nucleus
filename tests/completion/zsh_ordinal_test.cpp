@@ -1,4 +1,5 @@
 #include "nucleus/completion/zsh_emitter.h"
+#include "nucleus/completion/zsh_quoted_flag.h"
 #include "nucleus/completion/completion_model.h"
 #include "nucleus/completion/completion_generator.h"
 
@@ -165,4 +166,16 @@ TEST_CASE("a delimiter carrying the placeholder byte reaches the zsh walker as l
     const std::string zsh = script_of(generate_completion(shell::zsh, node_registry(), "myapp", star));
     REQUIRE(zsh.find("'--cluster*node*' '--cluster\\*node\\*' '*level' '\\*level'\n") != std::string::npos);
     REQUIRE(zsh.find("'--cluster*node*' '--cluster\\*node\\*' '*port' '\\*port'\n") != std::string::npos);
+}
+
+TEST_CASE("every slotted option's flag counts as quoted", "[completion][ordinal]")
+{
+    for(const walker_row &row : walker_rows)
+    {
+        DYNAMIC_SECTION(row.option.flag)
+        {
+            REQUIRE(nucleus::has_ordinal_slots(row.option));
+            CHECK(nucleus::detail::zsh_quotes_on_insert(row.option.flag));
+        }
+    }
 }

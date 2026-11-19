@@ -156,7 +156,7 @@ inline std::vector<std::string> records_of(const zsh_seen &seen, std::string_vie
 
 inline void require_no_noise(const zsh_session &session)
 {
-    constexpr std::array<std::string_view, 6> noise{"_arguments:", "comparguments", "command not found", "invalid option definition", "invalid argument", "no matches found"};
+    constexpr std::array<std::string_view, 7> noise{"_arguments:", "comparguments", "command not found", "invalid option definition", "invalid argument", "no matches found", "function definition file not found"};
     std::string                               terminal = session.setup;
     for(const zsh_seen &seen : session.cases)
         terminal += seen.terminal;

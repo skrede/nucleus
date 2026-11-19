@@ -60,7 +60,7 @@ private:
         return test + fn + R"( "$@"; else compdef )" + fn + " " + detail::zsh_word(prog) + "; fi\n";
     }
 
-    static bool quoted_spec(const completion_option &option) { return has_ordinal_slots(option) || detail::zsh_quotes_on_insert(option.flag); }
+    static bool quoted_spec(const completion_option &option) { return detail::zsh_quotes_on_insert(option.flag); }
 
     static bool guarded(const completion_model &model) { return std::ranges::any_of(model.options, quoted_spec); }
 
@@ -83,7 +83,8 @@ private:
     static std::string arguments_line(const completion_model &model)
     {
         const std::string ordinal = has_ordinal_options(model) ? " \"${ordinal_specs[@]}\"" : "";
-        return "    _arguments -s" + ordinal + " \\\n" + spec_lines(model);
+        const std::string specs   = spec_lines(model);
+        return "    _arguments -s" + ordinal + (specs.empty() ? "\n" : " \\\n" + specs);
     }
 
     // zsh inserts a word matching several specs differently by their order; the guarded specs follow the others so a
