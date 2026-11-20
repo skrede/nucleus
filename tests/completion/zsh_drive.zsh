@@ -38,7 +38,7 @@ nucleus_await()
         if zpty -r -t nucleus_z chunk; then
             nucleus_got+=$chunk
         elif (( SECONDS > deadline )); then
-            nucleus_fail "timeout waiting for $1"
+            nucleus_fail "timeout waiting for $1; the terminal held: ${(V)nucleus_got}"
         else
             zselect -t 1
         fi

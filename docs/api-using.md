@@ -1140,9 +1140,10 @@ rule and holds its values to it. Such a host also holds each flag to opening
 with `-` or `+`, since zsh's `_arguments` refuses any other spec and the
 program then completes nothing: in zsh 5.9 always, and before zsh 5.9 only when
 the script offers that flag there, which it does unless the flag holds a byte
-outside printable, non-syntax ASCII. A pure read of the sealed schema. nucleus
-is a library, not a CLI — it returns the script and the host decides how to
-surface it.
+outside printable, non-syntax ASCII.
+
+`generate_completion` is a pure read of the sealed schema. nucleus is a library,
+not a CLI — it returns the script and the host decides how to surface it.
 
 The bash script requires bash 5.0 or later. On older bash, including the bash 3.2
 macOS ships as `/bin/bash` and the bash 4.4 of RHEL 8 and its rebuilds, the script
@@ -1157,11 +1158,14 @@ example from `.zshrc`. A file under any other name, such as `_my-tool.v2`, or
 `_my_tool_v2` as releases before 0.4.2 documented it, completes nothing on the
 first TAB, which only registers the function the script defines; completion
 starts on the second. Remove a `_<ident>` file an earlier release installed:
-`compinit` registers the first file it finds for a program, so a leftover whose
-name sorts first, as `_myapp` does before `_nucleus_myapp`, is the one
-registered, and the program keeps the earlier release's completion, with no
-message. The bash script loaded through `bashcompinit` registers nothing, since
-zsh has no `BASH_VERSINFO`.
+`compinit` registers the first `#compdef` file it finds for a program, scanning
+`$fpath` in order, so a leftover can be the one registered, and the program then
+keeps the earlier release's completion, with no message. Then delete
+`compinit`'s dump (`${ZDOTDIR:-$HOME}/.zcompdump`, or the file passed to
+`compinit -d`) before starting a new shell: a dump written while the leftover
+was installed still names it, and the program's completion then fails with
+`function definition file not found`. The bash script loaded through
+`bashcompinit` registers nothing, since zsh has no `BASH_VERSINFO`.
 
 The zsh script supports zsh 5.0.8 and later, and its behavior is tested on zsh
 5.0.8, 5.5.1, 5.8.1 and 5.9. An older zsh is not refused, but it is not supported.
@@ -1179,10 +1183,10 @@ repeated container, such as `--cluster-node-\*-port`, and every flag under a
 delimiter holding such a byte. Before zsh 5.9, a repeated container's flag under
 any other delimiter completes once every ordinal in it is typed, as
 `--cluster-node-2-` completes to `--cluster-node-2-port`, and every other flag
-completes as on zsh 5.9. zsh 5.9 offers every flag. It inserts those ASCII bytes
-quoted, and a non-ASCII character quoted or as typed, depending on whether the
-platform's C library deems it printable, so one flag can be inserted differently
-on Linux and on macOS.
+completes as on zsh 5.9. zsh 5.9 offers every flag. It does not insert those
+ASCII bytes as typed, and it inserts a non-ASCII character quoted or as typed,
+depending on whether the platform's C library deems it printable, so one flag
+can be inserted differently on Linux and on macOS.
 
 Every function the script defines carries the `_nucleus_` prefix, which no
 function of zsh's completion system uses. A program named after one of zsh's

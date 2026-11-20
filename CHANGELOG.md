@@ -151,11 +151,15 @@ is listed last, under Additions.
   system carries the `_nucleus_` prefix. A script for a program with a repeated
   container also defines `_nucleus_<ident>-ordinal`, so sourcing it replaces any
   function of that name already defined; no program's completion function can
-  carry that name. Save the script on `$fpath` as `_nucleus_<ident>` and remove
-  the `_<ident>` file an earlier release installed. Left in place, it is the file
-  `compinit` registers whenever its name sorts first, as `_myapp` does before
-  `_nucleus_myapp`, and the program keeps the earlier release's completion, with
-  no message. The new script saved under the old name instead completes nothing
+  carry that name. Save the script on `$fpath` as `_nucleus_<ident>`, remove the
+  `_<ident>` file an earlier release installed, and delete `compinit`'s dump
+  (`${ZDOTDIR:-$HOME}/.zcompdump`, or the file passed to `compinit -d`) before
+  starting a new shell. `compinit` registers the first `#compdef` file it finds
+  for a program, scanning `$fpath` in order, so a leftover can be the one
+  registered, and the program then keeps the earlier release's completion, with
+  no message. A dump written while the leftover was installed still names it,
+  and the program's completion then fails with `function definition file not
+  found`. The new script saved under the old name instead completes nothing
   on its first TAB, and completion starts on the second. The emitted text and the
   install name change with no diagnostic.
 - **The zsh script's last line now registers the completion when the script is

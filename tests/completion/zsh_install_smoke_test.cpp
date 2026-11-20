@@ -61,6 +61,7 @@ void require_loads_under_ignoreclosebraces(const std::string &script)
             INFO(session.setup);
             REQUIRE(session.registered == "_nucleus_myapp");
             REQUIRE(session.setup.find("parse error") == std::string::npos);
+            require_quiet(session);
         }
 }
 }

@@ -138,7 +138,7 @@ TEST_CASE("a hostile program name runs nothing when the zsh script is installed 
     require_quiet(sourced);
 }
 
-TEST_CASE("a program named after another program's ordinal helper leaves the completion of both working on every install route", "[completion][smoke][zsh]")
+TEST_CASE("a program named after another program's ordinal helper leaves the completion of both working on fpath and in either source order", "[completion][smoke][zsh]")
 {
     if(!zsh_available())
         SKIP("no zsh with zsh/zpty reachable");
@@ -162,7 +162,7 @@ TEST_CASE("a program named after another program's ordinal helper leaves the com
     }
 }
 
-TEST_CASE("a completion file an earlier release installed is registered over the new one when its name sorts first on fpath", "[completion][smoke][zsh]")
+TEST_CASE("a completion file an earlier release installed is registered over the new one when its name sorts first in the same fpath directory", "[completion][smoke][zsh]")
 {
     if(!zsh_available())
         SKIP("no zsh with zsh/zpty reachable");
