@@ -3,9 +3,19 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
+#include "nucleus/tokenizer/tokenizer.h"
+#include "nucleus/tokenizer/resolve_error.h"
 #include "nucleus/tokenizer/tree_tokenizer.h"
 
 #include "nucleus/runtime/runtime_source.h"
+
+#include "nucleus/config_source/source_stack.h"
+
+#include "nucleus/error.h"
+#include "nucleus/config_space.h"
+
+#include "nucleus/keyspace/key_path.h"
+#include "nucleus/keyspace/keyspace.h"
 
 #include <catch2/catch_test_macros.hpp>
 

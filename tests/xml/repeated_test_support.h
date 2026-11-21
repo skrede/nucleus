@@ -2,6 +2,7 @@
 #define HPP_GUARD_NUCLEUS_TESTS_XML_REPEATED_TEST_SUPPORT_H
 
 #include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "support/builder_result_test_support.h"
 
@@ -10,6 +11,8 @@
 #include "nucleus/schema/schema_registry.h"
 
 #include "nucleus/xml/xml_source.h"
+
+#include "nucleus/config_source/source_handle.h"
 
 #include <catch2/catch_test_macros.hpp>
 

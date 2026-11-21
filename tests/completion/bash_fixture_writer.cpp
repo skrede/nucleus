@@ -1,11 +1,16 @@
+#include "nucleus/completion/completion.h"
 #include "nucleus/completion/completion_generator.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/cli_flag.h"
 #include "nucleus/schema/schema_registry.h"
+#include "nucleus/schema/schema_attach_rules.h"
 
 #include "nucleus/keyspace/key_path.h"
+
+#include "nucleus/error.h"
+#include "nucleus/expected.h"
 
 #include <string>
 #include <vector>

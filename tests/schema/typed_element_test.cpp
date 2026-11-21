@@ -5,7 +5,10 @@
 // conversion failure surfacing, get_as error distinctions,
 // repeated x typed (get_all_as), and orthogonality with other schema axes.
 
+#include "nucleus/error.h"
 #include "nucleus/config.h"
+#include "nucleus/expected.h"
+#include "nucleus/config_space.h"
 
 #include "support/builder_result_test_support.h"
 
@@ -13,6 +16,7 @@
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/converters.h"
 
+#include "nucleus/config_source/source_stack.h"
 #include "nucleus/config_source/config_source.h"
 
 #include "nucleus/xml/xml_source.h"

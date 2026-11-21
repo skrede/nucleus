@@ -2,6 +2,9 @@
 
 #include "nucleus/keyspace/entry.h"
 
+#include "nucleus/schema/projection.h"
+#include "nucleus/schema/schema_registry.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>

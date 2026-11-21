@@ -1,6 +1,7 @@
 #include "nucleus/config.h"
 #include "nucleus/log_sink.h"
 #include "nucleus/capability.h"
+#include "nucleus/config_space.h"
 
 #include "support/builder_result_test_support.h"
 
@@ -8,7 +9,9 @@
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/converters.h"
 
+#include "nucleus/config_source/degradation.h"
 #include "nucleus/config_source/feature_gate.h"
+#include "nucleus/config_source/source_stack.h"
 #include "nucleus/config_source/config_source.h"
 
 #include "nucleus/env/env_source.h"

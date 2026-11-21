@@ -3,6 +3,14 @@ int typed_example_main();
 #include "../../examples/schema/typed.cpp"
 #undef main
 
+#include "nucleus/error.h"
+#include "nucleus/expected.h"
+#include "nucleus/identity.h"
+#include "nucleus/config_space.h"
+
+#include "nucleus/schema/schema.h"
+#include "nucleus/schema/converters.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <any>

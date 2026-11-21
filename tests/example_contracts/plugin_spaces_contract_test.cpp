@@ -3,6 +3,18 @@ int plugin_spaces_example_main();
 #include "../../examples/composition/plugin_spaces.cpp"
 #undef main
 
+#include "nucleus/error.h"
+#include "nucleus/config.h"
+#include "nucleus/expected.h"
+#include "nucleus/identity.h"
+#include "nucleus/config_space.h"
+#include "nucleus/registration_policy.h"
+
+#include "nucleus/diagnostics/conflict_report.h"
+
+#include "nucleus/schema/anchor.h"
+#include "nucleus/schema/schema.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <map>

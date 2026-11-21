@@ -2,8 +2,11 @@
 
 #include "nucleus/error.h"
 #include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/xml/xml_emitter.h"
+
+#include "nucleus/config_source/source_stack.h"
 
 #include <catch2/catch_test_macros.hpp>
 

@@ -1,8 +1,11 @@
 #include "nucleus/identity.h"
 
+#include "nucleus/tokenizer/tokenizer.h"
+#include "nucleus/tokenizer/resolve_error.h"
 #include "nucleus/tokenizer/token_resolution.h"
 #include "nucleus/tokenizer/tokenizer_builder.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
+#include "nucleus/tokenizer/substitution_budget.h"
 
 #include <catch2/catch_test_macros.hpp>
 

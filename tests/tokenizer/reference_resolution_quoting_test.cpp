@@ -1,8 +1,13 @@
 #include "support/builder_result_test_support.h"
 
+#include "nucleus/tokenizer/tokenizer.h"
 #include "nucleus/tokenizer/tree_tokenizer.h"
 
 #include "nucleus/runtime/runtime_source.h"
+
+#include "nucleus/config_source/source_stack.h"
+
+#include "nucleus/config_space.h"
 
 #include <catch2/catch_test_macros.hpp>
 

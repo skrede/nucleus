@@ -2,6 +2,7 @@
 
 #include "nucleus/error.h"
 #include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include <catch2/catch_test_macros.hpp>
 

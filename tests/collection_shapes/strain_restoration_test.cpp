@@ -1,9 +1,17 @@
 #include "collection_shapes.h"
 
 #include "nucleus/config.h"
+#include "nucleus/config_space.h"
 #include "nucleus/strain_scope.h"
 
 #include "support/builder_result_test_support.h"
+
+#include "nucleus/config_source/source_stack.h"
+
+#include "nucleus/runtime/runtime_source.h"
+
+#include "nucleus/schema/anchor.h"
+#include "nucleus/schema/schema.h"
 
 #include <catch2/catch_test_macros.hpp>
 

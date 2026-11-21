@@ -1,7 +1,9 @@
 #include "support/builder_result_test_support.h"
 
 #include "nucleus/error.h"
+#include "nucleus/config.h"
 #include "nucleus/identity.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/env/env_source.h"
 
@@ -9,9 +11,15 @@
 
 #include "nucleus/runtime/runtime_source.h"
 
+#include "nucleus/tokenizer/tokenizer.h"
 #include "nucleus/tokenizer/tokenizer_builder.h"
 #include "nucleus/tokenizer/builtin_tokenizers.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
+
+#include "nucleus/config_source/source_stack.h"
+#include "nucleus/config_source/source_handle.h"
+
+#include "nucleus/keyspace/provenance.h"
 
 #include <catch2/catch_test_macros.hpp>
 

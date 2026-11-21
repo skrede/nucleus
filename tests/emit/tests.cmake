@@ -3,10 +3,14 @@
 nucleus_add_test(flat_emit_test
     SOURCES flat_emit_test.cpp flat_emit_ordinal_test.cpp flat_emit_record_test.cpp flat_emit_line_break_test.cpp
     LINK nucleus::env nucleus::argv nucleus::runtime)
-nucleus_add_test(flat_emit_round_trip_test LINK nucleus::env nucleus::argv nucleus::runtime)
+nucleus_add_test(flat_emit_round_trip_test
+    SOURCES flat_emit_round_trip_test.cpp flat_replay_metadata_test.cpp
+    LINK nucleus::env nucleus::argv nucleus::runtime)
 nucleus_add_test(emitter_contract_test LINK nucleus::env nucleus::argv)
 
 if(NUCLEUS_BUILD_SOURCE_XML)
     # The seam proof builds all three emitters from one space, so it links all three modules.
-    nucleus_add_test(seam_test LINK nucleus::xml nucleus::env nucleus::argv)
+    nucleus_add_test(seam_test
+        SOURCES seam_test.cpp seam_projection_test.cpp
+        LINK nucleus::xml nucleus::env nucleus::argv)
 endif()

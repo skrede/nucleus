@@ -3,6 +3,18 @@ int constraint_groups_example_main();
 #include "../../examples/schema/constraint_groups.cpp"
 #undef main
 
+#include "nucleus/config_source/source_stack.h"
+
+#include "nucleus/error.h"
+#include "nucleus/expected.h"
+#include "nucleus/config_space.h"
+
+#include "nucleus/runtime/runtime_source.h"
+
+#include "nucleus/schema/schema.h"
+#include "nucleus/schema/identity_group.h"
+#include "nucleus/schema/constraint_group.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>

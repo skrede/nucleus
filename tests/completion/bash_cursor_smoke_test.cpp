@@ -1,5 +1,6 @@
 #include "completion/bash_test_support.h"
 
+#include "nucleus/completion/completion.h"
 #include "nucleus/completion/bash_line_form.h"
 #include "nucleus/completion/completion_generator.h"
 

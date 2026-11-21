@@ -1,4 +1,6 @@
+#include "nucleus/error.h"
 #include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "support/builder_result_test_support.h"
 
@@ -13,6 +15,8 @@
 #include "nucleus/argv/argv_emitter.h"
 
 #include "nucleus/runtime/runtime_source.h"
+
+#include "nucleus/keyspace/key_path.h"
 
 #include <catch2/catch_test_macros.hpp>
 

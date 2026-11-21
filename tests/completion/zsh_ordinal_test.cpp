@@ -1,3 +1,4 @@
+#include "nucleus/completion/completion.h"
 #include "nucleus/completion/zsh_emitter.h"
 #include "nucleus/completion/zsh_safe_ascii.h"
 #include "nucleus/completion/completion_model.h"

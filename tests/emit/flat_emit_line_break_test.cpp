@@ -1,3 +1,4 @@
+#include "nucleus/error.h"
 #include "nucleus/config.h"
 
 #include "nucleus/env/env_emitter.h"

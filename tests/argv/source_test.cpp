@@ -2,6 +2,7 @@
 #include "nucleus/config.h"
 #include "nucleus/log_sink.h"
 #include "nucleus/capability.h"
+#include "nucleus/config_space.h"
 
 #include "support/builder_result_test_support.h"
 

@@ -1,8 +1,17 @@
+#include "xml/persist_artifact.h"
 #include "xml/persist_test_support.h"
 
 #include "support/builder_result_test_support.h"
 
 #include "nucleus/xml/xml_emitter.h"
+
+#include "nucleus/config_source/source_stack.h"
+
+#include "nucleus/error.h"
+#include "nucleus/config_space.h"
+
+#include "nucleus/schema/anchor.h"
+#include "nucleus/schema/schema.h"
 
 #include <catch2/catch_test_macros.hpp>
 

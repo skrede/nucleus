@@ -6,6 +6,8 @@
 
 #include "nucleus/config_source/source_stack.h"
 
+#include "nucleus/keyspace/provenance.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <latch>

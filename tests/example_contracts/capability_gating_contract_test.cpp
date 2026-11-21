@@ -7,6 +7,16 @@ int capability_gating_example_main();
 #include "../../examples/sources/capability_gating.cpp"
 #undef main
 
+#include "nucleus/error.h"
+#include "nucleus/config.h"
+#include "nucleus/expected.h"
+#include "nucleus/identity.h"
+#include "nucleus/config_space.h"
+
+#include "nucleus/config_source/source_stack.h"
+
+#include "nucleus/schema/schema.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>

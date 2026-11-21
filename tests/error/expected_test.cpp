@@ -1,5 +1,7 @@
 #include "nucleus/expected.h"
 
+#include "nucleus/detail/expected.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <memory>

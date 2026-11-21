@@ -6,6 +6,8 @@
 
 #include "nucleus/xml/xml_source.h"
 
+#include "nucleus/capability.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <map>

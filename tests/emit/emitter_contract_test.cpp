@@ -1,5 +1,7 @@
 #include "nucleus/error.h"
+#include "nucleus/config.h"
 #include "nucleus/expected.h"
+#include "nucleus/config_space.h"
 #include "nucleus/config_emitter.h"
 
 #include "nucleus/detail/emitter_delivery.h"

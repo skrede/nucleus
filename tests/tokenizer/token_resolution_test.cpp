@@ -1,5 +1,7 @@
 #include "nucleus/identity.h"
 
+#include "nucleus/tokenizer/resolve_error.h"
+#include "nucleus/tokenizer/resolver_scope.h"
 #include "nucleus/tokenizer/token_resolution.h"
 #include "nucleus/tokenizer/tokenizer_builder.h"
 #include "nucleus/tokenizer/builtin_tokenizers.h"

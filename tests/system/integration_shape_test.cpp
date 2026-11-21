@@ -16,6 +16,7 @@
 //   - Three loud-error paths: no-selection, unknown selection, duplicate unique value
 
 #include "nucleus/config.h"
+#include "nucleus/config_space.h"
 #include "nucleus/strain_scope.h"
 
 #include "support/builder_result_test_support.h"
@@ -26,6 +27,9 @@
 #include "nucleus/xml/xml_source.h"
 
 #include "nucleus/env/env_source.h"
+
+#include "nucleus/config_source/source_stack.h"
+#include "nucleus/config_source/source_handle.h"
 
 #include <catch2/catch_test_macros.hpp>
 

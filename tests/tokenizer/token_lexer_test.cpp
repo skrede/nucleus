@@ -1,4 +1,5 @@
 #include "nucleus/tokenizer/token_lexer.h"
+#include "nucleus/tokenizer/resolve_error.h"
 
 #include <catch2/catch_test_macros.hpp>
 

@@ -5,13 +5,17 @@
 #include "support/builder_result_test_support.h"
 
 #include "nucleus/config.h"
+#include "nucleus/expected.h"
+#include "nucleus/config_space.h"
 #include "nucleus/strain_scope.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/converters.h"
 
+#include "nucleus/config_source/source_stack.h"
 #include "nucleus/config_source/config_source.h"
+#include "nucleus/config_source/source_handle.h"
 
 #include "nucleus/env/env_source.h"
 

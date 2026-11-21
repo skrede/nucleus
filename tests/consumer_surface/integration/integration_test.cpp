@@ -2,7 +2,9 @@
 // nested schema (including a typed element), resolves a runtime-backed stack, and
 // reads values back as text and as the declared type. Exit code is the verdict.
 
+#include "nucleus/error.h"
 #include "nucleus/config.h"
+#include "nucleus/expected.h"
 #include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
@@ -10,6 +12,8 @@
 #include "nucleus/schema/converters.h"
 
 #include "nucleus/runtime/runtime_source.h"
+
+#include "nucleus/config_source/source_stack.h"
 
 #ifdef NUCLEUS_INTEGRATION_WITH_XML
 #include "nucleus/xml/xml_source.h"

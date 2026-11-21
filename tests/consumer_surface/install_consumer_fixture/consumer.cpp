@@ -1,10 +1,14 @@
+#include "nucleus/error.h"
 #include "nucleus/config.h"
+#include "nucleus/expected.h"
 #include "nucleus/config_space.h"
 
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
 #include "nucleus/runtime/runtime_source.h"
+
+#include "nucleus/config_source/source_stack.h"
 
 #include <utility>
 #include <iostream>

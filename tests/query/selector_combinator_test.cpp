@@ -1,10 +1,16 @@
 #include "nucleus/query/query.h"
+#include "nucleus/query/schema_query_context.h"
 
 #include "support/builder_result_test_support.h"
 
+#include "nucleus/error.h"
 #include "nucleus/config.h"
+#include "nucleus/config_node.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/runtime/runtime_source.h"
+
+#include "nucleus/config_source/source_stack.h"
 
 #include <catch2/catch_test_macros.hpp>
 

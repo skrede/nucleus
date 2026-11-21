@@ -6,11 +6,17 @@
 
 #include "support/builder_result_test_support.h"
 
+#include "nucleus/error.h"
+#include "nucleus/expected.h"
 #include "nucleus/identity.h"
+#include "nucleus/config_space.h"
 #include "nucleus/registration_policy.h"
 
 #include "nucleus/tokenizer/tokenizer.h"
 #include "nucleus/tokenizer/tree_tokenizer.h"
+
+#include "nucleus/schema/anchor.h"
+#include "nucleus/schema/schema.h"
 
 #include <catch2/catch_test_macros.hpp>
 

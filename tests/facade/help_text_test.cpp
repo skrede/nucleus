@@ -7,6 +7,8 @@
 
 #include "nucleus/keyspace/key_path.h"
 
+#include "nucleus/config_space.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>

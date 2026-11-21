@@ -2,10 +2,18 @@
 
 #include "nucleus/error.h"
 #include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "support/builder_result_test_support.h"
 
+#include "nucleus/schema/anchor.h"
+#include "nucleus/schema/schema.h"
 #include "nucleus/schema/converters.h"
+
+#include "nucleus/config_source/source_stack.h"
+#include "nucleus/config_source/source_handle.h"
+
+#include "nucleus/xml/xml_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -65,37 +73,6 @@ TEST_CASE("a key whose repeated-container segments are unindexed fails the load,
             CHECK(loaded.error().message.find(key) != std::string::npos);
         }
     }
-}
-
-TEST_CASE("a repeated leaf arriving plain under a named instance still mints its ordinal",
-          "[collection_shapes][addressing][leaf]")
-{
-    const nucleus::config_space space = cluster_space();
-
-    const nucleus::load_result loaded = over_two_nodes(space, "cluster/node[0]/mark");
-    REQUIRE(loaded);
-    INFO(nucleus::shapes::serialize(loaded.value()));
-    REQUIRE(loaded.value().get("cluster/node[0]/mark[0]") == "zzz");
-    REQUIRE(loaded.value().get("cluster/node[1]/port") == "20");
-}
-
-TEST_CASE("a named instance's scalar and a top-level repeated leaf are untouched by the "
-          "addressing rule",
-          "[collection_shapes][addressing][leaf]")
-{
-    const nucleus::config_space space = cluster_space();
-
-    const nucleus::load_result indexed = over_two_nodes(space, "cluster/node[0]/port");
-    REQUIRE(indexed);
-    REQUIRE(indexed.value().get("cluster/node[0]/port") == "zzz");
-    REQUIRE(indexed.value().get("cluster/node[1]/port") == "20");
-
-    const nucleus::load_result top_leaf = nucleus::load_config(space,
-        nucleus::source_stack{xml_of("<cluster><zone>x</zone></cluster>"),
-                              nucleus::shapes::runtime_layer({{"cluster/zone", "zzz"}})},
-        {});
-    REQUIRE(top_leaf);
-    REQUIRE(top_leaf.value().get_all("cluster/zone") == std::vector<std::string>{"zzz"});
 }
 
 TEST_CASE("an ordinal segment outside the accepted domain fails, naming the source, "

@@ -2,6 +2,15 @@
 
 #include "nucleus/xml/xml_emitter.h"
 
+#include "nucleus/config_source/source_stack.h"
+
+#include "nucleus/error.h"
+#include "nucleus/config_space.h"
+
+#include "nucleus/schema/anchor.h"
+#include "nucleus/schema/schema.h"
+#include "nucleus/schema/schema_registry.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <map>

@@ -13,6 +13,8 @@
 
 #include "nucleus/env/env_source.h"
 
+#include "nucleus/diagnostics/conflict_report.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <memory>

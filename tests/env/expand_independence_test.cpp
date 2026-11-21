@@ -12,6 +12,10 @@
 
 #include "nucleus/env/env_source.h"
 
+#include "nucleus/config_source/source_stack.h"
+
+#include "nucleus/config_space.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>

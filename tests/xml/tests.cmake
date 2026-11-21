@@ -11,7 +11,9 @@ nucleus_add_test(template_test LINK nucleus::xml)
 # is why this test links the xml module (and pugixml transitively) that core never links.
 nucleus_add_test(buffer_lifetime_test LINK nucleus::xml)
 
-nucleus_add_test(robustness_test LINK nucleus::xml)
+nucleus_add_test(robustness_test
+    SOURCES robustness_test.cpp pull_failure_test.cpp
+    LINK nucleus::xml)
 nucleus_add_test(keyed_projection_test LINK nucleus::xml)
 nucleus_add_test(keyed_selection_test LINK nucleus::xml)
 nucleus_add_test(identity_contract_test LINK nucleus::xml)

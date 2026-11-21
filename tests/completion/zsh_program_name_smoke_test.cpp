@@ -1,5 +1,6 @@
 #include "completion/zsh_test_support.h"
 
+#include "nucleus/completion/completion.h"
 #include "nucleus/completion/zsh_emitter.h"
 #include "nucleus/completion/completion_model.h"
 #include "nucleus/completion/completion_generator.h"

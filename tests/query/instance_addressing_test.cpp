@@ -1,9 +1,11 @@
 #include "nucleus/config.h"
 #include "nucleus/config_node.h"
+#include "nucleus/config_space.h"
 
 #include "support/builder_result_test_support.h"
 
 #include "nucleus/query/query.h"
+#include "nucleus/query/schema_query_context.h"
 
 #include <catch2/catch_test_macros.hpp>
 

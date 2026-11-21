@@ -115,6 +115,7 @@ set(cpp_files
     tests/example_contracts/pkey_tokenizer_contract_test.cpp
     tests/example_contracts/plugin_spaces_contract_test.cpp
     tests/example_contracts/query_contract_test.cpp
+    tests/example_contracts/query_setup_contract_test.cpp
     tests/example_contracts/schema_contract_test.cpp
     tests/example_contracts/typed_contract_test.cpp
     tests/tokenizer/pkey_tokenizer_test.cpp)

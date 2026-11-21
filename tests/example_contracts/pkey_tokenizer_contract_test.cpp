@@ -3,6 +3,20 @@ int pkey_tokenizer_example_main();
 #include "../../examples/tokens/pkey_tokenizer.cpp"
 #undef main
 
+#include "nucleus/error.h"
+#include "nucleus/expected.h"
+#include "nucleus/identity.h"
+#include "nucleus/config_space.h"
+
+#include "nucleus/keyspace/value.h"
+#include "nucleus/keyspace/key_path.h"
+#include "nucleus/keyspace/keyspace.h"
+
+#include "nucleus/schema/schema.h"
+
+#include "nucleus/tokenizer/resolve_error.h"
+#include "nucleus/tokenizer/tree_tokenizer.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>

@@ -1,6 +1,6 @@
 nucleus_add_test(registry_test)
 nucleus_add_test(enforcer_test)
-nucleus_add_test(element_text_test)
+nucleus_add_test(element_text_test SOURCES element_text_test.cpp allowed_value_text_test.cpp)
 nucleus_add_test(group_text_test)
 nucleus_add_test(cli_bijection_test LINK nucleus::argv)
 nucleus_add_test(constraint_group_test LINK nucleus::runtime)

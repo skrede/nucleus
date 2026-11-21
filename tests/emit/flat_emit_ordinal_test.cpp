@@ -1,8 +1,11 @@
+#include "nucleus/error.h"
 #include "nucleus/config.h"
 
 #include "nucleus/env/env_emitter.h"
 
 #include "nucleus/argv/argv_emitter.h"
+
+#include "nucleus/keyspace/key_path.h"
 
 #include <catch2/catch_test_macros.hpp>
 

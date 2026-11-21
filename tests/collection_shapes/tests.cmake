@@ -1,8 +1,9 @@
-# The folder include entry is what lets the twenty-five sources reach collection_shapes.h by its
+# The folder include entry is what lets the twenty-six sources reach collection_shapes.h by its
 # bare name; the fixture documents the define points at live beside them.
 nucleus_add_test(collection_shapes_test
     SOURCES collection_shapes_test.cpp
             addressing_test.cpp
+            addressing_leaf_test.cpp
             keyed_ordinal_test.cpp
             keyed_merge_stability_test.cpp
             keyed_duplicate_test.cpp

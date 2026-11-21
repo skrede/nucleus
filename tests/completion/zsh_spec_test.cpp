@@ -1,3 +1,4 @@
+#include "nucleus/completion/completion.h"
 #include "nucleus/completion/zsh_emitter.h"
 #include "nucleus/completion/zsh_safe_ascii.h"
 #include "nucleus/completion/completion_model.h"
@@ -6,6 +7,9 @@
 #include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/schema_registry.h"
+
+#include "nucleus/error.h"
+#include "nucleus/expected.h"
 
 #include <catch2/catch_test_macros.hpp>
 

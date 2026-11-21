@@ -1,8 +1,11 @@
 #include "collection_shapes.h"
 
 #include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "support/builder_result_test_support.h"
+
+#include "nucleus/config_source/source_stack.h"
 
 #include <catch2/catch_test_macros.hpp>
 

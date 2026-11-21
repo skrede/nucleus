@@ -205,7 +205,7 @@ None.
 
 ## Carried — test files over the 200-line ceiling
 
-33 of 205 units. Test units are held to the same ceiling.
+33 of 215 units. Test units are held to the same ceiling.
 
 Two rows here rose to close the pathname expansion the generated bash completion performed
 over its own candidates, and one of the two rose again for the zsh description escaper.
@@ -247,41 +247,46 @@ Four rows rose by one line each when the test units came to include `<cstddef>` 
 Thirteen rows rose by one to five lines when every include block was put in the project's include
 order, which separates each folder group from the next with a blank line.
 
+Thirty-two rows rose by one to fourteen lines when each test unit came to include every project
+header whose names it uses, rather than reaching them through another header. Those lines are the
+whole of each rise. The nine units the same lines would have carried past the ceiling were split
+instead, each into a second source of the same test executable, so none of them joined.
+
 | File | Lines |
 |---|---|
-| `tests/config_source/inherit_chain_test.cpp` | 1120 |
-| `tests/keyspace/repeated_container_test.cpp` | 817 |
-| `tests/schema/typed_element_test.cpp` | 810 |
-| `tests/config_node/config_node_test.cpp` | 779 |
-| `tests/argv/source_test.cpp` | 615 |
-| `tests/schema/typed_shape_test.cpp` | 519 |
-| `tests/schema/repeated_element_test.cpp` | 470 |
-| `tests/system/integration_shape_test.cpp` | 429 |
-| `tests/keyspace/strain_scope_policy_test.cpp` | 401 |
-| `tests/xml/keyed_projection_test.cpp` | 338 |
+| `tests/config_source/inherit_chain_test.cpp` | 1126 |
+| `tests/keyspace/repeated_container_test.cpp` | 822 |
+| `tests/schema/typed_element_test.cpp` | 814 |
+| `tests/config_node/config_node_test.cpp` | 782 |
+| `tests/argv/source_test.cpp` | 616 |
+| `tests/schema/typed_shape_test.cpp` | 523 |
+| `tests/schema/repeated_element_test.cpp` | 475 |
+| `tests/system/integration_shape_test.cpp` | 433 |
+| `tests/keyspace/strain_scope_policy_test.cpp` | 405 |
+| `tests/xml/keyed_projection_test.cpp` | 343 |
 | `tests/schema/registry_test.cpp` | 333 |
-| `tests/query/selector_test.cpp` | 318 |
-| `tests/completion/completion_test.cpp` | 309 |
-| `tests/schema/constraint_group_test.cpp` | 306 |
-| `tests/runtime/load_front_door_test.cpp` | 289 |
-| `tests/schema/keyed_composition_test.cpp` | 287 |
-| `tests/resolve/resolution_test.cpp` | 281 |
-| `tests/schema/enforcer_test.cpp` | 272 |
-| `tests/completion/smoke_test.cpp` | 255 |
-| `tests/tokenizer/token_resolution_test.cpp` | 245 |
-| `tests/config_source/discovery_test.cpp` | 240 |
-| `tests/xml/keyed_selection_test.cpp` | 232 |
-| `tests/error/expected_test.cpp` | 227 |
-| `tests/tokenizer/pkey_tokenizer_test.cpp` | 226 |
-| `tests/config_source/source_stack_test.cpp` | 219 |
-| `tests/system/multi_source_test.cpp` | 219 |
-| `tests/collection_shapes/identity_pool_scope_test.cpp` | 209 |
-| `tests/config_source/source_handle_test.cpp` | 203 |
-| `tests/query/instance_addressing_test.cpp` | 203 |
-| `tests/tokenizer/token_cycle_test.cpp` | 202 |
-| `tests/example_contracts/constraint_groups_contract_test.cpp` | 201 |
-| `tests/example_contracts/pkey_tokenizer_contract_test.cpp` | 201 |
-| `tests/example_contracts/plugin_spaces_contract_test.cpp` | 201 |
+| `tests/query/selector_test.cpp` | 322 |
+| `tests/schema/constraint_group_test.cpp` | 312 |
+| `tests/completion/completion_test.cpp` | 311 |
+| `tests/runtime/load_front_door_test.cpp` | 297 |
+| `tests/schema/keyed_composition_test.cpp` | 291 |
+| `tests/resolve/resolution_test.cpp` | 289 |
+| `tests/schema/enforcer_test.cpp` | 273 |
+| `tests/completion/smoke_test.cpp` | 257 |
+| `tests/tokenizer/token_resolution_test.cpp` | 247 |
+| `tests/config_source/discovery_test.cpp` | 241 |
+| `tests/tokenizer/pkey_tokenizer_test.cpp` | 236 |
+| `tests/xml/keyed_selection_test.cpp` | 236 |
+| `tests/error/expected_test.cpp` | 229 |
+| `tests/system/multi_source_test.cpp` | 224 |
+| `tests/config_source/source_stack_test.cpp` | 220 |
+| `tests/collection_shapes/identity_pool_scope_test.cpp` | 216 |
+| `tests/example_contracts/pkey_tokenizer_contract_test.cpp` | 215 |
+| `tests/example_contracts/constraint_groups_contract_test.cpp` | 213 |
+| `tests/example_contracts/plugin_spaces_contract_test.cpp` | 213 |
+| `tests/query/instance_addressing_test.cpp` | 205 |
+| `tests/tokenizer/token_cycle_test.cpp` | 205 |
+| `tests/config_source/source_handle_test.cpp` | 204 |
 
 ## Carried — CMake units over the 200-line ceiling
 

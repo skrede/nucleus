@@ -1,3 +1,4 @@
+#include "nucleus/completion/completion.h"
 #include "nucleus/completion/completion_model.h"
 #include "nucleus/completion/completion_generator.h"
 #include "nucleus/completion/completion_projection.h"

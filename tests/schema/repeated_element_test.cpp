@@ -8,7 +8,10 @@
 
 #include "nucleus/config.h"
 #include "nucleus/capability.h"
+#include "nucleus/config_space.h"
+#include "nucleus/strain_scope.h"
 
+#include "nucleus/config_source/source_stack.h"
 #include "nucleus/config_source/config_source.h"
 
 #include "nucleus/env/env_source.h"
@@ -16,6 +19,8 @@
 #include "nucleus/xml/xml_source.h"
 
 #include "nucleus/runtime/runtime_source.h"
+
+#include "nucleus/keyspace/value.h"
 
 #include <catch2/catch_test_macros.hpp>
 

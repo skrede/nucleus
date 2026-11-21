@@ -2,6 +2,7 @@
 
 #include "nucleus/error.h"
 #include "nucleus/config.h"
+#include "nucleus/config_space.h"
 
 #include "support/builder_result_test_support.h"
 
@@ -9,10 +10,16 @@
 #include "nucleus/schema/schema.h"
 #include "nucleus/schema/schema_enforcer.h"
 #include "nucleus/schema/schema_registry.h"
+#include "nucleus/schema/schema_validation.h"
 
 #include "nucleus/keyspace/value.h"
 #include "nucleus/keyspace/key_path.h"
 #include "nucleus/keyspace/keyspace.h"
+
+#include "nucleus/config_source/source_stack.h"
+#include "nucleus/config_source/source_handle.h"
+
+#include "nucleus/xml/xml_source.h"
 
 #include <catch2/catch_test_macros.hpp>
 

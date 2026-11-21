@@ -2,6 +2,11 @@
 
 #include "support/builder_result_test_support.h"
 
+#include "nucleus/config_source/source_stack.h"
+
+#include "nucleus/error.h"
+#include "nucleus/config_space.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <map>

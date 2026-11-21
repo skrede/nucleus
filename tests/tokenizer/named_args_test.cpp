@@ -5,6 +5,7 @@
 
 #include "nucleus/identity.h"
 
+#include "nucleus/tokenizer/resolve_error.h"
 #include "nucleus/tokenizer/token_resolution.h"
 #include "nucleus/tokenizer/builtin_tokenizers.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
