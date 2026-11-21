@@ -46,8 +46,8 @@ std::string result_text(const nucleus::load_result &loaded)
 
 void require_refused(const std::string &value, const std::string &token)
 {
-    std::int32_t calls = 0;
-    auto const loaded = load_with_emit(value, calls);
+    std::int32_t calls  = 0;
+    auto const   loaded = load_with_emit(value, calls);
     INFO("input: " << value);
     INFO("result: " << result_text(loaded));
     INFO("resolver calls: " << calls);
@@ -60,8 +60,8 @@ void require_refused(const std::string &value, const std::string &token)
 
 void require_dispatched(const std::string &value)
 {
-    std::int32_t calls = 0;
-    auto const loaded = load_with_emit(value, calls);
+    std::int32_t calls  = 0;
+    auto const   loaded = load_with_emit(value, calls);
     INFO("input: " << value);
     INFO("result: " << result_text(loaded));
     INFO("resolver calls: " << calls);
@@ -72,8 +72,8 @@ void require_dispatched(const std::string &value)
 
 void require_result(const std::string &value, const std::string &expected)
 {
-    std::int32_t calls = 0;
-    auto const loaded = load_with_emit(value, calls);
+    std::int32_t calls  = 0;
+    auto const   loaded = load_with_emit(value, calls);
     INFO("input: " << value);
     INFO("resolver calls: " << calls);
     CHECK(result_text(loaded) == expected);
@@ -102,8 +102,8 @@ TEST_CASE("an argument-list refusal ends the fallback chain", "[reference][fallb
 
 TEST_CASE("an argument-list refusal precedes the category lookup", "[reference][fallback]")
 {
-    std::int32_t calls = 0;
-    auto const loaded = load_with_emit("${abs:nope ?? typo.f(x=1)}", calls);
+    std::int32_t calls  = 0;
+    auto const   loaded = load_with_emit("${abs:nope ?? typo.f(x=1)}", calls);
     INFO("result: " << result_text(loaded));
     REQUIRE_FALSE(loaded.has_value());
     CHECK(loaded.error().message.find("takes no argument list") != std::string::npos);

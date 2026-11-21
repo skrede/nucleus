@@ -114,8 +114,8 @@ token_result tree_resolver_scope::resolve_one_arm(std::string_view arm, bool is_
             as_token.append(stripped);
             as_token += '}';
             if(auto const paren = find_top_level(stripped, "("); paren != std::string_view::npos && paren > dot)
-                return unexpected(resolve_error(resolve_errc::parse_error, nucleus::format(
-                    "tree tokenizer token '{}' takes no argument list", escaped_text(as_token))));
+                return unexpected(resolve_error(resolve_errc::parse_error,
+                                                nucleus::format("tree tokenizer token '{}' takes no argument list", escaped_text(as_token))));
             auto lexed = lex_token(as_token);
             if(lexed)
             {
