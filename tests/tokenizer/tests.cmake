@@ -7,6 +7,8 @@ nucleus_add_test(reference_resolution_test
     SOURCES reference_resolution_test.cpp reference_resolution_quoting_test.cpp
     LINK nucleus::runtime)
 nucleus_add_test(reference_cycle_test LINK nucleus::runtime)
-nucleus_add_test(reference_fallback_test LINK nucleus::runtime)
+nucleus_add_test(reference_fallback_test
+    SOURCES reference_fallback_test.cpp reference_fallback_arguments_test.cpp
+    LINK nucleus::runtime)
 nucleus_add_test(pass_one_fallback_test LINK nucleus::runtime)
 nucleus_add_test(pkey_tokenizer_test LINK nucleus::runtime)

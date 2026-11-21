@@ -506,7 +506,15 @@ The first three change results *silently*.
   with `errc::unresolved_token` (`takes no argument list`) before the resolver is
   called, where 0.4.1 called the resolver for `emit.f` with the arguments silently
   dropped. `${emit.f()}` is refused the same way. The refusal ends the chain, so
-  `${emit.f(x=1) ?? "y"}` fails rather than yielding `y`.
+  `${emit.f(x=1) ?? "y"}` fails rather than yielding `y`. A `??` inside the
+  argument list no longer splits the arm, so `${abs:a/missing ?? emit.f(x=a??b)}`
+  is refused whole where 0.4.1 split it and yielded `emit.f(x=a`, a silent value
+  change; `${abs:a/missing ?? (a??b)}` now yields `(a??b)` where 0.4.1 yielded
+  `(a`, and a `(` left unclosed holds the rest of the body in its arm. An unquoted
+  arm holding a dot is read as a tree-tokenizer dispatch, and one with a `(` after
+  the dot is now refused even when its list does not parse: `?? see.note(1)` no
+  longer yields `see.note(1)` from the floor. Quote floor text that contains a dot,
+  as in `?? "v1.2 (beta)"`.
 
 ### Inheritance and document loading
 

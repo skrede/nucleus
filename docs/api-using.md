@@ -398,7 +398,11 @@ a top-level `??`, such as `${env.NAME ?? "x"}`, fails the load with
 `errc::unresolved_token`. A `??` inside a quoted run, a nested token or an argument
 list belongs to that text, not to the outer token, so `${string.upper(value=a??b)}`
 yields `A??B`. An arm naming a tree tokenizer with an argument list, such as
-`?? server.port(x=1)`, fails the load rather than falling through.
+`?? server.port(x=1)`, fails the load rather than falling through, and a `??`
+inside that list does not split the arm. An unquoted arm holding a dot is read as
+a tree-tokenizer dispatch, and one with a `(` after the dot is refused even when
+its list does not parse, so quote floor text that contains a dot:
+`?? "v1.2 (beta)"`.
 
 See [`examples/references/tree_references.cpp`](../examples/references/tree_references.cpp) for live
 demonstrations of `abs:`, `rel:`, `??`, and `${dir.path}`.

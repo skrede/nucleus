@@ -163,8 +163,8 @@ inline resolve_error unterminated_token_error(std::string_view text, std::size_t
                          nucleus::format("unterminated ${{ in value: {} at offset {} is never closed", text[quote], quote));
 }
 
-// Splits body on each top-level '??', trimming blanks from every arm; a body with
-// no top-level '??' gives one arm.
+// Splits body on each '??' find_fallback_operator finds, so a '??' inside an argument
+// list does not split, trimming blanks from every arm; a body with none gives one arm.
 inline std::vector<std::string_view> split_fallback_arms(std::string_view body)
 {
     auto trim = [](std::string_view s) -> std::string_view
@@ -176,12 +176,12 @@ inline std::vector<std::string_view> split_fallback_arms(std::string_view body)
     };
     std::vector<std::string_view> arms;
     std::size_t                   start = 0;
-    std::size_t                   at    = find_top_level(body, "??");
+    std::size_t                   at    = find_fallback_operator(body);
     while(at != std::string_view::npos)
     {
         arms.push_back(trim(body.substr(start, at - start)));
         start = at + 2;
-        at    = find_top_level(body, "??", start);
+        at    = find_fallback_operator(body, start);
     }
     arms.push_back(trim(body.substr(start)));
     return arms;
