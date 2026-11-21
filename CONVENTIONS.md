@@ -63,12 +63,14 @@ encodes:
 * Include order: project includes (quoted) first, third-party second, standard
   library third — one blank line between these sections. Within a section,
   group by folder with a blank line between groups; in the project section the
-  file's own subsystem group comes first. Within a group, sort by file-name
-  length, shortest first, ties alphabetically. Only a header that must come
-  before another may break this order. `.clang-format` sets
-  `SortIncludes: Never` so the formatter cannot fight this rule.
-* A `.cpp` may rely on the standard headers its own header includes; any other
-  unit includes every standard header whose names it uses.
+  file's own subsystem group comes first; for a test under `tests/<x>/` that is
+  its own directory (includes spelled `<x>/...`), not the module it tests.
+  Within a group, sort by file-name length, shortest first, ties
+  alphabetically. Only a header that must come before another may break this
+  order. `.clang-format` sets `SortIncludes: Never` so the formatter cannot
+  fight this rule.
+* A `.cpp` may rely on the headers its own header includes; any other unit
+  includes every header, project or standard, whose names it uses.
 * A public header (`lib/<module>/include/`) must never include a private one
   (`lib/<module>/src/`). Enforced: `public_surface_test` compiles every public
   header together with only the public include roots, and
