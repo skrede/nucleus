@@ -72,6 +72,16 @@ inline std::size_t skip_quoted(std::string_view text, std::size_t at)
     return i;
 }
 
+// One past the quoted run or nested ${...} that opens at at, at itself when neither
+// opens there, or npos when it never closes.
+inline std::size_t skip_nested(std::string_view text, std::size_t at)
+{
+    if(!text.substr(at).starts_with("${"))
+        return skip_quoted(text, at);
+    std::size_t const close = scan_braced_span(text, at + 2);
+    return close == std::string_view::npos ? close : close + 1;
+}
+
 // The first index at or after from where needle starts outside every quoted run and
 // every nested ${...}, or npos, also when a run or nested token opened before it never
 // closes. A nested token's own "${" is top-level text.
@@ -80,20 +90,48 @@ inline std::size_t find_top_level(std::string_view text, std::string_view needle
     std::size_t i = from;
     while(i < text.size())
     {
-        std::string_view const rest = text.substr(i);
-        if(rest.starts_with(needle))
+        if(text.substr(i).starts_with(needle))
             return i;
-        if(rest.starts_with("${"))
-        {
-            i = scan_braced_span(text, i + 2);
-            if(i == std::string_view::npos)
-                return i;
-            ++i;
-        }
-        else if(std::size_t const past = skip_quoted(text, i); past != i)
+        if(std::size_t const past = skip_nested(text, i); past != i)
             i = past;
         else
             ++i;
+    }
+    return std::string_view::npos;
+}
+
+// One past the ')' closing the '(' at open, stepping over quoted runs and nested ${...}
+// without looking inside them, or npos when the list never closes.
+inline std::size_t skip_argument_list(std::string_view text, std::size_t open)
+{
+    std::int32_t depth = 0;
+    for(std::size_t i = open; i < text.size();)
+    {
+        if(std::size_t const past = skip_nested(text, i); past != i)
+        {
+            i = past;
+            continue;
+        }
+        if(text[i] == '(')
+            ++depth;
+        else if(text[i] == ')' && --depth == 0)
+            return i + 1;
+        ++i;
+    }
+    return std::string_view::npos;
+}
+
+// The first '??' at or after from outside every quoted run, nested ${...} and argument
+// list, or npos, also when one of those opened before it never closes.
+inline std::size_t find_fallback_operator(std::string_view body, std::size_t from = 0)
+{
+    while(from != std::string_view::npos)
+    {
+        std::size_t const op    = find_top_level(body, "??", from);
+        std::size_t const paren = find_top_level(body, "(", from);
+        if(paren == std::string_view::npos || op < paren)
+            return op;
+        from = skip_argument_list(body, paren);
     }
     return std::string_view::npos;
 }

@@ -393,6 +393,12 @@ app/label = ${abs:cluster/port ?? "8080"}
 server/url = ${rel:./host}:${rel:./port}
 ```
 
+`??` is the tree-reference operator only: a first-pass token whose own body carries
+a top-level `??`, such as `${env.NAME ?? "x"}`, fails the load with
+`errc::unresolved_token`. A `??` inside a quoted run, a nested token or an argument
+list belongs to that text, not to the outer token, so `${string.upper(value=a??b)}`
+yields `A??B`.
+
 See [`examples/references/tree_references.cpp`](../examples/references/tree_references.cpp) for live
 demonstrations of `abs:`, `rel:`, `??`, and `${dir.path}`.
 

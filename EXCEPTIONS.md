@@ -197,15 +197,15 @@ None.
 | `lib/core/include/nucleus/schema/converters.h` | 392 |
 | `lib/core/include/nucleus/config_space.h` | 300 |
 | `lib/core/src/nucleus/resolve/chain_walker.h` | 288 |
+| `lib/core/src/nucleus/tokenizer/resolver_scope.cpp` | 285 |
 | `lib/core/src/nucleus/tokenizer/tree_resolver_scope.cpp` | 277 |
 | `lib/core/src/nucleus/tokenizer/token_lexer.cpp` | 276 |
-| `lib/core/src/nucleus/tokenizer/resolver_scope.cpp` | 272 |
 | `lib/argv/include/nucleus/argv/multispace_argv_source.h` | 238 |
 | `lib/core/include/nucleus/schema/schema.h` | 218 |
 
 ## Carried — test files over the 200-line ceiling
 
-33 of 204 units. Test units are held to the same ceiling.
+33 of 205 units. Test units are held to the same ceiling.
 
 Two rows here rose to close the pathname expansion the generated bash completion performed
 over its own candidates, and one of the two rose again for the zsh description escaper.

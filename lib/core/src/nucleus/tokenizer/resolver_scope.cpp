@@ -8,6 +8,8 @@
 
 #include "nucleus/format.h"
 
+#include "nucleus/utility/escaped_text.h"
+
 #include <ranges>
 #include <optional>
 
@@ -46,6 +48,14 @@ std::optional<token_span> find_next_token(std::string_view input, std::size_t po
     if(close == std::string_view::npos)
         return std::nullopt;
     return token_span{start, close};
+}
+
+resolve_error pass_one_fallback_error(std::string_view token)
+{
+    return resolve_error(
+            resolve_errc::parse_error,
+            nucleus::format("?? is the tree-reference (pass-2) fallback operator; pass-1 token '{}' cannot use it",
+                            escaped_text(token)));
 }
 
 }
@@ -261,6 +271,9 @@ token_result resolver_scope::resolve_all(std::string_view input)
             }
         }
 
+        // Checked on the unflattened token, so a nested head's own failure cannot mask the operator.
+        if(find_fallback_operator(token.substr(2, token.size() - 3)) != std::string_view::npos)
+            return unexpected(pass_one_fallback_error(token));
         auto resolved = resolve_one(token);
         if(!resolved) return unexpected(std::move(resolved).error());
         result.append(resolved.value());

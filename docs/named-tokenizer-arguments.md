@@ -44,6 +44,9 @@ argument's type.
   resolved per value (and per list element) before coercion. It is handed on
   whole, its own quotes included, so quotes inside it group that token's own
   arguments and are stripped when it is lexed, not before.
+- An unquoted `??` inside an argument value is inert text, not a fallback on that
+  argument as it would be in C# or JavaScript: `${string.upper(value=a??b)}`
+  yields `A??B`.
 
 ```
 ${string.concat(values=['a,b', 'c]d'], separator='|')}  -> a,b|c]d

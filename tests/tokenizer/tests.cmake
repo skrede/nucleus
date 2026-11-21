@@ -8,4 +8,5 @@ nucleus_add_test(reference_resolution_test
     LINK nucleus::runtime)
 nucleus_add_test(reference_cycle_test LINK nucleus::runtime)
 nucleus_add_test(reference_fallback_test LINK nucleus::runtime)
+nucleus_add_test(pass_one_fallback_test LINK nucleus::runtime)
 nucleus_add_test(pkey_tokenizer_test LINK nucleus::runtime)

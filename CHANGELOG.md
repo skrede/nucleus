@@ -493,6 +493,14 @@ The first three change results *silently*.
 - **A tree-tokenizer field naming a nested path is refused before dispatch.** A
   field carrying `/` is reported as a missing field, so a `??` fallback still
   applies, and the host resolver is never called with it.
+- **A `??` in a first-pass token is refused.** `${env.NAME ?? "x"}` now fails the
+  load with `errc::unresolved_token` and the message `?? is the tree-reference
+  (pass-2) fallback operator; pass-1 token '${env.NAME ?? "x"}' cannot use it`.
+  0.4.1 looked up an environment variable literally named `NAME ?? "x"` and
+  reported it as not set, so the fallback the text asks for never applied. `??`
+  stays the fallback of a tree reference such as `${abs:a ?? "x"}`, and a `??`
+  inside a quoted run, a nested token or an argument list belongs to that text:
+  `${string.upper(value=a??b)}` still yields `A??B`.
 
 ### Inheritance and document loading
 
