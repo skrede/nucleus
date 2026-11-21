@@ -4,7 +4,7 @@
 #include "nucleus/completion/zsh_spec.h"
 #include "nucleus/completion/zsh_ordinal.h"
 #include "nucleus/completion/shell_emitter.h"
-#include "nucleus/completion/zsh_quoted_flag.h"
+#include "nucleus/completion/zsh_safe_ascii.h"
 #include "nucleus/completion/completion_model.h"
 
 #include "nucleus/utility/escaped_text.h"
@@ -60,9 +60,9 @@ private:
         return test + fn + R"( "$@"; else compdef )" + fn + " " + detail::zsh_word(prog) + "; fi\n";
     }
 
-    static bool quoted_spec(const completion_option &option) { return detail::zsh_quotes_on_insert(option.flag); }
+    static bool guarded_spec(const completion_option &option) { return detail::zsh_flag_outside_safe_ascii(option.flag); }
 
-    static bool guarded(const completion_model &model) { return std::ranges::any_of(model.options, quoted_spec); }
+    static bool guarded(const completion_model &model) { return std::ranges::any_of(model.options, guarded_spec); }
 
     static std::string guarded_block(const std::string &fn, const completion_model &model)
     {
@@ -74,7 +74,7 @@ private:
         out += "    if (( inserts_quoted )); then\n" + detail::zsh_ordinal_calls(fn, model, true) + "        quoted_specs=(\n";
         for(const completion_option &option : model.options)
         {
-            if(quoted_spec(option))
+            if(guarded_spec(option))
                 out += "            " + detail::zsh_single_quote(detail::zsh_spec(option)) + "\n";
         }
         return out + "        )\n    fi\n";
@@ -94,7 +94,7 @@ private:
         std::string out;
         for(const completion_option &option : model.options)
         {
-            if(!quoted_spec(option))
+            if(!guarded_spec(option))
                 out += (out.empty() ? "        " : " \\\n        ") + detail::zsh_single_quote(detail::zsh_spec(option));
         }
         if(guarded(model))

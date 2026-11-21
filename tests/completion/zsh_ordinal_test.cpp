@@ -1,5 +1,5 @@
 #include "nucleus/completion/zsh_emitter.h"
-#include "nucleus/completion/zsh_quoted_flag.h"
+#include "nucleus/completion/zsh_safe_ascii.h"
 #include "nucleus/completion/completion_model.h"
 #include "nucleus/completion/completion_generator.h"
 
@@ -175,7 +175,7 @@ TEST_CASE("every slotted option's flag counts as quoted", "[completion][ordinal]
         DYNAMIC_SECTION(row.option.flag)
         {
             REQUIRE(nucleus::has_ordinal_slots(row.option));
-            CHECK(nucleus::detail::zsh_quotes_on_insert(row.option.flag));
+            CHECK(nucleus::detail::zsh_flag_outside_safe_ascii(row.option.flag));
         }
     }
 }

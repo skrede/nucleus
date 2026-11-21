@@ -74,6 +74,13 @@ bool recursion_reported(const std::string &terminal)
     return terminal.find("maximum nested function level reached") != std::string::npos || terminal.find("recursion limit exceeded") != std::string::npos;
 }
 
+// Ubuntu 24.04's zsh 5.9 hangs on the runaway recursion instead of reporting it, at the program's own completion
+// or at the victim's; a hang at or before the victim is that symptom.
+bool hung_by_victim(const zsh_session &session, std::size_t victim)
+{
+    return !session.hung.empty() && std::stoul(session.hung) <= victim + 1;
+}
+
 std::vector<zsh_script> installed(zsh_route route, const std::string &name, const std::string &text)
 {
     const std::string prefixed = "_nucleus_" + name;
@@ -83,10 +90,22 @@ std::vector<zsh_script> installed(zsh_route route, const std::string &name, cons
     return {{"myapp.zsh", alpha_script("myapp")}, {name + ".zsh", text}};
 }
 
-zsh_session drive_named(zsh_route route, const std::string &name, const std::string &text)
+zsh_session drive_named(zsh_route route, const std::string &name, const std::string &text, bool hang_ok = false)
 {
     const std::vector<std::string> typed{name + " --a", "myapp --a", "othertool deco", "vprobe "};
-    return drive_zsh(installed(route, name, text), typed, {.route = route, .setup = std::string(vprobe_completion), .decoys = {"decoyfile"}});
+    return drive_zsh(installed(route, name, text), typed, {.route = route, .setup = std::string(vprobe_completion), .decoys = {"decoyfile"}, .hang_ok = hang_ok});
+}
+
+void check_broken(const zsh_session &session, const collision_row &row)
+{
+    const zsh_seen &victim = session.cases[row.victim];
+    INFO(victim.terminal);
+    if(row.recursion && hung_by_victim(session, row.victim))
+        return;
+    CHECK(session.hung.empty());
+    CHECK(records_of(victim, "HIT") == row.hits);
+    CHECK(records_of(victim, "BUF") == std::vector<std::string>{row.buf});
+    CHECK(recursion_reported(victim.terminal) == row.recursion);
 }
 
 std::vector<std::string> sorted_hits(const zsh_seen &seen)
@@ -124,12 +143,8 @@ TEST_CASE("a script defining zsh's own completion function under its name breaks
         for(const collision_row &row : collision_rows)
             DYNAMIC_SECTION(route_text(route) << " " << row.name)
             {
-                const zsh_session session = drive_named(route, row.name, unprefixed(alpha_script(row.name), row.name));
-                const zsh_seen   &victim  = session.cases[row.victim];
-                INFO(victim.terminal);
+                const zsh_session session = drive_named(route, row.name, unprefixed(alpha_script(row.name), row.name), row.recursion);
                 REQUIRE(session.registered == "_nucleus_myapp");
-                CHECK(records_of(victim, "HIT") == row.hits);
-                CHECK(records_of(victim, "BUF") == std::vector<std::string>{row.buf});
-                CHECK(recursion_reported(victim.terminal) == row.recursion);
+                check_broken(session, row);
             }
 }

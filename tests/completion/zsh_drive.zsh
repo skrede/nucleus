@@ -6,6 +6,7 @@ typeset -F SECONDS
 nucleus_scratch=$1
 nucleus_child=${0:a:h}/zsh_drive_child.zsh
 nucleus_got=
+nucleus_on_hang=
 
 nucleus_fail()
 {
@@ -38,6 +39,7 @@ nucleus_await()
         if zpty -r -t nucleus_z chunk; then
             nucleus_got+=$chunk
         elif (( SECONDS > deadline )); then
+            [[ $2 == soft ]] && return 1
             nucleus_fail "timeout waiting for $1; the terminal held: ${(V)nucleus_got}"
         else
             zselect -t 1
@@ -70,8 +72,18 @@ nucleus_case()
     nucleus_await NUCLEUS_ZLE
     zpty -w -n nucleus_z "$1$nucleus_keys"
     zpty -w nucleus_z $'\x15'"print -r -- NUCLEUS''_DONE_$2_; (( ++nucleus_case ))"
-    nucleus_await $sentinel
+    nucleus_await $sentinel $nucleus_on_hang || nucleus_hung $2
     nucleus_take $sentinel $nucleus_scratch/out/$2.tty
+}
+
+# A run marked in/hang_ok records a case that never finishes as hung and stops there, instead of failing.
+nucleus_hung()
+{
+    print -rn -- $nucleus_got > $nucleus_scratch/out/$1.tty
+    print -rn -- $1 > $nucleus_scratch/out/hung
+    nucleus_payload
+    zpty -d nucleus_z
+    exit 0
 }
 
 nucleus_payload()
@@ -93,6 +105,7 @@ nucleus_main()
     nucleus_locale
     unset TERM
     IFS= read -r -d '' nucleus_keys < $nucleus_scratch/in/keys
+    [[ -e $nucleus_scratch/in/hang_ok ]] && nucleus_on_hang=soft
     cases=( ${(f)"$(<$nucleus_scratch/in/cases)"} )
     (( $#cases )) || nucleus_fail "no case in $nucleus_scratch/in/cases"
     nucleus_start

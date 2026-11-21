@@ -1192,7 +1192,11 @@ Every function the script defines carries the `_nucleus_` prefix, which no
 function of zsh's completion system uses. A program named after one of zsh's
 completion functions, such as `tags`, `files` or `values`, therefore completes its
 own flags, and on either install route the completion of other programs,
-file-name completion and completions that call zsh's `_values` keep working. A
+file-name completion and completions that call zsh's `_values` keep working. Two
+programs whose names map to the same `<ident>`, such as `my-tool` and `my.tool`,
+do share function names, in zsh as in bash, and do not complete correctly side
+by side: a script sourced second replaces the first's functions, and on `$fpath`
+the two files take one name. A
 script for a program with a repeated container also defines
 `_nucleus_<ident>-ordinal`, where `_nucleus_<ident>` names its completion
 function; no program's completion function can take that name, since `<ident>`

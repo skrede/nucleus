@@ -142,11 +142,14 @@ is listed last, under Additions.
   must adjust to the new shape.
 - **The zsh script's function, and the file it installs as, are now named
   `_nucleus_<ident>`.** `<ident>` is `prog` with every byte other than a letter, a
-  digit or `_` replaced by `_`. 0.4.1 named the function `_<ident>`, so a program
-  named after one of zsh's completion functions replaced that function for the
-  whole shell, on zsh 5.0.8 through 5.9 and on either install route. With `tags`,
-  every completion through `_arguments` stopped and printed a recursion error;
-  with `files`, file-name completion stopped; with `values`, a completion calling
+  digit or `_` replaced by `_`. Programs whose names differ only in such bytes,
+  such as `my-tool` and `my.tool`, share an `<ident>`, and so share function names
+  in zsh as in bash; they do not complete correctly side by side. 0.4.1 named the
+  function `_<ident>`, so a program named after one of zsh's completion functions
+  replaced that function for the whole shell, on zsh 5.0.8 through 5.9 and on
+  either install route. With `tags`, every completion through `_arguments` stopped
+  and printed a recursion error, or hung on Ubuntu 24.04's zsh 5.9; with `files`,
+  file-name completion stopped; with `values`, a completion calling
   `_values` was offered the program's flags. No function of zsh's completion
   system carries the `_nucleus_` prefix. A script for a program with a repeated
   container also defines `_nucleus_<ident>-ordinal`, so sourcing it replaces any

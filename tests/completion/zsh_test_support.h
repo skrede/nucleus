@@ -82,11 +82,12 @@ struct zsh_script
 
 struct zsh_drive_options
 {
-    zsh_route                route  = zsh_route::fpath;
-    std::string              prog   = "myapp";
-    std::string              keys   = "\x18";
-    std::string              setup  = "";
-    std::vector<std::string> decoys = {};
+    zsh_route                route   = zsh_route::fpath;
+    std::string              prog    = "myapp";
+    std::string              keys    = "\x18";
+    std::string              setup   = "";
+    std::vector<std::string> decoys  = {};
+    bool                     hang_ok = false;
 };
 
 struct zsh_seen
@@ -101,6 +102,7 @@ struct zsh_session
     std::string           registered;
     std::string           setup;
     std::string           payload;
+    std::string           hung;
     std::vector<zsh_seen> cases;
 };
 
@@ -120,6 +122,8 @@ inline void prepare_drive(const std::filesystem::path &root, const std::vector<z
     write_file(root / "in" / "prog", options.prog);
     write_file(root / "in" / "keys", options.keys);
     write_file(root / "in" / "setup.zsh", options.setup);
+    if(options.hang_ok)
+        write_file(root / "in" / "hang_ok", "");
     std::string cases;
     for(const std::string &line : typed)
         cases += line + "\n";
@@ -137,7 +141,7 @@ inline zsh_session drive_zsh(const std::vector<zsh_script> &scripts, const std::
     prepare_drive(scratch.path(), scripts, typed, options);
     run_driver(scratch.path());
     const std::filesystem::path out = scratch.path() / "out";
-    zsh_session                 session{read_file(out / "version"), read_file(out / "registered"), read_file(out / "setup.tty"), read_file(out / "payload"), {}};
+    zsh_session                 session{read_file(out / "version"), read_file(out / "registered"), read_file(out / "setup.tty"), read_file(out / "payload"), read_file(out / "hung"), {}};
     for(std::size_t k = 1; k <= typed.size(); ++k)
         session.cases.push_back({read_file(out / (std::to_string(k) + ".rec")), read_file(out / (std::to_string(k) + ".tty"))});
     return session;

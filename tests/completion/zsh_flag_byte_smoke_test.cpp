@@ -1,7 +1,7 @@
 #include "completion/zsh_test_support.h"
 
 #include "nucleus/completion/zsh_emitter.h"
-#include "nucleus/completion/zsh_quoted_flag.h"
+#include "nucleus/completion/zsh_safe_ascii.h"
 #include "nucleus/completion/completion_model.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -102,7 +102,7 @@ bool offered(const zsh_seen &seen, const std::string &flag)
 
 void require_ascii_unit(const zsh_seen &seen, const flag_unit &unit, bool old)
 {
-    const bool                     quoted = nucleus::detail::zsh_quotes_on_insert(unit.flag);
+    const bool                     quoted = nucleus::detail::zsh_flag_outside_safe_ascii(unit.flag);
     const std::vector<std::string> buffer = records_of(seen, "BUF");
     const std::vector<std::string> raw{"myapp " + unit.flag + " "};
     INFO("typed " << unit.typed << (quoted ? ", classified quoted" : ", classified verbatim"));
@@ -122,7 +122,7 @@ void require_ascii_unit(const zsh_seen &seen, const flag_unit &unit, bool old)
 
 void require_non_ascii_unit(const zsh_seen &seen, const flag_unit &unit, bool old)
 {
-    const bool                     quoted = nucleus::detail::zsh_quotes_on_insert(unit.flag);
+    const bool                     quoted = nucleus::detail::zsh_flag_outside_safe_ascii(unit.flag);
     const std::vector<std::string> buffer = records_of(seen, "BUF");
     INFO("typed " << unit.typed << (quoted ? ", classified quoted" : ", classified verbatim"));
     CHECK(quoted);

@@ -1,5 +1,5 @@
 #include "nucleus/completion/zsh_emitter.h"
-#include "nucleus/completion/zsh_quoted_flag.h"
+#include "nucleus/completion/zsh_safe_ascii.h"
 #include "nucleus/completion/completion_model.h"
 #include "nucleus/completion/completion_generator.h"
 
@@ -173,6 +173,6 @@ TEST_CASE("a flag text counts as quoted exactly when it holds a byte outside pri
     for(const auto &[text, quoted] : insertion_rows)
     {
         CAPTURE(text);
-        CHECK(nucleus::detail::zsh_quotes_on_insert(text) == quoted);
+        CHECK(nucleus::detail::zsh_flag_outside_safe_ascii(text) == quoted);
     }
 }
