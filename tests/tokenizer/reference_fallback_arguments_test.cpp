@@ -80,6 +80,19 @@ void require_result(const std::string &value, const std::string &expected)
     CHECK(calls == 0);
 }
 
+void require_failed(const std::string &value, const std::string &message)
+{
+    std::int32_t calls  = 0;
+    auto const   loaded = load_with_emit(value, calls);
+    INFO("input: " << value);
+    INFO("result: " << result_text(loaded));
+    INFO("resolver calls: " << calls);
+    REQUIRE_FALSE(loaded.has_value());
+    CHECK(loaded.error().code == nucleus::errc::unresolved_token);
+    CHECK(loaded.error().message == message);
+    CHECK(calls == 0);
+}
+
 }
 
 TEST_CASE("a tree-tokenizer token carrying an argument list is refused before dispatch",
@@ -106,6 +119,7 @@ TEST_CASE("an argument-list refusal precedes the category lookup", "[reference][
     auto const   loaded = load_with_emit("${abs:nope ?? typo.f(x=1)}", calls);
     INFO("result: " << result_text(loaded));
     REQUIRE_FALSE(loaded.has_value());
+    CHECK(loaded.error().code == nucleus::errc::unresolved_token);
     CHECK(loaded.error().message.find("takes no argument list") != std::string::npos);
     CHECK(loaded.error().message.find("unknown tree tokenizer category") == std::string::npos);
 }
@@ -142,6 +156,6 @@ TEST_CASE("floor text holding a dot and a parenthesis keeps its reading", "[refe
     require_result("${abs:nope ?? \"see.note(1)\"}", "see.note(1)");
     require_result("${abs:nope ?? \"a(b.c)\"}", "a(b.c)");
     require_result("${abs:nope ?? (a??b)}", "(a??b)");
-    require_result("${abs:nope ?? a(b.c)}",
+    require_failed("${abs:nope ?? a(b.c)}",
                    "reference resolution failed for 'a/v': unknown tree tokenizer category 'a(b'");
 }

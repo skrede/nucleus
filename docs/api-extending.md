@@ -539,13 +539,18 @@ Three outcomes are possible, and the second is the one to design for:
 
 - **An unbalanced `${` fails the load** with `unterminated ${ in value`, because
   the scan never finds the closing brace. When a quote opened inside the token is
-  still open where the text ends, the message names that quote and its offset:
+  still open where the text ends, and a `}` follows that quote, its run swallowed
+  the closing brace, and the message names the quote and its offset:
   `${abs:a/absent ?? it's}` fails with
-  `unterminated ${ in value: ' at offset 20 is never closed`. The offset counts
-  from 0 into the scanned text, which is the value itself, or a resolver's output
-  from its first `${`. The usual cause is an apostrophe in an unquoted fallback
-  arm, which opens a quoted run that swallows the closing brace; quote the arm
-  instead, as in `?? "it's"`.
+  `unterminated ${ in value: ' at offset 20 is never closed`. A value that only
+  lacks its `}`, such as `${env.HOME is Bob's dir`, gets the plain message,
+  whatever quote it leaves open. The offset counts from 0 into the scanned text:
+  the value itself, a resolver's or tokenizer's output from its first `${`, or a
+  first-pass function argument after its quotes are stripped. In
+  `${string.upper(value="${a'}")}` the reported offset is 3, counted inside
+  `${a'}`. The usual cause is an apostrophe in an unquoted fallback arm, which
+  opens a quoted run that swallows the closing brace; quote the arm instead, as
+  in `?? "it's"`.
 
 To carry text that merely resembles a token, quote it. A token whose only arm is
 a quoted literal — one run in single or double quotes spanning the whole

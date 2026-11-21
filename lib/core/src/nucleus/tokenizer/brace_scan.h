@@ -152,12 +152,12 @@ inline std::size_t open_quote_at_end(std::string_view text, std::size_t body_sta
     return quote_char != '\0' ? opened : std::string_view::npos;
 }
 
-// The parse error for a token opened just before body_start that never closes; it names
-// the quote still open at the end of text, whose run swallowed the closing brace.
+// The parse error for a token opened just before body_start that never closes; it names the
+// quote still open at the end of text only when a '}' follows it, swallowed by that quote's run.
 inline resolve_error unterminated_token_error(std::string_view text, std::size_t body_start)
 {
     std::size_t const quote = open_quote_at_end(text, body_start);
-    if(quote == std::string_view::npos)
+    if(quote == std::string_view::npos || text.find('}', quote) == std::string_view::npos)
         return resolve_error(resolve_errc::parse_error, "unterminated ${ in value");
     return resolve_error(resolve_errc::parse_error,
                          nucleus::format("unterminated ${{ in value: {} at offset {} is never closed", text[quote], quote));
