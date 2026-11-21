@@ -198,7 +198,7 @@ None.
 | `lib/core/include/nucleus/config_space.h` | 300 |
 | `lib/core/src/nucleus/resolve/chain_walker.h` | 288 |
 | `lib/core/src/nucleus/tokenizer/resolver_scope.cpp` | 285 |
-| `lib/core/src/nucleus/tokenizer/tree_resolver_scope.cpp` | 277 |
+| `lib/core/src/nucleus/tokenizer/tree_resolver_scope.cpp` | 280 |
 | `lib/core/src/nucleus/tokenizer/token_lexer.cpp` | 276 |
 | `lib/argv/include/nucleus/argv/multispace_argv_source.h` | 238 |
 | `lib/core/include/nucleus/schema/schema.h` | 218 |
@@ -322,9 +322,9 @@ sets the decomposition problem.
 | `lib/core/src/nucleus/resolve/chain_walker.h` | 2 | 94 |
 | `lib/argv/include/nucleus/argv/multispace_argv_source.h` | 1 | 86 |
 | `lib/core/src/nucleus/tokenizer/resolver_scope.cpp` | 3 | 69 |
+| `lib/core/src/nucleus/tokenizer/tree_resolver_scope.cpp` | 4 | 66 |
 | `lib/core/include/nucleus/schema/converters.h` | 2 | 65 |
 | `lib/core/src/nucleus/tokenizer/tokenizer.cpp` | 1 | 63 |
-| `lib/core/src/nucleus/tokenizer/tree_resolver_scope.cpp` | 4 | 63 |
 | `lib/core/src/nucleus/tokenizer/builtin_tokenizers.cpp` | 1 | 61 |
 | `lib/core/include/nucleus/query/schema_query_context.h` | 2 | 58 |
 | `lib/argv/include/nucleus/argv/cli_surface.h` | 1 | 57 |

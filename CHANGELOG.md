@@ -501,6 +501,12 @@ The first three change results *silently*.
   stays the fallback of a tree reference such as `${abs:a ?? "x"}`, and a `??`
   inside a quoted run, a nested token or an argument list belongs to that text:
   `${string.upper(value=a??b)}` still yields `A??B`.
+- **A tree-tokenizer token carrying an argument list is refused.** For a host tree
+  tokenizer `emit`, `${emit.f(x=1)}`, alone or as a `??` arm, now fails the load
+  with `errc::unresolved_token` (`takes no argument list`) before the resolver is
+  called, where 0.4.1 called the resolver for `emit.f` with the arguments silently
+  dropped. `${emit.f()}` is refused the same way. The refusal ends the chain, so
+  `${emit.f(x=1) ?? "y"}` fails rather than yielding `y`.
 
 ### Inheritance and document loading
 

@@ -453,6 +453,11 @@ struct tree_access
 using tree_field_resolver = std::function<token_result(const tree_access &)>;
 ```
 
+A tree-access token takes no argument list. `${server.port(x=1)}` or
+`${server.port()}` fails the load with `errc::unresolved_token` (`takes no
+argument list`) before the resolver runs, in any arm of a `??` chain, and the
+chain does not fall past it.
+
 ### Constructing and installing a tree tokenizer
 
 A `tree_tokenizer` takes a category string and a single wildcard resolver

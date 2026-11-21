@@ -397,7 +397,8 @@ server/url = ${rel:./host}:${rel:./port}
 a top-level `??`, such as `${env.NAME ?? "x"}`, fails the load with
 `errc::unresolved_token`. A `??` inside a quoted run, a nested token or an argument
 list belongs to that text, not to the outer token, so `${string.upper(value=a??b)}`
-yields `A??B`.
+yields `A??B`. An arm naming a tree tokenizer with an argument list, such as
+`?? server.port(x=1)`, fails the load rather than falling through.
 
 See [`examples/references/tree_references.cpp`](../examples/references/tree_references.cpp) for live
 demonstrations of `abs:`, `rel:`, `??`, and `${dir.path}`.

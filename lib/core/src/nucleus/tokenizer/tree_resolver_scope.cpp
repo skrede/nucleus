@@ -86,9 +86,9 @@ token_result tree_resolver_scope::resolve_value(std::string_view value_text)
 
 // An arm is read, in order, as a quoted literal (one run in either quote spanning
 // the whole arm), an abs:/rel: tree token, a category-named tree-tokenizer
-// dispatch (${category.field}), or the unquoted floor, which only a fallback arm
-// may reach. An unrecognized category returns unknown_category so the ?? chain
-// does NOT silently swallow typos.
+// dispatch (${category.field}, refused if it carries an argument list), or the
+// unquoted floor, which only a fallback arm may reach. An unrecognized category
+// returns unknown_category so the ?? chain does NOT silently swallow typos.
 token_result tree_resolver_scope::resolve_one_arm(std::string_view arm, bool is_fallback)
 {
     auto stripped = arm;
@@ -116,6 +116,9 @@ token_result tree_resolver_scope::resolve_one_arm(std::string_view arm, bool is_
             auto lexed = lex_token(as_token);
             if(lexed)
             {
+                if(lexed.value().is_function)
+                    return unexpected(resolve_error(resolve_errc::parse_error, nucleus::format(
+                        "tree tokenizer token '{}' takes no argument list", escaped_text(as_token))));
                 const std::string_view category = lexed.value().category;
                 const std::string_view field    = lexed.value().name;
                 if(m_tree_tokenizer == nullptr
