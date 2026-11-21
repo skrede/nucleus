@@ -209,9 +209,7 @@ that applies, not the 3.21 one:
 include(FetchContent)
 FetchContent_Declare(nucleus
     GIT_REPOSITORY https://github.com/skrede/nucleus.git
-    # the unreleased 0.4.2 line, pinned to the commit so a moved reference cannot
-    # change the build
-    GIT_TAG 438c7ce8435b84c6a97334ee7562fad48598ed5e)
+    GIT_TAG v0.4.2)
 FetchContent_MakeAvailable(nucleus)
 ```
 

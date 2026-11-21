@@ -8,7 +8,7 @@ change what building or installing nucleus does, or stop code that used an API f
 compiling; each entry says which. From 0.4.2 on, each release also lists its
 additions. Entries describe behavior, not internals.
 
-## 0.4.2 (unreleased)
+## 0.4.2
 
 This release makes the emitters honest. Where a previous version would render
 something other than what was resolved &mdash; an ambiguous record, an invalid XML
