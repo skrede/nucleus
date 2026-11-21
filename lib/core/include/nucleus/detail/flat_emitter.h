@@ -1,6 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_DETAIL_FLAT_EMITTER_H
 #define HPP_GUARD_NUCLEUS_DETAIL_FLAT_EMITTER_H
 
+#include "nucleus/detail/expected.h"
 #include "nucleus/detail/flat_anchor.h"
 #include "nucleus/detail/flat_record.h"
 

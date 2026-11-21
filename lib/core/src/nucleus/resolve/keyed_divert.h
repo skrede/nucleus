@@ -7,6 +7,7 @@
 #include "nucleus/error.h"
 #include "nucleus/format.h"
 #include "nucleus/expected.h"
+#include "nucleus/capability.h"
 
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/key_path.h"

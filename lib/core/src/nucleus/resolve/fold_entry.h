@@ -21,6 +21,7 @@
 
 #include "nucleus/schema/schema_registry.h"
 
+#include "nucleus/tokenizer/tokenizer.h"
 #include "nucleus/tokenizer/token_resolution.h"
 #include "nucleus/tokenizer/tokenizer_registry.h"
 #include "nucleus/tokenizer/substitution_budget.h"

@@ -7,6 +7,7 @@
 #include "nucleus/schema/schema_defined_nodes.h"
 
 #include "nucleus/format.h"
+#include "nucleus/expected.h"
 
 #include "nucleus/keyspace/key_path.h"
 

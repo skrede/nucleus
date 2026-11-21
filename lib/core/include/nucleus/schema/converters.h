@@ -33,9 +33,12 @@
 #define _GNU_SOURCE 1
 #endif
 
+#include "nucleus/schema/anchor.h"
 #include "nucleus/schema/schema.h"
 
 #include "nucleus/expected.h"
+
+#include "nucleus/detail/expected.h"
 
 #include <any>
 #include <cctype>

@@ -20,12 +20,15 @@
 #include "nucleus/expected.h"
 #include "nucleus/strain_scope.h"
 
+#include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/keyspace.h"
 #include "nucleus/keyspace/provenance.h"
 
 #include "nucleus/schema/schema_registry.h"
 #include "nucleus/schema/converter_registry.h"
 
+#include "nucleus/config_source/degradation.h"
+#include "nucleus/config_source/config_source.h"
 #include "nucleus/config_source/inherit_declaration.h"
 
 #include "nucleus/tokenizer/tokenizer_registry.h"

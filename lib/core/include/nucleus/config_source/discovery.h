@@ -2,6 +2,7 @@
 #define HPP_GUARD_NUCLEUS_CONFIG_SOURCE_DISCOVERY_H
 
 #include "nucleus/config_source/path_text.h"
+#include "nucleus/config_source/source_handle.h"
 #include "nucleus/config_source/extension_registry.h"
 
 #include <string>

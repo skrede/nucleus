@@ -6,6 +6,7 @@
 
 #include "nucleus/error.h"
 #include "nucleus/expected.h"
+#include "nucleus/identity.h"
 #include "nucleus/config_node.h"
 
 #include <string>

@@ -3,6 +3,7 @@
 
 #include "nucleus/error.h"
 #include "nucleus/format.h"
+#include "nucleus/expected.h"
 
 #include "nucleus/config_source/config_source.h"
 

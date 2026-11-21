@@ -15,6 +15,8 @@
 
 #include "nucleus/utility/escaped_text.h"
 
+#include "nucleus/detail/expected.h"
+
 #include <map>
 #include <set>
 #include <string>

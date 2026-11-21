@@ -1,9 +1,12 @@
 #include "nucleus/tokenizer/brace_scan.h"
+#include "nucleus/tokenizer/tree_tokenizer.h"
 #include "nucleus/tokenizer/tree_resolver_scope.h"
 
 #include "nucleus/format.h"
 
 #include "nucleus/utility/escaped_text.h"
+
+#include "nucleus/keyspace/value.h"
 
 #include <string>
 #include <vector>

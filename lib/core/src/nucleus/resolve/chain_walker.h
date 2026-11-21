@@ -4,9 +4,11 @@
 #include "nucleus/error.h"
 #include "nucleus/format.h"
 #include "nucleus/expected.h"
+#include "nucleus/capability.h"
 
 #include "nucleus/schema/projection.h"
 
+#include "nucleus/config_source/config_source.h"
 #include "nucleus/config_source/source_handle.h"
 #include "nucleus/config_source/inherit_declaration.h"
 

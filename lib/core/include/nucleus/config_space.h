@@ -19,11 +19,14 @@
 #include "nucleus/config_source/feature_gate.h"
 #include "nucleus/config_source/source_stack.h"
 #include "nucleus/config_source/config_source.h"
+#include "nucleus/config_source/source_handle.h"
 #include "nucleus/config_source/inherit_declaration.h"
 
 #include "nucleus/config_source/argv/key_recognizer.h"
 
 #include "nucleus/diagnostics/conflict_report.h"
+
+#include "nucleus/keyspace/key_path.h"
 
 #include <any>
 #include <span>

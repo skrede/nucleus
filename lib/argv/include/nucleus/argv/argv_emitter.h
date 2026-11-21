@@ -3,13 +3,17 @@
 
 #include "nucleus/argv/detail/argv_key_render.h"
 
+#include "nucleus/error.h"
 #include "nucleus/config.h"
+#include "nucleus/expected.h"
 #include "nucleus/config_space.h"
 
 #include "nucleus/detail/flat_emitter.h"
 #include "nucleus/detail/emitter_delivery.h"
 
 #include "nucleus/schema/cli_flag.h"
+
+#include "nucleus/keyspace/key_path.h"
 
 #include <string>
 #include <ostream>

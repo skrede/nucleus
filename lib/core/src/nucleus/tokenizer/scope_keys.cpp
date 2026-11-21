@@ -1,6 +1,8 @@
 #include "nucleus/tokenizer/scope_keys.h"
+#include "nucleus/tokenizer/resolve_error.h"
 
 #include "nucleus/format.h"
+#include "nucleus/expected.h"
 
 #include "nucleus/config_source/path_text.h"
 

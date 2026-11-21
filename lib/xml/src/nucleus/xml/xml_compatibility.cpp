@@ -1,6 +1,10 @@
 #include "nucleus/xml/xml_rendering.h"
 
+#include "nucleus/error.h"
+#include "nucleus/config.h"
 #include "nucleus/format.h"
+#include "nucleus/expected.h"
+#include "nucleus/config_space.h"
 
 #include "nucleus/schema/schema.h"
 

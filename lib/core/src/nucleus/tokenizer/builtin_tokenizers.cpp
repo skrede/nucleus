@@ -1,7 +1,10 @@
+#include "nucleus/tokenizer/named_args.h"
+#include "nucleus/tokenizer/resolve_error.h"
 #include "nucleus/tokenizer/tokenizer_builder.h"
 #include "nucleus/tokenizer/builtin_tokenizers.h"
 
 #include "nucleus/format.h"
+#include "nucleus/expected.h"
 
 #include <cctype>
 #include <string>

@@ -3,7 +3,9 @@
 
 #include "nucleus/env/detail/env_key_render.h"
 
+#include "nucleus/error.h"
 #include "nucleus/config.h"
+#include "nucleus/expected.h"
 #include "nucleus/config_space.h"
 
 #include "nucleus/detail/flat_emitter.h"

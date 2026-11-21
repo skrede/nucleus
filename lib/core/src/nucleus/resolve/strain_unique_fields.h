@@ -12,6 +12,7 @@
 #include "nucleus/keyspace/key_path.h"
 #include "nucleus/keyspace/keyspace.h"
 
+#include "nucleus/schema/schema.h"
 #include "nucleus/schema/schema_registry.h"
 
 #include <map>

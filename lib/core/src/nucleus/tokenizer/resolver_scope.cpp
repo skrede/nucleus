@@ -1,4 +1,5 @@
 #include "nucleus/tokenizer/brace_scan.h"
+#include "nucleus/tokenizer/named_args.h"
 #include "nucleus/tokenizer/scope_keys.h"
 #include "nucleus/tokenizer/token_lexer.h"
 #include "nucleus/tokenizer/resolver_scope.h"

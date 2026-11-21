@@ -1,6 +1,8 @@
 #ifndef HPP_GUARD_NUCLEUS_DETAIL_EMITTER_DELIVERY_H
 #define HPP_GUARD_NUCLEUS_DETAIL_EMITTER_DELIVERY_H
 
+#include "nucleus/detail/expected.h"
+
 #include "nucleus/error.h"
 #include "nucleus/expected.h"
 

@@ -2,9 +2,12 @@
 #define HPP_GUARD_NUCLEUS_TOKENIZER_TREE_TOKENIZER_H
 
 #include "nucleus/tokenizer/tokenizer.h"
+#include "nucleus/tokenizer/resolve_error.h"
 
 #include "nucleus/keyspace/key_path.h"
 #include "nucleus/keyspace/keyspace.h"
+
+#include "nucleus/expected.h"
 
 #include <string>
 #include <utility>

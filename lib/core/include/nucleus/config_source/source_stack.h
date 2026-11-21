@@ -2,6 +2,7 @@
 #define HPP_GUARD_NUCLEUS_CONFIG_SOURCE_SOURCE_STACK_H
 
 #include "nucleus/config_source/source_handle.h"
+#include "nucleus/config_source/source_concept.h"
 
 #include <span>
 #include <vector>

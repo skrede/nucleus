@@ -2,12 +2,16 @@
 #define HPP_GUARD_NUCLEUS_RESOLVE_PKEY_TREE_TOKENIZER_H
 
 #include "nucleus/format.h"
+#include "nucleus/expected.h"
 
+#include "nucleus/keyspace/value.h"
 #include "nucleus/keyspace/key_path.h"
 #include "nucleus/keyspace/keyspace.h"
 
 #include "nucleus/schema/schema.h"
 
+#include "nucleus/tokenizer/tokenizer.h"
+#include "nucleus/tokenizer/resolve_error.h"
 #include "nucleus/tokenizer/tree_tokenizer.h"
 
 #include <string>

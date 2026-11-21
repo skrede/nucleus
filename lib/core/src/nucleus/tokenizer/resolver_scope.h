@@ -2,6 +2,7 @@
 #define HPP_GUARD_NUCLEUS_TOKENIZER_RESOLVER_SCOPE_H
 
 #include "nucleus/tokenizer/tokenizer.h"
+#include "nucleus/tokenizer/named_args.h"
 #include "nucleus/tokenizer/scope_frame.h"
 #include "nucleus/tokenizer/resolve_error.h"
 #include "nucleus/tokenizer/expansion_guard.h"

@@ -6,6 +6,7 @@
 
 #include "nucleus/error.h"
 #include "nucleus/format.h"
+#include "nucleus/expected.h"
 #include "nucleus/log_sink.h"
 #include "nucleus/capability.h"
 
@@ -18,6 +19,8 @@
 #include "nucleus/config_source/argv/key_recognizer.h"
 
 #include "nucleus/utility/escaped_text.h"
+
+#include "nucleus/schema/cli_flag.h"
 
 #include <string>
 #include <vector>

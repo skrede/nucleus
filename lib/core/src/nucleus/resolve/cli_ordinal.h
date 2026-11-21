@@ -9,6 +9,7 @@
 
 #include "nucleus/keyspace/entry.h"
 #include "nucleus/keyspace/value.h"
+#include "nucleus/keyspace/key_path.h"
 #include "nucleus/keyspace/keyspace.h"
 #include "nucleus/keyspace/provenance.h"
 

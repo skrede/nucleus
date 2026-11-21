@@ -1,6 +1,7 @@
 #ifndef HPP_GUARD_NUCLEUS_SCHEMA_INSTANCE_PATHS_H
 #define HPP_GUARD_NUCLEUS_SCHEMA_INSTANCE_PATHS_H
 
+#include "nucleus/schema/schema.h"
 #include "nucleus/schema/schema_registry.h"
 
 #include "nucleus/keyspace/key_path.h"

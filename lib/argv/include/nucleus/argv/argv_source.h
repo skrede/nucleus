@@ -17,6 +17,8 @@
 
 #include "nucleus/config_source/argv/key_recognizer.h"
 
+#include "nucleus/schema/cli_flag.h"
+
 #include <string>
 #include <vector>
 #include <utility>

@@ -5,6 +5,10 @@
 
 #include "nucleus/error.h"
 #include "nucleus/format.h"
+#include "nucleus/expected.h"
+#include "nucleus/identity.h"
+#include "nucleus/log_sink.h"
+#include "nucleus/capability.h"
 #include "nucleus/config_space.h"
 #include "nucleus/strain_scope.h"
 #include "nucleus/registration_policy.h"
@@ -13,8 +17,14 @@
 
 #include "nucleus/completion/completion_generator.h"
 
+#include "nucleus/schema/anchor.h"
+#include "nucleus/schema/schema.h"
+#include "nucleus/schema/cli_flag.h"
+#include "nucleus/schema/projection.h"
+#include "nucleus/schema/identity_group.h"
 #include "nucleus/schema/schema_enforcer.h"
 #include "nucleus/schema/schema_registry.h"
+#include "nucleus/schema/constraint_group.h"
 #include "nucleus/schema/converter_registry.h"
 #include "nucleus/schema/capability_requirements.h"
 
@@ -26,6 +36,15 @@
 #include "nucleus/tokenizer/tree_tokenizer_registry.h"
 
 #include "nucleus/utility/escaped_text.h"
+
+#include "nucleus/config_source/argv/key_recognizer.h"
+
+#include "nucleus/config_source/degradation.h"
+#include "nucleus/config_source/feature_gate.h"
+#include "nucleus/config_source/source_stack.h"
+#include "nucleus/config_source/source_handle.h"
+
+#include "nucleus/registry/registration.h"
 
 #include <map>
 #include <span>

@@ -1,8 +1,13 @@
 #include "nucleus/query/query.h"
+#include "nucleus/query/schema_query_context.h"
 
+#include "nucleus/schema/identity_group.h"
 #include "nucleus/schema/keyref_candidate_index.h"
 
+#include "nucleus/error.h"
 #include "nucleus/format.h"
+#include "nucleus/expected.h"
+#include "nucleus/config_node.h"
 
 #include <string>
 #include <string_view>

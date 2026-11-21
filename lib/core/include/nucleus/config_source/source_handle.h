@@ -3,6 +3,9 @@
 
 #include "nucleus/config_source/config_source.h"
 #include "nucleus/config_source/source_concept.h"
+#include "nucleus/config_source/inherit_declaration.h"
+
+#include "nucleus/capability.h"
 
 #include <memory>
 #include <cassert>

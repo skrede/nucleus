@@ -8,6 +8,8 @@
 
 #include "nucleus/schema/cli_flag.h"
 
+#include "nucleus/keyspace/key_path.h"
+
 #include <string>
 #include <string_view>
 

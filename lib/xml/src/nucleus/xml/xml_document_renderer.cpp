@@ -1,7 +1,12 @@
 #include "nucleus/xml/xml_grammar.h"
 #include "nucleus/xml/xml_rendering.h"
 
+#include "nucleus/error.h"
+#include "nucleus/config.h"
 #include "nucleus/format.h"
+#include "nucleus/expected.h"
+
+#include "nucleus/keyspace/key_path.h"
 
 #include <set>
 #include <string>

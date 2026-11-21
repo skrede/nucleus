@@ -3,7 +3,9 @@
 #include "xml_reader.h"
 #include "inherit_attr_rule.h"
 
+#include "nucleus/error.h"
 #include "nucleus/format.h"
+#include "nucleus/expected.h"
 #include "nucleus/capability.h"
 
 #include "nucleus/config_source/inherit_declaration.h"

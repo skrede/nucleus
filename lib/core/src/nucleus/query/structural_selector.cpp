@@ -1,6 +1,8 @@
 #include "nucleus/query/query.h"
+#include "nucleus/query/schema_query_context.h"
 
 #include "nucleus/config.h"
+#include "nucleus/config_node.h"
 
 #include "nucleus/keyspace/key_path.h"
 

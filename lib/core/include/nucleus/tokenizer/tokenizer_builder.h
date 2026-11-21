@@ -2,6 +2,7 @@
 #define HPP_GUARD_NUCLEUS_TOKENIZER_TOKENIZER_BUILDER_H
 
 #include "nucleus/tokenizer/tokenizer.h"
+#include "nucleus/tokenizer/named_args.h"
 
 #include <string>
 #include <vector>

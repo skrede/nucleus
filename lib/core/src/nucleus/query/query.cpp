@@ -1,5 +1,7 @@
 #include "nucleus/query/query.h"
 
+#include "nucleus/identity.h"
+
 #include <string>
 #include <vector>
 #include <utility>

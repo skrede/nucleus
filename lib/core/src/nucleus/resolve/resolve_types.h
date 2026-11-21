@@ -4,6 +4,7 @@
 #include "nucleus/error.h"
 #include "nucleus/identity.h"
 
+#include "nucleus/config_source/config_source.h"
 #include "nucleus/config_source/source_handle.h"
 #include "nucleus/config_source/inherit_declaration.h"
 

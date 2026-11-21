@@ -2,6 +2,9 @@
 #define HPP_GUARD_NUCLEUS_CONFIG_SOURCE_SOURCE_CONCEPT_H
 
 #include "nucleus/config_source/config_source.h"
+#include "nucleus/config_source/inherit_declaration.h"
+
+#include "nucleus/capability.h"
 
 #include <concepts>
 

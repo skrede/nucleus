@@ -6,6 +6,8 @@
 
 #include "nucleus/schema/projection.h"
 
+#include "nucleus/capability.h"
+
 #include <memory>
 #include <string>
 #include <utility>

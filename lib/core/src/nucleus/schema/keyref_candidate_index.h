@@ -5,6 +5,7 @@
 #include "nucleus/schema/instance_paths.h"
 
 #include "nucleus/config.h"
+#include "nucleus/config_node.h"
 
 #include "nucleus/keyspace/key_path.h"
 

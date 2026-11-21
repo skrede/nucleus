@@ -190,17 +190,17 @@ None.
 
 | File | Lines |
 |---|---|
-| `lib/core/src/nucleus/resolve/configuration_space.cpp` | 652 |
-| `lib/xml/src/nucleus/xml/xml_source.cpp` | 634 |
+| `lib/core/src/nucleus/resolve/configuration_space.cpp` | 671 |
+| `lib/xml/src/nucleus/xml/xml_source.cpp` | 636 |
 | `lib/core/include/nucleus/detail/expected.h` | 543 |
 | `lib/core/include/nucleus/config.h` | 495 |
-| `lib/core/include/nucleus/schema/converters.h` | 389 |
-| `lib/core/include/nucleus/config_space.h` | 297 |
-| `lib/core/src/nucleus/resolve/chain_walker.h` | 286 |
+| `lib/core/include/nucleus/schema/converters.h` | 392 |
+| `lib/core/include/nucleus/config_space.h` | 300 |
+| `lib/core/src/nucleus/resolve/chain_walker.h` | 288 |
+| `lib/core/src/nucleus/tokenizer/tree_resolver_scope.cpp` | 278 |
 | `lib/core/src/nucleus/tokenizer/token_lexer.cpp` | 276 |
-| `lib/core/src/nucleus/tokenizer/tree_resolver_scope.cpp` | 275 |
-| `lib/core/src/nucleus/tokenizer/resolver_scope.cpp` | 272 |
-| `lib/argv/include/nucleus/argv/multispace_argv_source.h` | 235 |
+| `lib/core/src/nucleus/tokenizer/resolver_scope.cpp` | 273 |
+| `lib/argv/include/nucleus/argv/multispace_argv_source.h` | 238 |
 | `lib/core/include/nucleus/schema/schema.h` | 218 |
 
 ## Carried — test files over the 200-line ceiling

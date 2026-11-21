@@ -1,3 +1,4 @@
+#include "nucleus/completion/completion.h"
 #include "nucleus/completion/zsh_emitter.h"
 #include "nucleus/completion/bash_emitter.h"
 #include "nucleus/completion/program_token.h"
@@ -12,6 +13,9 @@
 #include "nucleus/keyspace/key_path.h"
 
 #include "nucleus/utility/display_controls.h"
+
+#include "nucleus/error.h"
+#include "nucleus/expected.h"
 
 #include <map>
 #include <string>
