@@ -197,9 +197,9 @@ None.
 | `lib/core/include/nucleus/schema/converters.h` | 392 |
 | `lib/core/include/nucleus/config_space.h` | 300 |
 | `lib/core/src/nucleus/resolve/chain_walker.h` | 288 |
-| `lib/core/src/nucleus/tokenizer/tree_resolver_scope.cpp` | 278 |
+| `lib/core/src/nucleus/tokenizer/tree_resolver_scope.cpp` | 277 |
 | `lib/core/src/nucleus/tokenizer/token_lexer.cpp` | 276 |
-| `lib/core/src/nucleus/tokenizer/resolver_scope.cpp` | 273 |
+| `lib/core/src/nucleus/tokenizer/resolver_scope.cpp` | 272 |
 | `lib/argv/include/nucleus/argv/multispace_argv_source.h` | 238 |
 | `lib/core/include/nucleus/schema/schema.h` | 218 |
 

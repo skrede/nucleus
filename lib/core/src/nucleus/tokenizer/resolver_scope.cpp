@@ -226,9 +226,8 @@ token_result resolver_scope::resolve_all(std::string_view input)
             // legitimate literal remainder), or a ${ opened but never balanced.
             // A surviving ${ at or after pos means the latter -- fail loudly with
             // the same contract pass-2 raises, instead of emitting raw ${ text.
-            if(input.find("${", pos) != std::string_view::npos)
-                return unexpected(resolve_error(resolve_errc::parse_error,
-                                          "unterminated ${ in value"));
+            if(auto const start = input.find("${", pos); start != std::string_view::npos)
+                return unexpected(unterminated_token_error(input, start + 2));
             result.append(input.substr(pos));
             break;
         }

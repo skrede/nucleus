@@ -526,6 +526,13 @@ The first three change results *silently*.
   program name as an escape such as `\x1b`, so the text cannot drive the terminal
   that shows it. Under a concrete repeated anchor it now lists the flags beneath
   the anchor.
+- **A token that never closes names the quote left open.** When a `'` or `"`
+  opened inside a token is still open where the value ends, the load error says
+  so: `${abs:a/absent ?? it's}` fails with
+  `unterminated ${ in value: ' at offset 20 is never closed`, where 0.4.1
+  reported the bare `unterminated ${ in value`. The offset counts from 0 into the
+  value, or into a resolver's output from its first `${`. A host matching the old
+  text by prefix still matches.
 
 ### Schema API
 

@@ -1,6 +1,10 @@
 #ifndef HPP_GUARD_NUCLEUS_TOKENIZER_BRACE_SCAN_H
 #define HPP_GUARD_NUCLEUS_TOKENIZER_BRACE_SCAN_H
 
+#include "nucleus/tokenizer/resolve_error.h"
+
+#include "nucleus/format.h"
+
 #include <vector>
 #include <cstddef>
 #include <cstdint>
@@ -92,6 +96,33 @@ inline std::size_t find_top_level(std::string_view text, std::string_view needle
             ++i;
     }
     return std::string_view::npos;
+}
+
+// The index of the quote opening the run still open at the end of text, scanning from
+// body_start, or npos when every run closes.
+inline std::size_t open_quote_at_end(std::string_view text, std::size_t body_start)
+{
+    char        quote_char{};
+    std::size_t opened = std::string_view::npos;
+    for(std::size_t i = body_start; i < text.size(); ++i)
+    {
+        char const before = quote_char;
+        track_quote(text[i], quote_char);
+        if(before != quote_char && quote_char != '\0')
+            opened = i;
+    }
+    return quote_char != '\0' ? opened : std::string_view::npos;
+}
+
+// The parse error for a token opened just before body_start that never closes; it names
+// the quote still open at the end of text, whose run swallowed the closing brace.
+inline resolve_error unterminated_token_error(std::string_view text, std::size_t body_start)
+{
+    std::size_t const quote = open_quote_at_end(text, body_start);
+    if(quote == std::string_view::npos)
+        return resolve_error(resolve_errc::parse_error, "unterminated ${ in value");
+    return resolve_error(resolve_errc::parse_error,
+                         nucleus::format("unterminated ${{ in value: {} at offset {} is never closed", text[quote], quote));
 }
 
 // Splits body on each top-level '??', trimming blanks from every arm; a body with

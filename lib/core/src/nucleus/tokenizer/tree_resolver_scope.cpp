@@ -53,8 +53,7 @@ token_result tree_resolver_scope::resolve_value(std::string_view value_text)
 
         auto const close = scan_braced_span(value_text, open + 2);
         if(close == std::string_view::npos)
-            return unexpected(resolve_error(resolve_errc::parse_error,
-                                      "unterminated ${ in value"));
+            return unexpected(unterminated_token_error(value_text, open + 2));
 
         const std::string_view token_body = value_text.substr(open + 2, close - open - 2);
         pos = close + 1;

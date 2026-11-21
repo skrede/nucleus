@@ -87,3 +87,35 @@ TEST_CASE("a ?? inside a quoted arm does not split it, in either quote", "[refer
     CHECK(fallback_value("\"it's\" ?? \"x\"") == "it's");
     CHECK(fallback_value("a???b") == "a");
 }
+
+TEST_CASE("an apostrophe left open in a bare fallback arm is named with its offset",
+          "[reference][quoting]")
+{
+    std::string const message = fallback_value("it's");
+    INFO(message);
+    CHECK(message.find("unterminated ${ in value: ' at offset 20 is never closed") != std::string::npos);
+}
+
+TEST_CASE("a tree tokenizer's output with an open apostrophe reports it in the same words",
+          "[reference][quoting]")
+{
+    std::string const message = produced_value("${abs:x ?? it's}");
+    INFO(message);
+    CHECK(message.find("unterminated ${ in value: ' at offset 13 is never closed") != std::string::npos);
+}
+
+TEST_CASE("a double quote left open in a bare fallback arm is named with its offset",
+          "[reference][quoting]")
+{
+    std::string const message = fallback_value("\"x");
+    INFO(message);
+    CHECK(message.find("unterminated ${ in value: \" at offset 18 is never closed") != std::string::npos);
+}
+
+TEST_CASE("an unbalanced brace with no open quote keeps the plain message", "[reference][quoting]")
+{
+    std::string const message = produced_value("${abs:x");
+    INFO(message);
+    CHECK(message.find("unterminated ${ in value") != std::string::npos);
+    CHECK(message.find("never closed") == std::string::npos);
+}
