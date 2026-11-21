@@ -34,9 +34,9 @@ inline constexpr std::string_view zsh_walker_head = R"({
         if [[ -n $digits ]]; then
 )";
 
-// The walker reads the caller's `inserts_quoted` by zsh's dynamic scoping, as it appends to the caller's `ordinal_specs`.
+// The walker reads the caller's `inserts_guarded` by zsh's dynamic scoping, as it appends to the caller's `ordinal_specs`.
 inline constexpr std::string_view zsh_walker_tail = R"(            name+=$digits; rest=${rest#"$digits"}; filled+=1
-        elif [[ -z $rest ]] && (( inserts_quoted )); then
+        elif [[ -z $rest ]] && (( inserts_guarded )); then
             name+='\*'
         else
             return 1

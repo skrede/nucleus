@@ -68,10 +68,10 @@ private:
     {
         if(!guarded(model))
             return "";
-        std::string out = "    local -a quoted_specs\n    local -i inserts_quoted=0\n    is-at-least 5.9 && inserts_quoted=1\n";
+        std::string out = "    local -a guarded_specs\n    local -i inserts_guarded=0\n    is-at-least 5.9 && inserts_guarded=1\n";
         if(has_ordinal_options(model))
             out += std::string(detail::zsh_ordinal_locals) + detail::zsh_ordinal_calls(fn, model, false);
-        out += "    if (( inserts_quoted )); then\n" + detail::zsh_ordinal_calls(fn, model, true) + "        quoted_specs=(\n";
+        out += "    if (( inserts_guarded )); then\n" + detail::zsh_ordinal_calls(fn, model, true) + "        guarded_specs=(\n";
         for(const completion_option &option : model.options)
         {
             if(guarded_spec(option))
@@ -98,7 +98,7 @@ private:
                 out += (out.empty() ? "        " : " \\\n        ") + detail::zsh_single_quote(detail::zsh_spec(option));
         }
         if(guarded(model))
-            out += (out.empty() ? "        " : " \\\n        ") + std::string("\"${quoted_specs[@]}\"");
+            out += (out.empty() ? "        " : " \\\n        ") + std::string("\"${guarded_specs[@]}\"");
         return out.empty() ? out : out + "\n";
     }
 

@@ -85,10 +85,10 @@ TEST_CASE("a flag holding a byte outside printable, non-syntax ASCII is offered 
     const std::string zsh = zsh_emitter{}.emit({"myapp", {{"--a", "d", {}, {}}, {"--b$c", "d", {}, {}}}});
     REQUIRE(zsh.find("do not edit by hand.\nautoload -Uz is-at-least\n_nucleus_myapp()\n") != std::string::npos);
     REQUIRE(zsh.find("is-at-least\n") == zsh.rfind("is-at-least\n"));
-    REQUIRE(zsh.find("    if (( inserts_quoted )); then\n        quoted_specs=(\n            '--b\\$c[d]'\n        )\n    fi\n") != std::string::npos);
+    REQUIRE(zsh.find("    if (( inserts_guarded )); then\n        guarded_specs=(\n            '--b\\$c[d]'\n        )\n    fi\n") != std::string::npos);
     REQUIRE(zsh.find("--b\\$c") == zsh.rfind("--b\\$c"));
-    REQUIRE(zsh.find("    _arguments -s \\\n        '--a[d]' \\\n        \"${quoted_specs[@]}\"\n}\n") != std::string::npos);
-    REQUIRE(zsh_emitter{}.emit({"myapp", {{"--b$c", "d", {}, {}}}}).find("    _arguments -s \\\n        \"${quoted_specs[@]}\"\n}\n") != std::string::npos);
+    REQUIRE(zsh.find("    _arguments -s \\\n        '--a[d]' \\\n        \"${guarded_specs[@]}\"\n}\n") != std::string::npos);
+    REQUIRE(zsh_emitter{}.emit({"myapp", {{"--b$c", "d", {}, {}}}}).find("    _arguments -s \\\n        \"${guarded_specs[@]}\"\n}\n") != std::string::npos);
     REQUIRE(zsh_emitter{}.emit({"myapp", {{"--a", "d", {}, {}}}}).find("is-at-least") == std::string::npos);
 }
 

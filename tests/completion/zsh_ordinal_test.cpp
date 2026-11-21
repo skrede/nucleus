@@ -86,7 +86,7 @@ _nucleus_myapp-ordinal()
         if [[ -n $digits ]]; then
 )zsh" + bound_check +
         R"zsh(            name+=$digits; rest=${rest#"$digits"}; filled+=1
-        elif [[ -z $rest ]] && (( inserts_quoted )); then
+        elif [[ -z $rest ]] && (( inserts_guarded )); then
             name+='\*'
         else
             return 1
@@ -96,15 +96,15 @@ _nucleus_myapp-ordinal()
 }
 _nucleus_myapp()
 {
-    local -a quoted_specs
-    local -i inserts_quoted=0
-    is-at-least 5.9 && inserts_quoted=1
+    local -a guarded_specs
+    local -i inserts_guarded=0
+    is-at-least 5.9 && inserts_guarded=1
     local -a ordinal_specs
     local ordinal_word=${(Q)${PREFIX%%=*}}
     _nucleus_myapp-ordinal "$ordinal_word" '=[]:value:(debug info)' '--cluster-node-' '--cluster-node-' '-level' '-level'
     _nucleus_myapp-ordinal "$ordinal_word" '[]' '--cluster-node-' '--cluster-node-' '-port' '-port'
-    if (( inserts_quoted )); then
-        quoted_specs=(
+    if (( inserts_guarded )); then
+        guarded_specs=(
             '--cluster-node-\*-level[]'
             '--cluster-node-\*-port[]'
         )
@@ -114,7 +114,7 @@ _nucleus_myapp()
         '--cluster-node[]' \
         '--cluster-node-level=[]:value:(debug info)' \
         '--cluster-node-port[]' \
-        "${quoted_specs[@]}"
+        "${guarded_specs[@]}"
 }
 if [ "$funcstack[1]" = "_nucleus_myapp" ] && [ "${zsh_eval_context[-1]}" != file ]; then _nucleus_myapp "$@"; else compdef _nucleus_myapp myapp; fi
 )zsh";
@@ -144,8 +144,8 @@ TEST_CASE("the walker receives the static spec's tail and each raw piece beside 
 TEST_CASE("the static spec of a slotted option takes no value", "[completion][ordinal]")
 {
     const std::vector<walker_row> rows{
-            {{"--cluster-node-*-level", "lvl", {"debug", "info"}, {15}}, "        quoted_specs=(\n            '--cluster-node-\\*-level[lvl]'\n        )\n"},
-            {{"--cluster-node-*-y-", "xv", {"v"}, {15}}, "        quoted_specs=(\n            '--cluster-node-\\*-y\\-[xv]'\n        )\n"},
+            {{"--cluster-node-*-level", "lvl", {"debug", "info"}, {15}}, "        guarded_specs=(\n            '--cluster-node-\\*-level[lvl]'\n        )\n"},
+            {{"--cluster-node-*-y-", "xv", {"v"}, {15}}, "        guarded_specs=(\n            '--cluster-node-\\*-y\\-[xv]'\n        )\n"},
     };
     for(const walker_row &row : rows)
     {
