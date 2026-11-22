@@ -497,7 +497,11 @@ The first three change results *silently*.
   load with `errc::unresolved_token` and the message `?? is the tree-reference
   (pass-2) fallback operator; pass-1 token '${env.NAME ?? "x"}' cannot use it`.
   0.4.1 looked up an environment variable literally named `NAME ?? "x"` and
-  reported it as not set, so the fallback the text asks for never applied. `??`
+  reported it as not set, so the fallback the text asks for never applied. That
+  load failed in 0.4.1 as well, with the same code, so only the message changes.
+  A host first-pass tokenizer `host` whose wildcard resolver answers any name was
+  handed the name `NAME ?? "x"` in 0.4.1 and loaded, so for it
+  `${host.NAME ?? "x"}` is a case where a clean load now fails. `??`
   stays the fallback of a tree reference such as `${abs:a ?? "x"}`, and a `??`
   inside a quoted run, a nested token or an argument list belongs to that text:
   `${string.upper(value=a??b)}` still yields `A??B`.
@@ -507,10 +511,15 @@ The first three change results *silently*.
   called, where 0.4.1 called the resolver for `emit.f` with the arguments silently
   dropped. `${emit.f()}` is refused the same way. The refusal ends the chain, so
   `${emit.f(x=1) ?? "y"}` fails rather than yielding `y`. A `??` inside the
-  argument list no longer splits the arm, so `${abs:a/missing ?? emit.f(x=a??b)}`
-  is refused whole where 0.4.1 split it and yielded `emit.f(x=a`, a silent value
-  change; `${abs:a/missing ?? (a??b)}` now yields `(a??b)` where 0.4.1 yielded
-  `(a`, and a `(` left unclosed holds the rest of the body in its arm. An unquoted
+  argument list no longer splits the arm. `${abs:a/missing ?? emit.f(x=a??b)}` is
+  refused whole where 0.4.1 split it and yielded `emit.f(x=a`, so a clean load now
+  fails. `${abs:a/missing ?? (a??b)}` now yields `(a??b)` where 0.4.1 yielded
+  `(a`, a silent value change. A `(` left unclosed holds the rest of the body,
+  every later `??` included, in its arm: `${abs:a/missing ?? a(b ?? c}` now yields
+  `a(b ?? c` where 0.4.1 yielded `a(b`, again without a diagnostic, and in the
+  first arm of an `abs:` or `rel:` reference it takes the fallback with it, so
+  `${abs:a(b ?? "x"}` now fails the load with `errc::unresolved_token`
+  (`absent reference target`) where 0.4.1 yielded `x`. An unquoted
   arm holding a dot is read as a tree-tokenizer dispatch, and one with a `(` after
   the dot is now refused even when its list does not parse: `?? see.note(1)` no
   longer yields `see.note(1)` from the floor. Quote floor text that contains a dot,
