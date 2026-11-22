@@ -90,13 +90,13 @@ inline bool zsh_walker_outside_safe_ascii(const completion_option &option)
                                { return zsh_flag_outside_safe_ascii(piece); });
 }
 
-inline std::string zsh_ordinal_calls(const std::string &function, const completion_model &model, bool quoted)
+inline std::string zsh_ordinal_calls(const std::string &function, const completion_model &model, bool guarded)
 {
-    const std::string indent = quoted ? "        " : "    ";
+    const std::string indent = guarded ? "        " : "    ";
     std::string       out;
     for(const completion_option &option : model.options)
     {
-        if(has_ordinal_slots(option) && zsh_walker_outside_safe_ascii(option) == quoted)
+        if(has_ordinal_slots(option) && zsh_walker_outside_safe_ascii(option) == guarded)
             out += indent + zsh_ordinal_call(function, option);
     }
     return out;
