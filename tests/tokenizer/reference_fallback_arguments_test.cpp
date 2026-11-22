@@ -159,3 +159,21 @@ TEST_CASE("floor text holding a dot and a parenthesis keeps its reading", "[refe
     require_failed("${abs:nope ?? a(b.c)}",
                    "reference resolution failed for 'a/v': unknown tree tokenizer category 'a(b'");
 }
+
+TEST_CASE("an unclosed parenthesis in a fallback arm holds the rest of the body",
+          "[reference][fallback]")
+{
+    require_result("${abs:nope ?? a(b ?? c}", "a(b ?? c");
+    require_result("${rel:nope ?? a(b ?? c}", "a(b ?? c");
+}
+
+TEST_CASE("an unclosed parenthesis in the first arm takes the fallback with it and the load fails",
+          "[reference][fallback]")
+{
+    require_failed("${abs:a(b ?? \"x\"}",
+                   "reference resolution failed for 'a/v': "
+                   "absent reference target 'a(b ?? \"x\"'");
+    require_failed("${rel:a(b ?? \"x\"}",
+                   "reference resolution failed for 'a/v': "
+                   "absent relative reference target 'a/a(b ?? \"x\"'");
+}
